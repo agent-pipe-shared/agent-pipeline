@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-T3b-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "a871ff37d3a4a484bce12f18e91b6165ce23524d"
+  ],
+  "resultSha256": "d277f0b872a010100f839e9a0a2d9d68bb540ea759447daef8d047b1b4fbf5f9",
+  "report": {
+    "text": "WIN-AP-T3b-20261009: completed (implementation complete; independent review: pending; PO acceptance pending). Not a closing-allowance handover: the work finished well inside the base cap.\n\nBootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded; Project Agent-Pipeline; State briefing WIN-AP-T3b-20261009; Role Goldfish.\nRoute pre-check: the class is test-only (QG-04), not A/G/S, so the mandatory-escalation check does not apply. Requested from field 6: goldfish-deep, tool-layer model sonnet (Sonnet 5.5, effort xhigh). Observed from this dispatch's runtime prompt: \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- All six WIN-AP-T3 pins green on WSL, run order unchanged: passed. wsl-after.txt TAP lines 677-714 show ok for F1-win32 seam (30), F1-POSIX seam (31), F1 default-seam (32), F2 foreign private root (33), D1 existing (35), D1 fresh (36). The pin titles and positions are unchanged. wsl-compare.txt shows no REMOVED and no ADDED entry.\n- WSL whole-capture: passed. Three files, 119 entries, 112 pass, 0 fail, 7 skip (host-class skips), exit 0. The target file alone re-run on WSL once more for stability (scratch/WIN-AP-T3b/wsl-rerun.txt, untracked scratch): 48 pass, 0 fail, exit 0.\n- Native shows no new red: passed. native-compare.txt against the F3 native-after capture: only fail -> pass flips (the F1 default-seam pin and its enclosing suite entry \"ensureAgentPipelineRoot (Ruling 141 D0 root entry point)\"); 117 unchanged. The native capture has 2 fails, both pre-existing and not touched by this slice: \"pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository\" and \"pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository\" (agent-pipeline-root-creation.test.mjs). Cause (native-after.txt lines 14-30 and 39-55): both fail the same assertion in assertCreatorRanThenSegmentPrivate (agent-pipeline-root-creation.test.mjs:75), message \"the \"agent-pipeline\" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)\", expected true, actual false. WIN-AP-F3 recorded them red natively before and after its production change (unchanged) and green on WSL; the root cause of the native DACL is out of scope here and was not diagnosed.\n- One commit with the briefed subject: passed, a871ff37d3a4a484bce12f18e91b6165ce23524d; trailers Dispatch: WIN-AP-T3b-20261009 (goldfish) and AI-Assisted: true only; one file changed, 5 insertions, 1 deletion.\n- Terminal record evidence/dispatch-record-WIN-AP-T3b-20261009.json: written (v4, outcomeClassification authored-commit, criticRequired T3 pending).\n\n2. Evidence (machine-written by scratch/WIN-AP-T3b/tools.mjs; each capture carries its command and an \"# exit code:\" footer)\n- evidence/WIN-AP-T3b-20261009/wsl-after.txt (exit 0), native-after.txt (exit 1, the two pre-existing pins above), wsl-compare.txt, native-compare.txt.\n- Commands: `wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node scratch/WIN-AP-T3b/tools.mjs capture evidence/WIN-AP-T3b-20261009/wsl-after.txt ...\"` and `node scratch/WIN-AP-T3b/tools.mjs capture evidence/WIN-AP-T3b-20261009/native-after.txt ...`; each runs `node --test --test-reporter=tap` on lib/hardened-private-directory.test.mjs, lib/agent-pipeline-root-creation.test.mjs, lib/governance-event-store.test.mjs in ONE invocation (same shape as the F3 captures). Compares: `node scratch/WIN-AP-T3b/tools.mjs compare <WIN-AP-F3 after> <T3b after> <out>` for both hosts.\n\n3. Changed files\n- plugins/pipeline-core/lib/hardened-private-directory.test.mjs: in the F1 default-seam case only, one macrotask yield (`await new Promise((resolve) => setImmediate(resolve))`) as the first statement, before the listener is attached (with a three-line comment naming why), and the failure message now also lists the observed warning codes. The assertion (exactly one PB-ROOT-REPAIRED from the default seam), title and position are unchanged.\n\n4. Deliberately not changed\n- Every production file and every other test case. The foreign uncommitted edits (pipeline-state.mjs, po-human-approval.mjs, sanctioned-args-onboarding.mjs, pipeline-state.test.mjs, the tranche-2 guard-dispatch-budget test) and the foreign evidence records: not staged, not formatted.\n- The pre-existing native reds (pins (b) and (c)). The consumer-safe-paths red that WIN-AP-F3 reported (ADR-0014 plugin copy) was not part of this slice and was not re-measured.\n\n5. Deviations from spec\n- The briefing's alternative \"and/or count only warnings whose code and path belong to this test\" was applied only to its code half (the existing code filter stays). The path half is not available: the repaired-root warning names the segment and never a host path (an existing assertion of the sibling pin requires that), so there is no path to scope on. The yield alone cleared the foreign warnings.\n- Baseline for the compare is the committed-state F3 \"after\" captures (evidence/WIN-AP-F3-20261009/*-after.txt) rather than a fresh pre-edit capture, to save budget; the diff is clean (no REMOVED/ADDED), so the two are equivalent for this purpose.\n- The stop condition (the pin still sees a foreign warning after the yield) did not trigger.\n\n6. Open items\n- independent review: pending (the Elephant dispatches the Critic; no receipt supplied). PO acceptance pending.\n- Untracked for the Elephant to integrate: evidence/WIN-AP-T3b-20261009/*, evidence/dispatch-record-WIN-AP-T3b-20261009.json. Throwaway, ignored: scratch/WIN-AP-T3b/ (tools.mjs, wsl-rerun.txt, report.txt), scratch/commit-msg/WIN-AP-T3b-20261009.txt.\n- The native pins (b) and (c) of agent-pipeline-root-creation.test.mjs remain red natively (pre-existing, green on WSL).\n- One wasted call: a Glob readback of the record was refused by guard-lifecycle-ready (GUARD-READ-TARGET); the readback was done with an exact-path Read instead.\n- Closing statements. Committed: a871ff37d3a4a484bce12f18e91b6165ce23524d (the test file). Verified green: the six T3 pins and the three-file WSL capture, exit 0, artifact evidence/WIN-AP-T3b-20261009/wsl-after.txt. Remains undone: independent review, the two pre-existing native pins. Next-briefing adjustments: none for this slice.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read (obligations, CONT17/18/35 headers, WIN-AP-T3b section, WIN-AP-F3 record); preflight run once; route pre-check n/a (test-only class; requested goldfish-deep Sonnet 5.5 xhigh, observed claude-sonnet-5-5, no contradiction)",
+      "toolUses": 10
+    },
+    {
+      "phase": "wsl after edit (target + two caller tests)",
+      "toolUses": 20
+    },
+    {
+      "phase": "native after edit (target + two caller tests)",
+      "toolUses": 21
+    },
+    {
+      "phase": "committed a871ff37d (test file only); record checkpointed",
+      "toolUses": 29
+    },
+    {
+      "phase": "terminal: outcome completed, report bound",
+      "toolUses": 33
+    }
+  ]
+}

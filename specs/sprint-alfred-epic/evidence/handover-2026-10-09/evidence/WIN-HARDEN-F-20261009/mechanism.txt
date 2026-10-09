@@ -1,0 +1,62 @@
+command: node scratch/dispatch/win-harden-f-a1/probe.mjs
+label: native
+exitCode: 0
+head: d8b5d5a64676fba660705b625d49f2ecca04df80
+tree: 5f8f19721040669b964e437099a5b547a341a7ae
+dirty: true
+--- stdout ---
+{"ev":"env","platform":"win32","node":"v24.20.0","powershellFound":true}
+{"ev":"spawn","tag":"V0_production_GetAcl_SetAcl#1","n":1,"status":0,"errorCode":null,"ms":200,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V0_production_GetAcl_SetAcl#2","n":2,"status":1,"errorCode":null,"ms":230,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"spawn","tag":"V0_production_GetAcl_SetAcl#3","n":3,"status":1,"errorCode":null,"ms":232,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"variant-result","variant":"V0_production_GetAcl_SetAcl","withChild":false,"callStatuses":[0,1,1],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V1_GetAcl_then_DotNet_SetAccessControl#1","n":4,"status":0,"errorCode":null,"ms":197,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V1_GetAcl_then_DotNet_SetAccessControl#2","n":5,"status":0,"errorCode":null,"ms":185,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V1_GetAcl_then_DotNet_SetAccessControl#3","n":6,"status":0,"errorCode":null,"ms":185,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"variant-result","variant":"V1_GetAcl_then_DotNet_SetAccessControl","withChild":false,"callStatuses":[0,0,0],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl#1","n":7,"status":0,"errorCode":null,"ms":201,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl#2","n":8,"status":1,"errorCode":null,"ms":228,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl#3","n":9,"status":1,"errorCode":null,"ms":226,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"variant-result","variant":"V2_AccessOwner_object_then_SetAcl","withChild":false,"callStatuses":[0,1,1],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl+child#1","n":10,"status":0,"errorCode":null,"ms":189,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl+child#2","n":11,"status":1,"errorCode":null,"ms":228,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"spawn","tag":"V2_AccessOwner_object_then_SetAcl+child#3","n":12,"status":1,"errorCode":null,"ms":229,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"variant-result","variant":"V2_AccessOwner_object_then_SetAcl","withChild":true,"callStatuses":[0,1,1],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl#1","n":13,"status":0,"errorCode":null,"ms":175,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl#2","n":14,"status":0,"errorCode":null,"ms":158,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl#3","n":15,"status":0,"errorCode":null,"ms":169,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"variant-result","variant":"V3_AccessOwner_static_SetAccessControl","withChild":false,"callStatuses":[0,0,0],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"diag-after-V3","n":16,"status":0,"errorCode":null,"ms":201,"fqErrorId":null,"stdout":"GETACL-SDDL:O:<sid>G:<sid>D:PAI(A;OICI;FA;;;<sid>)\r\nACCESSOWNER-SDDL:O:<sid>D:PAI(A;OICI;FA;;;<sid>)\r\nPROTECTED:True\r\nACE-COUNT:1\r\n","stderrHead":""}
+{"ev":"diag","exit":0}
+{"ev":"spawn","tag":"noop-Set-Acl-on-hardened-dir","n":17,"status":1,"errorCode":null,"ms":250,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stdout":"","stderrHead":null}
+{"ev":"noop-set-acl","exit":1}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl+child#1","n":18,"status":0,"errorCode":null,"ms":182,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl+child#2","n":19,"status":0,"errorCode":null,"ms":177,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V3_AccessOwner_static_SetAccessControl+child#3","n":20,"status":0,"errorCode":null,"ms":185,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"variant-result","variant":"V3_AccessOwner_static_SetAccessControl","withChild":true,"callStatuses":[0,0,0],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl#1","n":21,"status":0,"errorCode":null,"ms":196,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl#2","n":22,"status":0,"errorCode":null,"ms":168,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl#3","n":23,"status":0,"errorCode":null,"ms":163,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"variant-result","variant":"V4_AccessOwner_DirectoryInfo_SetAccessControl","withChild":false,"callStatuses":[0,0,0],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl+child#1","n":24,"status":0,"errorCode":null,"ms":170,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl+child#2","n":25,"status":0,"errorCode":null,"ms":165,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"spawn","tag":"V4_AccessOwner_DirectoryInfo_SetAccessControl+child#3","n":26,"status":0,"errorCode":null,"ms":158,"fqErrorId":null,"stdout":"","stderrHead":""}
+{"ev":"variant-result","variant":"V4_AccessOwner_DirectoryInfo_SetAccessControl","withChild":true,"callStatuses":[0,0,0],"assessStatus":"secure","assessReason":"Windows owner, DACL, and reparse-point checks are private"}
+{"ev":"real-spawn","call":1,"withChild":false,"n":27,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":1,"withChild":false,"n":28,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":1,"withChild":false,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":2,"withChild":false,"n":29,"status":1,"errorCode":null,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stderrTagLines":[]}
+{"ev":"real-result","call":2,"withChild":false,"status":"unavailable","reason":"native Windows DACL observation failed","spawnsInCall":1}
+{"ev":"real-spawn","call":3,"withChild":false,"n":30,"status":1,"errorCode":null,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stderrTagLines":[]}
+{"ev":"real-result","call":3,"withChild":false,"status":"unavailable","reason":"native Windows DACL observation failed","spawnsInCall":1}
+{"ev":"real-spawn","call":1,"withChild":true,"n":31,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":1,"withChild":true,"n":32,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":1,"withChild":true,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":2,"withChild":true,"n":33,"status":1,"errorCode":null,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stderrTagLines":[]}
+{"ev":"real-result","call":2,"withChild":true,"status":"unavailable","reason":"native Windows DACL observation failed","spawnsInCall":1}
+{"ev":"real-spawn","call":3,"withChild":true,"n":34,"status":1,"errorCode":null,"fqErrorId":"System.Security.AccessControl.PrivilegeNotHeldException,Microsoft.PowerShell.Commands.Se ","stderrTagLines":[]}
+{"ev":"real-result","call":3,"withChild":true,"status":"unavailable","reason":"native Windows DACL observation failed","spawnsInCall":1}
+{"ev":"real-result","call":"missing-path","status":"unavailable","reason":"native Windows DACL observation failed","spawnsInCall":1}
+{"ev":"done","totalSpawns":35}
+
+--- stderr ---

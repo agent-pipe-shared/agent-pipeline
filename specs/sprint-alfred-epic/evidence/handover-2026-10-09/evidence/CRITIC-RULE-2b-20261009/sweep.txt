@@ -1,0 +1,177 @@
+=== before (A/G/S x higher-capability-tier co-occurrence lines in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills, harness/review-protocol.md, ADR-0003, ADR-0014; text below the DE-REFERENCE marker excluded; count 23; lines carrying the OLD per-diff canonical quote: 5) ===
+docs/adr/0003-role-implementation-subagents.md:35: > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subag
+docs/adr/0014-critic-contract.md:35: > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subag
+harness/review-protocol.md:45: | **T3** | Rigor 2, standard | MANDATORY | the review-tier model FIRST — escalate to the higher-capability model ONLY on (a) a finding ≥ major, (b) an A/G/S touch discove
+harness/review-protocol.md:46: | **T4** | Rigor 1 standard · risk class medium · rigor 0 WITH risk flag | MANDATORY, BLOCKING | the review-tier model FIRST — same cascade as T3 (escalate to the higher-
+harness/review-protocol.md:50: **Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G
+harness/review-protocol.md:58: > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subag
+plugins/pipeline-core/skills/critic-review/SKILL.md:212: > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subag
+policies/model-policy.md:44: All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for instance, runs every role on the cheaper model with staggered effort (see comment in `pipeline.
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-tier review; a short 
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:128: 2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **s
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage through Interview→Spe
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the orchestrator review; D
+policies/model-policy.md:156: - **Design phase (reversed):** When in doubt whether a design-phase step (interview, research, architecture debate, spec authoring, readiness evaluation) needs the Design
+roles/critic.md:71: > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subag
+roles/critic.md:215: - **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high risk class) — details a
+roles/critic.md:216: - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta
+roles/elephant.md:138: - **Rule:** Apply the trigger matrix (`harness/review-protocol.md` §2.1) when a goldfish delivers: no Critic only at rigor 0 / low risk / no flag; the review-tier model /
+roles/elephant.md:356: - **Model/effort:** profile-/phase-scoped (supersedes an earlier whole-session hardcode on a single fixed model/effort). **Design phase:** the design-tier model at effort
+templates/prompts/critic-review.md:30: verdict (never a higher-capability first pass for a non-A/G/S class-mittel
+templates/prompts/critic-review.md:275: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session functional-equivalent lane" 
+templates/prompts/critic-review.md:276: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Critic is dispatched O
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/effort — escalating gu
+
+=== after (A/G/S x higher-capability-tier co-occurrence lines in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills, harness/review-protocol.md, ADR-0003, ADR-0014; text below the DE-REFERENCE marker excluded; count 35; lines carrying the OLD per-diff canonical quote: 0) ===
+docs/adr/0003-role-implementation-subagents.md:35: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0003-role-implementation-subagents.md:40: commit and diff, the route the amended trigger selects (review tier; higher-capability only for the one batched critical architecture/security Critic), and a JSON-schema-
+docs/adr/0014-critic-contract.md:5: Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks; amended on 2026-10-09 (PO decision, Sprint Alfred R
+docs/adr/0014-critic-contract.md:37: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0014-critic-contract.md:54: 1. A Critic runs on the higher-capability (Opus) tier only for genuinely critical architecture
+docs/adr/0014-critic-contract.md:71: item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
+harness/review-protocol.md:43: | **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the review-tier model (Sonnet route); the higher-capability model ONLY for a genuinely criti
+harness/review-protocol.md:44: | **T2** | Risk class high | MANDATORY | the review-tier model; the higher-capability model only under MP-07's batched critical architecture/security rule, never for risk
+harness/review-protocol.md:45: | **T3** | Rigor 2, standard | MANDATORY | the review-tier model; no per-diff escalation — the higher-capability model only for a genuinely critical architecture or secur
+harness/review-protocol.md:48: | **T6** | Review-tier findings contested or contradictory | Elephant's option | a fresh review-tier second opinion (a higher-capability model only if the subject is genu
+harness/review-protocol.md:50: **Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G
+harness/review-protocol.md:58: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+harness/review-protocol.md:123: | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers; T1 uses t
+harness/review-protocol.md:125: | **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-
+plugins/pipeline-core/skills/critic-review/SKILL.md:198: Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claud
+plugins/pipeline-core/skills/critic-review/SKILL.md:212: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+policies/model-policy.md:44: All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for instance, runs every role on the cheaper model with staggered effort (see comment in `pipeline.
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-tier review; a short 
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:128: 2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **s
+policies/model-policy.md:133: - **Alignment (closed 2026-10-09, dispatch CRITIC-RULE-2b-20261009):** the canonical trigger wording quoted word-identically in `harness/review-protocol.md` §2.1, `roles/
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage through Interview→Spe
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the orchestrator review; D
+policies/model-policy.md:156: - **Design phase (reversed):** When in doubt whether a design-phase step (interview, research, architecture debate, spec authoring, readiness evaluation) needs the Design
+roles/critic.md:57: instruction; fixed candidate commit and diff; the route MP-07 selects (review tier; higher-capability only for the one batched critical architecture/security Critic);
+roles/critic.md:71: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+roles/critic.md:215: - **The review-tier model (the Critic agent's own Sonnet route) is the standard; the higher-capability model ONLY for genuinely critical architecture or security changes 
+roles/critic.md:216: - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07) and its batch scope (the slice ids and single candidate range; a re-critic names its delta range only). D
+roles/elephant.md:138: - **Rule:** Apply the trigger matrix (`harness/review-protocol.md` §2.1) when a goldfish delivers: no Critic only at rigor 0 / low risk / no flag; the review-tier model /
+roles/elephant.md:356: - **Model/effort:** profile-/phase-scoped (supersedes an earlier whole-session hardcode on a single fixed model/effort). **Design phase:** the design-tier model at effort
+templates/prompts/critic-review.md:30: per-diff higher-capability escalation); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
+templates/prompts/critic-review.md:277: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in
+templates/prompts/critic-review.md:278: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Critic is dispatched O
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/effort — escalating wo
+
+=== after (A/G/S x higher-capability-tier co-occurrence lines in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills, harness/review-protocol.md, ADR-0003, ADR-0014; text below the DE-REFERENCE marker excluded; count 35; lines carrying the OLD per-diff canonical quote: 0) ===
+docs/adr/0003-role-implementation-subagents.md:35: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0003-role-implementation-subagents.md:40: commit and diff, the route the amended trigger selects (review tier; higher-capability only for the one batched critical architecture/security Critic), and a JSON-schema-
+docs/adr/0014-critic-contract.md:5: Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks; amended on 2026-10-09 (PO decision, Sprint Alfred R
+docs/adr/0014-critic-contract.md:37: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0014-critic-contract.md:54: 1. A Critic runs on the higher-capability (Opus) tier only for genuinely critical architecture
+docs/adr/0014-critic-contract.md:71: item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
+harness/review-protocol.md:43: | **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the review-tier model (Sonnet route); the higher-capability model ONLY for a genuinely criti
+harness/review-protocol.md:44: | **T2** | Risk class high | MANDATORY | the review-tier model; the higher-capability model only under MP-07's batched critical architecture/security rule, never for risk
+harness/review-protocol.md:45: | **T3** | Rigor 2, standard | MANDATORY | the review-tier model; no per-diff escalation — the higher-capability model only for a genuinely critical architecture or secur
+harness/review-protocol.md:48: | **T6** | Review-tier findings contested or contradictory | Elephant's option | a fresh review-tier second opinion (a higher-capability model only if the subject is genu
+harness/review-protocol.md:50: **Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G
+harness/review-protocol.md:58: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+harness/review-protocol.md:123: | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers; T1 uses t
+harness/review-protocol.md:125: | **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-
+plugins/pipeline-core/skills/critic-review/SKILL.md:198: Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claud
+plugins/pipeline-core/skills/critic-review/SKILL.md:212: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+policies/model-policy.md:44: All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for instance, runs every role on the cheaper model with staggered effort (see comment in `pipeline.
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-tier review; a short 
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:128: 2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **s
+policies/model-policy.md:133: - **Alignment (closed 2026-10-09, dispatch CRITIC-RULE-2b-20261009):** the canonical trigger wording quoted word-identically in `harness/review-protocol.md` §2.1, `roles/
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage through Interview→Spe
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the orchestrator review; D
+policies/model-policy.md:156: - **Design phase (reversed):** When in doubt whether a design-phase step (interview, research, architecture debate, spec authoring, readiness evaluation) needs the Design
+roles/critic.md:57: instruction; fixed candidate commit and diff; the route MP-07 selects (review tier; higher-capability only for the one batched critical architecture/security Critic);
+roles/critic.md:71: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+roles/critic.md:215: - **The review-tier model (the Critic agent's own Sonnet route) is the standard; the higher-capability model ONLY for genuinely critical architecture or security changes 
+roles/critic.md:216: - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07) and its batch scope (the slice ids and single candidate range; a re-critic names its delta range only). D
+roles/elephant.md:138: - **Rule:** Apply the trigger matrix (`harness/review-protocol.md` §2.1) when a goldfish delivers: no Critic only at rigor 0 / low risk / no flag; the review-tier model /
+roles/elephant.md:356: - **Model/effort:** profile-/phase-scoped (supersedes an earlier whole-session hardcode on a single fixed model/effort). **Design phase:** the design-tier model at effort
+templates/prompts/critic-review.md:30: per-diff higher-capability escalation); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
+templates/prompts/critic-review.md:277: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in
+templates/prompts/critic-review.md:278: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Critic is dispatched O
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/effort — escalating wo
+
+=== after (A/G/S x higher-capability-tier co-occurrence lines in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills, harness/review-protocol.md, ADR-0003, ADR-0014; text below the DE-REFERENCE marker excluded; count 37; lines carrying the OLD per-diff canonical quote: 0) ===
+docs/adr/0003-role-implementation-subagents.md:35: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0003-role-implementation-subagents.md:40: commit and diff, the route the amended trigger selects (review tier; higher-capability only for the one batched critical architecture/security Critic), and a JSON-schema-
+docs/adr/0014-critic-contract.md:5: Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks; amended on 2026-10-09 (PO decision, Sprint Alfred R
+docs/adr/0014-critic-contract.md:37: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0014-critic-contract.md:54: 1. A Critic runs on the higher-capability (Opus) tier only for genuinely critical architecture
+docs/adr/0014-critic-contract.md:71: item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
+docs/adr/0014-critic-contract.md:93: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part of this
+harness/review-protocol.md:43: | **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the review-tier model (Sonnet route); the higher-capability model ONLY for a genuinely criti
+harness/review-protocol.md:44: | **T2** | Risk class high | MANDATORY | the review-tier model; the higher-capability model only under MP-07's batched critical architecture/security rule, never for risk
+harness/review-protocol.md:45: | **T3** | Rigor 2, standard | MANDATORY | the review-tier model; no per-diff escalation — the higher-capability model only for a genuinely critical architecture or secur
+harness/review-protocol.md:48: | **T6** | Review-tier findings contested or contradictory | Elephant's option | a fresh review-tier second opinion (a higher-capability model only if the subject is genu
+harness/review-protocol.md:50: **Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G
+harness/review-protocol.md:58: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+harness/review-protocol.md:123: | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers; T1 uses t
+harness/review-protocol.md:125: | **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-
+plugins/pipeline-core/skills/critic-review/SKILL.md:198: Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claud
+plugins/pipeline-core/skills/critic-review/SKILL.md:212: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+policies/model-policy.md:44: All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for instance, runs every role on the cheaper model with staggered effort (see comment in `pipeline.
+policies/model-policy.md:68: - **`goldfish-mechanic`** — effort **`low`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Pending route change 
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-tier review; a short 
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:128: 2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **s
+policies/model-policy.md:133: - **Alignment (closed 2026-10-09, dispatch CRITIC-RULE-2b-20261009):** the canonical trigger wording quoted word-identically in `harness/review-protocol.md` §2.1, `roles/
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage through Interview→Spe
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the orchestrator review; D
+policies/model-policy.md:156: - **Design phase (reversed):** When in doubt whether a design-phase step (interview, research, architecture debate, spec authoring, readiness evaluation) needs the Design
+roles/critic.md:57: instruction; fixed candidate commit and diff; the route MP-07 selects (review tier; higher-capability only for the one batched critical architecture/security Critic);
+roles/critic.md:71: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+roles/critic.md:215: - **The review-tier model (the Critic agent's own Sonnet route) is the standard; the higher-capability model ONLY for genuinely critical architecture or security changes 
+roles/critic.md:216: - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07) and its batch scope (the slice ids and single candidate range; a re-critic names its delta range only). D
+roles/elephant.md:138: - **Rule:** Apply the trigger matrix (`harness/review-protocol.md` §2.1) when a goldfish delivers: no Critic only at rigor 0 / low risk / no flag; the review-tier model /
+roles/elephant.md:356: - **Model/effort:** profile-/phase-scoped (supersedes an earlier whole-session hardcode on a single fixed model/effort). **Design phase:** the design-tier model at effort
+templates/prompts/critic-review.md:30: per-diff higher-capability escalation); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
+templates/prompts/critic-review.md:277: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in
+templates/prompts/critic-review.md:278: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. EVERY Critic is ONE overall Critic per batc
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/effort — escalating wo
+
+=== after (A/G/S x higher-capability-tier co-occurrence lines in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills, harness/review-protocol.md, ADR-0003, ADR-0014; text below the DE-REFERENCE marker excluded; count 37; lines carrying the OLD per-diff canonical quote: 0) ===
+docs/adr/0003-role-implementation-subagents.md:35: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0003-role-implementation-subagents.md:40: commit and diff, the route the amended trigger selects (review tier; higher-capability only for the one batched critical architecture/security Critic), and a JSON-schema-
+docs/adr/0014-critic-contract.md:5: Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks; amended on 2026-10-09 (PO decision, Sprint Alfred R
+docs/adr/0014-critic-contract.md:37: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+docs/adr/0014-critic-contract.md:54: 1. A Critic runs on the higher-capability (Opus) tier only for genuinely critical architecture
+docs/adr/0014-critic-contract.md:71: item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
+docs/adr/0014-critic-contract.md:93: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part of this
+harness/review-protocol.md:43: | **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the review-tier model (Sonnet route); the higher-capability model ONLY for a genuinely criti
+harness/review-protocol.md:44: | **T2** | Risk class high | MANDATORY | the review-tier model; the higher-capability model only under MP-07's batched critical architecture/security rule, never for risk
+harness/review-protocol.md:45: | **T3** | Rigor 2, standard | MANDATORY | the review-tier model; no per-diff escalation — the higher-capability model only for a genuinely critical architecture or secur
+harness/review-protocol.md:48: | **T6** | Review-tier findings contested or contradictory | Elephant's option | a fresh review-tier second opinion (a higher-capability model only if the subject is genu
+harness/review-protocol.md:50: **Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G
+harness/review-protocol.md:58: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+harness/review-protocol.md:123: | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers; T1 uses t
+harness/review-protocol.md:125: | **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-
+plugins/pipeline-core/skills/critic-review/SKILL.md:198: Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claud
+plugins/pipeline-core/skills/critic-review/SKILL.md:212: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+policies/model-policy.md:44: All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for instance, runs every role on the cheaper model with staggered effort (see comment in `pipeline.
+policies/model-policy.md:68: - **`goldfish-mechanic`** — effort **`medium`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Installed route (P
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-tier review; a short 
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:128: 2. A Critic runs on the Design-tier model (Opus) **only** for genuinely critical **architecture** (ADR-required decisions, core contracts, operating-model changes) or **s
+policies/model-policy.md:133: - **Alignment (closed 2026-10-09, dispatch CRITIC-RULE-2b-20261009):** the canonical trigger wording quoted word-identically in `harness/review-protocol.md` §2.1, `roles/
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage through Interview→Spe
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the orchestrator review; D
+policies/model-policy.md:156: - **Design phase (reversed):** When in doubt whether a design-phase step (interview, research, architecture debate, spec authoring, readiness evaluation) needs the Design
+roles/critic.md:57: instruction; fixed candidate commit and diff; the route MP-07 selects (review tier; higher-capability only for the one batched critical architecture/security Critic);
+roles/critic.md:71: > "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdi
+roles/critic.md:215: - **The review-tier model (the Critic agent's own Sonnet route) is the standard; the higher-capability model ONLY for genuinely critical architecture or security changes 
+roles/critic.md:216: - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07) and its batch scope (the slice ids and single candidate range; a re-critic names its delta range only). D
+roles/elephant.md:138: - **Rule:** Apply the trigger matrix (`harness/review-protocol.md` §2.1) when a goldfish delivers: no Critic only at rigor 0 / low risk / no flag; the review-tier model /
+roles/elephant.md:356: - **Model/effort:** profile-/phase-scoped (supersedes an earlier whole-session hardcode on a single fixed model/effort). **Design phase:** the design-tier model at effort
+templates/prompts/critic-review.md:30: per-diff higher-capability escalation); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
+templates/prompts/critic-review.md:277: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in
+templates/prompts/critic-review.md:278: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. EVERY Critic is ONE overall Critic per batc
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/effort — escalating wo
+

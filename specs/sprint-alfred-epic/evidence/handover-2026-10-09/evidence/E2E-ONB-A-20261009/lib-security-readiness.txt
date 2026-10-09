@@ -1,0 +1,29 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/security-readiness.test.mjs
+label: lib-security-readiness
+exitCode: 0
+head: 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa
+tree: 39b40977bbca9168496586b518c77e8713838f15
+dirty: true
+--- stdout ---
+✔ AC1: unclassified products are incomplete, not silently exempt (0.702842ms)
+✔ AC2: disclosure, restricted response and canonical findings remain distinct (0.150482ms)
+✔ AC3: releases outside the authoritative support window are rejected (0.116912ms)
+✔ AC4: full response trace needs named authority and evidence at every stage (0.221224ms)
+✔ AC5: incident and rollback runbooks bind to declared deployment capabilities (0.179803ms)
+✔ AC6: agents cannot take protected security decisions (4.67509ms)
+✔ AC7: security release evidence binds artifact, SBOM, provenance and validated findings (0.115091ms)
+✔ AC8: restricted fields cannot enter public artifacts (0.298025ms)
+✔ AC9: stale contacts, unsupported channels and missing artifacts are typed failures (0.230844ms)
+✔ AC10: public package, internal service, legacy EOL, emergency rollback, and valid not-applicable fixtures are covered (0.661812ms)
+✔ AC11: consumers can project readiness but cannot mutate authority (0.525279ms)
+✔ AC12: public documentation declares disclosure, support, incident, release, and recovery responsibilities (0.144933ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 111.048107
+
+--- stderr ---

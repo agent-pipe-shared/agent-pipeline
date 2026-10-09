@@ -1,0 +1,84 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test --test-reporter=spec plugins/pipeline-core/lib/design-workflow-package-route.test.mjs plugins/pipeline-core/lib/design-workflow-package.test.mjs plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs"
+label: R4-S3b-before
+exitCode: 1
+head: 6259c35cc394d51b7c5de5f765433f00c867303a
+tree: 2cf82d39fd54e9d1753669d013dc124af0077707
+dirty: true
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (531.932078ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (554.205864ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (394.836844ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (313.745497ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (306.723635ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (351.236608ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (372.514216ms)
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (10.336714ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (7.044451ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (6.334349ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (7.348017ms)
+✔ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (18.67646ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (6.92676ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (2.496657ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (7.746625ms)
+✖ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (7.691094ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (8.083422ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (7.101792ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (6.747177ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (6.40002ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (7.666363ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (5.840819ms)
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (155414.240234ms)
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (9.954456ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (25.66561ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (13.882759ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (8.686592ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (7.330986ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (14.846288ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (32.350976ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (13.718486ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (2.270392ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (10.262672ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (23.561071ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (95.957615ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (4.744728ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (8.392287ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (14.607723ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (6.331648ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (6.146945ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (6.966921ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (36.893849ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (81.341191ms)
+✔ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (178.436176ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 43
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 156749.589945
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-package-route.test.mjs:182:1
+✖ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (7.691094ms)
+  AssertionError [ERR_ASSERTION]: free text beyond receipt facts must not be admitted
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root-in-wsl>/plugins/pipeline-core/lib/design-workflow-package-route.test.mjs:187:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

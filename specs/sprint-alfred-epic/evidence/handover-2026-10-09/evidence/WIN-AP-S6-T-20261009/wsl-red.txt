@@ -1,0 +1,102 @@
+command: node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs
+label: wsl-red
+exitCode: 1
+head: ef1ba84dee3113ff9bab957075d3120d81d597dc
+tree: 000f0653972c24bff0c2e718ef555ff7c32c4b0c
+dirty: true
+--- stdout ---
+(node:19468) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (33.602707ms)
+✔ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (16.728887ms)
+✔ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (14.689605ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (13.53761ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (14.708746ms)
+✔ pin (f) private-boundary.ensurePrivateDirectory: leaves the agent-pipeline segment private on a fresh repository (14.23081ms)
+✖ pin (g) private-boundary.ensurePrivateDirectory: repairs a pre-existing insecure agent-pipeline segment in place (17.465187ms)
+✖ pin (h) private-boundary.ensurePrivateDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (16.485815ms)
+✔ pin (f) human-guard-override.secureDirectory: leaves the agent-pipeline segment private on a fresh repository (15.743497ms)
+✖ pin (g) human-guard-override.secureDirectory: repairs a pre-existing insecure agent-pipeline segment in place (15.512534ms)
+✖ pin (h) human-guard-override.secureDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (11.831972ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 7
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2647.53609
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:237:3
+✖ pin (g) private-boundary.ensurePrivateDirectory: repairs a pre-existing insecure agent-pipeline segment in place (17.465187ms)
+  AssertionError [ERR_ASSERTION]: pin (g) private-boundary.ensurePrivateDirectory: the pre-existing insecure "agent-pipeline" segment is still insecure after the helper ran (mode=0o755); the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)
+      at file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:249:14
+      at async withRepository (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:239:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:253:3
+✖ pin (h) private-boundary.ensurePrivateDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (16.485815ms)
+  AssertionError [ERR_ASSERTION]: pin (h) private-boundary.ensurePrivateDirectory: expected exactly one PB-ROOT-REPAIRED warning, saw 0 (codes seen: no warning); the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)
+  
+  0 !== 1
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:263:14
+      at async withRepository (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:255:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:237:3
+✖ pin (g) human-guard-override.secureDirectory: repairs a pre-existing insecure agent-pipeline segment in place (15.512534ms)
+  AssertionError [ERR_ASSERTION]: pin (g) human-guard-override.secureDirectory: the pre-existing insecure "agent-pipeline" segment is still insecure after the helper ran (mode=0o755); the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)
+      at file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:249:14
+      at async withRepository (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:239:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:253:3
+✖ pin (h) human-guard-override.secureDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (11.831972ms)
+  AssertionError [ERR_ASSERTION]: pin (h) human-guard-override.secureDirectory: expected exactly one PB-ROOT-REPAIRED warning, saw 0 (codes seen: no warning); the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)
+  
+  0 !== 1
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:263:14
+      at async withRepository (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:255:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,52 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CSW-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f06975126",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "5f1434105"
+  ],
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT18/CONT30 headers + CSW-T section read; preflight run; record created",
+      "toolUses": 15
+    },
+    {
+      "phase": "finalize: terminal record + report",
+      "toolUses": 44
+    }
+  ],
+  "resultSha256": "a15e37275f14fd392804540f16552beab39aa67d23f2714f06e71900d4033a72",
+  "report": {
+    "text": "CSW-T-20261009: implementation complete (RED pin committed). independent review: pending.\n\nRoute pre-check: class test-only (QG-04), not A/G/S. Requested goldfish-deep (Sonnet 5.5 / xhigh); observed identity from this dispatch's runtime prompt: \"Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- Pin red natively for the stated reason: passed. Native run: 67/68 checks passed; the single FAIL is \"CSW-T a live second session in the same repository fires the concurrent-session warning on this host platform\": \"no concurrent-session warning on platform win32: the live second session's owner reads \"unavailable\", and the warning fires only for a live owner\".\n- Nothing else changes state: passed. The only FAIL natively is the new pin; the new control case \"CSW-T control: a second session whose owner pid does not exist never fires the concurrent-session warning\" passes; no pre-existing check failed.\n- WSL: passed. Same command, wrapped exit 0 (pin green on Linux, where /proc gives a live owner).\n- check-consumer-safe-paths.test.mjs: passed, exit 0 (9/9).\n- One commit of the test file, exact subject: passed (5f1434105).\n\n2. Evidence\n- evidence/CSW-T-20261009/red.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-T-20261009/red.txt --label native -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs ; wrapped exit 1 (the pin only).\n- evidence/CSW-T-20261009/wsl.txt: same command under wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; ...\" ; wrapped exit 0.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 0 (stdout only, no artifact).\n\n3. Changed files\n- plugins/pipeline-core/lib/worktree-lifecycle.test.mjs: import of observeConcurrentSessionWarning, plus two checks (the red pin and a green dead-pid control), +44 lines, committed.\n- evidence/CSW-T-20261009/red.txt, wsl.txt: machine-written captures, untracked.\n\n4. Deliberately not changed\n- Production files (worktree-lifecycle.mjs, pipeline-start-preflight.mjs); the existing \"D0 session owner runtime\" check that pins \"unavailable\" off Linux (:818); the two native reds in pipeline-start-preflight.test.mjs (PHX-WP-AAC01-MULTISESSION), which Ruling 117 assigns to TR-J-T2c.\n- Foreign modified/untracked files in the working tree (specs/... evidence stray records, pipeline-state files) were not touched.\n\n5. Deviations from spec\n- The briefing asks for the pin \"with platform: win32 through the module's platform/process seam\". The module has NO platform seam: localProcessStartIdentity reads process.platform directly. Stubbing process.platform on Linux would drag in the Windows ACL path and prove nothing. I used the existing PROCESS seam (ownerPid, pointing at this live test process) and the REAL host platform: red natively on win32, green on Linux/WSL. The win32 branch therefore cannot be exercised on a non-win32 host.\n- Per-commit record checkpoint skipped; one terminal write, as the briefing directs.\n\n6. Open items\n- Seam the fix needs (for CSW-F): an injectable platform and boot-time/uptime source in worktree-lifecycle.mjs (for example options.platform and options.uptimeSeconds passed to startSessionDescriptor and inspectSessionOwnerRuntime) so a hermetic win32 case runs on every host; add it when CSW-F lands. Also decide whether the fix keeps status \"live\" or adds \"live-probable\": observeConcurrentSessionWarning keys on \"live\" only, and Ruling 117 limits CSW-F to worktree-lifecycle.mjs, so the pin asserts the warning, not a status name.\n- The pin imports ../scripts/pipeline-start-preflight.mjs from a lib test (precedent: worktree-create.mjs import); import is side-effect free (isDirectInvocation guard).\n- No advisor call was made (tool-budget pressure). Budget: 45 base reached at hand-back.\n- closing handover: committed = 5f1434105 (test file); verified green = WSL run, consumer-safe check, native red-for-the-right-reason; remains undone = nothing; independent Critic review pending.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+      "evidence/CSW-T-20261009/red.txt",
+      "evidence/CSW-T-20261009/wsl.txt"
+    ]
+  }
+}

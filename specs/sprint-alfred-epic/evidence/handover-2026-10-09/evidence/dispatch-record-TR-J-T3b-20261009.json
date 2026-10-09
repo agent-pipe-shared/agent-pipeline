@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-J-T3b-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "e7faf494a test(toolchain-preflight): spawn a frozen plugin-root copy in the R7-7e case -- only plugins/pipeline-core/scripts/toolchain-preflight.test.mjs"
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "TR-J-T3b-20261009: implementation complete, committed e7faf494a. Independent review: pending. PO acceptance: pending. Completed run, not a closing-allowance handover (committed at tool call 21 of 25). Route: requested claude-sonnet-5-5 / xhigh (goldfish-deep, not an A/G/S class); observed per this dispatch's runtime prompt: Sonnet 5.5, model ID claude-sonnet-5-5; no mismatch.\n\n1. DoD RESULTS\n- Native verify (44/44): passed. tests 44, pass 44, fail 0, exitCode 0. TCP040 ran 60 s (baseline 49 s: the plugin-root copy).\n- WSL direct-run, no worse than baseline: passed on the count with a changed failing set. tests 44, pass 42, fail 2, wrapped exit 1; the baseline was also 42/44. The set moved from {TCP039, TCP040} to {TCP033, TCP039}.\n  - TCP040: red -> GREEN. The same spawn that failed with 'must exit 0 (got 2)' now passes when it runs the frozen copy. That confirms the baseline red was GHS-SOURCE-DRIFT, a writer into the live tree, not a WSL-specific installer refusal. Because it passed, the new stdout/stderr tails were not needed.\n  - TCP039: unchanged red (path masking '<fixture>' vs the /tmp fixture path; pre-existing, untouched).\n  - TCP033: NEW red, classified as a foreign-writer artifact, not the edit. Its assertion diff shows 'MM specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md' in the before-snapshot and absent in the after-snapshot: a file I never touched changed state during the 71 s the case ran. Also TCP033 runs before TCP040 in case order, so the edited hunk cannot have executed yet when TCP033 ran, and native TCP033 passed. NOT re-run for budget, so TCP033 green on a quiet WSL tree is not demonstrated.\n- check-consumer-safe-paths.test.mjs: passed, 9/9, exit 0.\n- One commit, subject exactly as briefed, trailers exactly 'Dispatch: TR-J-T3b-20261009 (goldfish)' and 'AI-Assisted: true', via fresh file scratch/commit-msg/TR-J-T3b.txt and 'git commit -F ... -- <path>': passed (e7faf494a, 1 file, +13 -2).\n\n2. EVIDENCE\n- evidence/TR-J-T3-20261009/tcp-native-after.txt (exitCode 0, tests 44 pass 44): node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-J-T3-20261009/tcp-native-after.txt --label tcp-native-after -- node --test plugins/pipeline-core/scripts/toolchain-preflight.test.mjs\n- evidence/TR-J-T3-20261009/tcp-wsl-after.txt (exitCode 1, tests 44 pass 42 fail 2): wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-J-T3-20261009/tcp-wsl-after.txt --label tcp-wsl-after -- bash -c node plugins/pipeline-core/scripts/toolchain-preflight.test.mjs 3>/dev/null' (identical direct-run form as the baseline)\n- Baselines compared: tcp-native-before.txt (44/44), tcp-wsl-before.txt (42/44: TCP039, TCP040).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0, 9 pass.\n\n3. CHANGED FILES\n- plugins/pipeline-core/scripts/toolchain-preflight.test.mjs: committed e7faf494a exactly as the predecessor left it (I did not edit it). The R7-7e case copies the plugin root into <fixture dir>/plugin-copy and spawns the copy, asserts the finding still names the live script, asserts the spawned script is the copy, and appends stdout/stderr tails to the exit-0 message.\n- scratch/commit-msg/TR-J-T3b.txt (commit message), evidence/dispatch-record-TR-J-T3b-20261009.json, evidence/TR-J-T3-20261009/tcp-native-after.txt, tcp-wsl-after.txt (captures). None of these is in the commit.\n\n4. DELIBERATELY NOT CHANGED\n- TCP039 (WSL path masking), pre-existing and outside the slice.\n- The second 'import { cpSync } from node:fs' line (the predecessor's choice, with a comment) was not merged into the existing node:fs import.\n- The assertion 'frozenScript.startsWith(frozenPluginRoot)' is trivially true by construction; only the inequality half carries weight. Left as written.\n- harness/scripts/verify.mjs:909 (22 CMI ids for 23 cases) and TR-J-T3c (pre-push / pre-commit install tests): out of scope, queued per Ruling 115.\n- Foreign staged and dirty files were left alone.\n\n5. DEVIATIONS FROM SPEC\n- None. The briefing's expected TCP040 classification (GHS-SOURCE-DRIFT -> green) is what happened. One observation, not a deviation: the dispatch record was still 'in-progress' when the commit was made; the commit-msg hook accepted the Dispatch trailer.\n\n6. OPEN ITEMS\n- independent review: pending (Elephant dispatches the Critic; criticRequired decision T3 recorded in the opening record).\n- TCP033 under WSL is red in this run through a parallel writer into the shared tree; a quiet-tree WSL re-run would close that. Suggest the dispatcher not treat it as a regression of this slice without that re-run, and not as a TCP040 problem.\n- The WSL form is a direct run (bash -c node <file> 3>/dev/null) because plain node --test trips TCC-FD-WRITE under WSL on this file's hard fd 3 (Ruling 107 class); verify.mjs's own suite runner does not use that form.\n- cpSync of the live plugin root at test start can itself race a parallel writer (ENOENT mid-copy); not seen in the native or WSL run.\n- Bootstrap preflight reported DUTY-NOT-RUNTIME-LIVE for 5 files differing between the repo and the loaded plugin copy (including templates/prompts/goldfish-task.md); I read field-6 lines from the repo copy. Informational.\n- No PO manual step is required for this slice.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs"
+    ]
+  },
+  "log": [
+    { "phase": "opening: briefing, obligations, CONT17 header read; preflight run from the loaded plugin root; record written and read back", "toolUses": 7 },
+    { "phase": "orientation: predecessor record, git diff of the uncommitted edit, Ruling 115 TR-J-T3b", "toolUses": 11 },
+    { "phase": "native after-capture: tests 44, pass 44, fail 0, exitCode 0 (evidence/TR-J-T3-20261009/tcp-native-after.txt); TCP040 passed in 60 s", "toolUses": 14 },
+    { "phase": "WSL after-capture (direct-run form): wrapped exit 1, tests 44, pass 42, fail 2 = TCP033 (parallel-writer status drift, new, unrelated) + TCP039 (pre-existing path masking). TCP040 now GREEN (baseline was red). evidence/TR-J-T3-20261009/tcp-wsl-after.txt", "toolUses": 17 },
+    { "phase": "consumer-safe check 9/9 exit 0; commit message file written; git add; git commit e7faf494a", "toolUses": 21 },
+    { "phase": "checkpoint record written (committed-pending-report), then final record overwrite", "toolUses": 23 }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

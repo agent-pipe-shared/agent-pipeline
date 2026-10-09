@@ -1,0 +1,76 @@
+command: node scratch/closure-repair-m/probe.mjs fix scratch/closure-repair-m/repairs.json
+label: CLOSURE-REPAIR-M-fixpoint
+exitCode: 0
+head: a73d91b6c5ff2e0cb0e6c72cf604ecb34a9c0b94
+tree: d79a533d68e9608a3c4941c1753fa2193afb8c13
+dirty: true
+--- stdout ---
+ITERATION 0 (current edges, current kernel list of 372): 21 violations; after.txt has 21
+  same set as after.txt: true
+ITERATION 1: kernel=372, violations=26, new targets=15, non-edge violations=0
+  + plugins/pipeline-core/lib/git-null-device.mjs  (first pulled by plugins/pipeline-core/lib/po-gate-authority.mjs)
+  + plugins/pipeline-core/lib/continuity-authority-drift.mjs  (first pulled by plugins/pipeline-core/scripts/pipeline-state.mjs)
+  + plugins/pipeline-core/lib/fs-durability.mjs  (first pulled by plugins/pipeline-core/lib/governance-action-artifact.mjs)
+  + plugins/pipeline-core/lib/hardened-private-directory.mjs  (first pulled by plugins/pipeline-core/scripts/pre-push-hook-install.mjs)
+  + plugins/pipeline-core/lib/hook-currentness.mjs  (first pulled by plugins/pipeline-core/scripts/pre-push-hook-install.mjs)
+  + plugins/pipeline-core/lib/checkpoint-push-approval.mjs  (first pulled by plugins/pipeline-core/scripts/pre-push-hook-install.mjs)
+  + plugins/pipeline-core/lib/agy-start-hint.mjs  (first pulled by plugins/pipeline-core/scripts/pipeline-start-preflight.mjs)
+  + plugins/pipeline-core/scripts/toolchain-preflight.mjs  (first pulled by plugins/pipeline-core/scripts/pipeline-start-preflight.mjs)
+  + plugins/pipeline-core/lib/agy-central-refresh.mjs  (first pulled by plugins/pipeline-core/scripts/pipeline-update-channel.mjs)
+  + plugins/pipeline-core/lib/guard/env-dump-lane.mjs  (first pulled by plugins/pipeline-core/lib/guard/evaluate.mjs)
+  + plugins/pipeline-core/lib/critical-action-authorization.mjs  (first pulled by plugins/pipeline-core/lib/checkpoint-push-approval.mjs)
+  + plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs  (first pulled by plugins/pipeline-core/scripts/toolchain-preflight.mjs)
+  + plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs  (first pulled by plugins/pipeline-core/scripts/toolchain-preflight.mjs)
+  + plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs  (first pulled by plugins/pipeline-core/scripts/toolchain-preflight.mjs)
+  + plugins/pipeline-core/lib/agy-central-snapshot.mjs  (first pulled by plugins/pipeline-core/lib/agy-central-refresh.mjs)
+ITERATION 2: kernel=387, violations=0, new targets=0, non-edge violations=0
+
+NEW PATHS (sorted), total 15:
+plugins/pipeline-core/lib/agy-central-refresh.mjs   <- plugins/pipeline-core/scripts/pipeline-update-channel.mjs
+plugins/pipeline-core/lib/agy-central-snapshot.mjs   <- plugins/pipeline-core/lib/agy-central-refresh.mjs
+plugins/pipeline-core/lib/agy-start-hint.mjs   <- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+plugins/pipeline-core/lib/checkpoint-push-approval.mjs   <- plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+plugins/pipeline-core/lib/continuity-authority-drift.mjs   <- plugins/pipeline-core/scripts/pipeline-state.mjs
+plugins/pipeline-core/lib/critical-action-authorization.mjs   <- plugins/pipeline-core/lib/checkpoint-push-approval.mjs
+plugins/pipeline-core/lib/fs-durability.mjs   <- plugins/pipeline-core/lib/governance-action-artifact.mjs
+plugins/pipeline-core/lib/git-null-device.mjs   <- plugins/pipeline-core/lib/po-gate-authority.mjs
+plugins/pipeline-core/lib/guard/env-dump-lane.mjs   <- plugins/pipeline-core/lib/guard/evaluate.mjs
+plugins/pipeline-core/lib/hardened-private-directory.mjs   <- plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+plugins/pipeline-core/lib/hook-currentness.mjs   <- plugins/pipeline-core/scripts/pre-push-hook-install.mjs
+plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs   <- plugins/pipeline-core/scripts/toolchain-preflight.mjs
+plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs   <- plugins/pipeline-core/scripts/toolchain-preflight.mjs
+plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs   <- plugins/pipeline-core/scripts/toolchain-preflight.mjs
+plugins/pipeline-core/scripts/toolchain-preflight.mjs   <- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+
+HOOKREFRESH-F2 files already in kernel list: plugins/pipeline-core/scripts/model-role-bootstrap.mjs, plugins/pipeline-core/scripts/check-clone-provisioning.mjs, plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+HOOKREFRESH-F2 files among new paths: (none)
+HOOKREFRESH-F2 files in neither: plugins/pipeline-core/scripts/clone-hook-readiness.mjs, plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs
+
+CORRECTED DYNAMIC_IMPORT_EDGES entries:
+{
+  "plugins/pipeline-core/scripts/pre-push-hook-install.mjs": [
+    "../lib/manifest.mjs",
+    "../lib/verify-evidence-path.mjs",
+    "../lib/security-completeness-gate.mjs",
+    "../lib/push-destination-policy.mjs",
+    "../lib/checkpoint-push-audit.mjs",
+    "../lib/project-authority.mjs",
+    "../lib/checkpoint-push-approval.mjs",
+    "../lib/critical-human-proof-policy.mjs"
+  ],
+  "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs": [
+    "./toolchain-preflight.mjs",
+    "./model-role-bootstrap.mjs"
+  ],
+  "plugins/pipeline-core/scripts/toolchain-preflight.mjs": [
+    "./po-human-approval.mjs",
+    "./po-human-approval.mjs",
+    "./check-clone-provisioning.mjs",
+    "./pre-push-hook-install.mjs"
+  ],
+  "plugins/pipeline-core/scripts/guard-human-override.mjs": [
+    "./toolchain-preflight.mjs"
+  ]
+}
+
+--- stderr ---

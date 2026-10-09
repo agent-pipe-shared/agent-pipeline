@@ -1,0 +1,26 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/codex-readiness-finalization.test.mjs
+label: lib-codex-readiness-finalization
+exitCode: 0
+head: f06b434a2ae709ae34641f92856cd69aa907e47f
+tree: 7bf1b6176112a71f82c0a3867658cf425e7196df
+dirty: true
+--- stdout ---
+✔ unknown-at-launch child output binds original frame, canonical report and genuine closed pipes across fresh physical reader (1890.029386ms)
+✔ genuinely owned empty Node process cannot authorize a complete-looking caller report record (2122.054196ms)
+✔ caller-coordinated digest, pipe, session, controls and private-pointer mutations are refused (2268.93113ms)
+✔ private finalization mode, alias and coordinated-content drift invalidate existing receipt (2084.489273ms)
+✔ public package verifier independently resolves trusted executable before fresh private store acceptance (3879.434392ms)
+✔ readiness supplemental Advisor metadata binds real current receipt, route, design question and bounded physical bytes (31150.252033ms)
+✔ readiness supplemental Advisor physical aliases, oversized and duplicate-key observations refuse (47.651217ms)
+✔ readiness supplemental Advisor actual managed request and fresh default verifier bind declared runtime context (3346.493467ms)
+✔ readiness supplemental Advisor drift after actual turn refuses publication and private readiness record (793.218145ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50319.142092
+
+--- stderr ---

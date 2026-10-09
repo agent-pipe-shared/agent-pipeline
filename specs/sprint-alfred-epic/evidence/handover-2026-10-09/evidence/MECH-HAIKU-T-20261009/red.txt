@@ -1,0 +1,7 @@
+Native runs, Windows, after the edits (hand-summarised from tool output; not script-written).
+check-routing-projections.test.mjs: exit 1, 55/56, only RP04 red (mechanic haiku/medium expected).
+p3b-runner-conformance.test.mjs: exit 1, C01 red with invalid-source (haiku alias not yet accepted by registry/validator); C02, C03 green.
+runner-profile-migration-v2.test.mjs: exit 1, 17 red, all invalid-source/invalid-plan cascade from the haiku legacy and claude mechanic fixtures; passes unchanged otherwise.
+runner-profile-migration-v3.test.mjs: exit 1, only "committed registry is complete and exact -- mechanic.claude exact tuple" red (this is runner-contracts.schema.test.mjs, 14/15).
+runner-profile-migration-v3.test.mjs: not completed within 120s, background run; result not captured.
+project-onboarding-v3.test.mjs: not run (file is ~9000 lines).

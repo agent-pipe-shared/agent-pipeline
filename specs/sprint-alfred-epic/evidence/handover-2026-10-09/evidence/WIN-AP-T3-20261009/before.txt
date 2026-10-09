@@ -1,0 +1,286 @@
+# command: node --test --test-reporter=tap plugins/pipeline-core/lib/hardened-private-directory.test.mjs
+# host: platform=win32 node=v24.20.0
+# captured: 2026-10-09T05:06:25.339Z
+TAP version 13
+# Subtest: non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers
+ok 1 - non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers
+  ---
+  duration_ms: 2.5258
+  type: 'test'
+  ...
+# Subtest: win32 hardens every directory it created before descending and only assesses pre-existing ones
+ok 2 - win32 hardens every directory it created before descending and only assesses pre-existing ones
+  ---
+  duration_ms: 2.2075
+  type: 'test'
+  ...
+# Subtest: win32 refuses a pre-existing insecure directory instead of silently re-hardening it
+ok 3 - win32 refuses a pre-existing insecure directory instead of silently re-hardening it
+  ---
+  duration_ms: 1.3852
+  type: 'test'
+  ...
+# Subtest: win32 fails closed when hardening a directory it just created does not end secure
+ok 4 - win32 fails closed when hardening a directory it just created does not end secure
+  ---
+  duration_ms: 0.9678
+  type: 'test'
+  ...
+# Subtest: a target outside the anchor and a non-directory segment are refused on every platform
+ok 5 - a target outside the anchor and a non-directory segment are refused on every platform
+  ---
+  duration_ms: 1.719
+  type: 'test'
+  ...
+# Subtest: real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened
+ok 6 - real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened
+  ---
+  duration_ms: 2363.0974
+  type: 'test'
+  ...
+# Subtest: pre-commit installer creates its private state directories with a secure DACL
+ok 7 - pre-commit installer creates its private state directories with a secure DACL
+  ---
+  duration_ms: 1699.3736
+  type: 'test'
+  ...
+# Subtest: commit-msg installer creates its private state directories with a secure DACL
+ok 8 - commit-msg installer creates its private state directories with a secure DACL
+  ---
+  duration_ms: 1564.1255
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory
+ok 9 - win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory
+  ---
+  duration_ms: 2.5231
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory
+ok 10 - win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory
+  ---
+  duration_ms: 2.0838
+  type: 'test'
+  ...
+# Subtest: win32 removes only the failing created segment and never a pre-existing parent
+ok 11 - win32 removes only the failing created segment and never a pre-existing parent
+  ---
+  duration_ms: 1.5251
+  type: 'test'
+  ...
+# Subtest: win32 removes a failed created segment only while it is still empty and says when it could not
+ok 12 - win32 removes a failed created segment only while it is still empty and says when it could not
+  ---
+  duration_ms: 1.5799
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged
+ok 13 - win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged
+  ---
+  duration_ms: 1.055
+  type: 'test'
+  ...
+# Subtest: win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy
+ok 14 - win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy
+  ---
+  duration_ms: 1.2702
+  type: 'test'
+  ...
+# Subtest: win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy
+ok 15 - win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy
+  ---
+  duration_ms: 1.3288
+  type: 'test'
+  ...
+# Subtest: ensureAgentPipelineRoot (Ruling 141 D0 root entry point)
+    # Subtest: the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32)
+    ok 1 - the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32)
+      ---
+      duration_ms: 2.8444
+      type: 'test'
+      ...
+    # Subtest: an absent root is created hardened and reported as created, nothing repaired (seam-driven win32)
+    ok 2 - an absent root is created hardened and reported as created, nothing repaired (seam-driven win32)
+      ---
+      duration_ms: 1.2873
+      type: 'test'
+      ...
+    # Subtest: a present, secure root is returned as found under either posture, never hardened (seam-driven win32)
+    ok 3 - a present, secure root is returned as found under either posture, never hardened (seam-driven win32)
+      ---
+      duration_ms: 2.1918
+      type: 'test'
+      ...
+    # Subtest: an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32)
+    ok 4 - an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32)
+      ---
+      duration_ms: 0.9881
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is insecure is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 5 - a repair whose re-assessment is insecure is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 1.1299
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is unavailable is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 6 - a repair whose re-assessment is unavailable is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 0.9476
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is unreported is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 7 - a repair whose re-assessment is unreported is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 0.8736
+      type: 'test'
+      ...
+    # Subtest: a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32)
+    ok 8 - a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32)
+      ---
+      duration_ms: 6.147
+      type: 'test'
+      ...
+    # Subtest: a root owned by anyone else is refused and left untouched under either posture (seam-driven win32)
+    ok 9 - a root owned by anyone else is refused and left untouched under either posture (seam-driven win32)
+      ---
+      duration_ms: 2.0897
+      type: 'test'
+      ...
+    # Subtest: a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32)
+    ok 10 - a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.1132
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (an unavailable status carrying an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 11 - a root whose owner and DACL cannot be observed (an unavailable status carrying an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.1334
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (an unavailable status without an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 12 - a root whose owner and DACL cannot be observed (an unavailable status without an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.0503
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (no observation at all) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 13 - a root whose owner and DACL cannot be observed (no observation at all) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 0.9977
+      type: 'test'
+      ...
+    # Subtest: a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link)
+    ok 14 - a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link)
+      ---
+      duration_ms: 3.0623
+      type: 'test'
+      ...
+    # Subtest: a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file)
+    ok 15 - a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file)
+      ---
+      duration_ms: 3.0736
+      type: 'test'
+      ...
+    # Subtest: an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform)
+    ok 16 - an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform)
+      ---
+      duration_ms: 1.4374
+      type: 'test'
+      ...
+    # Subtest: an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX)
+    ok 17 - an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX)
+      ---
+      duration_ms: 2.7075
+      type: 'test'
+      ...
+    # Subtest: a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX)
+    ok 18 - a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX)
+      ---
+      duration_ms: 2.0738
+      type: 'test'
+      ...
+    # Subtest: a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX)
+    ok 19 - a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX)
+      ---
+      duration_ms: 1.3512
+      type: 'test'
+      ...
+    # Subtest: an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX)
+    ok 20 - an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX)
+      ---
+      duration_ms: 1.3415
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an absent root is created with mode 0o700 and reported as created
+    ok 21 - real POSIX mode host: an absent root is created with mode 0o700 and reported as created # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0443
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: a present root with mode 0o700 is returned as found
+    ok 22 - real POSIX mode host: a present root with mode 0o700 is returned as found # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0496
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o755 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 23 - real POSIX mode host: an insecure root of mode 0o755 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0284
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o770 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 24 - real POSIX mode host: an insecure root of mode 0o770 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0366
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o705 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 25 - real POSIX mode host: an insecure root of mode 0o705 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0236
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE
+    ok 26 - real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0216
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found
+    ok 27 - real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found
+      ---
+      duration_ms: 1670.3989
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED
+    ok 28 - real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED
+      ---
+      duration_ms: 1600.3333
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE
+    ok 29 - real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE
+      ---
+      duration_ms: 860.9307
+      type: 'test'
+      ...
+    1..29
+ok 16 - ensureAgentPipelineRoot (Ruling 141 D0 root entry point)
+  ---
+  duration_ms: 4170.6243
+  type: 'suite'
+  ...
+1..16
+# tests 44
+# suites 1
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 6
+# todo 0
+# duration_ms 9902.3276
+
+# exit code: 0

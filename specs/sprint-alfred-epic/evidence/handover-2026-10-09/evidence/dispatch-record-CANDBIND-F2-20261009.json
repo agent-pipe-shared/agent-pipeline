@@ -1,0 +1,50 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CANDBIND-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "12426da30bf6dd2c5c75d275d0e43bbcda0a619f"
+  ],
+  "resultSha256": null,
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+      "plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs",
+      "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs"
+    ],
+    "text": "COMPLETED, implementation complete; verify (Full Verify) pending; independent review: pending; PO acceptance: open. Commit 12426da30bf6dd2c5c75d275d0e43bbcda0a619f (3 production files, +4/-4). The optional requireCurrentCandidate (default true) is now forwarded host-evidence.verifyDesignReadinessHostExecution Codex drh_ branch call -> codex-tool-free-design-readiness.verifyCodexToolFreeBindingFromSources (new destructured param, default true) -> codex-readiness-finalization.rereadCurrentReadinessAdvisorObservation (new 5th positional param, default true) -> rereadReadinessAdvisorContextV2 (already accepted it as 5th arg). WSL captures under evidence/CANDBIND-F2-20261009/: before-pin.txt exit 1 (2 pass/2 fail: CANDBINDX-a and -c red), after-pin.txt exit 0 (4/4 green); before/after-binding.txt (design-workflow-candidate-binding.test.mjs) exit 0 both; before/after-descendant.txt (design-workflow-evidence-descendant.test.mjs) exit 0 both. Consumer-safe check (node --test harness/scripts/check-consumer-safe-paths.test.mjs) 9/9 exit 0. Route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 (runtime prompt statement), no contradiction. Deviation/clarification: readCurrentReadinessAdvisorObservation (finalization :94, v1 path, also called at tool-free :180 for the advisorObservationRefs branch) was NOT given the flag: it compares only against the observation's own recorded candidate and never against the moving HEAD, so there is no current-candidate enforcement to relax there; a parameter would be dead and could mislead. Other callers of the three functions were not changed and keep the strict default. Stop conditions: none triggered; no fourth production file; no default turned non-strict. Tool uses at commit: 36.",
+    "toolUses": 38
+  },
+  "log": [
+    { "phase": "opening: briefing + how-to-read + CONT5/CONT7 + obligations + goldfish-task read, preflight ready, record created; route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 (runtime prompt), no contradiction", "toolUses": 10 },
+    { "phase": "orientation: three chain ranges + pin file + v2 reader signature read; BEFORE captured under WSL (pin 2 pass/2 fail a,c red; binding exit 0; descendant exit 0)", "toolUses": 23 },
+    { "phase": "edits: host-evidence call site, tool-free signature + re-read call, finalization re-read (4 edits, 3 files)", "toolUses": 27 },
+    { "phase": "AFTER captured under WSL (pin 4/4 green; binding exit 0; descendant exit 0); consumer-safe 9/9 exit 0", "toolUses": 32 },
+    { "phase": "commit message file written; interim terminal record for the commit-gate", "toolUses": 34 },
+    { "phase": "committed 12426da30 (3 files); final record written", "toolUses": 38 }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

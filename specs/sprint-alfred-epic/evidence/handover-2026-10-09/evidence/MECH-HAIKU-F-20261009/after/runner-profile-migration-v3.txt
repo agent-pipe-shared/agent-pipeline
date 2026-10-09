@@ -1,0 +1,402 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+label: mech-haiku-after-runner-profile-migration-v3
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✖ RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization (10.689992ms)
+✖ RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner (6.904487ms)
+✔ RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty (120.606931ms)
+✔ RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature (187.602308ms)
+✔ RPM05 apply requires explicit activation and an unchanged in-process digest-only plan (80.578714ms)
+✔ RPM06 a V3 authority update refreshes every frozen routing mapping as one registry (223.173861ms)
+✔ RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection (238.473447ms)
+✔ RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction (225.314586ms)
+✔ RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it (167.324733ms)
+✔ RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed (647.065348ms)
+✔ RPM11 a cached preview acknowledgement cannot authorize a second recovery (147.245214ms)
+✔ RPM12 stale source invalidates a reviewed plan before staging (64.398751ms)
+✔ RPM13 a handled durable exclusive-commit error rolls every target back (96.933401ms)
+✔ RPM14 already-current v3 inspects ready and plans noop (150.813284ms)
+✔ RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh (17.375254ms)
+✔ RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial (168.542124ms)
+✖ RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy (8.900571ms)
+✖ RPM18 Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs (9.156916ms)
+✖ RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract (11.720469ms)
+✖ RPM20 legacy additions roll back files and created directories after interruption (7.943594ms)
+✖ RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target (7.64068ms)
+✖ RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup (7.213881ms)
+✔ RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes (6.872097ms)
+✖ RPM24 exclusive absent-target commit closes the race after its final preimage check (7.175711ms)
+✔ RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary (87.269388ms)
+✔ RPM26 current V3 with any missing runtime target remains fail-closed (11.082108ms)
+✔ RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable (85.943255ms)
+✔ RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant (97.824687ms)
+✔ RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent (171.618127ms)
+✔ RPM30 slim V3 initialization never replaces a present malformed runtime baseline (34.657157ms)
+✔ RPM31 legacy compatibility remains closed to malformed and unknown aliases (16.317876ms)
+✔ RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert (102.515507ms)
+✔ RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets (144.347754ms)
+✔ RPM34 authenticated noop apply remains bound to source, runtime digests, and root (351.904868ms)
+✔ RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors (543.163303ms)
+✔ RPM36 an unsafe existing neutral authority mirror fails planning without a transaction (19.443599ms)
+✔ RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply (123.634302ms)
+✔ RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically (147.268765ms)
+✔ RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded (145.651976ms)
+✔ RPM40 a source stale only in critic_export classifies as v3-refresh (145.528585ms)
+✔ RPM41 a source with critic_export entirely absent still fills it in unchanged (141.880702ms)
+✔ RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid (17.586779ms)
+✔ RPM43 CLI enforces inspect/plan/apply and explicit activation (199.38834ms)
+✖ RPM44 CLI activated apply emits the complete classified preview before any target mutation (14.516077ms)
+✖ RPM45 CLI production preview contract completes bounded short writes before activation (8.157069ms)
+✖ RPM46 CLI production preview zero-progress and failure seams stop before apply (6.914727ms)
+✖ RPM47 CLI preview-channel failure returns one sanitized result and cannot activate (6.117405ms)
+✔ RPM48 CLI previews a classified pending recovery before recovery and activation (195.238829ms)
+✔ RPM49 CLI completes bounded short writes for pending recovery before touching its journal (216.584162ms)
+✔ RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes (238.556974ms)
+✖ RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate (6.521766ms)
+✔ RPM52 a freshly onboarded project seeds both manifest tiers byte-identically (36897.286074ms)
+✔ RPM53 both freshly seeded manifest tiers resolve the same gate chapter (35728.22245ms)
+✔ RPM54 a customised existing manifest is never replaced by the fresh seed (82.844332ms)
+✔ RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply (148308.922037ms)
+✔ RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed (48493.08894ms)
+✔ RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed (43375.902537ms)
+✔ RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier (45931.238225ms)
+✔ RPM59 an Antigravity enrolment publishes its own tier and no Codex target (102203.595503ms)
+✔ RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines (54049.25739ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 46
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 522495.819412
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization (10.689992ms)
+  AssertionError [ERR_ASSERTION]: v0 must plan with  absent
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:157:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner (6.904487ms)
+  AssertionError [ERR_ASSERTION]: v0 must plan with .claude/pipeline.yaml absent
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:194:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy (8.900571ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:676:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM18 Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs (9.156916ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:763:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract (11.720469ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:813:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM20 legacy additions roll back files and created directories after interruption (7.943594ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'interrupted'
+       ^
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:833:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'interrupted',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target (7.64068ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'apply-failed'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:851:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'apply-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup (7.213881ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:885:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM24 exclusive absent-target commit closes the race after its final preimage check (7.175711ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:949:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM44 CLI activated apply emits the complete classified preview before any target mutation (14.516077ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1504:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM45 CLI production preview contract completes bounded short writes before activation (8.157069ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1559:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM46 CLI production preview zero-progress and failure seams stop before apply (6.914727ms)
+  AssertionError [ERR_ASSERTION]: zero-progress
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'preview-failed'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1585:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'preview-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM47 CLI preview-channel failure returns one sanitized result and cannot activate (6.117405ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'preview-failed'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1604:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'preview-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate (6.521766ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 'v1'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1722:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'v1',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

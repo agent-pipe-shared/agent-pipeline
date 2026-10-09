@@ -1,0 +1,40 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "E2E-ONB-A-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["c07067fff"],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2, "riskClass": "low", "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "opening: briefing read, preflight run, record created", "toolUses": 9 },
+    { "phase": "orientation done; first grouped WSL run hung >600 s, killed; per-file driver written (scratch/e2e-onb-a-driver.sh)", "toolUses": 24 },
+    { "phase": "budget checkpoint at 28; report written and committed c07067fff; closing allowance", "toolUses": 35 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["c07067fff: specs/sprint-alfred-epic/evidence/e2e-onb-a-suites-2026-10-09.md (partial report)"],
+    "verifiedGreen": [],
+    "remainsUndone": ["38 of 53 test files unmeasured (list in the report)", "4 antigravity-hard-enforcement reds unclassified", "3 files timed out at 100 s (clone-hook-readiness.rollback, onboarding-init, onboarding-runner-identity), no artifact written", "DRHS-UNSAFE-DIRECTORY throw site not located", "evidence/E2E-ONB-A-20261009/*.txt captures are NOT committed: the repo-root evidence/ directory is gitignored; scratch/e2e-onb-a-driver.sh was still running in WSL in the background and keeps writing captures", "scratch/commit-msg/E2E-ONB-A.txt, scratch/e2e-onb-a-driver.sh untracked scratch"],
+    "nextBriefingAdjustments": ["Cap of 100 s per file was too small for 3 files; use 300 s", "Run the suite in the background driver ONLY with an owner who can poll; a 35-call budget cannot cover 53 files plus classification", "Split: one dispatch for scripts/, one for lib/, one to classify reds", "Commands using > redirects in a shell are denied (GUARD-DEVPLAN-SHELL); use capture-evidence.mjs under wsl bash -lc (non-login bash lacks node, rc 127)", "Captures under repo-root evidence/ are gitignored; the report must cite them as local artifacts or the dispatcher must force-add"]
+  },
+  "report": {
+    "text": "Interim partial (closing-allowance handover). independent review: pending. DoD: report table partial (15 of 53 files; 11 green, design-workflow-signing-default 5/5 red DRHS-UNSAFE-DIRECTORY from test fixture line 53, antigravity-hard-enforcement 4 of 23 red, 3 timeouts at 100 s); captures exist under evidence/E2E-ONB-A-20261009/ (gitignored, uncommitted); report committed c07067fff. Product vs test fault not classified for any red; known reds TR-S1 and LE not confirmed. Not verifiable: remaining 38 files. resultSha256 left null (no tool use left to hash the text). See specs/sprint-alfred-epic/evidence/e2e-onb-a-suites-2026-10-09.md and closingAllowance above.",
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/e2e-onb-a-suites-2026-10-09.md"]
+  }
+}

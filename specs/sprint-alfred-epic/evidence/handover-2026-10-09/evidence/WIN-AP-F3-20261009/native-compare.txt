@@ -1,0 +1,3 @@
+# compare before=evidence/WIN-AP-F3-20261009/native-before.txt after=evidence/WIN-AP-F3-20261009/native-after.txt
+CHANGED: F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven win32): fail -> pass
+# unchanged: 118

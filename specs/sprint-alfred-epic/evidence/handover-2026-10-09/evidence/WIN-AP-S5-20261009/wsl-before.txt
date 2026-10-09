@@ -1,0 +1,107 @@
+command: node --test plugins/pipeline-core/lib/guard-maintenance-window.test.mjs plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs
+label: WIN-AP-S5-wsl-before
+exitCode: 0
+head: 902fe1b74859a53fb0f736ccf8c46aedad0bcbc2
+tree: c1835a99be648a18e5b71625dc933d4e39542a24
+dirty: true
+--- stdout ---
+(node:6743) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (36.202886ms)
+✔ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (23.384229ms)
+✔ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (25.812752ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (20.599464ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (23.953205ms)
+PASS GMW01 GS-6 and TP-* are liftable; GS-1..GS-5/GS-7 and arbitrary ids are not
+PASS GMW02 prepare rejects a scope naming a non-liftable rule id
+PASS GMW03 prepare -> install -> active -> windowCoversRule -> close -> absent
+PASS global committed chat arms GMW without an anchor/proof and records chat-attributed-unattested
+PASS signature/default/uncommitted/invalid human approval remains fail-closed without an anchor
+PASS GMW04 a missing/malformed subject.expiresAtMs resolves to NOT active (fail-closed)
+PASS GMW04b editing expiresAtMs in the stored record (a plaintext-looking field) fails verification, not renews
+PASS GMW09 repeating install() with the identical {request, proof} never moves expiry later than the signed bound
+PASS GMW10 install refuses a request whose signed expiresAtMs has already passed
+PASS GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)
+PASS GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later
+PASS GMW06 a window prepared for one physical repository does not verify for another
+PASS GMW07 a tampered window.json (any byte changed post-install) fails currentGuardMaintenanceWindow
+PASS GMW11 install rejects a hand-built request naming a non-liftable rule id, bypassing prepare()
+PASS GMW12 currentGuardMaintenanceWindow/windowCoversRule never report a non-liftable id as covered, even from an already-stored record
+PASS GMW08 isNeverLiftableKernelPath matches both anchors and nothing else
+PASS F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules
+PASS GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves
+PASS GMW15 an unresolvable digest yields no lines at all -- no record, no invented description
+PASS GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest
+PASS GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line
+PASS GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)
+PASS GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded
+PASS GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature
+PASS GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable
+PASS GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it
+PASS GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install
+PASS GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)
+PASS GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches
+PASS GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree
+PASS GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD
+PASS GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one
+PASS GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent
+PASS GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the "any well-formed key" posture, unlike the CRITICAL_ACTION_KINDS ceremonies
+PASS GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking
+PASS GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance
+PASS GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke
+PASS GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path
+PASS GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope
+PASS GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this
+PASS GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit
+PASS GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range
+PASS GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope
+PASS GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping
+PASS GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot
+PASS GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path
+PASS GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs
+PASS GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case
+PASS GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line
+PASS GMW15 prepare rejects authorshipMode "elephant-direct" with a missing/malformed stage0Selfcheck
+PASS GMW16 prepare rejects authorshipMode "elephant-direct" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)
+PASS GMW17 prepare+install accept authorshipMode "elephant-direct" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status
+PASS GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check
+PASS GMW19 authorshipMode "goldfish-dispatch" never requires (or carries) a stage0Selfcheck
+PASS GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent
+PASS GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)
+PASS GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)
+PASS GMW44 repoPathIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity
+PASS GMW45 repoFingerprint hashes the /mnt/c/... and <host-path> spellings of one physical repo to the same value, and two genuinely different repos still differ
+PASS GMW46 a plain POSIX repo path is unaffected (current formula equals the pre-fix legacy one -- no migration needed for the majority case)
+PASS GMW47 a fingerprint recorded under the pre-fix legacy formula for a WSL-mount repo is still recognized as bound (repoFingerprintMatches)
+PASS GMW48 an installed window is still found end-to-end when its stored repoFingerprintSha256 fields are the pre-fix legacy value (real repo/plugin fixtures, functional level)
+SKIP GMW49 (WIN-GMW-T) a GS-6-scoped window refuses an intervening commit whose only file is an ordinary out-of-scope repository file on a DIFFERENT volume from the live plugin root -- relative() across volumes returns the absolute target, which must not read as 'inside the anchor' [SINGLE-VOLUME]
+PASS GMW50 (WIN-GMW-T control) on ONE volume, an intervening commit whose only file is inside the live plugin root stays in scope and install tolerates it
+
+guard-maintenance-window: 63 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window.test.mjs (79343.71894ms)
+✔ prepare with --authorship-mode goldfish-dispatch succeeds and carries stage0Selfcheck: null (18156.808351ms)
+✔ prepare with --authorship-mode elephant-direct and a qualifying stage-0 self-check succeeds and carries the full object (20468.696882ms)
+✔ prepare with --authorship-mode elephant-direct and a non-qualifying stage-0 self-check still fails, with the library's own not-qualified code (45.213018ms)
+✔ prepare with --authorship-mode elephant-direct but no stage-0 self-check flags fails on the CLI's own usage check (45.402518ms)
+✔ prepare with an invalid --authorship-mode value still fails, matching the library's closed-set check (45.997679ms)
+✔ prepare with no --authorship-mode at all fails on the CLI's own usage check (47.993659ms)
+✔ install appends requested+granted to the portable ledger and arms the window (33406.386047ms)
+✔ committed global chat CLI install requires neither proof nor key/anchor and reports chat attribution (30557.341907ms)
+✔ re-installing the identical still-live request skips the ledger append (no duplicate grant) (39599.102557ms)
+✔ a proof that fails verification arms nothing and still leaves a revoked(NOT_ARMED) ledger trail (27117.067668ms)
+✔ close appends a revoked(CLOSED) disposition linked to the live grant, and still narrows exactly as before (25450.248723ms)
+✔ close on an absent window is a no-op and never appends (53.440682ms)
+✔ boundary: the emitted portable decisions never carry natural-person attribution or free-form reason (26558.955059ms)
+✔ install with --attribution-key-file appends exactly one restricted attribution record with no correlator (25788.726704ms)
+✔ install without --attribution-key-file: unchanged behavior, no restricted-store interaction (25272.833467ms)
+✔ install with a corrupt/wrong-length attribution key file: install still succeeds, attribution reports failure (26515.108907ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 301702.009792
+
+--- stderr ---

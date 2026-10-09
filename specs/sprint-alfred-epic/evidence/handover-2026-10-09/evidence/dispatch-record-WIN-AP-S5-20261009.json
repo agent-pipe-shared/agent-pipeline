@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S5-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "5cd3c2f8750830042ef25d15aa4c527166f018f2",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations + context read, route pre-check passed (observed claude-sonnet-5-5, effort unmappable), both preflights run, record created",
+      "toolUses": 16
+    },
+    {
+      "phase": "oriented, WSL baseline captured, in-tree edit admitted and applied",
+      "toolUses": 36
+    },
+    {
+      "phase": "after-captures: pin (d) cases green natively, GMW50 control red natively; budget notice at 44",
+      "toolUses": 44
+    },
+    {
+      "phase": "edit reverted (production file verified clean), stopped without commit, report written",
+      "toolUses": 54
+    }
+  ],
+  "resultSha256": "d40c060f59f43389364dedf6bc842b7f8c7f7e41fe931409d039ffcfc417bf5e",
+  "report": {
+    "text": "WIN-AP-S5-20261009 completion report (goldfish-deep). STOPPED WITHOUT COMMIT (stop condition 5 / DoD \"nothing else changes\" violated). Independent review: pending (nothing to review: no commit). PO acceptance: pending. Label: closing handover, not a completed run.\n\nRoute pre-check: requested (field 6) goldfish-deep, tool-layer model sonnet (Sonnet 5.5, effort xhigh). Observed in this dispatch's own runtime prompt: \"You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". Model matches. Effort: the prompt carries only a numeric reasoning-effort hint (30), not mappable to a named level, so effective effort is unknown (disclosed, not a mismatch).\n\nCLOSING STATEMENTS\n1. Committed: nothing committed.\n2. Verified green: scripts/guard-maintenance-window.test.mjs, native, with the edit applied: the four WIN-GES-F3 cases (prepare --authorship-mode goldfish-dispatch, prepare elephant-direct qualifying, committed global chat CLI install, close on an absent window) are green (command: node --test lib/guard-maintenance-window.test.mjs lib/agent-pipeline-root-creation.test.mjs scripts/guard-maintenance-window.test.mjs under capture-evidence.mjs; artifact evidence/WIN-AP-S5-20261009/native-after.txt, wrapped exit 1 because of other reds). WSL with the edit applied: lib/guard-maintenance-window.test.mjs and scripts/guard-maintenance-window.test.mjs green; the only 4 reds are the WIN-AP-S6-T pins (g)/(h) (artifact evidence/WIN-AP-S5-20261009/wsl-after.txt, wrapped exit 1; baseline evidence/WIN-AP-S5-20261009/wsl-before.txt, wrapped exit 0, taken before the S6-T pins landed in agent-pipeline-root-creation.test.mjs). consumer-safe-paths: NOT RUN (nothing to commit).\n3. Remains undone: the edit itself (reverted, see below), the single commit, consumer-safe-paths, a clean native-after. Files left modified and uncommitted: none in production (plugins/pipeline-core/lib/guard-maintenance-window.mjs verified clean with git status --short after the revert). Untracked and uncommitted: evidence/WIN-AP-S5-20261009/wsl-before.txt, wsl-after.txt, native-after.txt, this record; git-ignored scratch/commit-msg/WIN-AP-S5.txt and scratch/dispatch-wip/WIN-AP-S5/.\n4. Next briefing: see section 6.\n\n1. DoD results\n- pin (d), the four WIN-GES-F3 reds: passed natively (scripts test, see above).\n- nothing else changes: FAILED natively. lib/guard-maintenance-window.test.mjs native: 61 passed, 3 failed (GMW48, GMW49, GMW50). GMW48 is pre-existing (red in the WIN-GES-F3 captures with and without the patch). GMW50 is documented in the test file as a control \"GREEN today on every host\" and is red with the edit: PrivateBoundaryError \"private-state directory Windows assurance is unavailable for agent-pipeline: native Windows DACL hardening failed (exit 1, UnauthorizedAccessException). The directory was created by this call and has been removed again.\" thrown at ensureAgentPipelineRoot called from storagePaths (native-after.txt lines 492-503 and 515-526). GMW49 (the WIN-GMW-F target) fails with the same PrivateBoundaryError instead of its own reason, which masks that pin.\n- native-after also shows pins (b)/(c) red (the WIN-AP-S4 post-images are not installed yet, expected) and pins (g)/(h) of two helpers red (WIN-AP-S6-T, red by design); neither is caused by this slice. One scripts-test red (\"install with --attribution-key-file ...\", GES-MISSING) is also in the WIN-GES-F3 baseline list.\n- consumer-safe-paths: not run. One commit: not made.\n\n2. Evidence: evidence/WIN-AP-S5-20261009/wsl-before.txt, wsl-after.txt, native-after.txt (all written by plugins/pipeline-core/scripts/capture-evidence.mjs; the wrapped command is node --test lib/guard-maintenance-window.test.mjs lib/agent-pipeline-root-creation.test.mjs scripts/guard-maintenance-window.test.mjs; WSL runs via wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; ...\"). No native-before was captured (not asked; the WIN-GES-F3 native-gmw-before.txt is at an older base).\n\n3. Changed files: none (the in-tree edit was admitted by the guard, applied, measured, and reverted).\n\n4. Deliberately not changed: the kernel-list hunk of the F3 patch is already present (WIN-AP-F2, hardened-private-directory.mjs listed); tests (forbidden); hardened-private-directory.mjs; guard-maintenance-window.kernel-list.patch; the foreign uncommitted files.\n\n5. Deviations from spec\n- The DoD names lib/guard-maintenance-window.test.mjs and lib/agent-pipeline-root-creation.test.mjs for pin (d), but the four WIN-GES-F3 cases live in plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs (the test header of agent-pipeline-root-creation.test.mjs says so). I ran all three files; a superset of the literal DoD.\n- The applied edit used ensureAgentPipelineRoot(common) instead of the patch's ensureHardenedPrivateDirectory(common, privateSegment), because the briefing says the entry point exists and the patch's refusing variant is what turned 9 native reds into 13 in the WIN-GES-F3 captures. Skipped hunk 2 of the patch (already present).\n\n6. Open items (triggered stop condition: the edit makes a documented-green control red; the fix needs a test change or a change to the entry point, both forbidden here)\nEXACT EDITS (applied, measured, reverted; re-apply verbatim) in plugins/pipeline-core/lib/guard-maintenance-window.mjs:\n (a) after the line  import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from \"./windows-private-state.mjs\";  add the line  import { ensureAgentPipelineRoot } from \"./hardened-private-directory.mjs\";\n (b) in storagePaths, between  const directory = join(common, \"agent-pipeline\", \"guard-maintenance-window\");  and  const base = create ? secureDirectory(directory) : directory;  insert a short comment and the line  if (create) ensureAgentPipelineRoot(common);\nCommit subject (DoD): fix(guard-maintenance-window): walk the storage root through the hardened entry point; trailers AI-Assisted: true and Dispatch: WIN-AP-S5-20261009 (goldfish).\nHypothesis (untested): GMW49/GMW50 build their fixture repository under the checkout scratch directory on the checkout volume; the win32 DACL hardening of a freshly created agent-pipeline directory there fails with UnauthorizedAccessException in this dispatch's process (pins (a)-(c), which use the temporary directory on another volume, harden fine). Either it is a sandbox/host limit of this process (then a run in the PO's own native shell would show GMW49/50 green with the edit) or it is a real defect of ensureAgentPipelineRoot/hardenWindowsPrivateDirectory on a volume whose parent DACL cannot be rewritten.\nNext briefing must say differently: (1) first discriminate: run the native lib/guard-maintenance-window.test.mjs from the PO's own shell WITH the edit applied (or run only GMW50's fixture), 1 call; (2) if green there, re-land as briefed and take a native-before at HEAD for the same three files for an honest comparison; (3) if red there, a product ruling is needed (fix in hardened-private-directory.mjs S2 or a fixture seam in the WIN-GMW-T tests); (4) tell the dispatch that WIN-AP-S6-T pins (g)/(h) are red by design in agent-pipeline-root-creation.test.mjs and that pins (b)/(c) are red natively until the S4 post-images are installed, so the DoD can say \"no change except these\"; (5) correct the DoD file list (pin (d) lives in scripts/guard-maintenance-window.test.mjs); (6) budget: native lib test takes ~300 s, run WSL and native in separate calls.\n",
+    "changedFiles": []
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "taskId": "TR-S2-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-as-intended",
+  "supersedes": "the in-progress opening record written at the start of this dispatch",
+  "commits": [
+    {
+      "sha": "ecf4bad9317acdccf6b887b11b8ee96fe69fc0d4",
+      "subject": "test(execution-lane-credential): pin that secret-name patterns apply only to file operands (Ruling 97)",
+      "paths": ["plugins/pipeline-core/lib/execution-lane-credential.test.mjs"]
+    }
+  ],
+  "log": [
+    { "phase": "opening: briefing, CONT17/CONT15 headers and T2 record read; preflight ready; route pre-check matched", "toolUses": 8 },
+    { "phase": "orientation done; commit message file written; groups F3S/F3P/F3O and header assumption 14 inserted", "toolUses": 28 },
+    { "phase": "native capture of the final file, consumer-safe check; git add hit index.lock once, retried after other work", "toolUses": 41 },
+    { "phase": "commit ecf4bad93 made; terminal record written", "toolUses": 53 }
+  ],
+  "report": {
+    "route": "requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed runtime identity claude-sonnet-5-5 (match). No A/G/S class named in field 6, so disclosure only. The dispatch carried a reasoning_effort tag of 30 against the requested xhigh.",
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs", "why": "Ruling 97 pins: F3S sanity group, F3P pattern-position admissions, F3O file-operand refusals; header assumption 14 added (pure insertion, 140 insertions, 0 deletions)" }
+    ],
+    "evidence": {
+      "capture": "evidence/TR-S2-T3-20261009/after.txt",
+      "captureCommand": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S2-T3-20261009/after.txt --label after -- node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "captureExit": 1,
+      "captureNote": "native win32; capture head 0e7c39b65fcdc348fe4d8c898c33cb2d99c5909c, dirty true (the test file was uncommitted at capture; committed content identical). The module at that HEAD is unchanged since 63ba0c32c, so TR-S2-F2 had NOT landed.",
+      "totals": { "tests": 298, "pass": 191, "fail": 107, "skipped": 0, "todo": 0 },
+      "delta": "275/177/98 before (T2) -> 298/191/107 now: +23 tests, +14 green, +9 red; no previously green case changed state",
+      "consumerSafe": { "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exit": 0, "pass": 9, "fail": 0 }
+    },
+    "perCase": {
+      "greenToday": [
+        "F3S-0, F3S-1 (fixture sanity, no module call)",
+        "F3P-1 rg -n <key>.pem docs/ (bash, powershell): admitted",
+        "F3P-2 grep -rn <key>.pem docs (bash, powershell): admitted",
+        "F3P-3 rg -e <key>.pem docs/ (bash, powershell): admitted",
+        "F3P-4 rg --regexp=<key>.pem docs/ (bash, powershell): admitted",
+        "F3P-5 rg -n id_ed25519 . (bash, powershell): admitted",
+        "F3O-3 grep foo docs/<key>.pem (bash, powershell): refused, but by the exact-name rule (secretBasenames, directory-qualified), NOT by secretPatterns; so green today and green after F2 regardless of the pattern rule"
+      ],
+      "redToday": [
+        "F3O-1 cat <key>.pem (bash, powershell): got null",
+        "F3O-2 rg -n foo <key>.pem (bash, powershell): got null",
+        "F3O-4 type <key>.pem (powershell): got null",
+        "F3O-5 rg -n foo -- id_ed25519 (bash, powershell): got null",
+        "F3O-6 (extra) grep foo docs/<pattern-only>.pem (bash, powershell): got null"
+      ],
+      "reason": "a BARE secret name never matches the exact-name rule (it needs a directory component) and the module ignores targets.secretPatterns, so all bare-name and pattern-only file operands are admitted today"
+    },
+    "stopConditionCheck": "none of the existing F3-1..F3-11, F3-C1..C4, N3-4 or MATCH-BARE is contradicted: every existing F3 refusal has the name in a file-operand position, and N3-4 and MATCH-BARE run on the default fixture that carries no secretPatterns",
+    "deviations": [
+      "Extra case F3O-6 (a directory-qualified pattern-only name in grep) and the two F3S sanity tests, beyond the briefed list. Reason: F3O-3 with the po-private name is refused today by the exact-name rule alone, so it cannot prove the pattern rule; F3O-6 can.",
+      "Header: the DoD allows 'a header assumption line naming Ruling 97'. I added a NEW assumption 14 (4 physical lines) as a pure insertion and edited no existing line, rather than rewording assumption 11. git numstat: 140 added, 0 deleted.",
+      "Key names are built from parts (POLICY_KEY_NAME, PATTERN_ONLY_NAME, ID_KEY_NAME); F3S-0 asserts the policy name is a fixture secretBasename and the pattern-only name is not, so the F3O-6 non-vacuity cannot drift silently.",
+      "The budget hook counted 65 as the working budget (checkpoint at call 52), not the briefed 75; the dispatch stopped at the checkpoint."
+    ],
+    "notChanged": [
+      "the module, evaluate.mjs, hooks/, lib/guard/, harness/ (read-only)",
+      "no existing case or header line (0 deletions)",
+      "the bundled index.lock was not touched; one git add retried after other work and passed"
+    ],
+    "openItems": [
+      "Ruling gap, NOT pinned (named in header assumption 14): once -e or --regexp supplies the pattern, the first positional of rg/grep is a FILE operand (rg -e foo <key>.pem). Ruling 97's wording 'excludes the first positional and the value of -e/--regexp' read literally would admit it. The F2 slice may need a ruling on this before a pin is added; a wrong skip would be a credential-read hole for rg and grep.",
+      "TR-S2-F2 must apply secretPatterns to bare AND directory-qualified names in file-operand positions, and must keep F3P-1..5 admitted. After it lands, the Elephant re-captures at HEAD; the expected end state is all 23 new cases green.",
+      "No Critic review and no PO acceptance yet: implementation complete, RED as intended, review pending.",
+      "The advisor tool was consulted once before writing; it was not consulted again before the hand-back."
+    ]
+  }
+}

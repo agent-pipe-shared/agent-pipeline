@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-F2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["95452767f"],
+  "resultSha256": null,
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/lib/governance-event-store.mjs"],
+    "text": "Route pre-check: requested claude-sonnet-5-5 / xhigh; observed model identity claude-sonnet-5-5 (runtime prompt); effort not mappable from the numeric reasoning_effort 30, disclosed, no contradiction. independent review: pending.\n\n1. DoD results. (a) native store: PARTIAL. 57 tests, 48 pass, 9 fail (before 13/44); zero GES-LOCK strings remain; all 13 previously passing tests still pass; the 9 reds all failed before, none is new. Causes: 5x EPERM on symlink creation (windows symlink privilege; tests :530, :814, :897, :1012, :1320); :1100 GES-RESTRICTED-WINDOWS-ASSURANCE (store.mjs:232, DACL assurance insecure on the real temp dir; unverified); :1247 GES-RESTRICTED-PERMISSIONS (store.mjs:226, POSIX mode check on a win32 host); :1307 and :1332 GES-EXISTING-REPOSITORY-BINDING (store.mjs:891/930, cause NOT diagnosed). (b) native ceremony: FAILED against the 5/5 target: 5 tests, 4 pass, 1 fail. End-to-end is green. The drift case (signing-ceremony.test.mjs:328, assertion :349) fails with Missing expected rejection: install succeeded after an unrelated commit landed. That is not a lock error; GMW-CANDIDATE-COMMIT-MISMATCH is raised at lib/guard-maintenance-window.mjs:1509-1511 only if intervenedCommitsStayWithinScope (:1504) returns false, and on win32 it apparently did not (cause undiagnosed; file belongs to WIN-GES-F3, untouched). It was masked by GES-LOCKED before. WSL before and after: PASSED, 93/93 both, exit 0, no red absent from before. check-consumer-safe-paths: PASSED 9/9 exit 0. Commit: PASSED, 95452767f, exact subject, trailers Dispatch + AI-Assisted only.\n\n2. Evidence (repo-relative): evidence/WIN-GES-F2-20261009/{wsl-before,native-store-after,native-ceremony-after,wsl-after}.txt via capture-evidence.mjs (exit codes 0,1,1,0); node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0.\n\n3. Changed files: plugins/pipeline-core/lib/governance-event-store.mjs (+37/-7): guard path via env GES_STREAM_LOCK_GUARD_PATH with constant script; try/catch maps HResult low word 32/33 to exit 75 and anything else to stderr + exit 2; readiness /ready\\r?\\n/; stderr piped, drained, bounded to 2048 chars; close instead of exit; GES-LOCKED only when exit equals the command's held code (1 for perl default, 75 win32), else GES-LOCK-RUNTIME with exit code, signal and stderr head.\n\n4. Deliberately not changed: tests; guard-maintenance-window.mjs; perl branch; the 9 reds; the other slices' untracked records; the evidence artifacts and this record stay untracked.\n\n5. Deviations: reused existing GES-LOCK-RUNTIME as the distinct code (nothing in plugins/ or harness/ matches it; only tests match GES-LOCKED) instead of minting a new name. Held exit on win32 is 75, not 1, so a PowerShell parse error (exit 1) can never read as contention again. The briefing says the guard holds the lock while the store writes; in the code it is held only while .lock is inspected or created (acquireStreamLock finally releases), unchanged by this commit. NOT separately verified: a contended win32 guard (sharing violation to exit 75); the racing-writer and live-lock tests pass natively but may have lost at the .lock check rather than the guard. 3 tool uses lost to guard refusals (directory read targets, rg flags).\n\n6. Open items: drift case red (hand to WIN-GES-F3 or a follow-up, with the undiagnosed intervenedCommitsStayWithinScope behaviour on win32); the 9 non-lock native reds; independent Critic review pending; PO acceptance pending. Not a closing-allowance handover."
+  },
+  "log": [
+    { "phase": "opening: record created after reading agent-obligations, CONT17 header, goldfish-task 455-481; preflight run once (receipt refusal)", "toolUses": 8 },
+    { "phase": "orientation done (store 660-790, note A1, guard-spawn.txt); code consumers: only tests match GES-LOCKED, nothing matches GES-LOCK-RUNTIME in plugins/ or harness/", "toolUses": 20 },
+    { "phase": "WSL before: evidence/WIN-GES-F2-20261009/wsl-before.txt, 93 tests 93 pass 0 fail, exit 0", "toolUses": 23 },
+    { "phase": "edit applied to governance-event-store.mjs (env-bound path, exit-code contract, CRLF readiness, bounded stderr)", "toolUses": 26 },
+    { "phase": "native store after: native-store-after.txt exit 1, 57 tests 48 pass 9 fail, no GES-LOCKED; 9 reds are EPERM symlink (5), DACL/POSIX-mode (2), existing-repository-binding (2)", "toolUses": 29 },
+    { "phase": "native ceremony after: native-ceremony-after.txt exit 1, 5 tests 4 pass 1 fail; end-to-end green, drift case red (Missing expected rejection)", "toolUses": 32 },
+    { "phase": "WSL after: wsl-after.txt 93/93 pass exit 0; check-consumer-safe-paths 9/9 exit 0", "toolUses": 35 },
+    { "phase": "committed 95452767f (production file only); checkpoint written", "toolUses": 41 },
+    { "phase": "final record overwrite, outcome partial (drift case red)", "toolUses": 42 }
+  ]
+}

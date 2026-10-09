@@ -1,0 +1,27 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/codex-design-readiness-host.test.mjs
+label: scripts-codex-design-readiness-host
+exitCode: 0
+head: ae5b02b82a8a9814414dc38e5b8a0d5f5b1d9bb4
+tree: 3b4bea5b95aa8d0987ca659e7dc49c9a124dcf5b
+dirty: true
+--- stdout ---
+✔ regular host maps only independently verified tool-free result and removes closed input (16.587226ms)
+✔ export declined refuses before store creation and any provider call (4.778734ms)
+✔ foreign repository and candidate route cannot select a provider (9.622648ms)
+✔ source edits and stale dispatch fail before store or model effects (10.118385ms)
+✔ host unavailable keeps recovery input and never tries another provider route (10.760146ms)
+✔ private readback failure and post-turn candidate drift prevent reviewed publication (15.710137ms)
+✔ actual not-ready remains a reviewed refusal of readiness (10.265473ms)
+✔ active family never consults V3 and missing S6/source identity ports refuse before child preparation (4.59233ms)
+✔ active family refuses stale candidate and malformed/copied receipt before binding or child launch (6.689792ms)
+✔ active readiness carries immutable prompt through real signed S4/S2/S5 and accepts only S6 actual identity (45.251467ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 726.537047
+
+--- stderr ---

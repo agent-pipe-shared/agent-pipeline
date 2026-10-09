@@ -1,0 +1,43 @@
+{
+  "taskId": "R7-3-F1b-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (CONT16 family)",
+  "outcome": "stopped",
+  "stopCondition": "any green-to-red (briefing field 5; Ruling 61 test-only slice: fixtures do not commit the package)",
+  "commits": [],
+  "log": [
+    { "phase": "bootstrap, briefing read, route pre-check (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5: match), preflight ready", "toolUses": 6 },
+    { "phase": "git apply --check: FAILS (hunk 3, context line 59-60 changed by R4-S3c 314359cf6); by-hand Edit chosen", "toolUses": 14 },
+    { "phase": "BEFORE capture (WSL): 84 tests / 80 pass / 3 fail (exactly the R7-3a pins) / 1 skipped; exit 1", "evidence": "evidence/R7-3-F1b-20261009/before.txt", "toolUses": 27 },
+    { "phase": "hand-applied gate: 36 insertions (hunks 1+2 verbatim, hunk 3 as two lines after the DWP-APPROVAL-BINDING return, R4-S3c forwarding line untouched); node --check ok", "toolUses": 32 },
+    { "phase": "AFTER capture (WSL): 86 tests / 77 pass / 8 fail / 1 skipped; exit 1. R7-3a pins green; 8 green-to-red. STOP", "evidence": "evidence/R7-3-F1b-20261009/after.txt", "toolUses": 35 },
+    { "phase": "gate edit reverted to HEAD (git checkout -- file) so the shared tree carries no red gate; nothing committed", "toolUses": 37 }
+  ],
+  "report": {
+    "dod": {
+      "r73aPinsGreen": "passed in the edited state (3 IGNORED/UNTRACKED/MODIFIED refusal pins green); edit then reverted",
+      "nothingGreenTurnsRed": "FAILED: 8 green-to-red",
+      "consumerSafeCheck": "not run (stopped before commit)",
+      "commit": "not made (stop condition)"
+    },
+    "greenToRed": [
+      "lib/design-workflow-evidence-descendant.test.mjs: EVDESC-a, EVDESC-c1, EVDESC-d, EVDESC-h (approval side returns refused:DWP-BOUND-PATH-UNTRACKED where DWP2-CURRENT-CANDIDATE / ok is pinned)",
+      "lib/design-workflow-package-v2.test.mjs: RC12C001 (builder returns DWP-BOUND-PATH-UNTRACKED for evidence/package.json; fixture at :135)",
+      "lib/po-gate-authority.test.mjs: whole file fails (uncaught assertion 2 !== 0 at :720 inside withFixture/check :714; present-plan exits 2)",
+      "scripts/pipeline-state-rebind-runner.test.mjs: 'inspect exposes one typed PO approval action after submit and presentation, independent of runner' (exit 2 !== 0 at :286)",
+      "scripts/project-onboarding-e2e.test.mjs: 'in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary' (present-plan refused DWP-BOUND-PATH-UNTRACKED at freshDriver :1036 via :1453)"
+    ],
+    "cause": "In every case the fixture presents/approves a design-workflow package it never git-adds and commits, so the gate correctly refuses with DWP-BOUND-PATH-UNTRACKED. Ruling 61 anticipated this (test-only slice: every fixture commits its package first). R7-3-T2 (DWP21), R7-3-T2b scope evidently does not yet cover these five suites.",
+    "changedFiles": [],
+    "changedFilesNote": "The only file touched, plugins/pipeline-core/lib/design-workflow-approval.mjs, was reverted to HEAD after the AFTER run. Tree has no change from this dispatch other than evidence/ files and scratch/.",
+    "evidence": [
+      "evidence/R7-3-F1b-20261009/before.txt (wrapped exit 1)",
+      "evidence/R7-3-F1b-20261009/after.txt (wrapped exit 1)"
+    ],
+    "rebasedHunk3": "After the line ending 'code: \"DWP-APPROVAL-BINDING\" };' in createDesignWorkflowPackageApprovalRequest and before 'const packageRead = readDesignWorkflowPackageFromRepository(...)', insert: 'const boundPathRefusal = refuseUnsoundBoundPath(repoRoot, packagePath);' and 'if (boundPathRefusal) return boundPathRefusal;'. Hunks 1 (execFileSync import) and 2 (gitStatus + refuseUnsoundBoundPath after candidateReader) apply verbatim.",
+    "note": "Working-tree dirt present identically in BEFORE and AFTER: lib/design-workflow-package-v2.test.mjs (unstaged modification, foreign). Opening-act stub kept at scratch/dispatch-progress/R7-3-F1b-20261009.json."
+  }
+}

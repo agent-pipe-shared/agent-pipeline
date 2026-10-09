@@ -1,0 +1,81 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GMW-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "4ef3071a666ba755780c17d4a2c86668af66ef53",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT18 headers + WIN-GMW-F section read; preflight run; record created",
+      "toolUses": 14
+    },
+    {
+      "phase": "edit + native/WSL/consumer-safe verify green; foreign hunk seen in same file; file then found already committed by a concurrent dispatch (e51844ab8)",
+      "toolUses": 33
+    },
+    {
+      "phase": "finalize: stopped-without-commit record + report",
+      "toolUses": 35
+    }
+  ],
+  "report": {
+    "text": "CLOSING HANDOVER (stopped-without-commit): the fix is verified and already in HEAD, but not under this dispatch's commit. independent review: pending.\n\nRoute pre-check (class G): requested claude-sonnet-5-5 / xhigh; observed model identity from this dispatch's runtime prompt: 'Sonnet 5.5, exact model ID claude-sonnet-5-5' -> no contradiction. Effort has no direct model-identity evidence (the runtime prompt carried a reasoning-effort setting of 30, which I do not treat as model identity); disclosed, not a stop.\n\n1. DoD results\n- Native capture, guard-maintenance-window.test.mjs: passed. GMW49 PASS, GMW50 PASS, the only FAIL is GMW48 (63 passed, 1 failed).\n- WSL capture, same command: passed. 63 passed, 0 failed; GMW49 prints its [SINGLE-VOLUME] skip, GMW50 PASS, GMW48 PASS.\n- Caller list: passed (below). No caller needs a non-null value for an absolute result.\n- check-consumer-safe-paths.test.mjs: passed (9/9, exit 0).\n- One commit of the production file with the exact subject: NOT MET by this dispatch (see section 6). No commit was made.\n\nCallers of normalizeRepoRelativePath in lib/guard-maintenance-window.mjs (three, read only):\n- isNeverLiftableKernelPath, project-anchor call (rootDir): both uses are guarded by 'projectRelative !== null &&'. null skips the kernel-list comparison; an absolute spelling (lowercased 'd:/...') never equalled a relative kernel path, so behaviour there is unchanged, and a file on another volume cannot be a project kernel path.\n- isNeverLiftableKernelPath, plugin-anchor call (livePluginRoot): guarded by 'pluginRelative !== null &&'; same reasoning, unchanged.\n- pathWithinScope, GS-6 containment ('!== null' means inside the live plugin root): null now means not contained, so a cross-volume file falls through to the TP-* loop and the function returns false. This is the intended fix (Ruling 140).\n\n2. Evidence\n- evidence/WIN-GMW-F-20261009/native.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-GMW-F-20261009/native.txt --label native -- node --test plugins/pipeline-core/lib/guard-maintenance-window.test.mjs ; wrapped exit 1 (only the pre-existing GMW48).\n- evidence/WIN-GMW-F-20261009/wsl.txt: same command run under WSL ; wrapped exit 0.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 0 (stdout in this session, no artifact).\n\n3. Changed files\n- plugins/pipeline-core/lib/guard-maintenance-window.mjs: normalizeRepoRelativePath returns null when relative() yields an absolute result (added '|| isAbsolute(rel)' to the existing guard, doc comment extended); no platform branch.\n- evidence/WIN-GMW-F-20261009/native.txt, evidence/WIN-GMW-F-20261009/wsl.txt: machine-written captures.\n\n4. Deliberately not changed\n- Any test file (GMW48 left red natively as briefed); any other production file; the three call sites.\n- The 3-line NEVER_LIFTABLE_KERNEL_PATHS entry for hardened-private-directory.mjs (comment 'WIN-AP-F2') that appeared in the same file during my run: not mine, left alone.\n- scratch/commit-msg/WIN-GMW-F-20261009.txt (prepared, unused, untracked) and scratch/dispatch/win-gmw-f/finalize.mjs (this record writer).\n\n5. Deviations from spec\n- No commit by this dispatch (forced, see 6). No pre-edit baseline capture was taken (budget); GMW49 red before the change rests on the briefing and Ruling 140.\n\n6. Open items / triggered conditions\n- SHARED-TREE RACE (briefing defect / stop-class ambiguity): my pre-commit 'git diff' of the production file showed my hunk (+7/-2) together with a foreign unstaged hunk (+3, WIN-AP-F2 kernel-list entry). A concurrent dispatch then committed that file by pathspec: commit e51844ab8 'feat(hardened-private-directory): add the private-root entry point that repairs an own insecure segment' touches the file with +10/-2, i.e. my hunk rode along. My next 'git diff --stat' for the file was empty, so nothing is left to commit; the exact-subject commit cannot exist without rewriting history (forbidden) or an empty commit (wrong). The captures above were taken on the file content that includes my fix.\n- Dispatcher decision needed: accept e51844ab8 as the carrier of the fix (its Dispatch trailer names the other dispatch, so authorship of the normaliser hunk is attributed there), or order a follow-up. The Critic should read the normalizeRepoRelativePath hunk inside e51844ab8, not a WIN-GMW-F commit.\n- Next briefing: do not run two Goldfish dispatches that write the same production file in one shared tree; or brief a worktree.\n- closing handover: committed = nothing by this dispatch (fix reached HEAD via e51844ab8); verified green = native and WSL captures, consumer-safe test; remains undone = the dedicated exact-subject commit, nothing uncommitted left in the file; independent Critic review pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "evidence/WIN-GMW-F-20261009/native.txt",
+      "evidence/WIN-GMW-F-20261009/wsl.txt"
+    ]
+  },
+  "resultSha256": "516d2cf0fbea5d6ff337f45d7efd9403854da63319f15b19c88135a33072ab14",
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "native guard-maintenance-window.test.mjs (GMW49/GMW50 pass; only GMW48 red)",
+        "artifact": "evidence/WIN-GMW-F-20261009/native.txt",
+        "exitCode": 1
+      },
+      {
+        "check": "WSL guard-maintenance-window.test.mjs (0 failed)",
+        "artifact": "evidence/WIN-GMW-F-20261009/wsl.txt",
+        "exitCode": 0
+      },
+      {
+        "check": "check-consumer-safe-paths.test.mjs",
+        "artifact": null,
+        "exitCode": 0
+      }
+    ],
+    "remainsUndone": [
+      "the dedicated exact-subject commit (fix already in HEAD inside e51844ab8, carried by a concurrent dispatch)"
+    ],
+    "nextBriefingAdjustments": [
+      "serialize or worktree-isolate dispatches that write the same production file"
+    ]
+  }
+}

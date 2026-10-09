@@ -1,0 +1,40 @@
+command: node --test --test-name-pattern=DWP21 plugins/pipeline-core/lib/design-workflow-package.test.mjs
+label: after-dwp21-isolated
+exitCode: 1
+head: 8328f56bb437549da2a8f2caededf8219b99f4b8
+tree: 226dc80fa0fed6972ca9efea198e46f36d19b651
+dirty: true
+--- stdout ---
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (93.577189ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 892.892402
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (93.577189ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-package.test.mjs:936:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

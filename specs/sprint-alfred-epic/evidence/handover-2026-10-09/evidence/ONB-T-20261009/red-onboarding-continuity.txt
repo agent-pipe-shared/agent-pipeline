@@ -1,0 +1,27 @@
+command: node plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+label: ONB-T-red-onboarding-continuity
+exitCode: 1
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+
+--- stderr ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: the complete onboarding continuity corpus must be registered before execution begins
+
+299 !== 298
+
+    at file:///<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:5030:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 299,
+  expected: 298,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.20.0

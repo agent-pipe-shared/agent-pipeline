@@ -1,0 +1,74 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "588b845521d579a3df4e70850239f987286641fc"
+  ],
+  "log": [
+    {
+      "phase": "opening record written (preflight ran from loaded plugin root; route pre-check: requested claude-sonnet-5-5/xhigh == observed claude-sonnet-5-5 from runtime prompt)",
+      "toolUses": 10
+    },
+    {
+      "phase": "orientation done (Ruling 141, WIN-AP-D note s1a/2/3, three creator sources, hardened-private-directory + its test, GMW fixture)",
+      "toolUses": 26
+    },
+    {
+      "phase": "test file written: plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs (pins a, b, c, e, plus e-premise self-check)",
+      "toolUses": 27
+    },
+    {
+      "phase": "native run, evidence/WIN-AP-T-20261009/native.txt, wrapped exit 1 (expected red): a RED (DACL grants a non-owner principal), b RED (same), c RED (same), e-premise GREEN, e RED (export absent)",
+      "toolUses": 30
+    },
+    {
+      "phase": "WSL run, evidence/WIN-AP-T-20261009/wsl.txt, wrapped exit 1 (expected red): a RED (mode 0o755), b GREEN, c GREEN, e-premise GREEN, e RED (export absent)",
+      "toolUses": 31
+    },
+    {
+      "phase": "check-consumer-safe-paths.test.mjs: exit 0, 9/9 pass",
+      "toolUses": 32
+    },
+    {
+      "phase": "commit 588b845521d579a3df4e70850239f987286641fc (one file, 164 insertions); verify-suites registration (TP-13) pending, author route",
+      "toolUses": 38
+    },
+    {
+      "phase": "terminal write: outcome completed (implementation complete, independent review and verify-suites registration pending), report.text and resultSha256 in one write",
+      "toolUses": 42
+    }
+  ],
+  "report": {
+    "text": "WIN-AP-T-20261009 (goldfish-deep): implementation complete; independent review: pending; verify-suites registration: pending.\n\nRoute pre-check (class S): requested route from field 6 is claude-sonnet-5-5 / xhigh. Effective identity observed in this dispatch's own runtime prompt: \"Sonnet 5.5, exact model ID claude-sonnet-5-5\". They match; no contradiction. Ruleset echoed: 0.7.0+claude.20261008194106.da20519d. Commit: 588b845521d579a3df4e70850239f987286641fc on feat/sprint-alfred (base f43bc8564).\n\n1. DoD results\n- Native run of the new file: wrapped exit 1, which is the expected outcome (RED pins by design).\n- WSL run of the new file: wrapped exit 1, expected.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9.\n- One commit of the new test file only, briefed subject, trailers exactly `Dispatch: WIN-AP-T-20261009 (goldfish)` and `AI-Assisted: true`: passed (1 file, 164 insertions).\n- Registration in harness/verify-suites.json (TP-13, protected): not done, pending on the author route.\n\nPer-pin table (today's state, no production change):\n| Pin | Native win32 | WSL | Why |\n| (a) readLocalRepositoryFingerprint, fresh repo | RED | RED | creator is governance-event-store.mjs:155, a bare recursive mkdir with mode 0o755 and no hardening. Native: assessWindowsPrivatePath status=insecure (\"private path DACL grants a non-owner principal\"). WSL: mode=0o755. |\n| (b) recordBootstrapPreflightReceipt with injected identity and common-dir resolver | RED | GREEN | bootstrap-receipt.mjs:93 recursive mkdir, mode 0o700, no hardening. Native: same insecure DACL. WSL: 0o700 holds. |\n| (c) isFirstDenialThisScope (denial-telemetry.mjs:112 write) with injected identity and resolver | RED | GREEN | same creator shape as (b). |\n| (e) D0 default: ensureAgentPipelineRoot repairs a pre-existing insecure segment | RED | RED | ./hardened-private-directory.mjs has no ensureAgentPipelineRoot export (Ruling 141 slice S2); the assertion message names the slice. |\n| (e) premise self-check (extra case) | GREEN | GREEN | an insecure pre-existing segment can be built here (native: inherited DACL from the host temp directory; WSL: chmod 0o755). |\nEvery creator pin asserts the creator's own artefact exists (repository-binding.json, bootstrap-receipt/<agent>.json, guard-denial-classes/<session>.json) before it asserts privacy, so the WSL GREENs on (b) and (c) are real runs, not swallowed no-ops. Native (a) to (c) being RED shows the host temp directory hands down a foreign ACE, so these REDs are not \"absent premise\" artefacts.\n\n2. Evidence\n- evidence/WIN-AP-T-20261009/native.txt: `node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-AP-T-20261009/native.txt --label native -- node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs`, wrapped exit 1, machine-written (5 tests, 1 pass, 4 fail).\n- evidence/WIN-AP-T-20261009/wsl.txt: same command via `wsl.exe -e bash -lc \"cd <repo>; node ... --label wsl -- node --test ...\"`, wrapped exit 1 (5 tests, 3 pass, 2 fail).\n- Consumer-safe-paths check: `node --test harness/scripts/check-consumer-safe-paths.test.mjs`, exit 0, output shown inline (no artefact file, not captured).\n- Both captures ran against the final test file; it was not edited afterwards.\n- Dispatch record: evidence/dispatch-record-WIN-AP-T-20261009.json.\n\n3. Changed files\n- plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs (new, committed): pins (a), (b), (c), (e) plus the premise self-check; fresh temp repositories only; no production file touched.\n- Uncommitted by design: evidence/WIN-AP-T-20261009/native.txt and wsl.txt, evidence/dispatch-record-WIN-AP-T-20261009.json, scratch/commit-msg/WIN-AP-T-20261009.txt (scratch is ignored).\n\n4. Deliberately not changed\n- Every production creator (governance-event-store.mjs, guard/bootstrap-receipt.mjs, guard/denial-telemetry.mjs, scripts/po-human-approval.mjs creator row 3, lib/guard-maintenance-window.mjs storagePaths) and hardened-private-directory.mjs: read only.\n- Pin (d) (the four GMW integration reds): not written, per briefing.\n- Foreign staged and dirty files (sanctioned-args-onboarding.mjs, pipeline-state.test.mjs, pipeline-state.mjs, po-human-approval.mjs, onboarding-init.test.mjs, human-guard-override.mjs, other slices' evidence): untouched; the commit used an exact pathspec.\n- harness/verify-suites.json: not edited (protected).\n- This repository's live .git/agent-pipeline tree: never touched.\n\n5. Deviations from spec (all disclosed, none silent)\n- A fifth case, \"pin (e) premise\", was added. It is a self-check so pin (e) cannot become GREEN vacuously on a host that cannot build the insecure premise.\n- Pin (e) carries a t.skip branch for \"insecure premise not buildable on this host\". It is unreachable today because the missing-export assertion fires first and keeps (e) RED. Once S2 lands, a host that cannot build the premise would skip (e) rather than run it. The win32 premise builder falls back to an explicit `icacls ... /grant *S-1-1-0:(OI)(CI)R` when the temp directory hands down no foreign ACE; that fallback was NOT exercised here (inheritance already produced the premise). The Elephant decides whether S2's briefing should harden the premise builder.\n- The process umask is pinned to 0o022 inside the fixture on POSIX so the mode check measures the creator's own mode argument and not the invoking shell's umask.\n- Injected seams used (no production change): `subagentIdentityFn` and `resolveGitCommonDirFn` for (b) and (c). The mkdir and write under test stay the real ones.\n\n6. Open items\n- harness/verify-suites.json registration of the new file is pending (TP-13, author route).\n- The evidence files and the dispatch record are untracked; the Elephant picks them up.\n- independent review: pending (criticRequired recorded, row T3). PO acceptance: pending.\n- No stop condition triggered. Toil for the record: (1) the briefing's repo-relative preflight call did not satisfy the guard, the first Write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING and cleared only by the preflight run from the loaded plugin root; (2) a Glob was refused with GUARD-READ-TARGET; (3) native capture-evidence reported that the artifact path \"cannot be safely printed\" although `--out` was relative (the WSL run printed it as <repo-root>/...), the artifact itself was written and is correctly redacted.\n- Pin (e) assumes the Ruling 141 default (repair in place). A PO \"refuse\" ruling on D0 changes only pin (e).\n- Tool-use count by my own tally: about 44 of the 50 base cap; no closing-allowance handover was needed.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs"
+    ]
+  },
+  "resultSha256": "f391fbac83adf66209f659275f89c04bac93c4cb72c0f171cf4712f69c31b981"
+}

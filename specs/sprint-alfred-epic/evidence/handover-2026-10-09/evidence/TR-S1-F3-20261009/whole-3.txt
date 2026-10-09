@@ -1,0 +1,149 @@
+command: node --test --test-name-pattern signature-anchor --test-name-pattern "signature anchor" --test-name-pattern "new-key bootstrap" --test-name-pattern "new-key post-setup" --test-name-pattern first-anchor --test-name-pattern existing-key --test-name-pattern "leaves no copy of the private key" --test-name-pattern "writes the machine plane into the injected home" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: whole-3
+exitCode: 1
+head: 267fd4e29ccf2a626d1d4b4681d2ba90d91b2bf8
+tree: 818a1dbee3bab14b409332b508d759c167b91765
+dirty: true
+--- stdout ---
+✔ a failed first-anchor action returns an attended digest-bound recovery command (1.549665ms)
+✔ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (177510.353549ms)
+✔ a failed separate signature-anchor action preserves the completed initial chat-free transaction (45584.060241ms)
+✔ new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup (33842.267283ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor (1526.103148ms)
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1519.641968ms)
+✔ the in-process setup step writes the machine plane into the injected home and never into the ambient home (14.123796ms)
+✔ signature anchor reuses a key already at the canonical directory path without importing or replacing it (34729.512469ms)
+✖ first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary (27217.489134ms)
+✔ a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice (35008.695002ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 8
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 358888.953422
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1160:1
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1519.641968ms)
+  AssertionError [ERR_ASSERTION]: a failed key derivation must leave no copy of the private key in the target directory
+  + actual - expected
+  
+  + [
+  +   'po-private.pem'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1184:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'po-private.pem' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1360:1
+✖ first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary (27217.489134ms)
+  AssertionError [ERR_ASSERTION]: rollback/repository-pointer-readback: node --test exited 1
+  TAP version 13
+  # Subtest: isolated onboarding matrix cell
+  not ok 1 - isolated onboarding matrix cell
+    ---
+    duration_ms: 25621.170476
+    type: 'test'
+    location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2291:3'
+    failureType: 'testCodeFailure'
+    error: |-
+      repository-pointer-readback
+      
+      true !== false
+      
+    code: 'ERR_ASSERTION'
+    name: 'AssertionError'
+    expected: false
+    actual: true
+    operator: 'strictEqual'
+    stack: |-
+      checkRollbackCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1343:14)
+      TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2298:10)
+      Test.runInAsyncScope (node:async_hooks:227:14)
+      Test.run (node:internal/test_runner/test:1201:25)
+      Test.start (node:internal/test_runner/test:1096:17)
+      startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+    ...
+  1..1
+  # tests 1
+  # suites 0
+  # pass 0
+  # fail 1
+  # cancelled 0
+  # skipped 0
+  # todo 0
+  # duration_ms 27184.230309
+  
+  + actual - expected
+  
+  + [
+  +   'rollback/repository-pointer-readback: node --test exited 1\n' +
+  +     'TAP version 13\n' +
+  +     '# Subtest: isolated onboarding matrix cell\n' +
+  +     'not ok 1 - isolated onboarding matrix cell\n' +
+  +     '  ---\n' +
+  +     '  duration_ms: 25621.170476\n' +
+  +     "  type: 'test'\n" +
+  +     "  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2291:3'\n" +
+  +     "  failureType: 'testCodeFailure'\n" +
+  +     '  error: |-\n' +
+  +     '    repository-pointer-readback\n' +
+  +     '    \n' +
+  +     '    true !== false\n' +
+  +     '    \n' +
+  +     "  code: 'ERR_ASSERTION'\n" +
+  +     "  name: 'AssertionError'\n" +
+  +     '  expected: false\n' +
+  +     '  actual: true\n' +
+  +     "  operator: 'strictEqual'\n" +
+  +     '  stack: |-\n' +
+  +     '    checkRollbackCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1343:14)\n' +
+  +     '    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2298:10)\n' +
+  +     '    Test.runInAsyncScope (node:async_hooks:227:14)\n' +
+  +     '    Test.run (node:internal/test_runner/test:1201:25)\n' +
+  +     '    Test.start (node:internal/test_runner/test:1096:17)\n' +
+  +     '    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n' +
+  +     '  ...\n' +
+  +     '1..1\n' +
+  +     '# tests 1\n' +
+  +     '# suites 0\n' +
+  +     '# pass 0\n' +
+  +     '# fail 1\n' +
+  +     '# cancelled 0\n' +
+  +     '# skipped 0\n' +
+  +     '# todo 0\n' +
+  +     '# duration_ms 27184.230309\n'
+  + ]
+  - []
+  
+      at runMatrix (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:216:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1361:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ "rollback/repository-pointer-readback: node --test exited 1\nTAP version 13\n# Subtest: isolated onboarding matrix cell\nnot ok 1 - isolated onboarding matrix cell\n  ---\n  duration_ms: 25621.170476\n  type: 'test'\n  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2291:3'\n  failureType: 'testCodeFailure'\n  error: |-\n    repository-pointer-readback\n    \n    true !== false\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: false\n  actual: true\n  operator: 'strictEqual'\n  stack: |-\n    checkRollbackCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1343:14)\n    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2298:10)\n    Test.runInAsyncScope (node:async_hooks:227:14)\n    Test.run (node:internal/test_runner/test:1201:25)\n    Test.start (node:internal/test_runner/test:1096:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 27184.230309\n" ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

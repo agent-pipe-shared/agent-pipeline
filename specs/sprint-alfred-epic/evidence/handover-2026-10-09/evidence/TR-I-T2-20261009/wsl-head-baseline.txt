@@ -1,0 +1,69 @@
+command: node --test scratch/tcc-baseline/baseline.test.mjs
+label: wsl-head-baseline
+exitCode: 1
+head: 109cd3f6b5cb07635814482f6a1c3769600f59ae
+tree: a609614b6ec4e57b40efb1ca14c57448798ad81e
+dirty: true
+--- stdout ---
+✖ outside Verify a completion suite runs as a plain single file and reports its cases (40.989346ms)
+✔ inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE (37.564192ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 160.020263
+
+✖ failing tests:
+
+test at scratch/tcc-baseline/baseline.test.mjs:73:1
+✖ outside Verify a completion suite runs as a plain single file and reports its cases (40.989346ms)
+  AssertionError [ERR_ASSERTION]: registration must not throw without the Verify signal: file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79
+      const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                      ^
+  
+  Error: completion descriptor is missing or unwritable
+      at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79:21)
+      at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+      ... 5 lines matching cause stack trace ...
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+    code: 'TCC-FD-WRITE',
+    [cause]: Error: EINVAL: invalid argument, write
+        at writeSync (node:fs:917:3)
+        at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:71:23)
+        at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+        at buildRecorder (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:149:3)
+        at registerTestCaseCompletion (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:215:20)
+        at file:///tmp/pipeline-tcc-9DjaLC/plain-suite.mjs:5:3
+        at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+        at async node:internal/modules/esm/loader:639:26
+        at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+      errno: -22,
+      syscall: 'write',
+      code: 'EINVAL'
+    }
+  }
+  
+  Node.js v24.15.0
+  
+  + actual - expected
+  
+  + 'TCC-FD-WRITE'
+  - null
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/tcc-baseline/baseline.test.mjs:75:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'TCC-FD-WRITE',
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

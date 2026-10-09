@@ -1,0 +1,1180 @@
+command: node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs plugins/pipeline-core/scripts/pipeline-state.test.mjs
+label: after-neighbours-b
+exitCode: 1
+head: d924534740d2efbf44b931d33efc17ffd9dbee9c
+tree: 9944e5ec8ce9cf01e6e01f8c0a5c6548db0fc738
+dirty: true
+--- stdout ---
+project-onboarding-v3 controller: malformed coordinates, partition coverage, and child failure outcomes fail closed
+ORIGINAL184 CHILD START chunk=0 shard=0 index=0 pid=132030 mono_ns=3127342244745
+ORIGINAL184 CHILD START chunk=0 shard=1 index=1 pid=132031 mono_ns=3127343566450
+ORIGINAL184 CHILD START chunk=0 shard=2 index=2 pid=132032 mono_ns=3127345147409
+ORIGINAL184 CHILD START chunk=0 shard=3 index=3 pid=132039 mono_ns=3127346511005
+ORIGINAL184 CHILD START chunk=0 shard=4 index=4 pid=132040 mono_ns=3127347880480
+ORIGINAL184 CHILD START chunk=0 shard=5 index=5 pid=132046 mono_ns=3127349252956
+ORIGINAL184 CALLBACK START shard=0 index=0 pid=132030 mono_ns=3130489054309
+ORIGINAL184 CALLBACK START shard=2 index=2 pid=132032 mono_ns=3130489779824
+PASS  host-managed session and dispatch map to repository-mode-unsupported before later stages
+ORIGINAL184 CALLBACK END shard=2 index=2 pid=132032 mono_ns=3130510690016 elapsed_ms=20.910 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=14 pid=132032 mono_ns=3130510725636
+PASS  repository capability failures map exactly and stop before source/runtime inspection
+ORIGINAL184 CALLBACK END shard=0 index=0 pid=132030 mono_ns=3130536373645 elapsed_ms=47.319 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=12 pid=132030 mono_ns=3130536411705
+ORIGINAL184 CALLBACK START shard=3 index=3 pid=132039 mono_ns=3130979857294
+ORIGINAL184 CALLBACK START shard=5 index=5 pid=132046 mono_ns=3130982482852
+ORIGINAL184 CALLBACK START shard=1 index=1 pid=132031 mono_ns=3131606839562
+PASS  session capability failure phase is optional, closed, and retained only for its matching failure
+ORIGINAL184 CALLBACK END shard=1 index=1 pid=132031 mono_ns=3131628044899 elapsed_ms=21.205 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=13 pid=132031 mono_ns=3131628093890
+ORIGINAL184 CALLBACK START shard=4 index=4 pid=132040 mono_ns=3131741904157
+PASS  host-bound dispatch smoke observes and rolls back real session/worktree capability in a spaced root
+ORIGINAL184 CALLBACK END shard=3 index=3 pid=132039 mono_ns=3133214171355 elapsed_ms=2234.314 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=15 pid=132039 mono_ns=3133214221416
+PASS  runner-permission drift is repaired before a neutral PO authority decision, then exposes that decision again
+ORIGINAL184 CALLBACK END shard=3 index=15 pid=132039 mono_ns=3186545078229 elapsed_ms=53330.857 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=27 pid=132039 mono_ns=3186545155340
+PASS  general PRD/Spec drift exposes the same neutral read-only decision plan for all intents
+ORIGINAL184 CALLBACK END shard=2 index=14 pid=132032 mono_ns=3187839927877 elapsed_ms=57329.202 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=26 pid=132032 mono_ns=3187839972368
+PASS  App Server is observed only on the ready path and exactly once for required intents
+ORIGINAL184 CALLBACK END shard=4 index=4 pid=132040 mono_ns=3199371810013 elapsed_ms=67629.906 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=16 pid=132040 mono_ns=3199371903165
+FAIL  exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable -- B8 producer/guard command drift: partial po-authority-rebind-plan
++ actual - expected
+
+  {
++   exitCode: 2,
++   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature "kickoff-8fed00b58c45fed6" lifecycle is "invalid".\n' +
++     'Plan: specs/kickoff-8fed00b58c45fed6/prd_kickoff-8fed00b58c45fed6.md\n' +
++     'File: .pipeline-opaque-execution\n' +
++     'Why: The feature is still in draft design and has no implementation authority.\n' +
++     'Detected as a shell write to a dev-plan-gated path (lane: opaque-script-execution).\n' +
++     'Why: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\n' +
++     "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above.\n" +
++     '\n' +
++     'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
++     'Reason: planning the route failed with code=HGO-GIT.\n'
+-   exitCode: 0,
+-   stderr: ''
+  }
+
+ORIGINAL184 CALLBACK END shard=1 index=13 pid=132031 mono_ns=3201375837796 elapsed_ms=69747.744 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=25 pid=132031 mono_ns=3201375904987
+PASS  nonportable cleanup authority keeps a null nextAction when privatization is unavailable
+ORIGINAL184 CALLBACK END shard=0 index=12 pid=132030 mono_ns=3212592799466 elapsed_ms=82056.388 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=24 pid=132030 mono_ns=3212592853737
+PASS  runtime-current bootstrap exposes cleanup recovery before App Server or session start
+ORIGINAL184 CALLBACK END shard=5 index=5 pid=132046 mono_ns=3220296552181 elapsed_ms=89314.069 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=17 pid=132046 mono_ns=3220296621202
+PASS  V4 authority drift reopens the historical approval instead of rebinding it
+ORIGINAL184 CALLBACK END shard=5 index=17 pid=132046 mono_ns=3220317231386 elapsed_ms=20.610 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=29 pid=132046 mono_ns=3220317270007
+PASS  an unknown runner keeps the Codex-strength barrier and a manual action, never the Codex launcher
+ORIGINAL184 CALLBACK END shard=3 index=27 pid=132039 mono_ns=3234115558659 elapsed_ms=47570.403 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=39 pid=132039 mono_ns=3234115604910
+PASS  the codex runtime apply is unchanged: bound executable, frozen .codex digests, barrier durable before mutation
+ORIGINAL184 CALLBACK END shard=2 index=26 pid=132032 mono_ns=3240420548557 elapsed_ms=52580.576 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=38 pid=132032 mono_ns=3240420599048
+PASS  neutral PO decision apply requires all transactional V4 postimage readbacks to become ready
+ORIGINAL184 CALLBACK END shard=4 index=16 pid=132040 mono_ns=3250224983073 elapsed_ms=50853.080 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=28 pid=132040 mono_ns=3250225035494
+PASS  a pending Codex restart barrier never gates a Claude session, and that session leaves it untouched
+ORIGINAL184 CALLBACK END shard=1 index=25 pid=132031 mono_ns=3253373311778 elapsed_ms=51997.407 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=37 pid=132031 mono_ns=3253373353709
+PASS  a runner without a native runtime readback publishes no barrier and proceeds to the next real step
+ORIGINAL184 CALLBACK END shard=0 index=24 pid=132030 mono_ns=3253495869809 elapsed_ms=40903.016 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=36 pid=132030 mono_ns=3253495932330
+PASS  restart action for the codex runner is unchanged: still the Codex launcher (regression pin)
+ORIGINAL184 CALLBACK END shard=5 index=29 pid=132046 mono_ns=3270546245084 elapsed_ms=50228.975 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=41 pid=132046 mono_ns=3270546302675
+PASS  public CLI emits typed inspect, plan, and explicit-apply results
+ORIGINAL184 CALLBACK END shard=0 index=36 pid=132030 mono_ns=3300101211867 elapsed_ms=46605.280 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=48 pid=132030 mono_ns=3300101251238
+PASS  the barrier's runner exemption is the same set the V3 bootstrap authority already exempts
+ORIGINAL184 CALLBACK END shard=4 index=28 pid=132040 mono_ns=3300381190189 elapsed_ms=50156.155 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=40 pid=132040 mono_ns=3300381286201
+PASS  a seeded configuration leaves project verification to the shipped baseline
+ORIGINAL184 CALLBACK END shard=5 index=41 pid=132046 mono_ns=3321441822686 elapsed_ms=50895.520 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=53 pid=132046 mono_ns=3321441866187
+PASS  shared command renderer derives one copy-safe line from exact argv in a spaced root
+ORIGINAL184 CALLBACK END shard=5 index=53 pid=132046 mono_ns=3321442419667 elapsed_ms=0.553 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=65 pid=132046 mono_ns=3321442451548
+PASS  apply-portable-seed --activate surfaces the push-approval-setup ask-step for every repository, pre-filled from the machine default
+ORIGINAL184 CALLBACK END shard=3 index=39 pid=132039 mono_ns=3330105066973 elapsed_ms=95989.462 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=51 pid=132039 mono_ns=3330105120394
+PASS  apply-portable-seed --activate surfaces the missing-author-identity ask-step through the real CLI path
+ORIGINAL184 CALLBACK END shard=1 index=37 pid=132031 mono_ns=3347863337683 elapsed_ms=94489.984 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=49 pid=132031 mono_ns=3347863385814
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/directory-fsync
+ORIGINAL184 CALLBACK END shard=5 index=65 pid=132046 mono_ns=3372061227724 elapsed_ms=50618.776 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=77 pid=132046 mono_ns=3372061261305
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/close
+ORIGINAL184 CALLBACK END shard=5 index=77 pid=132046 mono_ns=3374643689196 elapsed_ms=2582.428 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=89 pid=132046 mono_ns=3374643743237
+PASS  NVA-R24-TRUSTANCHOR: a pre-existing key directory is reused byte-for-byte, never written to, by the onboarding transaction
+ORIGINAL184 CALLBACK END shard=3 index=51 pid=132039 mono_ns=3380072836808 elapsed_ms=49967.716 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=63 pid=132039 mono_ns=3380072907429
+PASS  initial author proposal follows Git author environment and author.* precedence without granting consent
+ORIGINAL184 CALLBACK END shard=2 index=38 pid=132032 mono_ns=3382883398814 elapsed_ms=142462.800 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=50 pid=132032 mono_ns=3382883469996
+PASS  apply-portable-seed records baseline-only verification without a PO question
+ORIGINAL184 CALLBACK END shard=4 index=40 pid=132040 mono_ns=3389090135442 elapsed_ms=88708.849 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=52 pid=132040 mono_ns=3389090179672
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PACKAGE-REQUIRED; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+FAIL  kickoff choosing a language different from the portable-seed default reaches a consistent authority without the mismatch/drift repair chain -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=5 index=89 pid=132046 mono_ns=3420941070410 elapsed_ms=46297.327 outcome=throw
+ORIGINAL184 CALLBACK START shard=5 index=101 pid=132046 mono_ns=3420941108601
+FAIL  the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2) -- Cannot find module '/tmp/secgate-installed-fixture-NA1J44/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-NA1J44/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+ORIGINAL184 CALLBACK END shard=5 index=101 pid=132046 mono_ns=3421075435794 elapsed_ms=134.327 outcome=throw
+ORIGINAL184 CALLBACK START shard=5 index=113 pid=132046 mono_ns=3421075462375
+PASS  the PO's answered author identity is written to local git config only, never global
+ORIGINAL184 CALLBACK END shard=5 index=113 pid=132046 mono_ns=3421103655362 elapsed_ms=28.193 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=125 pid=132046 mono_ns=3421103710413
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/close
+ORIGINAL184 CALLBACK END shard=3 index=63 pid=132039 mono_ns=3422819575432 elapsed_ms=42746.668 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=75 pid=132039 mono_ns=3422819634033
+PASS  NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise their own distinct, informational ask; a genuine no-key machine now raises its own distinct ask too (NVA-V17-NOKEYASK)
+ORIGINAL184 CALLBACK END shard=0 index=48 pid=132030 mono_ns=3423301152938 elapsed_ms=123199.902 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=60 pid=132030 mono_ns=3423301193649
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/write
+ORIGINAL184 CALLBACK END shard=3 index=75 pid=132039 mono_ns=3425232366186 elapsed_ms=2412.732 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=87 pid=132039 mono_ns=3425232431167
+PASS  NVA-R24-TRUSTANCHOR: a freshly bootstrapped anchor is actually accepted by the same resolution the signed override ceremony uses -- no HGO-TRUST-ANCHOR-MISSING deadlock
+ORIGINAL184 CALLBACK END shard=4 index=52 pid=132040 mono_ns=3432194005600 elapsed_ms=43103.826 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=64 pid=132040 mono_ns=3432194057691
+PASS  a local kickoff provisions its PO profile inside the confirmed kickoff action
+ORIGINAL184 CALLBACK END shard=3 index=87 pid=132039 mono_ns=3471940357453 elapsed_ms=46707.926 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=99 pid=132039 mono_ns=3471940404064
+PASS  NVA-R24-TRUSTANCHOR: trustAnchorAvailability reports the real absent/present state at the ready gate
+ORIGINAL184 CALLBACK END shard=2 index=50 pid=132032 mono_ns=3474751056882 elapsed_ms=91867.587 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=62 pid=132032 mono_ns=3474751162164
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/fstat
+ORIGINAL184 CALLBACK END shard=0 index=60 pid=132030 mono_ns=3475635764996 elapsed_ms=52334.571 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=72 pid=132030 mono_ns=3475635821607
+PASS  runtime target preflight maps every reversible probe permission failure without residue EPERM/directory-fsync
+ORIGINAL184 CALLBACK END shard=0 index=72 pid=132030 mono_ns=3478730969783 elapsed_ms=3095.148 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=84 pid=132030 mono_ns=3478731021654
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/rename
+ORIGINAL184 CALLBACK END shard=4 index=64 pid=132040 mono_ns=3482200421477 elapsed_ms=50006.364 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=76 pid=132040 mono_ns=3482200476898
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/file-fsync
+ORIGINAL184 CALLBACK END shard=4 index=76 pid=132040 mono_ns=3485401941394 elapsed_ms=3201.464 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=88 pid=132040 mono_ns=3485402012145
+PASS  NVA-V17-NOKEYASK: a machine with no PO signing key gets one structured public-driver bootstrap action on both absence states and composition paths
+ORIGINAL184 CALLBACK END shard=1 index=49 pid=132031 mono_ns=3508530260532 elapsed_ms=160666.875 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=61 pid=132031 mono_ns=3508530308493
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/file-fsync
+ORIGINAL184 CALLBACK END shard=2 index=62 pid=132032 mono_ns=3524030174068 elapsed_ms=49279.012 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=74 pid=132032 mono_ns=3524030236399
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/fstat
+ORIGINAL184 CALLBACK END shard=2 index=74 pid=132032 mono_ns=3526753392097 elapsed_ms=2723.156 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=86 pid=132032 mono_ns=3526753433118
+PASS  runtime plan preimage drift preserves external bytes and maps to exact projection repair
+ORIGINAL184 CALLBACK END shard=0 index=84 pid=132030 mono_ns=3529570469952 elapsed_ms=50839.448 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=96 pid=132030 mono_ns=3529570501982
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PACKAGE-REQUIRED; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+FAIL  a real fresh local kickoff is immediately a valid canonical PO authority -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=4 index=88 pid=132040 mono_ns=3536228902209 elapsed_ms=50826.890 outcome=throw
+ORIGINAL184 CALLBACK START shard=4 index=100 pid=132040 mono_ns=3536228959010
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/write
+ORIGINAL184 CALLBACK END shard=1 index=61 pid=132031 mono_ns=3559004763586 elapsed_ms=50474.455 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=73 pid=132031 mono_ns=3559004814217
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/create
+ORIGINAL184 CALLBACK END shard=1 index=73 pid=132031 mono_ns=3562573741429 elapsed_ms=3568.927 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=85 pid=132031 mono_ns=3562573829481
+PASS  kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles
+ORIGINAL184 CALLBACK END shard=5 index=125 pid=132046 mono_ns=3577189859439 elapsed_ms=156086.149 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=137 pid=132046 mono_ns=3577189899109
+PASS  Git capability rejects nonzero, missing-status, and non-EPERM spawn results
+ORIGINAL184 CALLBACK END shard=5 index=137 pid=132046 mono_ns=3577207500138 elapsed_ms=17.601 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=149 pid=132046 mono_ns=3577207521119
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify codex -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=0 index=96 pid=132030 mono_ns=3585334050665 elapsed_ms=55763.549 outcome=throw
+ORIGINAL184 CALLBACK START shard=0 index=108 pid=132030 mono_ns=3585334098556
+Push approved by "po" for commit 433b1fb138f6ca6df720e73bd016a79145d4b813 (2026-10-09T01:04:17.723Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+PASS  public kickoff plan/apply carries goal as one argv element and reconstructs the bound plan
+ORIGINAL184 CALLBACK END shard=2 index=86 pid=132032 mono_ns=3596507301515 elapsed_ms=69753.868 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=98 pid=132032 mono_ns=3596507371476
+PASS  the seeded push gate refuses an unapproved push and admits it after the shipped commands
+ORIGINAL184 CALLBACK END shard=3 index=99 pid=132039 mono_ns=3600234871563 elapsed_ms=128294.467 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=111 pid=132039 mono_ns=3600234923574
+PASS  the commit-msg hook onboarding installs rejects a structurally broken provenance block
+ORIGINAL184 CALLBACK END shard=0 index=108 pid=132030 mono_ns=3634139303766 elapsed_ms=48805.205 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=120 pid=132030 mono_ns=3634139395758
+PASS  manifest-only repair is source/preimage/plan bound, confirmed, and read back
+ORIGINAL184 CALLBACK END shard=5 index=149 pid=132046 mono_ns=3638107677793 elapsed_ms=60900.157 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=161 pid=132046 mono_ns=3638107719623
+PASS  NVA-SOURCERECOVERY-1: the recoverable source-recovery paths are unchanged by the repairCommand fix
+ORIGINAL184 CALLBACK END shard=5 index=161 pid=132046 mono_ns=3638151727369 elapsed_ms=44.008 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=173 pid=132046 mono_ns=3638151753370
+Push approved by "po" for commit a0255dd57ca155bb8e7b683baced11b55bf0cf73 (2026-10-09T01:05:05.457Z).
+PASS  the seeded security gate refuses a push with missing security evidence and admits it after the shipped scan command runs (SECGATE-1)
+ORIGINAL184 CALLBACK END shard=4 index=100 pid=132040 mono_ns=3646370607566 elapsed_ms=110141.649 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=112 pid=132040 mono_ns=3646370646957
+PASS  once an owned .gitignore's ask is fulfilled with ordinary tools, the evidence-circle can never reopen
+ORIGINAL184 CALLBACK END shard=3 index=111 pid=132039 mono_ns=3648747507911 elapsed_ms=48512.584 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=123 pid=132039 mono_ns=3648747578852
+FAIL  NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=2 index=98 pid=132032 mono_ns=3656059254064 elapsed_ms=59551.883 outcome=throw
+ORIGINAL184 CALLBACK START shard=2 index=110 pid=132032 mono_ns=3656059303995
+PASS  a claude-onboarded root completes kickoff promotion and observes the project as claude, not codex
+ORIGINAL184 CALLBACK END shard=0 index=120 pid=132030 mono_ns=3686578063605 elapsed_ms=52438.668 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=132 pid=132030 mono_ns=3686578101446
+PASS  H3 manifest repair fails closed on V4 readback failure
+ORIGINAL184 CALLBACK END shard=5 index=173 pid=132046 mono_ns=3689846657403 elapsed_ms=51694.904 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=185 pid=132046 mono_ns=3689846684373
+PASS  partial authority planner requires an explicit V3 selection and hashes preserved user projections
+ORIGINAL184 CALLBACK END shard=5 index=185 pid=132046 mono_ns=3689874773438 elapsed_ms=28.089 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=197 pid=132046 mono_ns=3689874790738
+PASS  a promotion plan produced for one runner does not validate an apply for another
+ORIGINAL184 CALLBACK END shard=3 index=123 pid=132039 mono_ns=3696820042583 elapsed_ms=48072.464 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=135 pid=132039 mono_ns=3696820094134
+PASS  a recognized read-only host control layout receives portable onboarding without an overwrite attempt
+ORIGINAL184 CALLBACK END shard=3 index=135 pid=132039 mono_ns=3700604927421 elapsed_ms=3784.833 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=147 pid=132039 mono_ns=3700604960882
+PASS  validateManifest never offers a repair when a second, unrelated defect survives adding schema
+ORIGINAL184 CALLBACK END shard=3 index=147 pid=132039 mono_ns=3700624860365 elapsed_ms=19.899 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=159 pid=132039 mono_ns=3700624878965
+PASS  runtime apply permission races roll back every byte and remove the exact restart barrier
+ORIGINAL184 CALLBACK END shard=1 index=85 pid=132031 mono_ns=3716971612423 elapsed_ms=154397.783 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=97 pid=132031 mono_ns=3716971648114
+PASS  the hook onboarding installs actually fires: blocks a push the gate would refuse, allows one it would admit
+ORIGINAL184 CALLBACK END shard=2 index=110 pid=132032 mono_ns=3727097599756 elapsed_ms=71038.296 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=122 pid=132032 mono_ns=3727097663397
+PASS  onboarding asks for a commit author it cannot name, and never invents one
+ORIGINAL184 CALLBACK END shard=4 index=112 pid=132040 mono_ns=3746585907406 elapsed_ms=100215.260 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=124 pid=132040 mono_ns=3746585988428
+PASS  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity antigravity
+ORIGINAL184 CALLBACK END shard=5 index=197 pid=132046 mono_ns=3750995243589 elapsed_ms=61120.453 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=209 pid=132046 mono_ns=3750995268639
+PASS  legacy close-feature refusal preserves a ready feature for the coordinator-backed finish-feature lifecycle
+ORIGINAL184 CALLBACK END shard=0 index=132 pid=132030 mono_ns=3752954261842 elapsed_ms=66376.160 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=144 pid=132030 mono_ns=3752954295503
+PASS  manifest repair admits a Claude-default, Claude-invoked V3 source (NVA-MANIFESTRUNNER-1)
+ORIGINAL184 CALLBACK END shard=3 index=159 pid=132039 mono_ns=3754474741098 elapsed_ms=53849.862 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=171 pid=132039 mono_ns=3754474767348
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=1 index=97 pid=132031 mono_ns=3762584664768 elapsed_ms=45613.017 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=109 pid=132031 mono_ns=3762584710449
+PASS  a kickoff plan produced for one runner does not validate an apply for another
+ORIGINAL184 CALLBACK END shard=2 index=122 pid=132032 mono_ns=3779726996280 elapsed_ms=52629.333 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=134 pid=132032 mono_ns=3779727040621
+PASS  existing unmanaged projects plan read-only while partial and symlink roots fail closed
+ORIGINAL184 CALLBACK END shard=2 index=134 pid=132032 mono_ns=3779830450791 elapsed_ms=103.410 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=146 pid=132032 mono_ns=3779830472632
+PASS  validateManifest offers a repair for a schema-less-but-otherwise-valid manifest, and self-heals only when asked
+ORIGINAL184 CALLBACK END shard=2 index=146 pid=132032 mono_ns=3779846271191 elapsed_ms=15.799 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=158 pid=132032 mono_ns=3779846290241
+PASS  a project that already owns a pre-push hook is never overwritten by onboarding
+ORIGINAL184 CALLBACK END shard=1 index=109 pid=132031 mono_ns=3797558622710 elapsed_ms=34973.912 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=121 pid=132031 mono_ns=3797558726562
+PASS  H3 manifest repair rolls back owned output on publication race
+ORIGINAL184 CALLBACK END shard=3 index=171 pid=132039 mono_ns=3801326079350 elapsed_ms=46851.312 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=183 pid=132039 mono_ns=3801326102111
+PASS  remote adoption rolls back the checked-out branch when its owned upstream bind fails
+ORIGINAL184 CALLBACK END shard=3 index=183 pid=132039 mono_ns=3801329125917 elapsed_ms=3.024 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=195 pid=132039 mono_ns=3801329147547
+PASS  Codex bootstrap accepts a dual-runner source whose default runner is Claude
+ORIGINAL184 CALLBACK END shard=0 index=144 pid=132030 mono_ns=3803746176218 elapsed_ms=50791.881 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=156 pid=132030 mono_ns=3803746202988
+PASS  an apply-shaped runtime-attestation-required exits non-zero; the same status stays a resting point for inspect/plan
+ORIGINAL184 CALLBACK END shard=4 index=124 pid=132040 mono_ns=3812581670478 elapsed_ms=65995.682 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=136 pid=132040 mono_ns=3812581706849
+PASS  source recovery planner distinguishes invalid authority and unsupported runner transitions
+ORIGINAL184 CALLBACK END shard=2 index=158 pid=132032 mono_ns=3826544065989 elapsed_ms=46697.776 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=170 pid=132032 mono_ns=3826544091740
+PASS  omitting the runner on a direct kickoff promotion call is a caller error, not a silent Codex default
+ORIGINAL184 CALLBACK END shard=1 index=121 pid=132031 mono_ns=3839405844377 elapsed_ms=41847.118 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=133 pid=132031 mono_ns=3839405882958
+FAIL  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity claude -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'language',
+    'profile',
+-   'projectDescription'
+  ]
+
+ORIGINAL184 CALLBACK END shard=3 index=195 pid=132039 mono_ns=3840608797618 elapsed_ms=39279.650 outcome=throw
+ORIGINAL184 CALLBACK START shard=3 index=207 pid=132039 mono_ns=3840608823538
+PASS  F-B V3 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused
+ORIGINAL184 CALLBACK END shard=5 index=209 pid=132046 mono_ns=3842590196250 elapsed_ms=91594.928 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 6/6: 16 passed, 2 failed
+kickoff choosing a language different from the portable-seed default reaches a consistent authority without the mismatch/drift repair chain: Expected values to be strictly equal:
+
+2 !== 0
+
+the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2): Cannot find module '/tmp/secgate-installed-fixture-NA1J44/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-NA1J44/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+ORIGINAL184 CHILD END chunk=0 shard=5 index=5 pid=132046 mono_ns=3842637253639 elapsed_ms=715288.001 outcome=fail
+PASS  manifest repair atomically preserves a target that appears at publication
+ORIGINAL184 CALLBACK END shard=0 index=156 pid=132030 mono_ns=3843958037573 elapsed_ms=40211.835 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=168 pid=132030 mono_ns=3843958068034
+PASS  an existing unmanaged project receives an additive adoption plan
+ORIGINAL184 CALLBACK END shard=4 index=136 pid=132040 mono_ns=3851959756538 elapsed_ms=39378.050 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=148 pid=132040 mono_ns=3851959790468
+PASS  H3 manifest repair rolls back owned output on fsync failure
+ORIGINAL184 CALLBACK END shard=2 index=170 pid=132032 mono_ns=3865194221416 elapsed_ms=38650.130 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=182 pid=132032 mono_ns=3865194251427
+PASS  remote adoption rejects a remote .codex and rolls back only its owned Git transaction
+ORIGINAL184 CALLBACK END shard=2 index=182 pid=132032 mono_ns=3865196587091 elapsed_ms=2.336 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=194 pid=132032 mono_ns=3865196602561
+PASS  H3 manifest repair rejects target appearance race: symlink
+ORIGINAL184 CALLBACK END shard=0 index=168 pid=132030 mono_ns=3883110779791 elapsed_ms=39152.712 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=180 pid=132030 mono_ns=3883110808812
+PASS  remote branch adoption plans read-only, preserves .codex, and advances only to the branch authority migration
+ORIGINAL184 CALLBACK END shard=0 index=180 pid=132030 mono_ns=3883142673839 elapsed_ms=31.865 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=192 pid=132030 mono_ns=3883142690799
+PASS  portable seed is manifest-valid, then onboarding owns the runtime initialization transaction
+ORIGINAL184 CALLBACK END shard=1 index=133 pid=132031 mono_ns=3887423610108 elapsed_ms=48017.727 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=145 pid=132031 mono_ns=3887423649989
+PASS  loadManifest offers the same repair from an on-disk schema-less file, and plan-manifest-repair surfaces it instead of the generic dead end
+ORIGINAL184 CALLBACK END shard=4 index=148 pid=132040 mono_ns=3888609047316 elapsed_ms=36649.257 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=160 pid=132040 mono_ns=3888609071646
+PASS  F4 runtime probe cleanup preserves foreign content when the probe inode number is reused
+ORIGINAL184 CALLBACK END shard=3 index=207 pid=132039 mono_ns=3918036494167 elapsed_ms=77427.671 outcome=pass
+B8 producer/guard command classes in shard: 2
+
+project-onboarding-v3 chunk 1/2 shard 4/6: 17 passed, 1 failed
+all three runners execute the exact returned consent and design-question actions without repeating durable Git identity claude: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'language',
+    'profile',
+-   'projectDescription'
+  ]
+
+ORIGINAL184 CHILD END chunk=0 shard=3 index=3 pid=132039 mono_ns=3918075325903 elapsed_ms=790728.815 outcome=fail
+PASS  a fresh greenfield onboarding populates both manifest tiers without ever reaching a mixed authority status
+ORIGINAL184 CALLBACK END shard=0 index=192 pid=132030 mono_ns=3919341207208 elapsed_ms=36198.516 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=204 pid=132030 mono_ns=3919341231418
+PASS  source recovery planner admits a Claude-default, Claude-invoked current V3 source (NVA-MANIFESTRUNNER-1)
+ORIGINAL184 CALLBACK END shard=4 index=160 pid=132040 mono_ns=3923246827989 elapsed_ms=34637.756 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=172 pid=132040 mono_ns=3923246853040
+PASS  an invalid generated manifest is never accepted as a current fresh authority
+ORIGINAL184 CALLBACK END shard=1 index=145 pid=132031 mono_ns=3923859289387 elapsed_ms=36435.639 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=157 pid=132031 mono_ns=3923859314107
+PASS  a source consumer never receives an automatic runner-permission repair
+ORIGINAL184 CALLBACK END shard=0 index=204 pid=132030 mono_ns=3950169447471 elapsed_ms=30828.216 outcome=pass
+B8 producer/guard command classes in shard: 0
+
+project-onboarding-v3 chunk 1/2 shard 1/6: 17 passed, 1 failed
+the public onboarding handover is executable for every runner with baseline-only and configured verify codex: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CHILD END chunk=0 shard=0 index=0 pid=132030 mono_ns=3950208234537 elapsed_ms=822865.990 outcome=fail
+PASS  manifest repair never quarantines a foreign post-publication target
+ORIGINAL184 CALLBACK END shard=1 index=157 pid=132031 mono_ns=3952138161959 elapsed_ms=28278.848 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=169 pid=132031 mono_ns=3952138188519
+PASS  H3 manifest repair preserves foreign content when the published inode number is reused
+ORIGINAL184 CALLBACK END shard=4 index=172 pid=132040 mono_ns=3954071106027 elapsed_ms=30824.253 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=184 pid=132040 mono_ns=3954071134038
+PASS  remote adoption refuses a normal initialized Git repository before remote observation
+ORIGINAL184 CALLBACK END shard=4 index=184 pid=132040 mono_ns=3954072140997 elapsed_ms=1.007 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=196 pid=132040 mono_ns=3954072156487
+PASS  a confirmed first-round language is visible as a default, not forced on later intake
+ORIGINAL184 CALLBACK END shard=2 index=194 pid=132032 mono_ns=3970507698608 elapsed_ms=105311.096 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=206 pid=132032 mono_ns=3970507733909
+PASS  H3 manifest repair rejects target appearance race: hardlink
+ORIGINAL184 CALLBACK END shard=1 index=169 pid=132031 mono_ns=3999753082988 elapsed_ms=47614.894 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=181 pid=132031 mono_ns=3999753126209
+PASS  remote adoption rejects a remote .agents and preserves the target control mount
+ORIGINAL184 CALLBACK END shard=1 index=181 pid=132031 mono_ns=3999758448039 elapsed_ms=5.322 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=193 pid=132031 mono_ns=3999758465250
+PASS  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity codex
+ORIGINAL184 CALLBACK END shard=4 index=196 pid=132040 mono_ns=4015238462560 elapsed_ms=61166.306 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=208 pid=132040 mono_ns=4015238510241
+PASS  source runner permission observation preserves lifecycle actions and ready-only fields
+ORIGINAL184 CALLBACK END shard=2 index=206 pid=132032 mono_ns=4043222161027 elapsed_ms=72714.427 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 3/6: 17 passed, 1 failed
+NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CHILD END chunk=0 shard=2 index=2 pid=132032 mono_ns=4043290303047 elapsed_ms=915945.156 outcome=fail
+FAIL  v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required) -- digest is not defined
+ORIGINAL184 CALLBACK END shard=1 index=193 pid=132031 mono_ns=4078397488602 elapsed_ms=78639.023 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=205 pid=132031 mono_ns=4078397531553
+PASS  F4 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused
+ORIGINAL184 CALLBACK END shard=4 index=208 pid=132040 mono_ns=4118541778223 elapsed_ms=103303.268 outcome=pass
+B8 producer/guard command classes in shard: 0
+
+project-onboarding-v3 chunk 1/2 shard 5/6: 17 passed, 1 failed
+a real fresh local kickoff is immediately a valid canonical PO authority: Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CHILD END chunk=0 shard=4 index=4 pid=132040 mono_ns=4118584203323 elapsed_ms=991236.323 outcome=fail
+PASS  a ready consumer with malformed permission shapes receives only the typed read-only repair plan
+ORIGINAL184 CALLBACK END shard=1 index=205 pid=132031 mono_ns=4218013346453 elapsed_ms=139615.815 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 2/6: 15 passed, 3 failed
+exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable: B8 producer/guard command drift: partial po-authority-rebind-plan
++ actual - expected
+
+  {
++   exitCode: 2,
++   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature "kickoff-8fed00b58c45fed6" lifecycle is "invalid".\n' +
++     'Plan: specs/kickoff-8fed00b58c45fed6/prd_kickoff-8fed00b58c45fed6.md\n' +
++     'File: .pipeline-opaque-execution\n' +
++     'Why: The feature is still in draft design and has no implementation authority.\n' +
++     'Detected as a shell write to a dev-plan-gated path (lane: opaque-script-execution).\n' +
++     'Why: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\n' +
++     "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above.\n" +
++     '\n' +
++     'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
++     'Reason: planning the route failed with code=HGO-GIT.\n'
+-   exitCode: 0,
+-   stderr: ''
+  }
+
+the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required): digest is not defined
+ORIGINAL184 CHILD END chunk=0 shard=1 index=1 pid=132031 mono_ns=4218069732597 elapsed_ms=1090726.166 outcome=fail
+
+project-onboarding-v3: 216 cases across 2 sequential chunks of 6 shards, 6 shards failed
+chunk 0 shard 0: exit 1
+chunk 0 shard 1: exit 1
+chunk 0 shard 2: exit 1
+chunk 0 shard 3: exit 1
+chunk 0 shard 4: exit 1
+chunk 0 shard 5: exit 1
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (1093613.546174ms)
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit a40b9904276221ca3e25a745ed93bf3c83ae4bf3 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit c8fbdfd4fb2f573f8fa88f390ea37972c76b6d4b (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit 44b883326aec21b33c03fae0ebf2b00a836209f8 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md(32ae22050f77...)+specs/stagingbolt-ordinary/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission b427bdcd19d9....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "stagingbolt-ordinary",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/stagingbolt-ordinary/design-input.md",
+      "sha256": "e84d24535c64f851f2208098d4e08c767ec97d5815158cd5a182b7a855ca193f",
+      "content": "Original request for stagingbolt-ordinary.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md",
+      "sha256": "32ae22050f772b55496ddad26fea07549e97963950e511d6c15dfe992244f8aa",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nstagingbolt-ordinary\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/stagingbolt-ordinary/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/stagingbolt-ordinary/design.md",
+      "sha256": "ecd07148dfec47243fc2e8ba49c140ae6996a3ddbf3ff5058ecf814947171837",
+      "content": "Revised design for stagingbolt-ordinary.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/stagingbolt-ordinary/traceability.md",
+      "sha256": "cdcc7bb0288dc5d90e027e34051cdf6ca0f03b5fd32d15b806e0667a7b9318a6",
+      "content": "Every requirement for stagingbolt-ordinary is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/stagingbolt-ordinary/evidence/advisor.json",
+      "sha256": "179330b4e18f6a70010299d6620108cd1336f7e930f0b7d2200cb6ef7a64a249",
+      "dispatchId": "advisor-stagingbolt-ordinary",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/stagingbolt-ordinary/evidence/readiness.json",
+    "sha256": "a8c9bc3701440bc97b1888fafedfdcdf5a87e611c7ad11b54d30e9857e7ef9ff",
+    "dispatchId": "readiness-stagingbolt-ordinary",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7c8c20883e759852f722a18b557e0b580961dea636aece4f866988bb6c82f23a",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10.json (package sha256 e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T10:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md(32ae22050f77...)+specs/stagingbolt-ordinary/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/global-chat-plan-approval/prd_global-chat-plan-approval.md(fcfef1996ea9...)+specs/global-chat-plan-approval/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 117c81c7354b....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "global-chat-plan-approval",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/global-chat-plan-approval/design-input.md",
+      "sha256": "808416e03083b29ad2ccb423a9388d1efd1cc2acf0d27f5bee8382e408852887",
+      "content": "Original request for global-chat-plan-approval.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/global-chat-plan-approval/prd_global-chat-plan-approval.md",
+      "sha256": "fcfef1996ea9bbe8757a6f4fb0db1f09495862fefe855d7d3062e19c610e4311",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nglobal-chat-plan-approval\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/global-chat-plan-approval/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/global-chat-plan-approval/design.md",
+      "sha256": "bb581ce9b38d3d5debb1cd22d7f16f4c3beea2b6df5231fa2ad5be7b08a30fd0",
+      "content": "Revised design for global-chat-plan-approval.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/global-chat-plan-approval/traceability.md",
+      "sha256": "a7373ab3688da057f29da059622dfe04ea282bc9cc5e570a878ff1351fb620ab",
+      "content": "Every requirement for global-chat-plan-approval is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/global-chat-plan-approval/evidence/advisor.json",
+      "sha256": "1d4f71c5678e702bcf8945a571931abfd687ba990be0be175afd99c24ea567cc",
+      "dispatchId": "advisor-global-chat-plan-approval",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/global-chat-plan-approval/evidence/readiness.json",
+    "sha256": "890090292edc12d685125525b9e078542070b1f38e2e46f5c7edb13f9b906366",
+    "dispatchId": "readiness-global-chat-plan-approval",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "f7741225d21709bdd49eebbebe8139b8fd2674beb3de9ced884eb97e41e4796c",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547.json (package sha256 5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "PO" on 2026-08-27T10:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/global-chat-plan-approval/prd_global-chat-plan-approval.md(fcfef1996ea9...)+specs/global-chat-plan-approval/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 7c5073ef1444....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T11:00:00.000Z; bound to submission 36083e40d674....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T11:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/prdframing-success/prd_prdframing-success.md(ecca622cacee...)+specs/prdframing-success/spec.md(1b355baa3076...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 7c5073ef1444....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T11:00:00.000Z; bound to submission 36083e40d674....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T11:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/advisor-early-refusal/prd.md(d19c20cdbc32...)+specs/advisor-early-refusal/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Error: present-plan requires one complete, current design-workflow package (DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED); no presentation or approval lock was recorded.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 0
+
+    at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state.test.mjs:1656:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/scripts/pipeline-state.test.mjs (7945.619676ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1093623.073922
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:1:1
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (1093613.546174ms)
+  'test failed'
+
+test at plugins/pipeline-core/scripts/pipeline-state.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/pipeline-state.test.mjs (7945.619676ms)
+  'test failed'
+
+--- stderr ---

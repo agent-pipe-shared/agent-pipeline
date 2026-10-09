@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-T5-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "f06975126",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "54026dea1"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations read, route pre-check clean (requested goldfish-deep/Sonnet 5.5/xhigh; observed claude-sonnet-5-5), preflight run once",
+      "toolUses": 12
+    },
+    {
+      "phase": "terminal: commit made, report written (independent review: pending)",
+      "toolUses": 52
+    }
+  ],
+  "report": {
+    "text": "TR-C-T5-20261009 (goldfish-deep, claude-sonnet-5-5 / xhigh). Implementation complete; independent review: pending. Candidate f06975126, commit 54026dea1.\n\nRoute pre-check: requested route (field 6) goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed identity from this dispatch's own runtime prompt: \"claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- New pins red for the stated reason: passed. GG22-T5F1a and GG22-T5F1b fail with \"exit 0 (expected 2)\" (the pathspec ledger commit with -i is admitted, GG-22 never answers). PGC-T5F3b and PGC-T5F3c fail with \"stderr unexpectedly contains Why:\" while the exact Reason line each pin requires is present in the refusal.\n- Controls green, nothing else changes state: passed. GG22-T5F1c, GG22-T5F4a, GG22-T5F4b, PGC-T5F3a, PGC-T5F4a, PGC-T5F4b pass. guard-git 256/258 (only the 2 new reds); guard-push 198/202 (the 2 new reds plus PG-CHECKPOINT and PG-CHECKPOINT-WORKTREE, which fail identically in every earlier capture). Every earlier case keeps its TR-C-F result.\n- Redirect fired: passed. TRCT5-REDIRECT-FIRED guard-git.mjs (243 loads) and guard-push.mjs (203 loads) are both in the capture, so the run used the tranche-2 guard post-images (sha256 115ccc72... and dda3322d..., asserted equal to the TR-C-F manifest values before the run).\n- TR-C-MANIFEST.md TR-C-T5 section (sha256, bytes, lines, inserted blocks, per-pin table, commands): passed.\n- consumer-safe-paths: passed (exit 0, \"Consumer-safe-path check passed: 1769 tracked file(s)\").\n- One commit of the two test post-images and the manifest: passed, 54026dea1 (3 files, 111 insertions, 0 deletions; the first commit attempt hit a stale .git/index.lock, one retry succeeded).\n\n2. Evidence\n- evidence/TR-C-T5-20261009/red.txt (37133 bytes, machine-written by capture-evidence.mjs). Command: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-T5-20261009/red.txt --label red -- node --test scratch/dispatch-wip/TR-C-T5/guard-push.trc.test.mjs scratch/dispatch-wip/TR-C-T5/guard-git.trc.test.mjs\". Run in the background and awaited (the combined run took 630379 ms, above the 600000 ms foreground ceiling). The job status reported exit code 1, as expected from the 4 new reds plus the 2 old ones.\n- Scratch tool (git-ignored): scratch/dispatch-wip/TR-C-T5/run.mjs (build, wait, finalize). Its build step also measured git itself: \"git commit -m 'chore: probe' -m -i -- f.txt\" in a throwaway repository commits the message body \"-i\".\n- Commit message file: scratch/commit-msg/TR-C-T5-20261009.txt; trailers Dispatch: TR-C-T5-20261009 (goldfish) and AI-Assisted: true only.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.test.mjs: +41 lines (1592-1632), 5 cases GG22-T5F1a-c, GG22-T5F4a-b; new sha256 8838587afbec84775bf929a73fd8d81cf6e339cbd7845bbce7d56cb0b985dfd5, 84514 bytes, 1648 lines.\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs: +22 lines (2437-2458), 5 cases PGC-T5F3a-c, PGC-T5F4a-b, inside the existing trc-classifier block; new sha256 f6ebe7a92c349650f23500190b141ef7c255a334bc5bda29f6aeb09039210152, 125779 bytes, 2478 lines.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md: +48 lines, the TR-C-T5 section.\n- Not in the commit (untracked, for the Elephant): evidence/TR-C-T5-20261009/red.txt and evidence/dispatch-record-TR-C-T5-20261009.json.\n\n4. Deliberately not changed\n- Both guard post-images, live hooks/ and lib/, the tranche README, TR-C-F-MANIFEST.md (its recorded test digests 6c6b153f... and 05e6d7a2... are now stale for the ceremony copy).\n- TR-C-MANIFEST.md sections 1 and 2 (their sha256/line counts are superseded by the new section, stated there) and line 21 with the absolute WSL path (Critic F5).\n- The foreign modified file specs/.../tranche-2/hooks/guard-dispatch-budget.test.mjs and the other dirty paths of the shared tree.\n\n5. Deviations from spec\n- Briefed F1 spelling \"git commit -m x -m -i -- <ledger>\" is NOT pinned. Measured: git reads -i there as the second -m's value (a message paragraph), so no --include exists and admitting it is correct; a BLOCK pin would force a false positive onto the F slice. Pinned instead the spellings where -i is really a flag: \"-m <subject> -m -m -i\" (the Critic's own -m -m -i) and \"--trailer --trailer -i\". Added GREEN control T5F1c (ordinary second -m paragraph).\n- The bare subject \"x\" is replaced by \"chore: reconcile ledger\" (GIT-01 reads the subject first; reasoned, not measured).\n- F4 pins are GREEN by design (the --help behaviour exists, it had no pin), so the Goal's \"RED pins\" holds for F1 and F3 only. The stop condition \"a pin is green\" is reported here for T5F4a/b (both files) and the controls; no RED-intended pin was green.\n- F3: one negative case per class would not fit the budget well; pinned two real-push, marker-free negatives (push option, refspec count) and one bundle control. The prefix, global-option and -C classes are not pinned.\n- The load hook serves the guard post-images directly from the tranche path (no scratch copy), a method detail.\n\n6. Open items\n- Independent review: pending (Elephant dispatches the Critic).\n- Design question for the F slice that these pins expose: the existing T38/T80/T82 marker cases (git grep, trailer with a parenthesis) are refused with the \"only git [-C <path>] push is accepted ...\" reason (a global-option class reason), the heredoc case with the shell-bundle reason. If the Why line is keyed by reason string, the git grep marker case loses its Why although a marker is the true cause; keying by marker presence would keep it. The F3 pins are chosen to hold under either reading (marker-free pushes carry no Why; the bundle refusal keeps it).\n- The dispatch hook's 80 % notice fired at counted call 44; the remaining steps (manifest, check, commit, record) were commit-path only and fit under the cap. No closing-allowance handover was needed.\n- The ceremony needs the new post-image digests of section 3 and a refresh of TR-C-F-MANIFEST.md's stale test digests (outside this dispatch's scope).\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md"
+    ]
+  },
+  "resultSha256": "3dfb358600a83948f8da027506df83426baa5aa53af944953173af1fd9513731"
+}

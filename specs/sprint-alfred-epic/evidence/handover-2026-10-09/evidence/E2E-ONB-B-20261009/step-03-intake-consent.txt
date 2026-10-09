@@ -1,0 +1,16 @@
+STEP 03 intake-consent-apply, then inspect
+Placeholders: <repo-root-in-wsl>, <temp-repo>. Prefix CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core.
+
+03a  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-consent-apply --root <temp-repo> --granted --language en --profile mini --activate --runner claude
+     exit code: 0
+     status: applied (pipeline.onboarding-intake-consent-apply.v1); checkpoint transactionState collecting; values language en, profile mini, gitAuthor null
+     PO answers used: language en, profile mini (smallest of epic|feature|mini).
+     observation: gitAuthor stays null although step 02b passed an author; the project is not a git repository yet, so no local git config could have been written.
+     observation: the output carries NO nextAction; the caller must run inspect to learn what is next.
+     observation: the existingFileApplyAction argv returned in step 02b is malformed: "...--activate --runner --text-file <file> --text-file-sha256 <sha> --activate --runner claude" (the consent action got capture flags appended, and "--runner" is followed by "--text-file").
+
+03b  node .../project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+     exit code: 0
+     status: intake-required; diagnostic intake_required "consent is recorded but no material input has been captured yet"
+     nextAction: collect-input textTurnRef (opaque native UserPromptSubmit reference "delivered in trusted hook context"), applyAction intake-capture-apply --text-turn-ref <ref> --activate --runner claude; fallback existingFileApplyAction intake-capture-apply --text-file <existing-repository-file> --text-file-sha256 <sha256> --activate --runner claude
+     friction: a dispatched agent has no native turn reference, so only the file route is usable; intake-generate-design.md still documents --text.

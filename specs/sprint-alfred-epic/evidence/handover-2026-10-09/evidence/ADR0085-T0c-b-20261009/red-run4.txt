@@ -1,0 +1,50 @@
+command: node --test scratch/dispatch-wip/t0c-run/b.test.mjs
+label: red-run4
+exitCode: 1
+head: ad96ef73049873058fd4b7f866835e0e6346986e
+tree: b3487dfc3fdd14eb90543bf08d83f312625d63da
+dirty: true
+--- stdout ---
+▶ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ✔ control: live-shaped v7 record, course store present -> both lanes admit (green today) (1963.110826ms)
+  ✖ target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today) (2115.195163ms)
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (6266.227307ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8651.800868
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/t0c-run/b.test.mjs:271:11
+✖ target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today) (2115.195163ms)
+  AssertionError [ERR_ASSERTION]: target (note section 17): Edit lane admits without a course store; exit 2; package re-read today: {"ok":false,"code":"DWP2-DURABLE-FAILURE"}; stderr: [guard-devplan] implementation requires a valid private design Advisor transaction (DWP2-DURABLE-FAILURE).
+  Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,
+  complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.
+  Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.
+  An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:277:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at TestContext.test (node:internal/test_runner/test:377:20)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:271:11)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

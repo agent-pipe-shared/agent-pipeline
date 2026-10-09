@@ -1,0 +1,44 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs
+label: lib-project-onboarding-ready-gate
+exitCode: 0
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ exact V4 ready is bound to the requested intent and returns one sanitized receipt (1.541777ms)
+✔ the gate never reads process.env; a missing runner fails closed as PORG-RUNNER even with CLAUDECODE=1 set (regression pin for ready-gate-env-var-runner-authority) (0.444608ms)
+✔ an unknown or malformed runner string fails closed as PORG-RUNNER (0.335385ms)
+✔ the gate accepts "claude" and "codex" explicitly and threads the exact caller-supplied value to inspection (0.390227ms)
+✔ a real V4 ready observation carrying pushApprovalMode/trustAnchorAvailability (thirteen keys) is accepted (0.221673ms)
+✔ ready gate keeps valid Claude cache drift optional while Codex and Antigravity stay settings-inapplicable (1.339532ms)
+✔ a ready observation may carry the producer's helpful design-to-implementation handover without becoming PORG-INVALID-OBSERVATION (0.218763ms)
+✔ a ready observation may carry only the closed verify-command collect/apply handover when calibration is not configured (0.358747ms)
+✔ all runners admit the exact read-only plan-lifecycle inspect action for draft and awaiting-approval (0.487578ms)
+✔ the plan-lifecycle inspect exception rejects arbitrary paths, argv, mutation, and expected states (0.972907ms)
+✔ the ready handover exception remains closed to arbitrary or malformed actions (0.617481ms)
+✔ the unconfigured-verify handover exception is exact about its input and placeholder-bound apply argv (0.907206ms)
+✔ the materialize-architecture and reopen-design shapes the producer publishes in approved and implementing are admitted (0.980797ms)
+✔ the new-shape fixtures mirror the literals the producer publishes (drift of project-onboarding-v3.mjs fails here) (13.738772ms)
+✔ the materialize-architecture exception is exact about its keys, argv, flags and expected result (2.182897ms)
+✔ the reopen-design exception is exact about its input, placeholder-bound apply argv, flags and confirmation (3.741644ms)
+✔ the new shapes are bound to the plugin's own resolved pipeline-state.mjs, not to a basename in any directory (0.561149ms)
+✔ a ready observation with an unexpected extra key beyond the thirteen is still rejected (not a subset check) (0.279114ms)
+✔ a non-ready observation carrying the two ready-only fields is rejected (the shape stays status-specific) (0.206033ms)
+✔ every controlling non-ready lifecycle status is preserved and denied without forwarding diagnostics (0.932026ms)
+✔ session capability failure phase is preserved only for a valid matching non-ready observation (0.345716ms)
+✔ intake-required, intake-design-questions-required, and bootstrap-binding-required fail closed as PORG-NOT-READY, not PORG-INVALID-OBSERVATION (0.253984ms)
+✔ exceptions, malformed envelopes, intent/root mismatch, and false-ready actions fail closed (0.58393ms)
+✔ unsupported or missing intents are rejected before inspection (0.122992ms)
+✔ a real, non-stubbed inspectProjectOnboardingV3() result is driven straight through the gate (Direction option 2 fallback) (12.586704ms)
+✔ validForeignCleanupResidueWarning accepts exactly the closed foreign-residue warning and rejects every tamper (1.431033ms)
+✔ a ready observation carrying exactly the foreign-residue warnings passes the gate while any other diagnostic is still PORG-INVALID-OBSERVATION (0.879175ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1476.415651
+
+--- stderr ---

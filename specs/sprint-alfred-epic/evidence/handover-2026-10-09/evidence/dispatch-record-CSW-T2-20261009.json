@@ -1,0 +1,58 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CSW-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "ae5b02b82"
+  ],
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT18 headers + CONT35 header and CSW-T2 section + goldfish-task 455-481 read; preflight run (named marketplace path after GUARD-BOOTSTRAP-RECEIPT-MISSING); CSW-F record read; record created",
+      "toolUses": 10
+    },
+    {
+      "phase": "checkpoint after commit ae5b02b82",
+      "toolUses": 43
+    },
+    {
+      "phase": "final: report written, resultSha256 bound to the UTF-8 bytes of report.text",
+      "toolUses": 45
+    }
+  ],
+  "resultSha256": "144acb0d55d61947f013f9f400f28d064be9096fc531b93b8802c6ff85fb92ea",
+  "report": {
+    "text": "CSW-T2-20261009: implementation complete (committed ae5b02b82); independent review: pending. Not PO-accepted. No stop condition triggered; this is an ordinary completion, not a closing-allowance handover.\n\nRoute pre-check: field 6 declares class test-only (QG-04), not A/G/S, so MP-07 does not apply. Requested: goldfish-deep, tool-layer model sonnet (Sonnet 5.5, effort xhigh). Observed from this dispatch's runtime prompt: \"You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- New pins green natively: passed. native.txt: 77/77 checks passed (68 existing plus 9 new), the nine CSW-T2 lines PASS (lines 41-49); the two CSW-T pins still PASS.\n- New pins green on WSL: passed. wsl.txt: 77/77 checks passed, the nine CSW-T2 lines PASS (lines 41-49).\n- No production file touched: passed (the commit changes one test file).\n- One commit with the exact subject \"test(worktree-lifecycle): cover the opt-in probable-liveness check on every host\": passed, ae5b02b82.\n- Terminal record evidence/dispatch-record-CSW-T2-20261009.json: written, resultSha256 bound to the UTF-8 bytes of report.text.\n- No new pin was red on landed code, so there is no product finding to report.\n\n2. Evidence\n- node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-T2-20261009/native.txt --label native -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs ; wrapped exit 0.\n- wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-T2-20261009/wsl.txt --label wsl -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs\" ; wrapped exit 0. (A first attempt that left the literal placeholder in the command was a shell syntax error, exit 2: nothing ran and no artifact was written. The retry substituted the real WSL path at invocation time.)\n- Both captures ran the whole test file, so \"nothing else changes\" holds on both hosts (77/77).\n\n3. Changed files (commit ae5b02b82, 243 insertions, 1 deletion)\n- plugins/pipeline-core/lib/worktree-lifecycle.test.mjs: two extra imports from the lifecycle module plus the warning schema constant (the one deleted line is the widened preflight import), five helpers and nine new checks placed after the CSW-T control.\n- Untracked, git-ignored evidence: evidence/CSW-T2-20261009/native.txt, wsl.txt; the dispatch record; scratch/commit-msg/CSW-T2.txt and scratch/csw-t2-finalize.mjs (scratch helpers).\n\nThe nine pins, all driven through the injected platform/nowMs/uptimeSeconds seams so a Linux or macOS host runs the win32 branch (whole-minute inputs; boot minute 29999880):\n1. Registration: win32 records pid plus the floored boot minute in processStartId; +59.999 s same minute, +60 s next minute; no runtime for an absent pid, platform darwin, or unusable clock inputs (negative or NaN uptime, NaN now, minute 0).\n2. Opt-in versus default: default is \"unavailable\" with no probable key; opted in is \"live\" with probable: true and exactly five keys, no nonce; only literal true opts in (1, \"true\", {}, undefined, null, false all stay unavailable); darwin stays unavailable opted in, registered or read there.\n3. Tolerance edge: deltas 0, -1, -60000, +59999, +60000, +119999 ms read live/probable; -60001, -120000, +120000 read reused, no probable key.\n4. Reused versus not-live: a rebooted host (uptime reset) reads reused (default read unavailable); a descriptor rewritten to a vanished pid reads not-live with and without opt-in, never probable.\n5. Host table on the real platform: Linux live/live with no probable key; win32 unavailable default, live+probable opted in; other hosts unavailable both ways.\n6. Warning shape via the inspectOwner seam: exactly six keys, schema constant, status live, probable true, message matches \"probably live\", no nonce/processStartId/boot minute; the warning opts in and pins the descriptor digest; on real Linux the warning keeps its four-key shape.\n7. Warning edge: fires at -60000..+119999 ms, silent at -120000, -60001, +120000, after a reboot, and for a vanished owner.\n8. Retirement family: inspectSessionRetirement reads owner-unavailable, inspectExternallyArchivedSession owner-active, inspectOrphanArchiveEligibility ownerStatus unavailable (not asserted beyond that); none carries a probable marker.\n9. Structural: only lib/worktree-lifecycle.mjs and scripts/pipeline-start-preflight.mjs mention probableLiveness among non-test .mjs files under lib, scripts and hooks.\n\n4. Deliberately not changed\n- Every production file, the D0 session-owner test (it still pins unavailable off Linux), the CSW-T pins, and the foreign uncommitted edits in pipeline-state.mjs, po-human-approval.mjs, sanctioned-args-onboarding.mjs and pipeline-state.test.mjs (the index still holds two of them staged; I committed by exact pathspec only).\n- consumer-safe-paths was not run: it is not in this slice's DoD (CSW-F recorded a pre-existing red in the ADR-0014 copy).\n\n5. Deviations from spec\n- None to the goal or DoD. Pin 9 (the structural scan) is the one design choice beyond the literal bullet list: it is how \"retirement never acts on a probable status\" is made checkable, since the claim rests on no retirement caller opting in.\n- I did not pin the behavior of forwarding probableLiveness into the retirement readers (see open items), because that is not a claim the landed design makes.\n- No before-run exists: the pins cover already-landed code, so there is no red baseline by construction.\n\n6. Open items\n- Observation, not a defect today: inspectSessionRetirement, inspectExternallyArchivedSession and inspectOrphanArchiveEligibility spread ...options into the owner read. A caller that forwarded probableLiveness: true would get a probably-live owner as owner-live/owner-active/observable (the blocking direction), but a boot-minute mismatch (\"reused\") would make inspectSessionRetirement answer \"retirable\". Pin 9 keeps that unreachable; if a retirement caller ever opts in, the option should be stripped there first.\n- Observation: on win32 the default read of a probably live owner is \"unavailable\", and \"unavailable\" is in ORPHAN_ARCHIVE_OWNER_STATUSES. That is unchanged by CSW-F (it was unavailable before), but it means the zero-authority orphan-archive tier does not see a live native-Windows owner as observable. I asserted only ownerStatus there and did not measure the eligibility verdict; a follow-up slice may want to decide whether that is intended.\n- Still unverified (carried from CSW-F): whether os.uptime() on Windows counts time asleep; if not, the boot minute drifts after each sleep and a live session reads \"reused\" (a quiet miss).\n- The Linux-only four-key warning assertion ran on WSL only; the native run took the win32 branch of the host table (the native session registered and read within one minute of each other).\n- independent review: pending (Elephant-dispatched Critic only; criticRequired decision recorded T3).\n- Tool uses: about 46 of the 55 base cap.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+      "evidence/CSW-T2-20261009/native.txt",
+      "evidence/CSW-T2-20261009/wsl.txt"
+    ]
+  }
+}

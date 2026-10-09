@@ -1,0 +1,21 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs
+label: lib-project-onboarding-v3-answers-file
+exitCode: 0
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ R5-12 the design-questions nextAction keeps applyAction and answersJson unchanged and adds a sibling fileApplyAction on a scratch path (1.18764ms)
+✔ R5-12 the design-questions guidance names the file route (0.353796ms)
+✔ R5-14 the generated PRD under specs/ carries the po-language comment of the consented language (regression pin) (0.139572ms)
+✔ R5-15 once consent holds a language, no intake-path nextAction asks for one (collecting, pending, ready, generated; regression pin) (0.404867ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44553.293119
+
+--- stderr ---

@@ -1,0 +1,82 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+label: mech-haiku-after-check-routing-projections
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+PASS RP01 authority is provider-neutral
+PASS RP02 Claude design mapping unchanged
+PASS RP03 Claude implement mapping unchanged
+PASS RP04 mechanic route is Haiku at effort medium
+PASS RP05 implementor effort is medium
+PASS RP06 deep effort is xhigh
+PASS RP07 critic effort is max
+PASS RP08 manifest projection is byte-deterministic
+PASS RP09 all profile phase routes are projected
+PASS RP09a all configured advisor routes are projected without invented effort
+PASS RP09b Claude manifest alias remains sonnet-5
+PASS RP10 all fixed agent routes are projected
+PASS RP11 Codex Fable keeps low
+PASS RP11 Codex Fable keeps medium
+PASS RP11 Codex Fable keeps high
+PASS RP11 Codex Fable keeps xhigh
+PASS RP11 Codex Fable keeps max
+PASS RP12 unsupported Codex identity fails closed
+PASS RP12b unsupported effort fails closed
+PASS RP13 partial Codex alias mapping remains narrow
+PASS RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch
+PASS RP13b Codex normal Critic duty contract passes
+PASS RP13c unknown host duty fails closed
+PASS RP14 committed projections match authority
+PASS RP15 light is ceremony-only
+PASS RP16 light routes exclude deep
+PASS RP17 missing manifest route is detected
+PASS RP18 extra manifest route is detected
+PASS RP19 stale provenance is detected
+PASS RP20 custom models pass through without invented aliases
+PASS RP21 pro preset remains projectable
+PASS RP22 valid custom design advisor is projected
+PASS RP23 direct v1 defaults validate as the sole source
+PASS RP24 direct Claude projection preserves the legacy modelRouting shape
+PASS RP25 all direct routes project deterministically
+PASS RP26 Codex design and Critic preserve the validator-approved canonical requests
+PASS RP27 Codex implementation preserves the validator-approved canonical request
+PASS RP28 unobserved concrete Codex IDs fail closed
+PASS RP29 any advisory route may be deliberately disabled
+PASS RP30 cross-runner worktype substitution fails closed before P5
+FAIL RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf
+PASS RP32 P1 Codex implementation retains its validated direct request
+PASS RP33 P1 runner providers stay explicitly mapped
+PASS RP34 P1 Fable resolves to Sol at identity low effort
+PASS RP34 P1 Fable resolves to Sol at identity medium effort
+PASS RP34 P1 Fable resolves to Sol at identity high effort
+PASS RP34 P1 Fable resolves to Sol at identity xhigh effort
+PASS RP34 P1 Fable resolves to Sol at identity max effort
+PASS RP35 V3 checker accepts the configured advisory selector and effort projection
+PASS RP35a V3 checker rejects advisory selector and effort corruption before projection
+PASS RP35b V3 checker detects advisory bytes tampered on disk
+PASS RP36 V3 checker detects advisory runtime drift
+PASS RP37 Antigravity runner provider is google
+PASS RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes
+PASS RP39 Antigravity aliases resolve accurately
+PASS RP40 Antigravity direct routes validate against observed model-ids
+
+55/56 checks passed.
+✖ plugins/pipeline-core/scripts/check-routing-projections.test.mjs (334.574015ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 343.856052
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/check-routing-projections.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/check-routing-projections.test.mjs (334.574015ms)
+  'test failed'
+
+--- stderr ---

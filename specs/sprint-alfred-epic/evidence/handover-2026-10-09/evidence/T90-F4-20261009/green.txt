@@ -1,0 +1,34 @@
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (1.982ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.1556ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.5517ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.1062ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.3884ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.1408ms)
+✔ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.1848ms)
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (5629.5523ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (3293.0602ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (5657.4484ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (5665.6763ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (1867.3336ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (1816.2924ms)
+✔ T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead (15291.7442ms)
+✔ T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched (5635.1742ms)
+✔ T90-T2 (seam): an injected host decides the owner the lock records (3523.4557ms)
+✔ T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous (16945.6589ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (3771.9693ms)
+✔ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (3618.4043ms)
+✔ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (10449.9932ms)
+✔ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (3256.3384ms)
+✔ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (3261.2048ms)
+✔ T90-T4 (F-1): a recovery.files whose second iteration differs from its first never reaches the rendered line (0.3483ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.0364ms) # Linux control: needs /proc on a Linux host
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 89986.6559
+
+exit=0

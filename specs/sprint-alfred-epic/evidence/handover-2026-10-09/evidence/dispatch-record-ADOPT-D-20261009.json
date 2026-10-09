@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-D-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "434a01bb1",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "2f829beab"
+  ],
+  "resultSha256": "ed5f4fbb2adba7a867431e2b7bc57bf50d5524bfc6a0b80f311934a9e1ab51b4",
+  "report": {
+    "text": "ADOPT-D-20261009 completion report (goldfish-deep, Sonnet 5.5 / xhigh). Implementation complete, independent review: pending, PO acceptance pending.\n\nRoute pre-check: class is diagnosis (no code edit), not A/G/S. Requested route: goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed in this dispatch's runtime prompt: Sonnet 5.5, claude-sonnet-5-5. No contradiction. GUARD-BOOTSTRAP-RECEIPT-MISSING fired once on the first Write; the named preflight was run once (exit 0) and the identical Write retried.\n\n1. DoD results\n- Tracked report with (a)-(e): passed (specs/sprint-alfred-epic/evidence/adopt-d-architecture-adoption-2026-10-09.md).\n- Captures of commands run under evidence/ADOPT-D-20261009/: passed (propose.txt exit 0, check-sprint-scope.txt exit 0; git-ignored by design, not committed).\n- One commit of the report: passed, 2f829beab (SHA taken from the commit output).\n\nFindings: (1) a signed deferred state is superseded by prepare -> PO signature -> apply; apply has no guard against an existing state, no recovery verb needed. (2) Scope is load-bearing: fitness class 9 needs the signed scope to cover architecture/map, project/pipeline.json and pipeline.user.yaml (architecture-fitness.mjs:742-743), otherwise it is unavailable, tolerated as report-only only under deferred (architecture-entry-readiness.mjs:189-196), so a sprint-only approved-scoped scope would refuse every later set-phase implementation. Recommended scope: specs/sprint-alfred-epic/, architecture/map, project/pipeline.json, pipeline.user.yaml. (3) Ruling 160's premise is inaccurate: the profile ships at plugins/pipeline-core/architecture/agent-first-profile.v1.json (exists, spec.md:515); architecture/agent-first-profile.v1.json is not required and AC-8 names no path. (4) Gates read the adoption state only at set-phase implementation (entry-gates.mjs:23-32,100-211), checkpoint-debt planning boundary and push currency, not on the dispatch, commit or Edit/Write path. (5) The deferral lapses 2026-10-20 anyway. (6) After signing, any byte change to the three bound inputs is class-9 drift and blocks set-phase implementation; apply requires HEAD and the snapshot identical to prepare.\n\n2. Evidence\n- evidence/ADOPT-D-20261009/propose.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --label adopt-d-propose --out ... -- node plugins/pipeline-core/scripts/architecture-adoption.mjs propose --json ; wrapped exit 0 (5 modules, 4 stages, 24 units, decisionOptions empty).\n- evidence/ADOPT-D-20261009/check-sprint-scope.txt: same wrapper, architecture-adoption.mjs check --json --scope specs/sprint-alfred-epic/ ; wrapped exit 0, ok true, disposition deferred.\n- node plugins/pipeline-core/scripts/pipeline-start-preflight.mjs: exit 0 (orientation decision-recorded, state deferred).\n- node plugins/pipeline-core/scripts/architecture-adoption.mjs --help: exit 1 (unknown option, no state write); no --help exists.\n- Two earlier capture attempts without --label exited 1 and wrote nothing.\n\n3. Changed files\n- specs/sprint-alfred-epic/evidence/adopt-d-architecture-adoption-2026-10-09.md: the diagnosis report (the only committed file).\n- Untracked, git-ignored, not committed: evidence/ADOPT-D-20261009/*.txt, evidence/dispatch-record-ADOPT-D-20261009.json, scratch/finalize-ADOPT-D.mjs, scratch/commit-msg/ADOPT-D-20261009.txt.\n\n4. Deliberately not changed\n- architecture/ and every source, test and guard file (forbidden). The foreign modified and untracked files in the working tree were not touched. No state-writing verb (prepare was not run either: it needs a decidedAt and would print a request bound to HEAD).\n\n5. Deviations from spec\n- The advisor was not consulted and the finalizer script was not dry-run before the 44-call checkpoint notice; the orientation spent calls on two failed captures (missing --label), a refused directory Grep and a refused composed rg. The hook-counted total passed the 80 percent notice at call 44 and the commit and record close ran in the remaining base and the closing allowance.\n- GF-09-D per-finding log entries were skipped; the report file and captures carry the same information.\n\n6. Open items\n- independent review: pending (only the Elephant may dispatch the Critic); PO acceptance pending.\n- Decisions and gaps Ruling 160 does not settle (details in the report): final scope (PO decides at signing); the CLI that emits the signature digest and builds the proof file for kind architecture-adoption was not found (only architecture-adoption-authority.mjs and control-placement.mjs name the kind), plus how the --request JSON file is produced under the closed shell grammar; whether an origin remote exists (fingerprint v2 versus path-bound fallback); AGENTS.md pointer, fitness-model.json and baseline.json validity and map currency were not measured; whether the remaining 0.7.0 slices cross set-phase implementation, and the guard-push push-currency call site, were not traced.\n- Next: ADOPT-P0 (read-only measurement of entry readiness and planning fitness at HEAD), then P1 (map currency if stale), P2 (stage the proposal at the final HEAD), P3 (prepare, PO signature, apply immediately, commit), ADOPT-E.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/evidence/adopt-d-architecture-adoption-2026-10-09.md"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read, preflight run, record created",
+      "toolUses": 14
+    },
+    {
+      "phase": "orientation, captures, report written, committed",
+      "toolUses": 54
+    },
+    {
+      "phase": "finalized (hook-counted total about 55)",
+      "toolUses": null
+    }
+  ]
+}

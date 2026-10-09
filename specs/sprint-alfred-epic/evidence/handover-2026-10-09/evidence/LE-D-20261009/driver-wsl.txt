@@ -1,0 +1,14 @@
+command: node scratch/dispatch-wip/LE-D/driver.mjs
+label: driver-wsl
+exitCode: 0
+head: ae14b4c43738996ccec90e4ea12f32c061c19160
+tree: 40324f113d50f4412964da279d3e2e0ac2fa1a21
+dirty: true
+--- stdout ---
+tmpdir: /tmp root: /tmp/le-d-LHFALz real: /tmp/le-d-LHFALz
+git version: git version 2.53.0
+git rev-parse --show-toplevel => status 128 stdout "" stderr "fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n"
+git rev-parse --is-inside-work-tree => status 128 stdout "" stderr "fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n"
+plan: {"ok":false,"code":"LINE-ENDINGS-GIT-FAILED","detail":"fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).","exitCode":128}
+
+--- stderr ---

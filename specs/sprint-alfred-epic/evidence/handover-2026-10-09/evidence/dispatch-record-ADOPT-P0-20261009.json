@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-P0-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "runner": "claude",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit"},
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {"schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": {"mechanical": false, "architecture": false, "guardrails": false, "security": false}},
+    "appliedRow": "T3"
+  },
+  "commits": ["369217c71"],
+  "log": [
+    {"phase": "opening: briefing read, preflight run, record created", "toolUses": 7},
+    {"phase": "measured: signing CLI (static), origin (git remote -v exit 0), AGENTS.md pointer (rg exit 0), status --json (exit 0)", "toolUses": 28},
+    {"phase": "report written and committed 369217c71; items 3, 5, 6 not measured (budget)", "toolUses": 34}
+  ],
+  "report": {
+    "text": "Closing-allowance handover. Committed: 369217c71 (specs/sprint-alfred-epic/evidence/adopt-p0-measure-2026-10-09.md). Verified: git remote -v exit 0 (origin present, fingerprint v2); rg AGENTS.md exit 0 (pointer present); architecture-adoption.mjs status --json exit 0 (deferred, reviewDate 2026-10-20). Findings: sign-intent --intent-sha256 can sign the adoption intent, but --request cannot (needs top-level intentSha256; adoption request has intent.sha256) and prepare has no file output; quiet-window sequence written. Remains undone: items 3 (map currency), 5 (fitness-model/baseline validity), 6 (set-phase/push-currency crossing) unmeasured; no command run for item 1 (static only). Next briefing: read argv of module-inventory.mjs, architecture-baseline.mjs, architecture-fitness.mjs first (budget went to the signing-CLI search), allow 35 calls for P0b alone. Independent review: pending.",
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/adopt-p0-measure-2026-10-09.md"]
+  },
+  "resultSha256": null
+}

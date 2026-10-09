@@ -1,0 +1,40 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs
+label: mech-haiku-after-p3b-runner-conformance
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+FAIL C01 v1 preserves Claude routes and projects exact Codex routes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS C02 native Claude and Codex usage bind only through receipts and never persist raw events
+PASS C03 native Antigravity usage binds correctly using v3 definitions
+
+1 failure(s):
+- C01 v1 preserves Claude routes and projects exact Codex routes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+✖ plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs (177.735234ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186.836833
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs:1:1
+✖ plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs (177.735234ms)
+  'test failed'
+
+--- stderr ---

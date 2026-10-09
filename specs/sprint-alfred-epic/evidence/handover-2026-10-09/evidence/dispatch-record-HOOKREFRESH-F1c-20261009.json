@@ -1,0 +1,92 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "HOOKREFRESH-F1c-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "6259c35cc394d51b7c5de5f765433f00c867303a",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "c9ffebeb388c87baeb7f595ab6e3ed67aceec3f650d72e97a2f7dd88452f5aeb",
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER, STOP CONDITION TRIGGERED (Ruling 70 R1 gate check not ready) plus a scope burst (5 regressions in a test file I may not edit). NOTHING COMMITTED. Route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 (runtime prompt); effort not observable; no contradiction.\n\n1. DoD results\n- 11 ENFORCEMENT cases green: PASSED (native cheap loop: 14 pass, 0 fail, 1 todo; WSL AFTER capture lists no ENFORCEMENT case among its failures).\n- Nothing green before is red after: FAILED. 5 cases of pipeline-start-preflight.test.mjs went green to red: F2 (:1639), F4(c) (:1657), F4(a) (:1672), PX0-AC-08(b), PHX-WP-AAC01-MULTISESSION. Four were read: each asserts status 'ready' and now gets 'hook-refresh-required'. The fifth was not inspected individually. Cause: these cases call the real preflight with the real default checkCloneProvisioning, which reads THIS repo's installed hooks; those hooks read 'refresh' against the repo copy of the plugin, so the ratified enforcement fires. The cases are not hermetic. Fixing them is a test-file edit, outside my scope (stop condition 3).\n- Key-list case: not in the AFTER failure list (it was red BEFORE); head at capture was 6259c35cc, so TESTFIX-B may have landed. Not verified, not chased.\n- Ruling 70 R1 gate check: FAILED. The real repo-copy preflight with no role printed status 'plugin-refresh-required' (exit code 0 by the allowlist), not 'ready'. My diff cannot have caused it: planMandatoryHookRefresh returns the status unchanged unless the base status is 'ready', and the base status is computed earlier. I could not run a pre-change comparison (no stash, no worktree allowed). The guard-prescribed marketplace-copy preflight, run before my first write, printed 'ready'. Per R1 I STOPPED without committing. Also: all three repo hooks read 'refresh' against the repo copy, so if the base status were 'ready' a no-role Elephant run here would be hook-refresh-required, exit 2 (the R1 hazard, S3 territory).\n- Consumer-safe check: PASSED (exit 0).\n- R2 consumers: no protected consumer needs a change. freshnessHostActionForPreflight (:796) returns null for any status other than 'ready' (fail closed, tolerates the new status; under stale hooks the freshness binding is now null where it used to bind). ruleset-freshness-host.mjs:231 calls observePreflight() with no seam (plain object, unchanged). command-catalogue.mjs:272 is a sync call with no seam and only reads nextAction; attestation actions require base status plugin-attestation-required, which the enforcement never touches.\n- R3 (real bootstrap writes): runEntry ran it once with confirm=null: modelRoleBootstrap = { status: 'unavailable', code: 'MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE' }. git status afterwards shows no file attributable to it. Host-store writes are not observable within my read limits: NOT independently verifiable, not claimed as passed.\n- R5: pre-push applyInstall is exported (pre-push-hook-install.mjs:705), so the helper refreshes pre-push too; only 'ready-to-upgrade' plans with updateRequired === true are ever applied.\n\n2. Evidence\n- node --test plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs: exit 0 (terminal output only, no artifact file).\n- WSL capture-evidence of both test files: evidence/HOOKREFRESH-F1b-20261009/after-preflight.txt (exitCode 1 recorded in the file, head 6259c35cc); 93 tests, 85 pass, 5 fail, 3 todo. BEFORE: 93/78/12/3 at head 410d0addf.\n- node plugins/pipeline-core/scripts/pipeline-start-preflight.mjs (repo copy, no role): exit 0, status plugin-refresh-required (terminal output only).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0, 9 pass.\n\n3. Changed files (UNCOMMITTED, nothing staged)\n- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs (modified): role and runModelRoleBootstrapFn options, planMandatoryHookRefresh, conditional-thenable attachModelRoleBootstrap, main()/runEntry role and readback plumbing, lenient --role parser.\n- plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs (new, untracked): the refresh helper.\n\n4. Deliberately not changed: every test file, hooks/ and guard files, scripts/model-role-bootstrap.mjs, the foreign staged and unstaged files of parallel dispatches, check-clone-provisioning.mjs, clone-hook-readiness.mjs.\n\n5. Deviations: the opening record was not read back after the Write (the tool confirmed creation; budget); the AFTER capture label is HOOKREFRESH-F1b-after.\n\n6. Open items: stop condition R1 triggered; scope burst (5 non-hermetic tests); independent review: pending; verify: partial; PO acceptance: open. Not tested: after the helper runs on the stale+missing mix, readiness is [current, install]; clone-hook-readiness --apply refuses with HOOK-READINESS-PLAN-DRIFT for any non-install entry, and the action's expected status 'ready' cannot hold, so the repair stays two-step there. The helper's guard admission (S3) and the --role text in the guard message are still open.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "plugins/pipeline-core/scripts/refresh-mandatory-hooks.mjs"
+    ]
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "11 ENFORCEMENT cases",
+        "command": "node --test plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs",
+        "exitCode": 0,
+        "artifact": "evidence/HOOKREFRESH-F1b-20261009/after-preflight.txt (WSL run)"
+      },
+      {
+        "check": "consumer-safe paths",
+        "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+        "exitCode": 0,
+        "artifact": null
+      }
+    ],
+    "remainsUndone": [
+      "commit of the two files (left uncommitted on purpose, R1 stop)",
+      "5 regressed cases in pipeline-start-preflight.test.mjs (non-hermetic, test-file edit needed)",
+      "R1 gate check not ready (plugin-refresh-required)",
+      "R3 host-store write check not independently verifiable"
+    ],
+    "nextBriefingAdjustments": [
+      "Rule on R1: is plugin-refresh-required with exit 0 (independent of the diff) acceptable, or must the gate be measured on a synced marketplace copy",
+      "First a test-only dispatch: make the 5 cases hermetic (inject checkCloneProvisioningFn or pass role goldfish), QG-04",
+      "Then a commit-only dispatch for the two uncommitted files: cheap loop, WSL capture, commit by pathspec with this record terminal",
+      "Decide how the stale+missing mix should converge (two-step repair, PLAN-DRIFT in clone-hook-readiness)"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening-record-created-after-preflight-receipt",
+      "toolUses": 12
+    },
+    {
+      "phase": "orientation-complete-advisor-consulted",
+      "toolUses": 31
+    },
+    {
+      "phase": "implementation-written-six-edits-and-helper",
+      "toolUses": 40
+    },
+    {
+      "phase": "verification-cheap-loop-green-r1-gate-not-ready-wsl-5-regressions-consumer-safe-green",
+      "toolUses": 48
+    },
+    {
+      "phase": "stopped-without-commit-record-terminal",
+      "toolUses": 49
+    }
+  ]
+}

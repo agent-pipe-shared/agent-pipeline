@@ -1,0 +1,17 @@
+status-lines: diff before(<) after(>), uniq -c of status lines minus timing
+diff-exit=0
+PASS/FAIL line diff before(<) after(>), uniq -c
+17d16
+<       1 FAIL  PS54ah the repository's porcelain status is unchanged across all three commands -- before/after differ:
+22c21
+<       1 FAIL  the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2) -- Cannot find module '/tmp/secgate-installed-fixture-b9Fboi/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-b9Fboi/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+---
+>       1 FAIL  the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2) -- Cannot find module '/tmp/secgate-installed-fixture-H9U8xY/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-H9U8xY/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+424a424
+>       1 PASS  PS54ah the repository's porcelain status is unchanged across all three commands
+diff-exit=1
+   648 /tmp/f1b-pf-ADR0085-F1-20261009.txt
+   648 /tmp/f1b-pf-ADR0085-F1b-20261009.txt
+  1296 total
+ADR0085-F1-20261009/neighbours-before.txt:26
+ADR0085-F1b-20261009/neighbours-after.txt:25

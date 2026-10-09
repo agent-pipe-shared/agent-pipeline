@@ -1,0 +1,45 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs
+label: scripts-pipeline-start-preflight.session-intent
+exitCode: 0
+head: c07067fff232237d5573b0e33a659970ccf15f1b
+tree: d07a998331899579698860219e57e338ccea1038
+dirty: true
+--- stdout ---
+✔ FLAPP1-R1 (a): bootstrap ready but session not ready -> nextAction is inspect --intent session (10.779925ms)
+✔ FLAPP1-R1 (b): both intents ready -> result identical to the bootstrap-only path (11.929181ms)
+✔ FLAPP1-R1 (c): a session probe that itself throws fails closed -- no plain ready path (6.139885ms)
+✔ FLAPP1-R1 (d): a bootstrap-not-ready project keeps the guided driver and never reaches the session probe (5.936056ms)
+⚠ FLAPP1-R1 (e): the session inspect command the preflight names is one the readiness guard admits (8.344635ms) # undiagnosed: guard refuses the named session inspect command on native Windows; measure on POSIX
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 2842.565589
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs:210:1
+⚠ FLAPP1-R1 (e): the session inspect command the preflight names is one the readiness guard admits (8.344635ms) # undiagnosed: guard refuses the named session inspect command on native Windows; measure on POSIX
+  AssertionError [ERR_ASSERTION]: node '<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs' inspect --root '/projects/current' --intent session --runner codex
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.session-intent.test.mjs:218:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

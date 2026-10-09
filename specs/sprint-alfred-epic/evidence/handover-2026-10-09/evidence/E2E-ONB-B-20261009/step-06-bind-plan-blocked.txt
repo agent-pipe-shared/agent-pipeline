@@ -1,0 +1,19 @@
+STEP 06 bootstrap-bind-plan (first refusal), then inspect
+Placeholders: <repo-root-in-wsl>, <temp-repo>. Prefix CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core.
+
+06a  node .../project-onboarding-v3.mjs bootstrap-bind-plan --root <temp-repo> --runner claude        (command from intake-generate-design.md table)
+     exit code: 2 (measured)
+     code: KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING
+     message (paraphrased; the literal marker line is not reproduced here because the host Write guard refuses any file containing it, see friction F10): the promoted PRD must carry the PO plan acknowledgement marker exactly once on its own line, otherwise the PO plan gate refuses it with no sanctioned repair route once bound.
+     owner: plugins/pipeline-core/lib/onboarding-continuity.mjs:5186 (throw site)
+     why this is misleading: under human_approval signature the marker is written only by the signature proof, and the same guidance forbids a manual edit; the refusal names no next step. The way out is the actions in 06b and step 07.
+
+06b  node .../project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+     exit code: 0
+     status: bootstrap-binding-required
+     nextAction.kind: architecture-design-required, code ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE (schema pipeline.architecture-design-remediation.v1, mutation false)
+       prdPath specs/onboarding-c7166f570a9a/prd_onboarding-c7166f570a9a.md, specPath specs/onboarding-c7166f570a9a/spec.md
+       guidance: author an explicit pipeline-architecture-design block in the staging PRD (module responsibilities, ownership, contracts, verification entry points, implementation surface, fitness model, zero-debt initial baseline, scoped disposition); review with the PO; do not sign a scaffold.
+     owner of the check: plugins/pipeline-core/lib/architecture-design.mjs:62 (rejects the DRAFT TEMPLATE comment and placeholders)
+     diagnostic bootstrap_binding_required tells the agent to "follow the exact detached-signature acknowledgement action", which is NOT what nextAction returns at this point.
+     this is the first point a mechanical walk cannot pass without authoring: the PRD generated in step 05 already carries a DRAFT TEMPLATE architecture block (REPLACE placeholders).

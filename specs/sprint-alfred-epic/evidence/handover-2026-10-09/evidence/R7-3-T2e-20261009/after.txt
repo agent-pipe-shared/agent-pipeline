@@ -1,0 +1,51 @@
+command: node --test "--test-name-pattern=in-process driver follows" plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+label: R7-3-T2e-after
+exitCode: 1
+head: 312424d8db9c0a4ee1144d42c9aefe590a176ddf
+tree: e3b8543d86d85cb93c8f6087fc676538e38d8fd9
+dirty: true
+--- stdout ---
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (205333.526837ms)
+ℹ codex: verified original intake {"sha256":"7f20392cdcb17ff87149ff7de331b483a8e53d81a1bead1da97c1b9f156165f4","byteLength":67,"consentGranted":true,"captureRoute":"returned-consent-with-explicit-description","nativeReference":false}
+ℹ codex: real hooked bootstrap candidate {"commit":"1fd1f72bac43197f4cb59c3c5755108bf0b94d81","tree":"8c1069336e31b095b7b5e6df93dec4148eb47e56"}
+ℹ codex: real hooked five-source design candidate {"commit":"bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e","tree":"d61fec9c77a01ba6a68dfaadec6bbfeb50c3a5e2"}
+ℹ codex: exact requested readiness route {"authoringRunner":"codex","requestedRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e"},"registeredCell":{"state":"default","selector":{"kind":"alias","value":"sonnet"},"effort":"high","unavailable":"defer","evidence":"dispatch-receipt"},"registrySha256":"c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac","reasonFieldPresent":false,"explanation":"The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider."}
+ℹ codex: assigned local readiness host {"authoringRunner":"codex","reviewRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e"},"assignment":"existing-v1-local-host","nativeProviderAvailabilityClaim":false}
+ℹ codex: canonical fixture readiness {"reviewRunner":"claude","candidate":{"commit":"bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e","tree":"d61fec9c77a01ba6a68dfaadec6bbfeb50c3a5e2"},"selectionId":"drh_49c938dfda08a470a4a7fcc5e395d13e","assurance":"host-observed-local","providerAttestation":false}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 208309.653345
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:780:1
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (205333.526837ms)
+  AssertionError [ERR_ASSERTION]: codex: final approval remains bound to the committed five-source candidate
+  + actual - expected
+  
+    {
+  +   commit: '61abda3ef1e68f66fcfa32b3eb3fdfc662b996f2',
+  +   tree: 'bd58be9d27b4e8da502c0cd0b1dfaae89455c9b4'
+  -   commit: 'bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e',
+  -   tree: 'd61fec9c77a01ba6a68dfaadec6bbfeb50c3a5e2'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1470:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { commit: '61abda3ef1e68f66fcfa32b3eb3fdfc662b996f2', tree: 'bd58be9d27b4e8da502c0cd0b1dfaae89455c9b4' },
+    expected: { commit: 'bb3274a3b1b8d3cc344eb8ebf2643cd2eb4ccf1e', tree: 'd61fec9c77a01ba6a68dfaadec6bbfeb50c3a5e2' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

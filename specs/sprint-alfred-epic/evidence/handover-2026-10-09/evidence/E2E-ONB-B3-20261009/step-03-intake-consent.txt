@@ -1,0 +1,161 @@
+03a  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-consent-apply --root <temp-repo> --granted --language en --profile mini --activate --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.onboarding-intake-consent-apply.v1",
+  "status": "applied",
+  "root": "<temp-repo>",
+  "mutated": true,
+  "checkpoint": {
+    "schema": "pipeline.onboarding-intake-checkpoint.v1",
+    "root": "<temp-repo>",
+    "revision": 0,
+    "createdAt": "2026-10-09T07:03:34.295Z",
+    "updatedAt": "2026-10-09T07:03:34.295Z",
+    "consent": {
+      "granted": true,
+      "at": "2026-10-09T07:03:34.295Z"
+    },
+    "values": {
+      "gitAuthor": null,
+      "language": "en",
+      "profile": "mini"
+    },
+    "materialInput": [],
+    "designQuestions": null,
+    "transactionState": "collecting",
+    "generated": null,
+    "contentSha256": "9ffc7a1b7727b8f41c2087f593b940754fe51e40b98947ca32c37c5fb51112db"
+  }
+}
+
+  --- end ---
+
+03b  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.project-onboarding.v4",
+  "status": "intake-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intent": "onboarding",
+  "repository": {
+    "status": "local-valid-writable",
+    "mode": "local",
+    "gitVersion": "2.53.0",
+    "initializesGit": false,
+    "rootWritable": "passed",
+    "sessionCapability": "not-required",
+    "worktreeCapability": "not-required"
+  },
+  "runtime": {
+    "status": "readback-not-applicable",
+    "sourceSha256": "4b91f3cdb947706e7677a91607b24fa4ebcb850fd9a93dec13e2ab3e555bc831",
+    "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+    "barrierSha256": null,
+    "readbackSha256": null
+  },
+  "continuity": {
+    "status": "absent-pristine",
+    "stateSha256": null,
+    "handoverSha256": null,
+    "historySha256": null
+  },
+  "appServer": {
+    "required": false,
+    "status": "not-applicable",
+    "code": null
+  },
+  "runnerPermissions": {
+    "target": ".claude/settings.local.json",
+    "status": "pending-runtime-initialization",
+    "lanes": [
+      "Bash",
+      "PowerShell"
+    ],
+    "exactEntries": []
+  },
+  "nextAction": {
+    "kind": "collect-input",
+    "input": {
+      "name": "textTurnRef",
+      "encoding": "json",
+      "trim": true,
+      "minBytes": 1,
+      "maxBytes": 8192,
+      "singleLine": true,
+      "rejectNul": true
+    },
+    "mutation": false,
+    "requiresConfirmation": false,
+    "guidance": "Consent is already recorded. Supply only the opaque native UserPromptSubmit reference delivered in trusted hook context, then run applyAction. The reader resolves exact host-observed bytes after consent. Never supply a transcript path, paste prompt text as a reference, or use a guessed identifier. If no native reference is available, use existingFileApplyAction only for an existing regular repository file.",
+    "applyAction": {
+      "kind": "command",
+      "executable": "node",
+      "argv": [
+        "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "intake-capture-apply",
+        "--root",
+        "<temp-repo>",
+        "--text-turn-ref",
+        "<native-text-turn-reference-json>",
+        "--activate",
+        "--runner",
+        "claude"
+      ],
+      "mutation": true,
+      "requiresConfirmation": true,
+      "expected": {
+        "schema": "pipeline.onboarding-intake-capture-apply.v1",
+        "statuses": [
+          "applied"
+        ]
+      }
+    },
+    "existingFileApplyAction": {
+      "kind": "command",
+      "executable": "node",
+      "argv": [
+        "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "intake-capture-apply",
+        "--root",
+        "<temp-repo>",
+        "--text-file",
+        "<existing-repository-file>",
+        "--text-file-sha256",
+        "<sha256-of-existing-file>",
+        "--activate",
+        "--runner",
+        "claude"
+      ],
+      "mutation": true,
+      "requiresConfirmation": true,
+      "expected": {
+        "schema": "pipeline.onboarding-intake-capture-apply.v1",
+        "statuses": [
+          "applied"
+        ]
+      }
+    },
+    "expected": {
+      "schema": "pipeline.project-onboarding.v4",
+      "statuses": [
+        "intake-required"
+      ]
+    }
+  },
+  "diagnostics": [
+    {
+      "path": "$.continuity",
+      "code": "intake_required",
+      "message": "consent is recorded but no material input has been captured yet",
+      "guidance": "capture the PO's next message of project material via the read-only intake-capture-apply action"
+    }
+  ]
+}
+
+  --- end ---
+

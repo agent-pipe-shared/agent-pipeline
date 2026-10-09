@@ -1,0 +1,37 @@
+command: node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+label: native
+exitCode: 0
+head: 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a
+tree: ef25c511aca6ec7d0c36d66ae6b4bdea1a4fe4e0
+dirty: true
+--- stdout ---
+✔ legacy Goldfish command flow renders separate exact-path argv without shell composition (4.6426ms)
+✔ legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata (0.4285ms)
+✔ CLI maps repeated body/path flags exactly and never executes Git (3.2481ms)
+✔ CLI normalizes unsorted --path input to the sorted output and still refuses duplicates (2.7796ms)
+✔ generated commands create one exact-path Git commit with the required trailer block (240.6248ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (a) fixture sanity: the producer returns the stage and commit steps (0.5603ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.7605ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (c) RED by design: copyCommand.posix of each step contains no newline (0.4854ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.5818ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (e) RED by design: copyCommand.powershell of each step contains no newline (0.616ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (a) fixture sanity: the producer returns the stage and commit steps (0.7731ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.8054ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (c) RED by design: copyCommand.posix of each step contains no newline (0.7307ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.7487ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (e) RED by design: copyCommand.powershell of each step contains no newline (0.7243ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (a) fixture sanity: the producer returns the stage and commit steps (1.3226ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (b) control: each plain command is one guard-admitted git command at linux and win32 (1.1196ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (c) RED by design: copyCommand.posix of each step contains no newline (1.2101ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (1.531ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (e) RED by design: copyCommand.powershell of each step contains no newline (1.5368ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 570.9042
+
+--- stderr ---

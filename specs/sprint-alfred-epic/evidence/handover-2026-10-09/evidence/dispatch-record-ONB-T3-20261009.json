@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ONB-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "3d5c858c048e6a298aa32d15ebe2859f79f3773d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "b46403a06df7237197a34da3b2eee5ef6a864090"
+  ],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "orientation-done-record-opened", "toolUses": 13 },
+    { "phase": "drafts-read-new-file-written-continuity-edit-made", "toolUses": 24 },
+    { "phase": "measured-wsl-greenfield-walk: GFW001 and GFW002 red for stated reasons (evidence/ONB-T3-20261009/greenfield-walk.txt)", "toolUses": 26 },
+    { "phase": "measured-wsl-continuity-pins: OBC299 and OBC300 red for stated reasons (evidence/ONB-T3-20261009/continuity-pins.txt)", "toolUses": 28 },
+    { "phase": "measured-wsl-continuity-whole-file: 300 tests, 298 pass, only OBC299/OBC300 fail (evidence/ONB-T3-20261009/continuity-neighbours.txt)", "toolUses": 29 },
+    { "phase": "committed b46403a06df7237197a34da3b2eee5ef6a864090", "toolUses": 36 },
+    { "phase": "final-record-and-handback", "toolUses": 39 }
+  ],
+  "report": {
+    "text": "ONB-T3-20261009 completed: one commit b46403a06df7237197a34da3b2eee5ef6a864090, four pins red for their stated reasons, 298 neighbours green. independent review: pending.\n\nRoute pre-check: class test-only (not A/G/S). Requested route: Sonnet 5.5 at xhigh; observed (this dispatch's runtime prompt): Sonnet 5.5, model ID claude-sonnet-5-5. No contradiction.\n\n1. DoD results\n- GFW001 (F3 argv, new file): red for the stated reason: passed as a pin.\n- GFW002 (F4, new file): red for the stated reason: passed as a pin.\n- OBC299 (F7) and OBC300 (F9) in onboarding-continuity.test.mjs, guard 298 to 300: red for the stated reasons: passed as pins.\n- Neighbours: the WHOLE continuity file ran (300 tests): 298 pass, only OBC299 and OBC300 fail; the 300 count guard held. The first-restart-intake and v3 fixture files are untouched.\n- One commit with the requested subject, reds marked intended in the body: done. Terminal record: this file.\n\n2. Evidence (machine-written by capture-evidence.mjs, all on WSL with CLAUDECODE=1, PIPELINE_TEST_TMP_BASE under $HOME, timeout 540; wrapped exit code 1 each, which is the intended red)\n- evidence/ONB-T3-20261009/greenfield-walk.txt: `node --test plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs`, exit 1. GFW001 52 s, GFW002 62 s.\n  - GFW001: `doubled --runner`, count 2 !== 1. The captured argv is [..., --activate, --runner, --text-file, <file>, --text-file-sha256, <sha>, --activate, --runner, claude]: THREE stacked reds for the F3 slice, only the first assertion fires: (a) --runner and --activate doubled, (b) the first --runner lost its value (followed by --text-file), (c) --text-file and --text-file-sha256 are present for claude (ruling 2 says ABSENT). The F implementer sees only (a) until it is fixed.\n  - GFW002: mismatches = [intake-consent-apply, intake-capture-apply, intake-design-questions-apply, intake-generate-apply]; the deepEqual message also quotes the second red: the intake-generate-plan nextAction is the intake-generate-apply argv ending in --activate with NO --runner codex.\n- evidence/ONB-T3-20261009/continuity-pins.txt: `node --test --test-name-pattern 'greenfield walk' plugins/pipeline-core/lib/onboarding-continuity.test.mjs`, exit 1, 2 tests, 2 fail. OBC299: refusal code KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING asserted green, then nextAction.kind undefined vs architecture-design-required. OBC300: planOnboardingBootstrapAcknowledgementChat does not throw (code undefined vs BOOTSTRAP-ACK-PLACEHOLDER-CONTENT).\n- evidence/ONB-T3-20261009/continuity-neighbours.txt: command line `--test-name-pattern '^(?!.*greenfield walk)'` did NOT filter; the whole file ran: 300 tests, 298 pass, 2 fail (OBC299, OBC300), 29 s. This is the stronger neighbours check, but the artifact header describes a filtered run that did not happen.\n- Measurement state: all three captures show head 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa, dirty tree, not the briefed candidate 3d5c858c0 (the shared tree moved before measurement). candidateCommit in this record stays as briefed. F7/F9 were measured against onboarding-continuity.mjs WITH the Elephant's uncommitted LE-F2 edit in the tree (not staged, not touched).\n- evidence/ is git-ignored: the three captures are not in the commit.\n\n3. Changed files (commit b46403a06)\n- plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (new): F3 argv pin and F4 pin; fixtures imported from project-onboarding-v3.test.mjs (ruling 1); local two-argument test collector with registerTestCaseCompletion, 2 cases, ids GFW001-2.\n- plugins/pipeline-core/lib/onboarding-continuity.test.mjs: one Edit before the guard line: F7 and F9 check() cases, guard 298 to 300 (38 insertions, 1 deletion).\n- Uncommitted by design: evidence/dispatch-record-ONB-T3-20261009.json (ignored dir), scratch/commit-msg/ONB-T3-20261009.txt, evidence/ONB-T3-20261009/*.txt.\n\n4. Deliberately not changed\n- All production files, the foreign uncommitted edits (pipeline-state.mjs, sanctioned-args-onboarding.mjs, onboarding-continuity.mjs LE-F2, harness/scripts/pipeline-state.test.mjs and the others in git status), onboarding-first-restart-intake.test.mjs, project-onboarding-v3.test.mjs, any other count guard.\n\n5. Deviations from spec\n- Ruling 4 location: the one Grep on onboarding-first-restart-intake.test.mjs found `completionCases.length !== 7` at line 197. The literal case-sensitive patterns (`cases.length`, `EXPECTED_`) are a hair off that spelling, but it is a case-count guard in substance and bumping it is forbidden (ONB-T2 item 3), so F3/F4 went to the new file as the ruling prescribes for that branch.\n- Ruling 5: the --runner assertions sit below the final deepEqual as ruled. Because that makes them unreachable while the mismatch red stands, the runner finding is collected first (no assertion) and quoted in the deepEqual message so one run reports both reds. A small addition, not a change of the ruled order.\n- Ruling 5 fallback NOT needed: the CLI intake-generate-plan and intake-generate-apply route ran under fakeGit with exit code 0 (the invoke helper asserts exit 0 before the deepEqual), so no real-git split case; this answers ONB-T2 report 6(f).\n- Ruling 3: F9 pins the exact code BOOTSTRAP-ACK-PLACEHOLDER-CONTENT on the Chat route (draft accepted any BOOTSTRAP-ACK-* naming placeholder/draft/template).\n\n6. Open items\n- TP-13 note (ruling 4): the new onboarding-greenfield-walk.test.mjs may need a Verify suite registration; that is the Elephant's item, not touched or named further here.\n- F4 nuance for the F slice: the collected-mismatch list cannot tell `apply returned null` from `apply returned a different nextAction`; DoD is met (all four named) but the ONB-T2 6 owner claim that none attaches nextAction is confirmed only as a mismatch, not specifically as null.\n- Unreached post-fix checks (unmeasured by design while red): F4 --runner assertions below the deepEqual, F9 no-request-file post-condition (the refusal assertion fires first).\n- independent review: pending (Elephant dispatches the Critic).\n- No stop condition triggered; ~39 of 55 tool uses; no closing-allowance handover."
+    ,
+    "changedFiles": [
+      "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs"
+    ]
+  }
+}

@@ -1,0 +1,318 @@
+command: node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: wsl
+exitCode: 1
+head: a1b1b2e8430e88aaf0edbed6cc29d5380f8645cb
+tree: ff7169576747ff54a2be71e4824d50e954cc4061
+dirty: true
+--- stdout ---
+✔ recovery plan is bound to the public preimage and refuses an in-repository key directory (2.268152ms)
+✔ recovery requires exact digest and explicit attended confirmation before bounded setup (0.973619ms)
+✔ recovery CLI rejects non-TTY activation without invoking setup (0.692583ms)
+✔ recovery reports source complete if audit fails, without pretending the setup rolled back (0.710524ms)
+✔ successful attended recovery writes a bounded, replay-safe private audit receipt (1.304765ms)
+✔ a failed first-anchor action returns an attended digest-bound recovery command (0.951848ms)
+✔ driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks (137465.550134ms)
+✔ initial answer CLI refuses absent or invalid language before any source or receipt write (37325.921987ms)
+✔ an earlier intake language cannot be mislabeled as a later override (34167.856052ms)
+✔ a later explicit intake language override is reported by the real CLI (35945.350898ms)
+✔ host-managed initial answers publish privately and never write reserved Git or Codex controls (7159.715257ms)
+✔ host-managed first stop asks identity, approval and language before intake consent (5485.643032ms)
+✖ host-managed consent CLI routes its later explicit language into private intake state (14311.758679ms)
+✔ later intake language projection resumes after each target publication (16888.419992ms)
+✔ public re-entry repairs consent recorded before language projection (11511.883147ms)
+✔ later-language recovery refuses foreign edits without publishing an audit (4804.348842ms)
+✔ later-language projection completes a prior three-target journal after plugin upgrade (4805.621168ms)
+✔ host-managed first answers recover after every publication boundary (21173.8608ms)
+✔ host-managed first answers complete a prior three-target journal after plugin upgrade (4916.909965ms)
+✔ host-managed recovery refuses changed answers and foreign post-interruption bytes (5058.859615ms)
+✖ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (63178.666063ms)
+✔ a failed separate signature-anchor action preserves the completed initial chat-free transaction (45803.208203ms)
+✔ new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup (31412.936266ms)
+✖ signature anchor reuses a key already at the canonical directory path without importing or replacing it (32896.145633ms)
+✔ first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary (112190.812061ms)
+✔ a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice (35177.553026ms)
+✔ new-key recovery refuses malformed or foreign authority receipts before setup (75276.0562ms)
+✔ driveOnboardingInit: stops at the first published ask (pendingAsks or collect-input) without inventing any of its values (40878.441418ms)
+✔ driveOnboardingInit: executes a run of consecutive command actions before it has to stop (43847.424529ms)
+✔ driveOnboardingInit: is re-entrant -- a second run never repeats the already-executed command that published the ask (78025.053768ms)
+✔ driveOnboardingInit: the step cap fires on a chain that never converges (0.650763ms)
+✔ driveOnboardingInit: failed portable seed stops at its first unexpected mutation outcome (0.285656ms)
+✔ portable lifecycle apply returns its rollback instead of replanning the same seed (127.302401ms)
+✔ driveOnboardingInit: re-anchors after an executed step settles with no nextAction, and completes (0.324477ms)
+✔ driveOnboardingInit: re-anchors after a published command succeeds with plain human-facing output (0.288475ms)
+✔ driveOnboardingInit: binds a returned root-less project action to the Driver root (0.321676ms)
+✔ driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status (0.327976ms)
+✔ driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results remain closed (0.870766ms)
+✔ driveOnboardingInit: a blocked published runner-permission repair retains its exact diagnostic action (0.468139ms)
+✔ driveOnboardingInit: plain or malformed anchor output, JSON-shaped malformed command output, and nonzero command output remain errors (1.343255ms)
+✔ driveOnboardingInit: a nextAction-less result from the anchoring inspect itself does not re-anchor again (0.204683ms)
+✔ driveOnboardingInit: a genuinely non-converging chain stops with its own outcome, not the step cap (0.434138ms)
+✔ driveOnboardingInit: collect-input, external-operator, ready, unsupported-next-action and error outcomes reached directly are typed (0.719653ms)
+✔ driveOnboardingInit: a command nextAction carrying pendingAsks stops and surfaces them instead of executing straight past them (2.88614ms)
+✔ driveOnboardingInit: a command nextAction with no pendingAsks (absent or empty) is unaffected (3.546159ms)
+✔ driveOnboardingInit: a collect-input nextAction that also carries pendingAsks surfaces both, neither lost (3.445624ms)
+✔ driveOnboardingInit: malformed pendingAsks does not crash the driver and is not silently swallowed (6.335749ms)
+✔ driveOnboardingInit: walks migration plan -> apply --activate -> re-anchor inspect -> ready without premature termination (0.314936ms)
+✔ driveOnboardingInit: a migration-ready V4 response keeps required asks while optional handover commands remain terminal (2.754512ms)
+✔ driveOnboardingInit: a greenfield V4-ready command nextAction executes before reaching PO input (0.282626ms)
+✔ driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready (0.202734ms)
+✔ DEFAULT_STEP_CAP is a small, positive constant (0.057821ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: cabf6f7e69f2f1cb634303c5802e565a5570a0b6de899aa8f3d76ca8fc888143
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T02:04:55.151Z
+  candidate commit: 7f4df41577bd6e0b725e734960eb8a36590b69df
+  candidate tree: 66b28e5ddd41246ecc2e3029c1f8efcc11be37c9
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: fd4d2529f422aa1f0798068f73736262328435bf42d748dbeebf57a9302ec899
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T02:05:19.294Z
+  candidate commit: de74293bce6868653a2f4710bdc8f2e6cbd01a3e
+  candidate tree: 1276fb2601b2f7a712e85d6e7deb837eb52e04df
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from /tmp/signing-ceremony-external-decline-EzC5DV/po-private.pem
+40B79F59F5760000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../providers/implementations/ciphers/ciphercommon_block.c:107:
+40B79F59F5760000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 7e16319ebbacafb3a3024e3d8ffa51cec907a0c3b9d7b97ddbe25537700865fb
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T02:05:32.553Z
+  candidate commit: dba0bd4b9ebba8062dcc3e700b88568712936b91
+  candidate tree: 7eca571ea21cd5148e4283ed68812cd0127d81de
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (24140.157705ms)
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (13267.442135ms)
+✔ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (11779.172396ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.177493ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.246375ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 54
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 902511.248561
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:455:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (14311.758679ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:519:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:919:1
+✖ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (63178.666063ms)
+  AssertionError [ERR_ASSERTION]: approval/claude/signature: node --test exited 1
+  TAP version 13
+  # Subtest: isolated onboarding matrix cell
+  not ok 1 - isolated onboarding matrix cell
+    ---
+    duration_ms: 60574.466147
+    type: 'test'
+    location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2136:3'
+    failureType: 'testCodeFailure'
+    error: |-
+      claude: PO-HUMAN-APPROVAL-FAILED: PO-KEY-UNENCRYPTED: the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase; repair: in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in "<key>" -out "<key>.encrypted" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid.
+      
+      {
+        "schema": "pipeline.onboarding-init.v1",
+        "runner": "claude",
+        "root": "/tmp/onboarding-init-test-pYWwaR",
+        "outcome": "error",
+        "bootstrap": {
+          "ok": false,
+          "code": "TRUST-ANCHOR-SETUP-FAILED"
+        },
+        "recovery": {
+          "kind": "external-operator",
+          "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",
+          "executable": "<home-path>",
+          "argv": [
+            "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+            "plan",
+            "--root",
+            "/tmp/onboarding-init-test-pYWwaR",
+            "--mode",
+            "existing",
+            "--directory",
+            "/tmp/onboarding-init-test-home-ETpHZK/po-authority",
+            "--human-name",
+            "Greenfield Anchor PO",
+            "--existing-key",
+            "/tmp/onboarding-init-existing-source-aXt95o/existing-private.pem"
+          ],
+          "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."
+        }
+      }
+      
+      
+      1 !== 0
+      
+    code: 'ERR_ASSERTION'
+    name: 'AssertionError'
+    expected: 0
+    actual: 1
+    operator: 'strictEqual'
+    stack: |-
+      checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:900:14)
+      TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2142:36)
+      Test.runInAsyncScope (node:async_hooks:227:14)
+      Test.run (node:internal/test_runner/test:1201:25)
+      Test.start (node:internal/test_runner/test:1096:17)
+      startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+    ...
+  1..1
+  # tests 1
+  # suites 0
+  # pass 0
+  # fail 1
+  # cancelled 0
+  # skipped 0
+  # todo 0
+  # duration_ms 62741.01679
+  
+  + actual - expected
+  
+  + [
+  +   'approval/claude/signature: node --test exited 1\n' +
+  +     'TAP version 13\n' +
+  +     '# Subtest: isolated onboarding matrix cell\n' +
+  +     'not ok 1 - isolated onboarding matrix cell\n' +
+  +     '  ---\n' +
+  +     '  duration_ms: 60574.466147\n' +
+  +     "  type: 'test'\n" +
+  +     "  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2136:3'\n" +
+  +     "  failureType: 'testCodeFailure'\n" +
+  +     '  error: |-\n' +
+  +     '    claude: PO-HUMAN-APPROVAL-FAILED: PO-KEY-UNENCRYPTED: the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase; repair: in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in "<key>" -out "<key>.encrypted" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid.\n' +
+  +     '    \n' +
+  +     '    {\n' +
+  +     '      "schema": "pipeline.onboarding-init.v1",\n' +
+  +     '      "runner": "claude",\n' +
+  +     '      "root": "/tmp/onboarding-init-test-pYWwaR",\n' +
+  +     '      "outcome": "error",\n' +
+  +     '      "bootstrap": {\n' +
+  +     '        "ok": false,\n' +
+  +     '        "code": "TRUST-ANCHOR-SETUP-FAILED"\n' +
+  +     '      },\n' +
+  +     '      "recovery": {\n' +
+  +     '        "kind": "external-operator",\n' +
+  +     '        "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",\n' +
+  +     '        "executable": "<home-path>",\n' +
+  +     '        "argv": [\n' +
+  +     '          "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",\n' +
+  +     '          "plan",\n' +
+  +     '          "--root",\n' +
+  +     '          "/tmp/onboarding-init-test-pYWwaR",\n' +
+  +     '          "--mode",\n' +
+  +     '          "existing",\n' +
+  +     '          "--directory",\n' +
+  +     '          "/tmp/onboarding-init-test-home-ETpHZK/po-authority",\n' +
+  +     '          "--human-name",\n' +
+  +     '          "Greenfield Anchor PO",\n' +
+  +     '          "--existing-key",\n' +
+  +     '          "/tmp/onboarding-init-existing-source-aXt95o/existing-private.pem"\n' +
+  +     '        ],\n' +
+  +     '        "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."\n' +
+  +     '      }\n' +
+  +     '    }\n' +
+  +     '    \n' +
+  +     '    \n' +
+  +     '    1 !== 0\n' +
+  +     '    \n' +
+  +     "  code: 'ERR_ASSERTION'\n" +
+  +     "  name: 'AssertionError'\n" +
+  +     '  expected: 0\n' +
+  +     '  actual: 1\n' +
+  +     "  operator: 'strictEqual'\n" +
+  +     '  stack: |-\n' +
+  +     '    checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:900:14)\n' +
+  +     '    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2142:36)\n' +
+  +     '    Test.runInAsyncScope (node:async_hooks:227:14)\n' +
+  +     '    Test.run (node:internal/test_runner/test:1201:25)\n' +
+  +     '    Test.start (node:internal/test_runner/test:1096:17)\n' +
+  +     '    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n' +
+  +     '  ...\n' +
+  +     '1..1\n' +
+  +     '# tests 1\n' +
+  +     '# suites 0\n' +
+  +     '# pass 0\n' +
+  +     '# fail 1\n' +
+  +     '# cancelled 0\n' +
+  +     '# skipped 0\n' +
+  +     '# todo 0\n' +
+  +     '# duration_ms 62741.01679\n'
+  + ]
+  - []
+  
+      at runMatrix (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:176:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:920:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ `approval/claude/signature: node --test exited 1\nTAP version 13\n# Subtest: isolated onboarding matrix cell\nnot ok 1 - isolated onboarding matrix cell\n  ---\n  duration_ms: 60574.466147\n  type: 'test'\n  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2136:3'\n  failureType: 'testCodeFailure'\n  error: |-\n    claude: PO-HUMAN-APPROVAL-FAILED: PO-KEY-UNENCRYPTED: the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase; repair: in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in "<key>" -out "<key>.encrypted" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid.\n    \n    {\n      "schema": "pipeline.onboarding-init.v1",\n      "runner": "claude",\n      "root": "/tmp/onboarding-init-test-pYWwaR",\n      "outcome": "error",\n      "bootstrap": {\n        "ok": false,\n        "code": "TRUST-ANCHOR-SETUP-FAILED"\n      },\n      "recovery": {\n        "kind": "external-operator",\n        "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",\n        "executable": "<home-path>",\n        "argv": [\n          "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",\n          "plan",\n          "--root",\n          "/tmp/onboarding-init-test-pYWwaR",\n          "--mode",\n          "existing",\n          "--directory",\n          "/tmp/onboarding-init-test-home-ETpHZK/po-authority",\n          "--human-name",\n          "Greenfield Anchor PO",\n          "--existing-key",\n          "/tmp/onboarding-init-existing-source-aXt95o/existing-private.pem"\n        ],\n        "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."\n      }\n    }\n    \n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:900:14)\n    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2142:36)\n    Test.runInAsyncScope (node:async_hooks:227:14)\n    Test.run (node:internal/test_runner/test:1201:25)\n    Test.start (node:internal/test_runner/test:1096:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 62741.01679\n` ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1066:1
+✖ signature anchor reuses a key already at the canonical directory path without importing or replacing it (32896.145633ms)
+  AssertionError [ERR_ASSERTION]: PO-HUMAN-APPROVAL-FAILED: PO-KEY-UNENCRYPTED: the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase; repair: in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in "<key>" -out "<key>.encrypted" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid.
+  
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1081:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

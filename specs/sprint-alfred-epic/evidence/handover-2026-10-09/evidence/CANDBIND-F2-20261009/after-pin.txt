@@ -1,0 +1,21 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs"
+label: CANDBIND-F2-after-pin
+exitCode: 0
+head: 6259c35cc394d51b7c5de5f765433f00c867303a
+tree: 2cf82d39fd54e9d1753669d013dc124af0077707
+dirty: true
+--- stdout ---
+✔ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (577.823006ms)
+✔ CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate (442.066042ms)
+✔ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (445.348734ms)
+✔ CANDBINDX-d (diagnostic) the Codex branch's re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts (371.120112ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4462.236321
+
+--- stderr ---

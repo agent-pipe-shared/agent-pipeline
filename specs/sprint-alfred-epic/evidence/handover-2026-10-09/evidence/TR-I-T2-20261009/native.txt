@@ -1,0 +1,57 @@
+command: node --test plugins/pipeline-core/lib/test-case-completion.test.mjs
+label: native
+exitCode: 1
+head: fa8aaf39dc53838e822df9b35a4de6852c0fabab
+tree: 9a45204a7ad69b06f2b0effd70e6100466613c16
+dirty: true
+--- stdout ---
+✔ rejects duplicate, unstable, and invalid declared ids before emitting bytes (4.648ms)
+✔ rejects unknown and duplicate disposal without forging extra records (3.6583ms)
+✔ fails closed when the explicitly configured inherited descriptor is missing (0.8457ms)
+✔ retries short descriptor writes with exact offsets and rejects zero progress (0.2563ms)
+✔ one early failure stays red while later siblings dispose and terminal remains complete (64.0354ms)
+✔ dual runtime skip and todo remains red and is disposed as fail (58.8281ms)
+✔ outside Verify a completion suite runs as a plain single file and reports its cases (82.5748ms)
+✔ inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE (57.333ms)
+✖ outside Verify a descriptor 3 nobody announced receives no completion bytes (67.5534ms)
+✔ inside Verify a writable descriptor 3 receives the complete declared-to-terminal stream (63.4951ms)
+✔ preflights the complete bounded stream before declaration and emits within the accepted cap (2.7638ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 481.2774
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.test.mjs:251:3
+✖ outside Verify a descriptor 3 nobody announced receives no completion bytes (67.5534ms)
+  AssertionError [ERR_ASSERTION]: without the Verify signal the recorder must leave an unannounced descriptor 3 untouched
+  + actual - expected
+  
+  + '{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["PR01","PR02","PR03"],"caseCount":3,"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR01","ordinal":0,"disposition":"pass"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR02","ordinal":1,"disposition":"skip"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR03","ordinal":2,"disposition":"pass"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["PR01","PR02","PR03"],"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824","dispositionsSha256":"d3749d8b383eb391cff5c90dcf7e4dd8dff61266157827c26f34d2413ff8c72f","counts":{"pass":2,"fail":0,"skip":1,"todo":0}}\n'
+  - ''
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.test.mjs:260:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["PR01","PR02","PR03"],"caseCount":3,"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR01","ordinal":0,"disposition":"pass"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR02","ordinal":1,"disposition":"skip"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR03","ordinal":2,"disposition":"pass"}\n{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["PR01","PR02","PR03"],"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824","dispositionsSha256":"d3749d8b383eb391cff5c90dcf7e4dd8dff61266157827c26f34d2413ff8c72f","counts":{"pass":2,"fail":0,"skip":1,"todo":0}}\n',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

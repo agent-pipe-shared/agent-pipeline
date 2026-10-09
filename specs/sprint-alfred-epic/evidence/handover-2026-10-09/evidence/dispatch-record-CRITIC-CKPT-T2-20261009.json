@@ -1,0 +1,61 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-CKPT-T2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "30194de72980f783d11a2a7b7c80beb1380d8365",
+  "resultSha256": "2f8fe90d9d87b9df36905b5e8ac31f8bda0a6fc824e5e2d4c256be8a1eff7b03",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "902fe1b74859a53fb0f736ccf8c46aedad0bcbc2"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created, route pre-check passed (requested sonnet 5.5, observed claude-sonnet-5-5); preflight run once for GUARD-BOOTSTRAP-RECEIPT-MISSING",
+      "toolUses": 9
+    },
+    {
+      "phase": "pins appended, scratch redirect set built",
+      "toolUses": 36
+    },
+    {
+      "phase": "rebuilt after the 240 s runner bound; first targeted run hit the stale 10 s body",
+      "toolUses": 43
+    },
+    {
+      "phase": "terminal record written (commit, report, resultSha256 in one write)",
+      "toolUses": 54
+    }
+  ],
+  "report": {
+    "text": "CRITIC-CKPT-T2-20261009 completion report. Implementation complete: RED pins committed as 902fe1b74. Independent review: pending. PO acceptance: pending.\n\nROUTE PRE-CHECK: requested route (field 6) = goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed, quoted from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". No contradiction. Effort is not observable from the prompt (unknown). Ruleset 0.7.0+claude.20261008194106.da20519d; candidate 30194de72 resolved to its full SHA in the record.\n\n1. DoD results\n- (a)-(c) and the scratch/dispatch/other/ case red for the stated reason; other (d) cases and the control green; nothing else changes: passed. (a) first refusal at call 36 (working cap 35 = min(50, maxTurns 50 - 15)); (b) first notice on call 28 (expected 40); (c) call 36 refused before the closing acts; (d4) admitted, 0 !== 2. (d1) (d2) (d3) (d5) green. Nothing else changes: the base-prefix sha of the post-image equals the base, git numstat is +144 -0; the 106 pre-existing cases of the whole-file run are 100 pass, 4 fail (3 accepted 10 s timeouts + R7-11a, a recorded baseline flake), 2 skipped.\n- CRITIC-CKPT-MANIFEST.md (base sha256/bytes, new sha256/bytes, inserted block, commands): passed (committed).\n- consumer-safe-paths exits 0: passed (9 tests, exit 0; stdout only, no artifact file).\n- One commit of the test post-image and the manifest: passed, 902fe1b74.\n- Whole-file WSL red.txt of the FINAL body: not verifiable in one foreground call (the file alone takes about 530 s; see Deviations).\n\n2. Evidence\n- evidence/CRITIC-CKPT-T2-20261009/red-ckpt.txt: eight new cases, final body, WSL, wrapped exit 1 (8 tests, 4 pass, 4 fail). Command in CRITIC-CKPT-MANIFEST.md (capture-evidence ... node --test --test-name-pattern='CRITIC-CKPT-T2' scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.test.mjs).\n- evidence/CRITIC-CKPT-T2-20261009/red.txt: whole file, FIRST body, WSL, wrapped exit 1 (114 tests, 101 pass, 11 fail, 2 skipped). The 7 Critic scenarios there failed only by the shared 10 s bound; do not read them as verdicts.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0.\n- Redirect sidecar CKPT2-REDIRECT-FIRED in both captures (the tranche-2 guard post-image, sha256 f7649839..., ran).\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: +144 lines appended after TR-G T34 (new sha256 1447a996c575658adcda46f4f6a26b8d5447bf3783b0b9cc319c4d7b8004a814, 144278 bytes; base 0bda864c... 133519 bytes).\n- specs/sprint-alfred-epic/signed-package/tranche-2/CRITIC-CKPT-MANIFEST.md: new, shas, block, design, pin table, commands, results.\n\n4. Deliberately not changed\n- Guard post-images and live guards, agents/critic.md, TR-G-MANIFEST.md (forbidden). Foreign uncommitted edits (guard-git.mjs, guard-push.mjs post-images, plugin lib/script edits) and foreign staged files untouched; commit was by exact pathspec.\n- Pre-cap confinement of the Critic's Write is not pinned (Ruling 161: tools frontmatter, no hook).\n\n5. Deviations from spec\n- No single whole-file WSL run of the final body: the first whole-file run took 530 s, so adding about 190 s would pass the 600 s foreground limit. Equivalent evidence: red.txt (106 pre-existing cases, same bytes before the block) plus red-ckpt.txt (the 8 new cases). The only change between the two bodies is the timeout line inside the new block.\n- The Critic children use their own bound max(RUNNER_TIMEOUT_MS, 240000) (41-90 sequential guard calls at several hundred ms each on the mount); the shared 10 s bound would only measure the host.\n- Budget: the checkpoint notice fired at call 44 with the commit still open. I continued only because the red evidence was verified at call 46 and the commit was the deliverable; the finalizer ran at call 54, not by 44. One targeted run (call 41) was wasted on a stale scratch body (rebuild after every edit). The advisor tool was not consulted (budget).\n- criticRequired in the record is copied from the sibling TR-G-T4 record (test-only, low risk, appliedRow T3); the guard-class decision for the review is the Elephant's. outcome \"completed\" / kind \"authored-commit\" mirror that record.\n- First opening record write was refused (GUARD-BOOTSTRAP-RECEIPT-MISSING); preflight run once, write retried; the index.lock refusal on the first commit attempt was retried once, as instructed.\n\n6. Open items\n- CRITIC-CKPT-F: cap 50 needs maxTurns 65 in agents/critic.md (or a role rule that effectiveDispatchBaseCap also reflects); CRITIC_NOTES_PATTERN needs a critic-prefixed subdirectory. (b) pins only the FIRST notice; today notices also come on calls 33, 34, 35 (the repeat pattern is not pinned).\n- R7-11a is red in the whole-file run (recorded baseline flake in TR-G-MANIFEST.md); not mine.\n- Independent Critic review pending; PO acceptance pending.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/CRITIC-CKPT-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

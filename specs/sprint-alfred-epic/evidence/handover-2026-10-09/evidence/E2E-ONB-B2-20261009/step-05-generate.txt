@@ -1,0 +1,167 @@
+05a  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-design-questions-apply --root <temp-repo> --answers-json {"disposition":"no-open-questions"} --activate --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.onboarding-intake-design-questions-apply.v1",
+  "root": "<temp-repo>",
+  "mutated": true,
+  "checkpoint": {
+    "schema": "pipeline.onboarding-intake-checkpoint.v1",
+    "root": "<temp-repo>",
+    "revision": 2,
+    "createdAt": "2026-10-09T06:40:53.864Z",
+    "updatedAt": "2026-10-09T06:41:31.184Z",
+    "consent": {
+      "granted": true,
+      "at": "2026-10-09T06:40:53.864Z"
+    },
+    "values": {
+      "gitAuthor": null,
+      "language": "en",
+      "profile": "mini"
+    },
+    "materialInput": [
+      {
+        "sha256": "732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12",
+        "evidencePath": "intake-checkpoint-evidence/732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12.txt",
+        "byteLength": 24,
+        "receivedAt": "2026-10-09T06:41:14.118Z"
+      }
+    ],
+    "designQuestions": [],
+    "transactionState": "ready-to-generate",
+    "generated": null,
+    "contentSha256": "b03f85b5c67cedd2f32a313ad3cac240a293b73926147af9f130c622da26b1f8"
+  }
+}
+
+  --- end ---
+
+05b  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.onboarding-intake-generate-plan-summary.v1",
+  "root": "<temp-repo>",
+  "repositoryCapability": "local",
+  "featureId": "onboarding-31416e711b2c",
+  "checkpointDataSha256": "8a75a8915c846e17f035e0bea9e32953562ce2fa3b90ba53ae73d6b3b4e2c62a",
+  "planSha256": "33b88191687fc37429c9e23439cebe0ecbb9101109b7495eafbee5823e49d379",
+  "targets": {
+    "designInput": {
+      "path": "specs/onboarding-31416e711b2c/design-input.md",
+      "afterSha256": "13712fae9d935637ba71fc1008221034b69cb122b50f6c874dbbbedec303560f",
+      "byteLength": 782
+    },
+    "prd": {
+      "path": "specs/onboarding-31416e711b2c/prd_onboarding-31416e711b2c.md",
+      "afterSha256": "8e66c62b13d7352279a9ae5a18867f35dd2ddf1fa382f1aefdf20461a46f56be",
+      "byteLength": 2834
+    },
+    "spec": {
+      "path": "specs/onboarding-31416e711b2c/spec.md",
+      "afterSha256": "d8864f1dbc1f20b0c1b936bdd73ef6c333e85814420446098a4b27f92fab23dd",
+      "byteLength": 1529
+    }
+  },
+  "nextAction": {
+    "kind": "command",
+    "executable": "node",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "intake-generate-apply",
+      "--root",
+      "<temp-repo>",
+      "--plan-sha256",
+      "33b88191687fc37429c9e23439cebe0ecbb9101109b7495eafbee5823e49d379",
+      "--activate"
+    ],
+    "mutation": true,
+    "requiresConfirmation": true
+  },
+  "fullPlanAction": {
+    "kind": "command",
+    "executable": "node",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "intake-generate-plan",
+      "--root",
+      "<temp-repo>",
+      "--verbose",
+      "--intent",
+      "onboarding",
+      "--runner",
+      "claude"
+    ],
+    "mutation": false,
+    "requiresConfirmation": false,
+    "expected": {
+      "schema": "pipeline.onboarding-intake-generate-plan.v1"
+    }
+  }
+}
+
+  --- end ---
+
+05c  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-apply --root <temp-repo> --plan-sha256 33b88191687fc37429c9e23439cebe0ecbb9101109b7495eafbee5823e49d379 --activate
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.onboarding-intake-generate-apply.v1",
+  "root": "<temp-repo>",
+  "mutated": true,
+  "featureId": "onboarding-31416e711b2c",
+  "targets": {
+    "designInput": {
+      "path": "specs/onboarding-31416e711b2c/design-input.md",
+      "wrote": true
+    },
+    "prd": {
+      "path": "specs/onboarding-31416e711b2c/prd_onboarding-31416e711b2c.md",
+      "wrote": true
+    },
+    "spec": {
+      "path": "specs/onboarding-31416e711b2c/spec.md",
+      "wrote": true
+    }
+  },
+  "checkpoint": {
+    "schema": "pipeline.onboarding-intake-checkpoint.v1",
+    "root": "<temp-repo>",
+    "revision": 3,
+    "createdAt": "2026-10-09T06:40:53.864Z",
+    "updatedAt": "2026-10-09T06:42:11.854Z",
+    "consent": {
+      "granted": true,
+      "at": "2026-10-09T06:40:53.864Z"
+    },
+    "values": {
+      "gitAuthor": null,
+      "language": "en",
+      "profile": "mini"
+    },
+    "materialInput": [
+      {
+        "sha256": "732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12",
+        "evidencePath": "intake-checkpoint-evidence/732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12.txt",
+        "byteLength": 24,
+        "receivedAt": "2026-10-09T06:41:14.118Z"
+      }
+    ],
+    "designQuestions": [],
+    "transactionState": "generated",
+    "generated": {
+      "designInputSha256": "13712fae9d935637ba71fc1008221034b69cb122b50f6c874dbbbedec303560f",
+      "prdSha256": "8e66c62b13d7352279a9ae5a18867f35dd2ddf1fa382f1aefdf20461a46f56be",
+      "specSha256": "d8864f1dbc1f20b0c1b936bdd73ef6c333e85814420446098a4b27f92fab23dd",
+      "generatedAt": "2026-10-09T06:42:11.854Z"
+    },
+    "contentSha256": "780065f6718b2c1ba955db7d14021d3f3c035f8c0a0f7bc69f00212f29ddcb09"
+  }
+}
+
+  --- end ---
+

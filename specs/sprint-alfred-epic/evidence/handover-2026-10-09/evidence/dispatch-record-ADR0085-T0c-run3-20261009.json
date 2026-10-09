@@ -1,0 +1,66 @@
+{
+  "taskId": "ADR0085-T0c-run3-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing ADR0085-T0c-run3-20261009)",
+  "outcome": "completed-a-only-route-b-pending-fixture",
+  "commits": ["4137c9bd5f388aa1eba4a96547a27b4754b4d37e"],
+  "log": [
+    { "phase": "opening: route pre-check (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the runtime prompt, effort unobservable, no contradiction); first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, preflight run from the loaded plugin root (status ready); GF-09-D opening record written to scratch/dispatch-wip/ADR0085-T0c-run3-interim.json (untracked)", "toolUses": 6 },
+    { "phase": "orientation: CONT17/CONT15 headers, both predecessor records, scratch b.test.mjs, design-workflow-package-v2.mjs and design-workflow-package.mjs excerpts", "toolUses": 11 },
+    { "phase": "B fix applied (frozen readCandidate reverted to the live observation; evidence commit stages exactly the bound paths derived from packageObject, with a staged-set assert); B rerun under WSL: DWP2-CURRENT-CANDIDATE cleared, new failure in enrollFixture", "toolUses": 14 },
+    { "phase": "diagnostic only (not a second fix): enrollFixture throw enriched with JSON.stringify of plan and active; second B WSL capture enroll-diagnostic.txt: scope state declined; one read of governance-scope.mjs applyDecision; A-only route chosen; advisor consulted", "toolUses": 22 },
+    { "phase": "A-only landing: commit message file, A post-image written to signed-package/tranche-2/hooks/ (no guard refusal), git diff --no-index against the draft, sha256, A rerun under WSL at the current head (7 red, 2 green), README section, consumer-safe check exit 0", "toolUses": 31 },
+    { "phase": "git add, git commit (4137c9bd5), full-sha read, advisor consulted, terminal record", "toolUses": 36 }
+  ],
+  "report": {
+    "headline": "Draft A landed (post-image plus README section, one commit). Draft B NOT landed: its DWP2-CURRENT-CANDIDATE refusal is cleared by the exact-bound-set staging, but the fixture builder now fails earlier in the governance enrollment. A-only route taken, B marked 'pending, fixture'. Implementation complete; independent Critic review and PO acceptance pending (not 'done').",
+    "routePreCheck": "requested (briefing field 6): goldfish-deep, claude-sonnet-5-5, xhigh. Observed: the runtime prompt of this dispatch names 'Sonnet 5.5' with exact model ID claude-sonnet-5-5. Model matches; effort is not directly observable (unknown), disclosed, no contradiction.",
+    "dodResults": {
+      "check1_bWslCapture": "failed (A-only route taken): control and target never ran. evidence/ADR0085-T0c-b-20261009/red.txt (wrapped exit 1, head 5031d4dc4) holds the post-fix run; the asserts that failed before (prepared.ok, verified.ok, exceptionBinding.kind) now pass, so DWP2-CURRENT-CANDIDATE is cleared. The builder fails at enrollFixture: 'fixture enrollment did not become active'. evidence/ADR0085-T0c-b-20261009/enroll-diagnostic.txt (diagnostic capture, wrapped exit 1) shows applyDecision returning state declined, provenance explicit-local-decision / git-common-config, requiresEnforcement false.",
+      "check2_sha256": "passed: sha256sum of the A post-image = dba4f1459637951f458c088410e10e8e61f0d73200da7f9cf9543b9424269726 (exit 0; file reports ASCII text, LF); recorded in the README.",
+      "check3_consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9 tests, 9 pass, 0 fail, exit 0.",
+      "check4_commit": "passed: git add -- <2 paths>, then git commit -F scratch/commit-msg/ADR0085-T0c-run3.txt -- <2 paths>; commit 4137c9bd5f388aa1eba4a96547a27b4754b4d37e, 2 files changed, 434 insertions; subject exactly as briefed; trailers Dispatch: ADR0085-T0c-run3-20261009 (goldfish) and AI-Assisted: true only (no Co-Authored-By, no Claude-Session).",
+      "check5_terminalRecord": "passed: this file, written once, after the commit."
+    },
+    "evidence": [
+      "evidence/ADR0085-T0c-b-20261009/red.txt: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0c-b-20261009/red.txt --label red -- node --test scratch/dispatch-wip/t0c-run/b.test.mjs\"; wrapped exit 1; head 5031d4dc4",
+      "evidence/ADR0085-T0c-b-20261009/enroll-diagnostic.txt: same form, label enroll-diagnostic, after enriching the enrollFixture throw message; wrapped exit 1",
+      "evidence/ADR0085-T0c-a-20261009/red-run3.txt: same form with scratch/dispatch-wip/t0c-run/a.test.mjs, label red-run3; wrapped exit 1; head 02689a69c; 9 tests, 7 fail (C1-C7), 2 pass (FX1, FX2)",
+      "git diff --no-index --stat (draft vs post-image): 5 insertions, 8 deletions, header only; exit not captured to a file",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0 (console output only)"
+    ],
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs (NEW, committed: the A post-image)",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/README.md (committed: new section 'New contract test files' with A's target path, post-image path, sha256, WSL command, state, evidence, and B marked 'pending, fixture' with the measured cause)",
+      "scratch/commit-msg/ADR0085-T0c-run3.txt (untracked commit message file, fresh; the run2 message file was not reused)",
+      "scratch/dispatch-wip/t0c-run/b.test.mjs (untracked scratch; TWO edits: the exact-bound-set staging that replaces 'git add -- evidence' with the derived bound paths plus a staged-set assert, and the readCandidate revert to the live observation; plus a diagnostic-only JSON.stringify added to enrollFixture's throw message)",
+      "scratch/dispatch-wip/ADR0085-T0c-run3-interim.json (untracked GF-09-D opening record)",
+      "evidence/ADR0085-T0c-b-20261009/red.txt (overwritten), evidence/ADR0085-T0c-b-20261009/enroll-diagnostic.txt (new), evidence/ADR0085-T0c-a-20261009/red-run3.txt (new): machine-written captures, untracked",
+      "evidence/dispatch-record-ADR0085-T0c-run3-20261009.json (this terminal record)"
+    ],
+    "bResult": {
+      "fixFromBriefing": "readCandidate reverted to () => observeAdvisorCandidate(root); evidence commit stages EXACTLY the bound paths [evidence/package.json, readiness.path, advisor.initialContext.path, advisor.failureEvidence.path, advisor.receipt?.path, advisor.report?.path] derived from packageObject, and asserts the staged set equals that set.",
+      "newMeasuredCause": "enrollFixture (b.test.mjs, called after the package/evidence steps) gets scope state 'declined' from applyDecision.",
+      "unverifiedHypothesis": "governance-scope.mjs applyDecision writes 'declined' when enrollment history is retained (the ternary plan.decision==='enroll'&&!retained on the record state); B enrolls after coordinateInitialDesignAdvisory wrote under the git common dir and after the evidence commit, whereas A enrolls right after git init. Candidate fix for the next dispatch: call enrollFixture(root) immediately after advisorHostFixture returns, then rerun. Not applied (the one allowed fixture fix was spent).",
+      "stateOfScratchB": "scratch/dispatch-wip/t0c-run/b.test.mjs is the next dispatch's starting point: bound-set staging in place, readCandidate live, enrollFixture throw message enriched with the plan and active objects; still scratch-only, header still carries the DRAFT paragraph, 'today' not filled in."
+    },
+    "deliberatelyNotChanged": "Nothing under plugins/, harness/, any existing test or the tranche-2 patch files. No write under plugins/pipeline-core/hooks/. No second fixture fix on B (enrollFixture ordering left as is). The scratch run copy a.test.mjs untouched. The three foreign staged files and the dirty tracked files in the shared checkout were not touched (commit by exact pathspec).",
+    "deviationsFromSpec": [
+      "A's header differs from the recipe 'draft bytes minus header lines 7-10': the diff against the draft is 5 insertions and 8 deletions, not 4 deletions. Besides dropping the DRAFT paragraph (replaced by a single 'Target path:' line), the four old explanatory lines 35-38 ('Cases ... Today every v8 record is blocked ... recognises approval schemas v2..v7 only ...') were replaced by the briefed RED-reason sentence (verbatim, on one line) plus one connecting sentence, so the header does not contradict itself. The body from the imports on is byte-identical to the draft. The briefed sentence sits on one 409-char comment line in a file otherwise wrapped near 100 columns (style only).",
+      "README: B got a labelled subsection (measured cause, unverified hypothesis, next step), not a single line.",
+      "README points at evidence files (red.txt, red-run3.txt, enroll-diagnostic.txt, the run2 probes) that are untracked working files; they will not exist on a second machine unless tracked.",
+      "The second B WSL run was a DIAGNOSTIC capture of the same scratch file after enriching an error message, not a second fixture-fix attempt; red.txt holds the post-fix run.",
+      "Record: the role contract asks for an opening record, the briefing/CONT17 asks for one terminal record after the commit at the repo-root evidence/. My first Write targeted the wrong directory (specs/sprint-alfred-epic/evidence/) and was refused by GUARD-BOOTSTRAP-RECEIPT-MISSING before anything landed; the opening record is the untracked scratch interim, and this file is the only record at the evidence path.",
+      "HEAD moved during the dispatch from other sessions' commits (B capture at 5031d4dc4, A rerun at 02689a69c); expected in the shared checkout."
+    ],
+    "openItems": [
+      "B (guard-devplan-design-approval-v7.test.mjs) needs a continuation: apply the enrollment-order candidate fix to scratch b.test.mjs, rerun under WSL (control green, target red with today's real refusal), build the post-image (paths ../lib/ ../scripts/ ./, DRAFT paragraph removed, 'today' filled in), update the README B subsection. Its sole copy is the untracked scratch file.",
+      "The README cites untracked evidence captures (red.txt, red-run3.txt, enroll-diagnostic.txt, run2 probes): track them or accept session-local pointers.",
+      "Independent Critic review of the commit and PO acceptance are pending; this is implementation complete, not done.",
+      "No guard fired on the write under signed-package/tranche-2/hooks/; the earlier 'unknown' is now measured: the write is admitted.",
+      "Guard notes met: GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the preflight from the loaded plugin root), GUARD-PARSE-UNSUPPORTED on a piped Bash call (re-issued as a simple command)."
+    ]
+  }
+}

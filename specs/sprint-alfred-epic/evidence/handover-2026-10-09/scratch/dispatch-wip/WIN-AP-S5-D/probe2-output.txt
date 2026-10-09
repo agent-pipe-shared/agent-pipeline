@@ -1,0 +1,43 @@
+=== WIN-AP-S5-D probe 2 ===
+
+##### BASE: TEMP volume (os.tmpdir())
+HEAD storagePaths(<fresh .git>) => ok, base=<tmpdir>\s5d2-head-OIHaru\.git\agent-pipeline\guard-maintenance-window
+
+-- owner-section-only (SetOwner to the SAME owner, nothing else)
+OK
+[exit 0]
+assessWindowsPrivatePath after => {"status":"insecure","reason":"private path DACL grants a non-owner principal"}
+
+-- grant explicit user FullControl via Access section, THEN the shipped script
+GRANT-OK
+[exit 0]
+OK
+[exit 0]
+assessWindowsPrivatePath after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+-- PROTOTYPE FIX (skip SetOwner when the owner is already the current user)
+OK ownerWasSelf=True
+[exit 0]
+assessWindowsPrivatePath after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+##### BASE: CHECKOUT volume (<repo-root>/scratch)
+HEAD storagePaths(<fresh .git>) threw GuardMaintenanceWindowError/GMW-DACL: window directory DACL is not owner-private
+
+-- owner-section-only (SetOwner to the SAME owner, nothing else)
+FAIL step=Directory.SetAccessControl(owner only) type=System.UnauthorizedAccessException hresult=0x80070005
+[exit 1]
+assessWindowsPrivatePath after => {"status":"insecure","reason":"private path DACL grants a non-owner principal"}
+
+-- grant explicit user FullControl via Access section, THEN the shipped script
+GRANT-OK
+[exit 0]
+OK
+[exit 0]
+assessWindowsPrivatePath after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+-- PROTOTYPE FIX (skip SetOwner when the owner is already the current user)
+OK ownerWasSelf=True
+[exit 0]
+assessWindowsPrivatePath after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+(fixtures removed)

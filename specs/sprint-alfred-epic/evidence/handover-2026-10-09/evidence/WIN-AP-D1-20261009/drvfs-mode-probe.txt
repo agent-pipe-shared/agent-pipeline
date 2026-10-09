@@ -1,0 +1,10 @@
+command: node scratch/dispatch/elephant/drvfs-mode-probe.mjs
+label: drvfs-mode
+exitCode: 0
+head: 648046bfba85bc472f7675171dd3f63726ecd388
+tree: 045d1cede60e40cb63261f5228bda887d20235aa
+dirty: true
+--- stdout ---
+platform=linux created=0o777 afterChmod=0o777 private=false
+
+--- stderr ---

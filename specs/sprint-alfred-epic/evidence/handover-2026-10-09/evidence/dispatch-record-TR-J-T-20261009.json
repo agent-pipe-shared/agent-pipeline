@@ -1,0 +1,72 @@
+{
+  "taskId": "TR-J-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "interim": true,
+  "stopReason": "DISPATCH-BUDGET-CHECKPOINT at call 52 of 65; no verified-green change exists, so nothing was committed",
+  "log": [
+    { "phase": "opening", "toolUses": 6 },
+    { "phase": "orientation (T45 file, T44/T58 candidates, capture usage)", "toolUses": 38 },
+    { "phase": "baselines captured (native before, WSL before)", "toolUses": 49 },
+    { "phase": "T45 partial edit applied (import + constants only); budget checkpoint reached", "toolUses": 52 },
+    { "phase": "interim record written, hand-back", "toolUses": 55 }
+  ],
+  "commits": [],
+  "report": {
+    "dod": {
+      "preflight-native-before.txt": "passed (captured)",
+      "preflight-native-after.txt": "not reached",
+      "preflight-wsl-after.txt": "not reached (a WSL BEFORE capture exists as the reference)",
+      "T44/T58 before/after pairs": "not reached; no T44/T58 file changed",
+      "consumer-safe check": "not run (no committed change yet)",
+      "commit": "none"
+    },
+    "evidence": [
+      "evidence/TR-J-T-20261009/preflight-native-before.txt: native win32, wrapped exit 1; tests 78, pass 37, fail 39, todo 2, 342 s",
+      "evidence/TR-J-T-20261009/preflight-wsl-before.txt: WSL, wrapped exit 0; tests 78, pass 76, fail 0, todo 2, 407 s. This is the reference for the 'WSL unchanged' check.",
+      "Command shape: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <l> -- node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs (WSL via wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; ...')"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs: UNCOMMITTED partial edit, two hunks only. (1) import { join } -> { join, resolve } from node:path. (2) a commented block of seven constants after the imports: ROOT_CURRENT, ROOT_WSL, ROOT_MINE, ROOT_OTHER, ROOT_THIRD, ROOT_NOT_A_REPOSITORY, ROOT_REPO = resolve(<old POSIX literal>). Nothing uses them yet, so behavior is unchanged. Not verified, not committed.",
+      "scratch/commit-msg/TR-J-T.txt: the commit message (two trailers only), written and ready",
+      "evidence/TR-J-T-20261009/*.txt: the two baseline captures"
+    ],
+    "deliberatelyNotChanged": [
+      "No production file, hooks/ test, lib/guard/ or harness/ file was touched.",
+      "pipeline-start-preflight-enforcement.test.mjs untouched (HOOKREFRESH-owned).",
+      "The rows /repo/./x/.. (lines ~1213-1215 before my edit) are intentionally left as literals: that case tests path normalization and resolve() would erase the point. Convert only if the post-edit run shows them red."
+    ],
+    "deviationsFromSpec": [
+      "Run stopped at the budget checkpoint before the fix was applied; the slice is NOT done.",
+      "DECISION FOR THE DISPATCHER: several literals sit in assertion operands, e.g. assert.equal(rootDir, '/projects/current') at line ~226, argv[3] === '/projects/wsl' at ~797, and an expected nextAction argv containing '/projects/current' at ~411. A fixture-only fix cannot turn those green on win32. My plan was to use the SAME constant on both sides (on POSIX the constant equals the literal, so the WSL-unchanged check proves identical semantics) and to list every touched assertion operand in the report. That does edit assertion lines. Field 4 forbids assertion changes. Please confirm that reading, or tell the next dispatch to leave those cases failing and list them."
+    ],
+    "openItems": {
+      "T45 findings": [
+        "Native before: 39 failures, the same as the toil-log count. WSL before: 0 failures.",
+        "By error signature, the large group is fixture-root: 'pipeline-governance-unverifiable' instead of 'ready' / 'plugin-refresh-required' / 'hook-provisioning-required' (about 17 cases, all via preflight() with cwd '/projects/current'), plus wrong-shape results from the same cause (nextAction null, executionBoundary undefined, version undefined, source 'unknown' with ambiguous true on the local-marketplace and project-scope cases that use '/repo', '/projects/mine', '/projects/other', '/projects/third').",
+        "Likely NOT fixture-root, list and do not touch: two EPERM failures (log lines ~759 'Codex registry binding rejects equal manifest versions with stale cached installer bytes' and ~1018 'observeDutyNotRuntimeLive recognizes two paths to one physical plugin root'; most likely symlinkSync needing privilege on win32 and so a typed win32 skip rather than a root change); the 19.7 s case 'a Claude version mismatch between loaded and installed identity requires refresh' (actual 'ready', expected 'plugin-refresh-required', line ~740); the Codex attestation case ~808 (sourcePluginRoot '<host-path>' vs the POSIX literal '/project/plugins/pipeline-core'); and the three 'unattested origin / rejected observation / F4(b)' cases (~851, 894, 937), which got the onboarding command where an advisory was expected. Classify these AFTER the fix run, because several may turn green once roots are native.",
+        "Timing: the whole file runs in about 6 minutes natively and about 7 minutes under WSL, so both fit a foreground Bash call at timeout 600000. The 14-minute figure in the toil log is stale."
+      ],
+      "T45 remaining steps": [
+        "Call 1: Edit replace_all of the exact quoted literals, one call each: \"/projects/current\" -> ROOT_CURRENT; \"/repo\" -> ROOT_REPO (the quote-closed form does not touch the \"/repo/./x/..\" rows); \"/projects/wsl\" -> ROOT_WSL; \"/projects/mine\" -> ROOT_MINE; \"/projects/other\" -> ROOT_OTHER; \"/projects/third\" -> ROOT_THIRD; \"/projects/does-not-exist-as-a-repository\" -> ROOT_NOT_A_REPOSITORY.",
+        "Then capture native after and WSL after (foreground), compare with the two baselines: native failures must fall by the fixture-root set only, WSL must stay at tests 78, pass 76, fail 0, todo 2.",
+        "If any other POSIX-shaped literal turns out to matter (e.g. '/project/plugins/pipeline-core' at ~808, '/local/agent-pipeline', '/cache/...' sources) decide per case; two failed attempts on one cause is the stop.",
+        "Then consumer-safe check, git add -- the one path, git commit -F scratch/commit-msg/TR-J-T.txt -- the one path, terminal record."
+      ],
+      "T44/T58 findings (analysis only, nothing changed)": [
+        "The live-tree inventory is publishGitHookRuntimeSnapshot / inspectGitHookSourceSnapshot in lib/git-hook-runtime-snapshot.mjs: sourceRootOf(pluginLibDir) = resolve(pluginLibDir, '..'), i.e. the whole plugin root, inventoried twice and refused as GHS-SOURCE-DRIFT.",
+        "lib/git-hook-runtime-snapshot-fast-verify.test.mjs, scripts/install-snapshot-progress.test.mjs and scripts/hook-currentness.digest-once.test.mjs already pass their own fixture lib dirs (f.lib / lib / libA / libB); they are NOT live-tree consumers. No change needed.",
+        "scripts/commit-msg-hook-install.test.mjs (CMI016 is its 16th case id per harness/scripts/verify.mjs:909) defaults PLUGIN_LIB_DIR to the LIVE <plugin>/lib (line 33-34) and has an env override PIPELINE_CORE_TEST_PLUGIN_LIB_DIR. A test-only frozen copy is feasible: when the env var is unset, cpSync the plugin root (the file already does this at line ~295) into a tmpdir once at load and point PLUGIN_LIB_DIR at <copy>/lib. Its case at line ~388 spawns the real installer script, which derives its lib dir from import.meta.url, so that one case needs a look. pre-push-hook-install.test.mjs and pre-commit-hook-install.test.mjs were not inspected and probably share the pattern.",
+        "scripts/toolchain-preflight.test.mjs (TCP040 = R7-7e, lines 583-608): the typed repair is spawned from finding.repair.argv, whose argv[0] is the live scripts/toolchain-preflight.mjs, and repairMandatoryGitHooks calls applyInstall({ rootDir }) WITHOUT a pluginLibDir (toolchain-preflight.mjs:524), so the installer snapshots the live tree. No production seam is needed: the test could cpSync the plugin root to a tmpdir, assert argv[0] still equals the live script (keeping the typed-repair contract), and spawn the copy's scripts/toolchain-preflight.mjs with the remaining argv. The drift refusal stays untouched. This file was not run and no before/after pair exists.",
+        "Neither T44/T58 file was changed, so no pair was captured. Per the briefing's own condition these two are test-only and feasible, hence not a stop for a missing seam; they were simply not reached."
+      ],
+      "guard learnings for the next dispatch": [
+        "Grep on a directory is refused (GUARD-READ-TARGET); rg with --glob, -c, or patterns containing parentheses is refused or trips guard-push. Single exact-path rg and the Grep tool on one file work.",
+        "capture-evidence.mjs creates the --out parent directory itself.",
+        "Bash `wc -c` is refused; use rg on the target path or Read."
+      ]
+    }
+  }
+}

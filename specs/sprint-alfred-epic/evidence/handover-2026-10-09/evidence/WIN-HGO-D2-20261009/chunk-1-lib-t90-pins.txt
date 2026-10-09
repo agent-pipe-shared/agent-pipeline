@@ -1,0 +1,23 @@
+command: node --test "--test-name-pattern=T90-T2 \\(v\\)" plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: WIN-HGO-D2 chunk 1: lib T90-T2 (v) pins
+exitCode: 0
+head: 237ab69f97d2953dea78a1f1efaa53192ad99ca5
+tree: e7c7abaf4c7b868e399d328cea7109f35ed23efe
+dirty: true
+--- stdout ---
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (2.2413ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.1595ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.5705ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.1087ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.3904ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.1416ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 296.1156
+
+--- stderr ---

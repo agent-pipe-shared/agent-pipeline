@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "candidateCommit": "f396c628e6dab83d6e7a0b477784ea8476374341",
+  "commits": [
+    "8c5c4cd5d94e24334ed015b7bb40e2a45745ae02"
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "Implementation complete (test-only post-image). independent review: pending. PO acceptance and the signed-package install of the post-image at the protected target path: pending.\n\nRoute pre-check: requested claude-sonnet-5-5/xhigh (field 6); observed from this dispatch's runtime prompt: Sonnet 5.5, model id claude-sonnet-5-5. No contradiction; no A/G/S class declared.\n\n1. DoD results\n- (1) build.mjs: passed (exit 0). finalSha256 33411458451a7dabd4c067f6b7e94601739ccdd0f7e5fc2e27b6a1325a1b817d, 121431 bytes, LF; liveSha256 e92bc503189bec44737699058643d6023230f38c196ad53e581765de2dc52a4d (unchanged from the predecessor's run, so the live file is untouched).\n- (2) WSL capture of the copy: passed against the required states. 92 tests, 86 pass, 6 fail. T34 GREEN. T49 (a) RED, T49 (b) GREEN, T49 (c) RED, T37 (a) RED, T37 (b) GREEN, T57 GREEN, exactly as field 1 lists. The red reasons are unchanged from the predecessor (DISPATCH-BUDGET-EXHAUSTED for T49 (a)/(c); DISPATCH-BUDGET-INPUT-INVALID / DBB-PENDING-BINDING-MISSING with no re-dispatch wording for T37 (a)). Pre-existing cases match the baseline except the named flaky R7-11a (green in the copy, red in the baseline) and the same three 10 s timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40).\n- (3) TR-G-MANIFEST.md written with target, final sha256, WSL command, per-pin state, A1-A4 and the live-plus-appended-block statement; tranche README untouched: passed.\n- (4) node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0 (9 tests, 9 pass).\n- (5) One commit 8c5c4cd5d94e24334ed015b7bb40e2a45745ae02 on feat/sprint-alfred, exact pathspec of the two paths, trailers exactly Dispatch: TR-G-T2-20261009 (goldfish) and AI-Assisted: true: passed.\n- (6) This record: opened first, terminal after the commit: passed.\n\n2. Evidence\n- evidence/TR-G-T2-20261009/red.txt. Command: wsl.exe -e bash -lc \"cd <repo-root>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T2-20261009/red.txt --label TR-G-T2-red -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs\" (the briefed DoD spelling, with the machine path redacted to <repo-root> here); wrapped exit code 1 (red pins by design plus baseline reds). Baseline for comparison: evidence/TR-G-T-20261009/baseline.txt (85 tests, 81 pass, 4 fail).\n- Build: node scratch/dispatch-wip/TR-G-T/build.mjs, exit 0.\n- Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: tranche-2 post-image = live file plus the appended 7-case pin block; no existing line changed; T34 fixture now applies the decline plan with { activate: true, planSha256 }.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md: manifest for the post-image.\n- Not committed, local only: scratch/dispatch-wip/TR-G-T/pins.append.mjs.txt (T34 line edited), regenerated runnable copy, scratch/commit-msg/TR-G-T2.txt, evidence/TR-G-T2-20261009/red.txt, this record.\n\n4. Deliberately not changed\n- The live hooks/guard-dispatch-budget.test.mjs, every production file, lib/guard/, harness/, other test files, the tranche README, every pin other than T34, the predecessor's record. The three baseline timeouts and the flaky R7-11a were not touched.\n\n5. Deviations from spec\n- T34 cause confirmed at governance-scope.mjs:287: applyDecision fails GS-PLAN unless activate is true and planSha256 matches; the first fix attempt (add activate: true) was sufficient, so only one of the two permitted attempts was used, and the decline plan is expressible (no corrupt-state-file variant, no drop).\n- Capture used --test-reporter=spec as in the predecessor's run; the field-2 command already names it.\n- candidateCommit in this record is the parent of the commit at commit time (f396c628e...), not dcf0faab9: other agents committed to the shared branch meanwhile (the task allowed dcf0faab9 or later).\n- Record outcome stays committed-pending-report as the briefing prescribes (no further interim string).\n- Opening-record readback skipped: the opening record was written in a call parallel to the first pins-file read and was not read back immediately as the template requires. The record's existence is evidenced only by the later successful overwrites of the same path (the Write tool reported the update, not a create), which is weaker than the mandated readback.\n- Machine-specific path in a committed file: the committed TR-G-MANIFEST.md carries the briefed WSL command verbatim, including the machine path after cd (the mount path of this repository on this PC). CLAUDE.md forbids machine-specific absolute paths in docs and commits, while the briefing's DoD 2 spelled the command with that path; the predecessor's record and capture-evidence.mjs redact it to <repo-root>. I did not amend or add a second commit (DoD asks for one commit; amend is a history rewrite). This is a briefing-vs-repo-rule conflict reported, not resolved: the Elephant decides between accepting the briefed spelling or a one-line redaction follow-up. The consumer-safe check (DoD 4) passed with the path present. This record's report.text is redacted.\n- Bootstrap line timing: the canonical bootstrap confirmation and the route pre-check were printed after the two briefing-mandated reads (agent-obligations.md, CONT17 header) and before any substantive work; it is restated as the first line of this hand-back.\n\n6. Open items\n- independent review: pending (only the Elephant dispatches the Critic). PO acceptance: pending. Installing the post-image at plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs is a signed-package step for the PO ceremony and was not attempted.\n- T57 reading (the guard's own denial already shows the charge, Ruling 115 half unmet cannot be expressed in this file) still awaits Elephant confirmation, as in the predecessor's handover.\n- T34 detection reach (checked, inherited assumption A4): run() spawns one runner process per call and the T34 case makes two run() calls, so the two guard calls are separate processes. The pin therefore catches a cross-process (file-backed) cache serving a stale active verdict, and would not catch a purely in-process cache. Every real hook invocation is its own node process, so a file-backed cache is the relevant shape; stated as a limit of the pin, not changed.\n- Side finding for TR-G production work (from T37 A1): the DBB-PENDING-BINDING-MISSING refusal says the persisted counter was left unchanged and to repair it through the trusted host path, which is misleading for a first-call binding miss.\n- No stop condition triggered. Tool uses at close: about 26 of base cap 30 (closing allowance unused).",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations and CONT17 header read, bootstrap line and route pre-check printed after those two mandated reads (requested claude-sonnet-5-5/xhigh; observed runtime identity Sonnet 5.5 / claude-sonnet-5-5; no contradiction), predecessor record read, preflight run once after GUARD-BOOTSTRAP-RECEIPT-MISSING",
+      "toolUses": 6
+    },
+    {
+      "phase": "T34 diagnosis: governance-scope.mjs:287 requires activate true and matching planSha256 (GS-PLAN); pins.append edited once; build.mjs exit 0, finalSha256 33411458...a1b817d",
+      "toolUses": 13
+    },
+    {
+      "phase": "WSL copy capture done: 92 tests, 86 pass, 6 fail; T34 green, other pins as predecessor, baseline unchanged except flaky R7-11a; red.txt written",
+      "toolUses": 16
+    },
+    {
+      "phase": "manifest and commit message written; consumer-safe check exit 0; git add, git commit 8c5c4cd5d94e24334ed015b7bb40e2a45745ae02; record checkpointed committed-pending-report with report",
+      "toolUses": 23
+    },
+    {
+      "phase": "advisor consulted; run() process-per-call checked (T34 reach disclosed); record report finalised with deviations (readback skip, machine path in committed manifest); hand-back next",
+      "toolUses": 25
+    }
+  ]
+}

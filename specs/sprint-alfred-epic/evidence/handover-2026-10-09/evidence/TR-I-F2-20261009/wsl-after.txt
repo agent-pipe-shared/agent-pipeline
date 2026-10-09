@@ -1,0 +1,258 @@
+command: node --test plugins/pipeline-core/lib/test-case-completion.test.mjs plugins/pipeline-core/scripts/verify-journal.test.mjs harness/scripts/check-verify-case-completion.test.mjs harness/scripts/verify-case-completion-augmentation.test.mjs plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs
+label: wsl-after
+exitCode: 1
+head: 6212dbd800da362f733db053565d4291f0b36eac
+tree: 3179ab8da8a0057275956bc9c158bbcbb7ea79a2
+dirty: true
+--- stdout ---
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (15142.501761ms)
+✔ VCR02 the closed classifier distinguishes vulnerable and separately registered cases (18.79395ms)
+✔ VCR03 missing, new, duplicate, and stale registry entries fail closed (5.832559ms)
+✔ VCR04 unknown fields and missing backlog reasons cannot widen the registry (5.929071ms)
+✔ VCR05 a touched legacy suite must migrate in the same candidate (6.626064ms)
+✔ VCR06 base/candidate mode reads the candidate registry and enforces same-candidate migration (205.494078ms)
+✔ VCR07 required needs both the suite protocol and the Verify-side completion policy (11.058437ms)
+✔ VCR08 required cannot claim an unreachable helper call as normal suite setup (134.868569ms)
+✔ VCR09 required cannot alias a recorder or use an open registration configuration (1872.416887ms)
+✔ VCR10 required must resolve the import to the shipped completion helper (5.728377ms)
+✔ VCR11 every Verify array entry must use the closed literal registration grammar (17.351694ms)
+✔ VCR12 the candidate schema is loaded and enforced in worktree and Git blob modes (148.554824ms)
+✔ VCR13 a newly registered existing suite cannot enter as legacy (156.182428ms)
+✔ VCR14 the CLI rejects unpaired refs and unknown arguments (200.324224ms)
+✔ VCR15 required declarative suite is admitted from canonical closed JSON with real protocol (5.678297ms)
+✔ VCR16 required declarative registration still needs an explicit completion policy (5.731648ms)
+✔ VCR17 required declarative registration still needs actual reachable shipped protocol (5.840379ms)
+✔ VCR18 canonical declarative schema and unknown fields fail closed (36.097175ms)
+✔ VCR19 declarative path and full runtime completion policy constraints are enforced (68.850168ms)
+✔ VCR20 duplicate suite IDs and missing files fail while distinct IDs may share a canonical file (30.605552ms)
+✔ VCR21 physical declarative directory and outside-repository alias cannot become absence (14.704875ms)
+✔ VCR22 candidate JSON, policy and suite bytes cannot borrow matching working-tree bytes (445.405676ms)
+✔ VCR23 candidate declarative symlink and wildcard suite paths cannot borrow regular blobs (332.066777ms)
+✔ VCR24 new declarative registration cannot give an existing suite a legacy exemption (160.492611ms)
+✔ VCR25 base declarative registrations remain present in same-candidate migration inventory (156.158378ms)
+✔ VCR26 closed shorthand registration is admitted and produces an actual inherited-FD terminal receipt (50.996633ms)
+✔ VCR27 supplementary policy admits required completion without mutating an existing declarative row (5.421611ms)
+✔ VCR28 unknown, duplicate, malformed and conflicting supplementary policies fail the canonical gate (25.790853ms)
+✔ VCR29 candidate-bound supplementary JSON cannot borrow worktree policy or hide required historical absence (281.170674ms)
+✔ VCR30 published supplementary policy cannot be ignored when no matching declarative rows exist (6.242416ms)
+✔ VCR31 strict declarative monotone extension passes the full exact prior policy object to the augmentation loader (6.225666ms)
+✔ VCR32 static boolean case-presence markers cannot authorize a monotone policy extension (6.176375ms)
+✔ VAC001 exact augmentation fills absent policy without changing any original row or order (1.58024ms)
+✔ VAC002 absent optional file preserves historical rows while present unknown policies cannot remain unconsumed (2.14545ms)
+✔ VAC003 augmentation binds exact existing name and file and refuses ambiguous targets (0.305396ms)
+✔ VAC004 even an equal existing policy cannot be shadowed or rewritten (0.283155ms)
+✔ VAC005 duplicate augmentation IDs are refused before composition (0.272385ms)
+✔ VAC006 closed root and row schemas reject extra or missing keys (0.246604ms)
+✔ VAC007 full canonical completion-policy checks refuse unknown keys and case coverage drift (0.192844ms)
+✔ VAC008 unsafe, path-shaped and wildcard target files never match an existing row (0.228814ms)
+✔ VAC009 physical JSON rejects duplicate keys, malformed bytes, directories and outside aliases (1.539319ms)
+✔ VAC010 actual two-case FD completion cannot be weakened by a one-case supplementary policy (40.347484ms)
+✔ VAC011 actual candidate reads bind augmentation bytes and historical absence despite worktree changes (42.718348ms)
+✔ VAC012 candidate symlink/tree and unbound refs cannot borrow a regular worktree policy (44.38681ms)
+✔ VAC013 exact previous-policy binding permits a strict ordered case-ID superset without mutating source rows (0.382687ms)
+✔ VAC014 removing IDs, adding no new ID, or reducing maxBytes refuses a bound replacement (0.378417ms)
+✔ VAC015 wrong previous-policy preimage digest refuses an otherwise monotone extension (0.162653ms)
+✔ VAC016 existing-policy shadowing remains a conflict without exact binding and binding cannot target an absent policy (0.173493ms)
+✔ VAC017 ordered superset may interleave new IDs while retaining every old ID in order (0.286725ms)
+✔ rejects duplicate, unstable, and invalid declared ids before emitting bytes (1.349975ms)
+✔ rejects unknown and duplicate disposal without forging extra records (1.09079ms)
+✔ fails closed when the explicitly configured inherited descriptor is missing (0.302846ms)
+✔ retries short descriptor writes with exact offsets and rejects zero progress (0.284585ms)
+✔ one early failure stays red while later siblings dispose and terminal remains complete (61.97421ms)
+✔ dual runtime skip and todo remains red and is disposed as fail (69.724214ms)
+✔ outside Verify a completion suite runs as a plain single file and reports its cases (47.345374ms)
+✔ inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE (37.466842ms)
+✔ outside Verify a descriptor 3 nobody announced receives no completion bytes (44.175414ms)
+✔ inside Verify a writable descriptor 3 receives the complete declared-to-terminal stream (48.899455ms)
+✔ preflights the complete bounded stream before declaration and emits within the accepted cap (0.628361ms)
+✔ BPM001 Bootstrap byte measurement and rejection bounds (4.980013ms)
+✔ BPM002 Normal receipt measures both original segments (4.993304ms)
+✔ BPM003 Enrolled physical bootstrap emits retained-check receipt (4582.210298ms)
+✔ BPM004 Oversized machine envelope remains rejected and truncated (4.81196ms)
+✔ BPM005 Budget has one owner and every consumer respects exact boundaries (48.386325ms)
+✔ execution metrics retain lane/reuse facts and reject malformed measurement inputs (1.902296ms)
+✔ private journal writes bounded JSON progress and keeps complete logs off the channel (107.884257ms)
+✔ WSL EPERM after a zero suite exit remains successful; other error shapes stay closed (225.301343ms)
+✔ a terminal matching receipt is reused and still produces complete current coverage (225.882028ms)
+✔ a required case-completion descriptor is captured into receipt v2 and reused only with its attestation (214.940463ms)
+✔ a required suite with a missing completion terminal fails closed even when its process exits zero (124.09498ms)
+✔ the default async child transport inherits and captures the bounded completion descriptor (172.454104ms)
+✔ reuseReceipts false re-executes a terminal matching receipt and records why (232.575558ms)
+✔ a freshly executed suite carries a durationMs derived from its own receipt timing (116.203052ms)
+✔ an interrupted run has no reusable receipt and reruns the partial suite (123.903087ms)
+✔ candidate and log drift invalidate reuse before execution (363.266302ms)
+✔ permissive or symlinked prior run parents are ignored, never traversed (228.047354ms)
+✔ cleanup registration is required before any private run directory is created (117.771932ms)
+✔ session-less passed and numeric failed terminals retain journal bytes, release only their created owner, and issue a fresh next owner (598.262175ms)
+✔ a session-less checkout with an already-active foreign session descriptor still runs Verify and leaves that descriptor byte-identical (254.826674ms)
+✔ an already-bound cleanup owner remains borrowed after passed and numeric failed terminals (566.35842ms)
+✔ a normalized failed receipt after a production spawn error cannot release a newly-created owner (201.454725ms)
+✔ SIGINT interruption terminates only its child group, seals distinct immutable evidence, and releases its exact automatic owner (229.767472ms)
+✔ interruption keeps a borrowed descriptor and treats unknown child-group closure as unreleasable (321.092998ms)
+✔ a caller-supplied registration callback has no automatic owner teardown authority (188.933123ms)
+✔ a suite-created foreign descriptor is never touched by Verify cleanup and terminal evidence is kept (285.08394ms)
+✔ an extra resource in or beside a sealed run directory survives Verify cleanup and the journal stays intact (218.76739ms)
+✔ a completed receipt owned by a currently live exact writer is never reused (228.312498ms)
+✔ ADR-0065: compileVerifySuites declares the repository root plus suite-dependencies, not a bare candidate-tree (442.162906ms)
+✔ ADR-0065: policySha256 no longer couples unrelated suites, and suite-dependencies restores its own dependsOn check (239.744918ms)
+✔ a manifest with a drifted cleanup registration cannot authorize receipt reuse (225.351596ms)
+✔ ADR-0065 candidate (b): a Tier-A suite spawns with no --permission flags at all (regression, bit-identical to before this change) (118.18952ms)
+✔ ADR-0065 candidate (b): the real human-role-label-tests registration declares exactly its own two files, never the repository root (245.00883ms)
+✔ ADR-0065 candidate (c): the real recovery-preview-attestation-tests registration declares exactly its own two files, never the repository root (128.175626ms)
+✔ control-catalog-schema-tests remains Tier A after completion and child-process instrumentation (116.908906ms)
+✔ ADR-0065 candidate (b): a Tier-B suite that reaches an undeclared path fails under the REAL Node permission model, not a mock (143.996902ms)
+✔ ADR-0065 candidate (b): a Tier-B suite whose declared reads are actually sufficient still passes under the REAL Node permission model (147.12695ms)
+✔ ADR-0065 candidate (b) regression: a Tier-B suite whose own declared files are unchanged is reused across a candidate whose commit and tree both differ, WHEN allowCrossCandidateReuse: true is explicitly passed (400.725045ms)
+✔ NVA-ADR65TIERFIX-2: WITHOUT allowCrossCandidateReuse (the default, matching harness/scripts/verify.mjs's real unmodified call -- the flag is not passed at all here), a Tier-B suite whose own declared files are unchanged is NOT reused across a candidate change and is re-executed instead (280.221868ms)
+✔ AGY-VERIFYTUNER-1: steps[] materializes in registration order regardless of real completion order (173.198885ms)
+✔ AGY-VERIFYTUNER-1: a dependsOn suite does not START executing before its dependency's receipt exists, under concurrency > 1 (157.710255ms)
+✔ AGY-VERIFYTUNER-1/2: explicit concurrency: 1 still matches the prior strictly-sequential behavior -- same steps[] content and order, same exit codes (explicit sequential stays available on request) (118.84306ms)
+✔ AGY-VERIFYTUNER-2: with no concurrency argument, no env override, and no calibration file, the resolved default is the hardcoded literal (> 1) -- real production concurrency, not the stage-1 mechanism default (130.021748ms)
+✔ AGY-VERIFYTUNER-2: PIPELINE_VERIFY_CONCURRENCY in the passed environment overrides the default (144.086981ms)
+✔ AGY-VERIFYTUNER-2: a project/pipeline.json verifyConcurrency field is read as a calibration override when no env var is present (148.011704ms)
+✔ AGY-VERIFYTUNER-2: PIPELINE_VERIFY_CONCURRENCY takes precedence over a project/pipeline.json calibration value (123.563487ms)
+✔ AGY-VERIFYTUNER-2: two suites named in serialLaneSuites never overlap each other, but a pool suite still overlaps a lane suite (169.72831ms)
+✔ AGY-VERIFYTUNER-2: an exclusiveSuites member runs alone -- nothing else is in flight while it runs, and it runs before the concurrent phase starts (155.062355ms)
+✔ security-scan uses the default exclusive phase so sibling fixtures cannot race its cleanliness snapshot (161.250721ms)
+✔ AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking (105.738214ms)
+✔ BUGFIX ALFRED-VERIFY-EXCL-B: the real validate-manifest -> security-scan pair resolves inside the exclusive set and does not throw (111.371311ms)
+✔ BUGFIX ALFRED-VERIFY-EXCL-B: a synthetic exclusive suite depending on a pool suite still throws (111.506361ms)
+✔ AGY-VERIFYTUNER-1: concurrency > 1 genuinely overlaps suites' child processes in real wall-clock time (151.336397ms)
+✔ AGY-VERIFYTUNER-1: reuseSuite's cache-hit result still lands in steps[] at the correct registration-order position under the async pool (220.0731ms)
+✔ AGY-VERIFYTUNER-1: a cyclic dependsOn is rejected up front (by the existing verify-resume.mjs assertAcyclic check, run before the pool ever starts) rather than deadlocking the pool (107.997457ms)
+✔ AGY-VERIFYTUNER-1: an out-of-range concurrency value is rejected (0.335546ms)
+✔ AGY-VERIFYTUNER-1: the new default async spawn (no explicit spawn passed) genuinely runs a real child process end to end (149.561473ms)
+✔ AGY-VERIFYTUNER-1: a Tier-B suite's --permission flags still apply correctly under the new default async spawn (real Node permission model, no mock) (137.092931ms)
+✔ ALFRED-WINHIDE2: win32 wraps every spawn-family function and supplies windowsHide:true when the options do not state it (0.707057ms)
+✔ ALFRED-WINHIDE2: win32 callback-bearing signatures keep the callback last and the options in position (0.236474ms)
+✔ ALFRED-WINHIDE2: an explicit windowsHide is respected and the caller's options object is never mutated (0.141903ms)
+✔ ALFRED-WINHIDE2: an argument shape Node itself rejects is passed through unchanged (0.121683ms)
+✔ ALFRED-WINHIDE2: loading twice wraps once, and the marker identifies a wrapped function (0.139572ms)
+✔ ALFRED-WINHIDE2: util.promisify(execFile) still resolves {stdout, stderr} and goes through the wrapper (0.258135ms)
+✔ ALFRED-WINHIDE2: non-win32 platforms replace nothing and sync nothing (0.146263ms)
+✔ ALFRED-WINHIDE2: this host's real child_process matches the platform contract and still round-trips (59.000286ms)
+✔ ALFRED-WINHIDE2: a NODE_OPTIONS child, and its own node child, load the preload only on win32 (71.139519ms)
+✔ ALFRED-WINHIDE2: a permission-model child is not broken by the NODE_OPTIONS entry (25.972306ms)
+✔ ALFRED-WINHIDE2: composeWindowsHideNodeOptions adds one gated --import entry, preserves existing options and is idempotent on win32 (0.280655ms)
+✔ ALFRED-WINHIDE2/WINVERIFY: resolveWindowsVerifyConcurrency defaults win32 to 4 (hard maximum 5) unless a valid override is given, and leaves other platforms alone (0.118512ms)
+✔ ALFRED-WINHIDE2: resolveSuiteChildEnvironment composes NODE_OPTIONS on win32 and is the identity elsewhere (0.225124ms)
+✔ ALFRED-WINHIDE2/WINVERIFY: resolveDefaultConcurrency defaults win32 to 4 and clamps every source to 5; other platforms keep 8 and are never clamped (0.392647ms)
+✔ ALFRED-WINHIDE2: runVerifyJournal hands each suite child this host's NODE_OPTIONS contract (mock spawn) (107.977947ms)
+✔ ALFRED-WINHIDE2/WINVERIFY: the default pool width is 4 on win32 and 8 elsewhere (six suites), an env override wins, and win32 never exceeds 5 (462.962771ms)
+✔ ALFRED-WINHIDE2: a real suite run through the default spawn loads the preload only on win32, in the suite and in its own children (171.419572ms)
+✔ ALFRED-WINHIDE2: a Tier-B (--permission) suite passes through the default spawn with the NODE_OPTIONS entry present (144.437931ms)
+✔ ALFRED-WINHIDE2: the only non-test spawn site in the verify spawner and in the evidence producer passes windowsHide: true (11.162208ms)
+✔ WINVERIFY: win32 extends an explicit env with the preload entry, folds key casing, and leaves an inherited or already-carrying env alone (0.404698ms)
+✔ WINVERIFY: a Node grandchild started with a hand-built env (no NODE_OPTIONS) still loads the preload, on win32 only (60.209175ms)
+✔ WINVERIFY: clampWindowsVerifyConcurrency applies the hard maximum of 5 on win32 only (0.198304ms)
+✔ WINVERIFY: an explicit concurrency above the win32 maximum runs at the maximum (seven suites) (140.054486ms)
+✔ WINVERIFY guard: the scanner classifies calls, follows import aliases and skips comments and RegExp.exec (1.61452ms)
+✔ WINVERIFY guard: the scanner is RED on deliberately uncovered fixture spawns (0.449179ms)
+✖ WINVERIFY guard: GREEN on the real tree -- no spawn the windowsHide preload cannot cover is reachable from a full Verify (6474.089885ms)
+✔ WINVERIFY guard: the Verify ROOT process loads the windowsHide preload (verify.mjs -> verify-journal.mjs -> windows-hide-preload.mjs) (1074.784602ms)
+✔ ALFRED-RF1: a passed and a numeric failed terminal leave no own descriptor, binding or intent (413.128613ms)
+✔ ALFRED-RF1: a planning error after the owner exists (VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE) retires the exact own descriptor, binding and intent (207.694263ms)
+✔ ALFRED-RF1: a failure raised while the private run is being created retires the owner too (210.836127ms)
+✔ ALFRED-RF1: an exception thrown from the suite spawn seam is rethrown unchanged and the owner is retired (202.210794ms)
+✔ ALFRED-RF1: owner retirement never touches a descriptor it did not create (240.850863ms)
+✔ ALFRED-RF1: reusing the id of an existing retained run is refused before any owner exists and deletes nothing (359.976329ms)
+✔ ALFRED-RF1: an uncaught exception that ends the process leaves no own descriptor, binding or intent (2839.426451ms)
+✔ ALFRED-RF1: SIGINT stops the child group gracefully, retires the owner and exits with the conventional code (2596.37535ms)
+✔ ALFRED-RF1: SIGTERM stops the child group gracefully, retires the owner and exits with the conventional code (2204.663739ms)
+✔ ALFRED-RF1: a second signal while the first is still being honored forces the exit and still retires the owner (2195.012709ms)
+✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (2139.332264ms)
+ℹ tests 156
+ℹ suites 0
+ℹ pass 153
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35224.496553
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (15142.501761ms)
+  AssertionError [ERR_ASSERTION]: VULNERABLE-UNREGISTERED gitleaks-repair-ignore-cli-tests plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs
+  VULNERABLE-UNREGISTERED hardened-private-directory-install-tests plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/harness/scripts/check-verify-case-completion.test.mjs:109:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/verify-journal.test.mjs:1763:1
+✖ WINVERIFY guard: GREEN on the real tree -- no spawn the windowsHide preload cannot cover is reachable from a full Verify (6474.089885ms)
+  AssertionError [ERR_ASSERTION]: every finding is a spawn form the preload cannot reach: fix the call site or, if intentional, allowlist it with a reason
+  + actual - expected
+  
+  + [
+  +   {
+  +     file: 'harness/scripts/attended-recovery.test.mjs',
+  +     line: 715,
+  +     rule: 'node-options-mutation',
+  +     text: 'if (nodeOptions !== null) process.env.NODE_OPTIONS = nodeOptions;'
+  +   },
+  +   {
+  +     file: 'harness/scripts/attended-recovery.test.mjs',
+  +     line: 720,
+  +     rule: 'node-options-mutation',
+  +     text: 'if (savedNodeOptions === undefined) delete process.env.NODE_OPTIONS;'
+  +   },
+  +   {
+  +     file: 'harness/scripts/attended-recovery.test.mjs',
+  +     line: 721,
+  +     rule: 'node-options-mutation',
+  +     text: 'else process.env.NODE_OPTIONS = savedNodeOptions;'
+  +   },
+  +   {
+  +     file: 'plugins/pipeline-core/scripts/po-human-approval.test.mjs',
+  +     line: 5079,
+  +     rule: 'node-options-mutation',
+  +     text: 'process.env.NODE_OPTIONS = `--require "${hook.replace(/\\\\/gu, "/")}"`;'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/verify-journal.test.mjs:1767:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ { file: 'harness/scripts/attended-recovery.test.mjs', line: 715, rule: 'node-options-mutation', text: 'if (nodeOptions !== null) process.env.NODE_OPTIONS = nodeOptions;' }, { file: 'harness/scripts/attended-recovery.test.mjs', line: 720, rule: 'node-options-mutation', text: 'if (savedNodeOptions === undefined) delete process.env.NODE_OPTIONS;' }, { file: 'harness/scripts/attended-recovery.test.mjs', line: 721, rule: 'node-options-mutation', text: 'else process.env.NODE_OPTIONS = savedNodeOptions;' }, { file: 'plugins/pipeline-core/scripts/po-human-approval.test.mjs', line: 5079, rule: 'node-options-mutation', text: 'process.env.NODE_OPTIONS = `--require "${hook.replace(/\\\\/gu, "/")}"`;' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/verify-journal.test.mjs:1960:1
+✖ ALFRED-RF1: a real SIGINT delivered by the operating system retires the owner (2139.332264ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  13 !== 130
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/verify-journal.test.mjs:1971:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 13,
+    expected: 130,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

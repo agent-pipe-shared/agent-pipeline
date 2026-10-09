@@ -1,0 +1,32 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: wsl
+exitCode: 0
+head: 5428bfecc6ba9a48bf60632ed54f5c6325d0dfee
+tree: 0f63963e03afb5a196ee777df94518a38c0f834a
+dirty: true
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.745218ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.110147ms)
+✔ WPS003 rejects owner drift and reparse points (0.079058ms)
+✔ WPS004 keeps malformed observations unavailable (0.074407ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.577283ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.148095ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.395888ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.134826ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.174445ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.211404ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.307191ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.146206ms)
+﹣ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (0.060449ms) # SKIP
+﹣ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (0.127876ms) # win32-native only: no seam for the fixed powershell.exe lookup
+﹣ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (0.246563ms) # win32-native only: no seam for the fixed powershell.exe lookup
+ℹ tests 15
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 76.030623
+
+--- stderr ---

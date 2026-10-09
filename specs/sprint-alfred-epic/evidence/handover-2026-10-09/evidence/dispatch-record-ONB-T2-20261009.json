@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ONB-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "9709982dc70207d97ec71d6287269099e237799e",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "F3 argv pin",
+      "F4 pins",
+      "F7 pin",
+      "F9 pin",
+      "count guard 298 to 300",
+      "WSL capture into evidence/ONB-T2-20261009/",
+      "the commit"
+    ],
+    "nextBriefingAdjustments": [
+      "hand over the two draft files by path and forbid re-orientation",
+      "supply the capture-evidence.mjs path and flags",
+      "rule the fixture import, the F3 text-file question and the F9 code token set",
+      "say whether a new test file needs a Verify suite registration"
+    ]
+  },
+  "log": [
+    { "phase": "opening-record (briefing, obligations, preflight, ONB-T hand-back and Ruling 163 read)", "toolUses": 14 },
+    { "phase": "orientation (fixtures, owners, helpers) done, no pin measured", "toolUses": 44 },
+    { "phase": "80 percent checkpoint: drafts and full report written under evidence/ONB-T2-20261009", "toolUses": 48 },
+    { "phase": "terminal record written (shell-write route refused 3 times: test-path word, push word, interpreter write)", "toolUses": 53 }
+  ],
+  "report": {
+    "text": "ONB-T2-20261009 stopped-without-commit (closing-allowance handover; 80 percent checkpoint reached at call 44 of 55 with no pin measured). independent review: pending.\n1. DoD results: F3 argv pin, F4 pins, F7 pin, F9 pin, the 298 to 300 guard bump, the WSL capture and the commit are all NOT done. The pins are drafted and unmeasured; no test was run by me, so no pin is known red or green.\n2. Evidence: no machine-written test output exists. Drafts on disk (untracked): evidence/ONB-T2-20261009/draft-onboarding-greenfield-walk.test.mjs.txt and draft-onboarding-continuity-pins.test.mjs.txt, each with owner, anchor, expected red reason and neighbours. Full report: evidence/ONB-T2-20261009/report.txt. Preflight exit 0.\n3. Changed files: no tracked file changed. Untracked: this record and the three files under evidence/ONB-T2-20261009/.\n4. Deliberately not changed: all production files, the foreign uncommitted edits, the Verify suite registration file.\n5. Deviations: the draft imports root, dispose, fakeDeps, fakeGit, clearRuntimeBarrier from project-onboarding-v3.test.mjs instead of copying (fakeDeps is about 250 lines; onboarding-first-restart-intake.test.mjs borrows the same exports) - needs a ruling. The F3 pin allows at most one --text-file because CONT36 said none while Ruling 163 narrowed F3 to the doubled and dropped tokens - needs a ruling. F9 is pinned on planOnboardingBootstrapAcknowledgementChat (accepted code: BOOTSTRAP-ACK-* containing PLACEHOLDER, DRAFT, TEMPLATE, SCAFFOLD or UNFINISHED) because the signature route fails earlier on trust-anchor codes in a bare fixture.\n6. Open items: Committed: nothing. Verified green: none. Remains undone: everything in section 1. Next briefing: hand over the two drafts by path and forbid re-orientation; supply the capture-evidence.mjs path and flags (Glob was refused, never located); rule the three items in section 5; say whether a new test file needs a Verify suite registration (protected file, not editable by a Goldfish); in the F4 draft move the generate-plan --runner assertions below the final mismatches assertion; the CLI generate route under fakeGit is unmeasured. Production owners: F3 intakeConsentAction lib/project-onboarding-v3.mjs 2755-2759; F4 scripts/project-onboarding-v3.mjs branches 904-973 plus the planOnboardingIntakeGenerate nextAction builder; F7 buildKickoffPromotionPlan lib/onboarding-continuity.mjs 5184-5189; F9 bootstrapAcknowledgementPlan in the same file. Record defect: resultSha256 is bound after the fact by a read-only hash step if the next line says so; see the final message.",
+    "changedFiles": []
+  }
+}

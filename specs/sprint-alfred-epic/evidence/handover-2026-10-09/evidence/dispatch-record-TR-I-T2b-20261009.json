@@ -1,0 +1,44 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-I-T2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["b32f859c0"],
+  "resultSha256": null,
+  "report": {
+    "text": "TR-I-T2b: implementation complete, independent review: pending. (1) DoD: both fixture-spawn cases in plugins/pipeline-core/lib/test-case-completion.test.mjs ('one early failure ...', 'dual runtime skip and todo ...') now set PIPELINE_VERIFY_CASE_COMPLETION_FD to \"3\" (the value verify-journal.mjs:1004 sets) in the spawn env; both green on native and WSL. Native 10 pass / 1 fail (single failing case: 'outside Verify a descriptor 3 nobody announced receives no completion bytes'); WSL 9 pass / 2 fail ('outside Verify a completion suite runs as a plain single file ...' and the same descriptor-3 case); case names and totals identical to the TR-I-T2 reference captures. Consumer-safe check exit 0 (9 pass). One commit b32f859c0 with exactly the two trailers. (2) Evidence: evidence/TR-I-T2b-20261009/native.txt (node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-I-T2b-20261009/native.txt --label native -- node --test plugins/pipeline-core/lib/test-case-completion.test.mjs; wrapped exit 1, as expected), evidence/TR-I-T2b-20261009/wsl.txt (same under wsl.exe -e bash -lc; wrapped exit 1). Reference: evidence/TR-I-T2-20261009/{native,wsl}.txt. (3) Changed: plugins/pipeline-core/lib/test-case-completion.test.mjs (spawn env of two cases only: +12/-2 lines, each env literal expanded to multi-line with one comment line). (4) Not changed: no assertions, no other case, no production file; the two pre-existing red cases are the T2 RED pin awaiting TR-I-F2 (and on WSL the plain-single-file case). (5) Deviations: the MAX_BYTES variable is not set (the briefing named only the FD signal; the recorder reads only the FD one); a one-line comment was added inside each env literal; no advisor call was made (budget); full commit SHA not captured (git show was refused after the working cap), short SHA recorded. (6) Open: independent review pending (Critic by the Elephant only); the budget hook counted the 4 edit/Write acts and the parallel calls, so it hit the cap at the commit and the full-SHA lookup was refused; the repo-root preflight status was plugin-refresh-required (advisory) while the loaded plugin root reported ready.",
+    "changedFiles": ["plugins/pipeline-core/lib/test-case-completion.test.mjs"]
+  },
+  "log": [
+    { "phase": "bootstrap-and-orientation", "toolUses": 9, "note": "both preflights run (repo copy plugin-refresh-required advisory; loaded plugin root ready); obligations + CONT17/CONT15 headers read" },
+    { "phase": "edit", "toolUses": 17, "note": "PIPELINE_VERIFY_CASE_COMPLETION_FD: \"3\" added to the spawn env of the two fixture-spawn cases (value as set by verify-journal.mjs:1004)" },
+    { "phase": "verify", "toolUses": 24, "note": "native 10 pass / 1 fail, WSL 9 pass / 2 fail; names and totals identical to evidence/TR-I-T2-20261009 reference (exit 1 on both, as expected)" },
+    { "phase": "consumer-safe-check", "toolUses": 28, "note": "node --test harness/scripts/check-consumer-safe-paths.test.mjs: 9 pass / 0 fail" },
+    { "phase": "commit", "toolUses": 30, "note": "b32f859c0 test(test-case-completion): announce fd 3 in the fixture-spawn cases; 1 file changed, 12 insertions, 2 deletions; checkpoint written" },
+    { "phase": "closing", "toolUses": 33, "note": "final record written; independent review pending" }
+  ]
+}

@@ -1,0 +1,88 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/design-workflow-package-route.test.mjs plugins/pipeline-core/lib/design-workflow-package.test.mjs plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs
+label: R4-T0c-after
+exitCode: 1
+head: 825ebd9981717be91191bbf00b3f1c72624c1063
+tree: 0b5b018159defcb138a4288359f68cd57e0ad381
+dirty: true
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (677.612878ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (727.837225ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (588.864939ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (493.146548ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (422.893007ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (391.226013ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (403.193257ms)
+✔ EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain) (861.900692ms)
+✖ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused with DWP2-CURRENT-CANDIDATE (544.427703ms)
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (13.062676ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (9.931415ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (7.834677ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (9.094131ms)
+✔ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (24.789653ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (8.55347ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (3.061738ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (8.784264ms)
+✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (8.57019ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (9.755223ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (10.084488ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (8.716343ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (8.432088ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (9.667491ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (7.672604ms)
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (175529.482311ms)
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (12.461923ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (33.256962ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (16.596889ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (9.647896ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (8.771648ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (15.569082ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (31.123198ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (15.918823ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (2.966811ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (13.271839ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (29.13367ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (113.798577ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (5.466142ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (10.386214ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (18.289421ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (7.917388ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (7.598692ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (9.780793ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (45.231926ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (101.281254ms)
+✔ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (241.496345ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 45
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 177318.077038
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:94:30
+✖ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused with DWP2-CURRENT-CANDIDATE (544.427703ms)
+  AssertionError [ERR_ASSERTION]: ruling 68: a deletion in candidate..HEAD keeps DWP2-CURRENT-CANDIDATE
+  + actual - expected
+  
+    {
+  +   approval: 'refused:DWP2-PHYSICAL-OR-GIT',
+  +   reader: 'refused:DWP2-PHYSICAL-OR-GIT'
+  -   approval: 'refused:DWP2-CURRENT-CANDIDATE',
+  -   reader: 'refused:DWP2-CURRENT-CANDIDATE'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:271:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { reader: 'refused:DWP2-PHYSICAL-OR-GIT', approval: 'refused:DWP2-PHYSICAL-OR-GIT' },
+    expected: { reader: 'refused:DWP2-CURRENT-CANDIDATE', approval: 'refused:DWP2-CURRENT-CANDIDATE' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

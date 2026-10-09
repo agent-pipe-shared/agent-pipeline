@@ -1,0 +1,11 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "5a72c9b610938b58832d3f6d4ee58f6a6b6ff25d"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/windows-private-state.mjs"
+    ]
+  }
+}

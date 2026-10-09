@@ -1,0 +1,35 @@
+{
+  "taskId": "HOOKREFRESH-T5-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "complete-with-premise-deviation",
+  "commits": ["7249b15db"],
+  "log": [
+    { "phase": "opening: record created after guard-required bootstrap preflight (status ready)", "toolUses": 3 },
+    { "phase": "orientation: read briefing, test stub shape, five case bodies, baseline; found PHX premise mismatch", "toolUses": 14 },
+    { "phase": "edit: readyCloneProvisioning() helper + five case injections (+20 lines, additions only)", "toolUses": 20 },
+    { "phase": "verify: WSL capture exit 0 (78 tests, 76 pass, 0 fail); consumer-safe test 9/9 pass", "toolUses": 26 },
+    { "phase": "commit: first attempt refused by GIT-03 (co-author and session trailers); message rewritten; committed 7249b15db", "toolUses": 32 }
+  ],
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs"],
+    "dodResults": {
+      "wslAfterCapture": "passed: evidence/HOOKREFRESH-T5-20261009/after.txt, wrapped exit 0, 78 tests / 76 pass / 0 fail / 0 cancelled / 0 skipped; the five briefed cases all show a pass mark",
+      "consumerSafePathsTest": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9 pass, exit 0",
+      "oneCommitTestFileOnly": "passed: 7249b15db, 1 file changed, 20 insertions, exact pathspec with -F; the three staged foreign files stayed staged and untouched",
+      "noOtherCaseChangedState": "passed against the baseline red list (5 red before, 0 red after); the baseline had no other red cases"
+    },
+    "deviations": [
+      "PHX-WP-AAC01-MULTISESSION LIVE (briefed case 5): the briefing premise that it calls the real checkCloneProvisioning(cwd) is wrong. It runs through the preflight() wrapper, whose default already injects an equivalent ready report, and preflightOptions carried no override. Its baseline red was GHS-SOURCE-DRIFT thrown by applyInstall inside buildConcurrencyRepoFixture (:1812), before any preflight call, not hook-refresh-required. The briefed injection was applied there anyway (redundant, harmless) to keep 'exactly five'. Its AFTER pass is therefore not attributable to the stub; the GHS-SOURCE-DRIFT flake is unfixed and simply did not fire in this run.",
+      "Commit trailers: the briefing-mandated Dispatch/AI-Assisted trailers were kept; the harness-suggested Co-Authored-By and Claude-Session lines were omitted because guardrail GIT-03 (guard-git hook) refuses them with no override.",
+      "Dispatch record: an in-progress record was written first (Goldfish contract, GF-09-D); this terminal record replaces it as the single final write the briefing asks for.",
+      "Final advisor consult before done was skipped: the working budget was exhausted by the guard (cap 30), and no closing slot remained for it."
+    ],
+    "evidenceCaveat": "The bootstrap preflight run at the start reported all three hooks 'current' on this machine, so a green AFTER does not by itself isolate the stub's effect. The deliverable is hermeticity (the five cases no longer read machine hook state), not a red-to-green flip observed in this run.",
+    "notChanged": "No production file, hooks/, lib/guard/, harness/, or wrapper lines :120-138 / preflight() were touched. The uncommitted scripts/pipeline-start-preflight.mjs and untracked scripts/refresh-mandatory-hooks.mjs were not staged. scratch/commit-msg-hookrefresh-t5.txt remains as an untracked scratch file.",
+    "openItems": "PO/Elephant: (1) the PHX fixture GHS-SOURCE-DRIFT flake (concurrent source edits during applyInstall snapshot) stays open as a separate backlog candidate; (2) correct the briefing family premise about PHX; (3) the final SHA was taken from the commit output (short form 7249b15db) because the git rev-parse call was refused by the budget guard."
+  }
+}

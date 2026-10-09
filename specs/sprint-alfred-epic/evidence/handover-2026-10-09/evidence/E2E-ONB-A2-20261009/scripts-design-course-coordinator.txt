@@ -1,0 +1,18 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/scripts/design-course-coordinator.test.mjs
+label: scripts-design-course-coordinator
+exitCode: 0
+head: 1503a68287f491411f30a85c58516279d345badb
+tree: db8f0773cd78b1ce9414caf1b4fe70bf881556c4
+dirty: true
+--- stdout ---
+✔ K19001 course inspection exposes runner-specific readiness and preserves typed native Advisor unavailability (1.67758ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.208616
+
+--- stderr ---

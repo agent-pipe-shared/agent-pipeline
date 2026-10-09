@@ -1,0 +1,43 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs
+label: mech-haiku-after-runner-contracts.schema
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+FAIL  committed registry is complete and exact -- mechanic.claude exact tuple
+PASS  committed schemas are closed and aligned
+PASS  P3B-owned modules carry exact SPDX headers
+PASS  missing runner cell is rejected
+PASS  extra duty cell is rejected
+PASS  prior alias:terra selector is rejected
+PASS  wrong Sol effort pair is rejected
+PASS  wrong Terra effort pair is rejected
+PASS  Codex Advisor substitution is rejected
+PASS  asserted Terra effective model is rejected
+PASS  non-closed schema root is rejected
+PASS  missing common metric is rejected
+PASS  wrong source or scope registry is rejected
+PASS  missing capability state is rejected
+PASS  divergent schema id is rejected
+
+14/15 cases passed.
+Failures:
+  - committed registry is complete and exact: mechanic.claude exact tuple
+✖ plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs (80.270297ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 88.29293
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs (80.270297ms)
+  'test failed'
+
+--- stderr ---

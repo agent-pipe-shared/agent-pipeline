@@ -1,0 +1,217 @@
+command: node --test plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+label: after
+exitCode: 1
+head: bd0666a24ec8f59ff28e3d5e083fe94752361927
+tree: bfbeb9f69bb3a2bd82c780fb827d2da7174330dc
+dirty: true
+--- stdout ---
+✔ project-onboarding-v3 refuses an unrecognized subcommand (closed command set, not open) (2.0518ms)
+✔ project-onboarding-v3 refuses an unrecognized flag on a known, read-only subcommand (0.4884ms)
+✔ project-onboarding-v3 refuses --activate on a subcommand outside the apply-shaped set (0.4867ms)
+✔ project-onboarding-v3 refuses an unrecognized flag value for a closed enum flag (0.4985ms)
+✔ R5-8 intake-design-questions-apply accepts --answers-file (a valid in-root file applies, exit 0) (13265.1217ms)
+✔ R5-8 intake-design-questions-apply refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (117.9155ms)
+✔ R5-8 intake-design-questions-apply refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (127.8643ms)
+✔ R5-8 intake-design-questions-apply rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (53.9666ms)
+✔ R5-8 intake-design-questions-apply with neither --answers-json nor --answers-file is a usage error naming both options (46.7972ms)
+✔ R5-8 intake-design-questions-replace accepts --answers-file (a valid in-root file applies, exit 0) (12600.6918ms)
+✔ R5-8 intake-design-questions-replace refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (122.3356ms)
+✔ R5-8 intake-design-questions-replace refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (116.9146ms)
+✔ R5-8 intake-design-questions-replace rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (46.4276ms)
+✔ R5-8 intake-design-questions-replace with neither --answers-json nor --answers-file is a usage error naming both options (46.2632ms)
+✔ R5-8 the usage text lists --answers-file and --answers-file-sha256 for the design-question commands (0.1632ms)
+✖ R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest (1.2364ms)
+✖ R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair (0.1766ms)
+✔ R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map (0.4208ms)
+✔ R5-10 a 30,720-byte multi-line non-ASCII LF answers file applies via --answers-file and matches the inline route (26830.4848ms)
+✔ R5-10 a 30,720-byte multi-line non-ASCII CRLF answers file applies via --answers-file and matches the inline route (26307.3579ms)
+✔ R5-10 -replace over --answers-file follows the inline rules: a different second round needs replace, replace is applied (20855.6235ms)
+✔ R5-11 every answers-file refusal through the real CLI exits non-zero with its typed code and leaves the checkpoint bytes unchanged (23543.5589ms)
+✔ R5-11 malformed JSON in the file is the apply function's own refusal, identical to the inline route (12107.6274ms)
+✔ R5-16 the intake-generate-design reference documents the file route with the exact flag names the shape table emits (0.3907ms)
+✔ R5-16 the kickoff-design reference says a recorded consent language is not asked again (0.5254ms)
+✔ project-onboarding-v3 accepts a digest-bound existing project file without a scratch copy (10966.5648ms)
+✖ project-onboarding-v3 resolves only canonical Claude prompt references after consent (5449.7741ms)
+✔ intake-generate-plan defaults to a digest-stable summary and requires --verbose for the full payload (19427.4876ms)
+✔ project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package (74542.5786ms)
+✔ project-onboarding-v3 CLI: bootstrap bind and acknowledgement subcommands reach their own precondition errors, not 'unknown argument' (337.3625ms)
+✔ project-onboarding-v3 CLI: kickoff plan/apply --language is refused without an attended confirmation (30.2985ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff language terminal-free and labels its result unattested (431.2417ms)
+✖ project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal (535.1449ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (124.78ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language is refused when an attended human types the wrong value (15.4602ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff --language confirmation, even carrying the correct value (307.6315ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan/apply --profile is refused without an attended confirmation (29.6128ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff promotion terminal-free and labels its result unattested (417.6292ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (31.0462ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile is refused when an attended human types the wrong value (16.3408ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff promote --profile confirmation, even carrying the correct value (302.4824ms)
+✔ project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --language/--profile carve-outs (plan-repair, plan-partial-authority) unaffected (0.8866ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 38
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249498.6182
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:212:1
+✖ R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest (1.2364ms)
+  AssertionError [ERR_ASSERTION]: intake-design-questions-apply
+  + actual - expected
+  
+    [
+      '--root',
+  +   '--answers-json'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:216:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '--root', '--answers-json' ],
+    expected: [ '--root' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:222:1
+✖ R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair (0.1766ms)
+  TypeError: intake-design-questions-apply requires --answers-json
+      at automatedMutatingApplyArgv (file:///<repo-root>/plugins/pipeline-core/lib/onboarding-argv-shapes.mjs:131:36)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:226:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:478:1
+✖ project-onboarding-v3 resolves only canonical Claude prompt references after consent (5449.7741ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'available'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:491:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'available',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:701:1
+✖ project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal (535.1449ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /CHAT-GATE-NOT-ATTENDED/. Input:
+  
+  '{\n' +
+    '  "schema": "pipeline.project-onboarding.v4",\n' +
+    '  "status": "invalid",\n' +
+    '  "root": "<host-path>",\n' +
+    '  "runner": null,\n' +
+    '  "intent": "onboarding",\n' +
+    '  "repository": {\n' +
+    '    "status": "local-valid-writable",\n' +
+    '    "mode": "local",\n' +
+    '    "gitVersion": "2.55.0.windows.5",\n' +
+    '    "initializesGit": false,\n' +
+    '    "rootWritable": "passed",\n' +
+    '    "sessionCapability": "not-required",\n' +
+    '    "worktreeCapability": "not-required"\n' +
+    '  },\n' +
+    '  "runtime": {\n' +
+    '    "status": "not-observed",\n' +
+    '    "sourceSha256": null,\n' +
+    '    "targetsSha256": null,\n' +
+    '    "barrierSha256": null,\n' +
+    '    "readbackSha256": null\n' +
+    '  },\n' +
+    '  "continuity": {\n' +
+    '    "status": "unavailable",\n' +
+    '    "stateSha256": null,\n' +
+    '    "handoverSha256": null,\n' +
+    '    "historySha256": null\n' +
+    '  },\n' +
+    '  "appServer": {\n' +
+    '    "required": false,\n' +
+    '    "status": "not-requested",\n' +
+    '    "code": null\n' +
+    '  },\n' +
+    '  "runnerPermissions": {\n' +
+    '    "target": ".claude/settings.local.json",\n' +
+    '    "status": "not-observed",\n' +
+    '    "lanes": [\n' +
+    '      "Bash",\n' +
+    '      "PowerShell"\n' +
+    '    ],\n' +
+    '    "exactEntries": []\n' +
+    '  },\n' +
+    '  "nextAction": {\n' +
+    '    "kind": "command",\n' +
+    '    "executable": "node",\n' +
+    '    "argv": [\n' +
+    '      "<host-path>",\n' +
+    '      "plan-source-recovery",\n' +
+    '      "--root",\n' +
+    '      "<host-path>",\n' +
+    '      "--runner",\n' +
+    '      "codex"\n' +
+    '    ],\n' +
+    '    "mutation": false,\n' +
+    '    "requiresConfirmation": false,\n' +
+    '    "expected": {\n' +
+    '      "schema": "pipeline.project-onboarding-source-recovery.v1",\n' +
+    '      "statuses": [\n' +
+    '        "recoverable",\n' +
+    '        "unrepairable"\n' +
+    '      ]\n' +
+    '    }\n' +
+    '  },\n' +
+    '  "diagnostics": [\n' +
+    '    {\n' +
+    '      "path": "$.source",\n' +
+    '      "code": "source_invalid",\n' +
+    '      "message": "pipeline.user.yaml is not a valid V3 source",\n' +
+    '      "guidance": "review the closed source recovery disposition"\n' +
+    '    }\n' +
+    '  ],\n' +
+    '  "humanApproval": {\n' +
+    '    "mode": "chat-attributed-unattested",\n' +
+    '    "kind": "kickoff-language"\n' +
+    '  }\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:712:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n  "schema": "pipeline.project-onboarding.v4",\n  "status": "invalid",\n  "root": "<host-path>",\n  "runner": null,\n  "intent": "onboarding",\n  "repository": {\n    "status": "local-valid-writable",\n    "mode": "local",\n    "gitVersion": "2.55.0.windows.5",\n    "initializesGit": false,\n    "rootWritable": "passed",\n    "sessionCapability": "not-required",\n    "worktreeCapability": "not-required"\n  },\n  "runtime": {\n    "status": "not-observed",\n    "sourceSha256": null,\n    "targetsSha256": null,\n    "barrierSha256": null,\n    "readbackSha256": null\n  },\n  "continuity": {\n    "status": "unavailable",\n    "stateSha256": null,\n    "handoverSha256": null,\n    "historySha256": null\n  },\n  "appServer": {\n    "required": false,\n    "status": "not-requested",\n    "code": null\n  },\n  "runnerPermissions": {\n    "target": ".claude/settings.local.json",\n    "status": "not-observed",\n    "lanes": [\n      "Bash",\n      "PowerShell"\n    ],\n    "exactEntries": []\n  },\n  "nextAction": {\n    "kind": "command",\n    "executable": "node",\n    "argv": [\n      "<host-path>",\n      "plan-source-recovery",\n      "--root",\n      "<host-path>",\n      "--runner",\n      "codex"\n    ],\n    "mutation": false,\n    "requiresConfirmation": false,\n    "expected": {\n      "schema": "pipeline.project-onboarding-source-recovery.v1",\n      "statuses": [\n        "recoverable",\n        "unrepairable"\n      ]\n    }\n  },\n  "diagnostics": [\n    {\n      "path": "$.source",\n      "code": "source_invalid",\n      "message": "pipeline.user.yaml is not a valid V3 source",\n      "guidance": "review the closed source recovery disposition"\n    }\n  ],\n  "humanApproval": {\n    "mode": "chat-attributed-unattested",\n    "kind": "kickoff-language"\n  }\n}\n',
+    expected: /CHAT-GATE-NOT-ATTENDED/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

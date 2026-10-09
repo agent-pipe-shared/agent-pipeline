@@ -1,0 +1,30 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs plugins/pipeline-core/hooks/guard-apply-patch.test.mjs plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs plugins/pipeline-core/lib/architecture-design.test.mjs plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs plugins/pipeline-core/lib/design-authoring.test.mjs plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs plugins/pipeline-core/lib/project-onboarding-v3.test.mjs plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs 2>&1 | grep -E '^(ℹ (tests|pass|fail)|✖)'" (run through a scratch wrapper script, same node/grep pipeline)
+label: after-edit-A1
+exitCode: 0
+nodeTestExitCode: 1
+head: 710b8d255c3a3df2e48e722a82e76b2cdaa0fef2
+tree: 5a06e51dad86fe7dbf4217814c0c73b14bb32a2e
+dirty: true
+--- stdout ---
+✖ plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs (1490069.641692ms)
+✖ plugins/pipeline-core/hooks/guard-apply-patch.test.mjs (714160.988662ms)
+✖ a PO-deferred adoption reports complete fitness observations without enforcing them (57801.135096ms)
+✖ approved greenfield design defers missing physical surfaces without fabricating fitness pass (60948.372151ms)
+✖ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (65804.348435ms)
+✖ malformed or incomplete fitness outcomes fail closed (68547.576155ms)
+✖ a deferred architecture decision remains visible without changing lifecycle readiness (59437.152514ms)
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (917066.818568ms)
+ℹ tests 70
+ℹ pass 61
+ℹ fail 8
+✖ failing tests:
+✖ plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs (1490069.641692ms)
+✖ plugins/pipeline-core/hooks/guard-apply-patch.test.mjs (714160.988662ms)
+✖ a PO-deferred adoption reports complete fitness observations without enforcing them (57801.135096ms)
+✖ approved greenfield design defers missing physical surfaces without fabricating fitness pass (60948.372151ms)
+✖ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (65804.348435ms)
+✖ malformed or incomplete fitness outcomes fail closed (68547.576155ms)
+✖ a deferred architecture decision remains visible without changing lifecycle readiness (59437.152514ms)
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (917066.818568ms)
+
+--- stderr ---

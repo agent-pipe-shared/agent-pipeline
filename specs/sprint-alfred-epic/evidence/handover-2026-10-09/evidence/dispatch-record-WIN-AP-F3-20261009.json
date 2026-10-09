@@ -1,0 +1,75 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-F3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "862db7a68de4a9353d73c3efc861a733f78df8a4",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "d980f8b83e35ba3d78afd40500b0cd4fced0d0bc"
+  ],
+  "resultSha256": "0537df892d969aeb3d68d0a153ecbe0637c2e9725320b5ffd7932772c3efaf93",
+  "report": {
+    "text": "WIN-AP-F3-20261009: partial. Implementation committed, one WIN-AP-T3 pin still red (stop condition: the pin needs a test change). independent review: pending. Not a closing-allowance handover: the base cap was never reached; the work stopped on a stop condition.\n\nBootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded; Project Agent-Pipeline; Role Goldfish.\nRoute pre-check (class S declared in field 6): requested goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed from this dispatch's runtime prompt: \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- WIN-AP-T3 pins green on WSL: partial. 5 of 6 flipped fail -> pass (F1-win32, F1-POSIX, F2, D1-existing, D1-fresh). The F1 default-seam pin (\"without an emitWarning seam the repair surfaces as a typed process warning ...\") stays red.\n- Native unchanged except pins that can run natively going green: passed. Only F1-win32 flipped fail -> pass; 118 entries unchanged. The default-seam pin is red natively too (same cause). The POSIX-seam pins skip natively (no-posix-owner-ids / open-mode-not-buildable).\n- Callers (agent-pipeline-root-creation.test.mjs, governance-event-store.test.mjs), native and WSL, before/after: passed, no new red. Pins (b) and (c) of the root-creation test are red natively before AND after (unchanged); they are green on WSL.\n- consumer-safe-paths exits 0: failed, pre-existing and independent of this module. Test 8 of harness/scripts/check-consumer-safe-paths.test.mjs reports three findings in plugins/pipeline-core/docs/adr/0014-critic-contract.md lines 68, 70, 90 (source-only prefix \"harness/\"), which arrive with commit d7926f82c (ADR-0014 amendment). No finding names this module. I did not touch that file (outside scope).\n- One commit of the module: passed, d980f8b83e35ba3d78afd40500b0cd4fced0d0bc, subject as briefed, trailers Dispatch: WIN-AP-F3-20261009 (goldfish) and AI-Assisted: true only.\n\n2. Evidence (machine-written by scratch/WIN-AP-F3/tools.mjs; each capture carries its command and \"# exit code:\" footer)\n- evidence/WIN-AP-F3-20261009/native-before.txt (exit 1), native-after.txt (exit 1), wsl-before.txt (exit 1), wsl-after.txt (exit 1), native-compare.txt, wsl-compare.txt, consumer-safe-paths.txt (exit 1).\n- Commands: `node scratch/WIN-AP-F3/tools.mjs capture <out> --log ...` (runs `node --test --test-reporter=tap` on the target test file plus the two caller test files in ONE invocation); WSL via `wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node scratch/WIN-AP-F3/tools.mjs capture ...\"`; `node scratch/WIN-AP-F3/tools.mjs compare ...`.\n- Diagnosis run: `node --test --test-name-pattern=\"without an emitWarning seam\" plugins/pipeline-core/lib/hardened-private-directory.test.mjs` natively: 1 pass, exit 0 (console output only, not a file).\n\n3. Changed files\n- plugins/pipeline-core/lib/hardened-private-directory.mjs: +80/-10. New option seam emitWarning (default (message, options) => process.emitWarning(message, options)); one PB-ROOT-REPAIRED warning per repaired result on win32 and POSIX; POSIX foreign-owner refusal for a private-mode root; D1 narrow mode-unrecorded advisory PB-ROOT-MODE-UNRECORDED; exported AGENT_PIPELINE_ROOT_MODE_UNRECORDED_POSTURE (\"accept\") and AGENT_PIPELINE_ROOT_MODE_UNRECORDED_ADVISORY beside D0's; unrecordedPosture per-call option; ensureAgentPipelineRoot JSDoc updated.\n\n4. Deliberately not changed\n- Any test file, any other production file, plugins/pipeline-core/docs/adr/0014-critic-contract.md (the consumer-safe finding), the two foreign staged files and the foreign unstaged modifications from the opening status, no push.\n- The ordinary repaired return keeps its literal `created: false` (an existing root repaired by chmod); a root created by this call and then repaired would still say created false, as before.\n\n5. Deviations from spec\n- Design choices (disclosed, not briefed): (a) an owner that cannot be proven (null/NaN/non-integer uid) on a PRIVATE existing or freshly created POSIX root is now refused PB-ROOT-INSECURE (previously returned as found), consistent with the existing insecure-root handling; (b) \"exactly 0o777\" is tested on mode & 0o7777, so a sticky or setgid 0o1777/0o2777 stays PB-ROOT-INSECURE; (c) the D1 acceptance also requires the owner uid to be unchanged after the chmod; (d) the PB-ROOT-REPAIRED win32 warning text carries no observer-supplied detail, the POSIX one carries only module-generated mode text; (e) an extra unrecordedPosture option mirrors D0's posture option.\n- Mechanics: captures run the target and both caller test files in one node --test invocation per host, which bends CONT18's \"single test files\" letter; closing sequence ran about two calls past the briefed call 44.\n\n6. Open items\n- STOP CONDITION (a pin needs a test change): the F1 default-seam pin is order dependent. In isolation it passes; in the full file it sees 8 warnings (WSL) / 6 (native) with code PB-ROOT-REPAIRED instead of 1. Evidence: wsl-after.txt \"saw 8 warning(s)\", native-after.txt \"saw 6 warning(s)\". The extras are the earlier tests that repair through the default seam (the D0 default-posture test x3, the win32 repair test, and on WSL the three real-POSIX repairs). Best hypothesis: process.emitWarning delivers via nextTick, node:test runs the preceding synchronous tests in one continuous promise chain, so those ticks flush only at the pin's own setImmediate, after its listener is attached. Every production remedy (dedupe by code, a non-process default channel) contradicts \"every repaired result emits exactly one warning\" or the pin's premise.\n- Proposed fix for the next briefing: a test-only slice that yields one macrotask (await new Promise((resolve) => setImmediate(resolve))) BEFORE attaching the \"warning\" listener, or counts only warnings emitted after attach. No production change is then expected.\n- Repo finding for the Elephant: consumer-safe-paths is red at the candidate because of ADR-0014's plugin copy (see section 1).\n- The D1 real-host pin skips on both DoD hosts (host-records-mode-bits on WSL ext4, no-posix-owner-ids natively); to exercise it run WSL with TMPDIR on a DrvFs mount without metadata.\n- Untracked for the Elephant to integrate: evidence/WIN-AP-F3-20261009/*, evidence/dispatch-record-WIN-AP-F3-20261009.json; throwaway scratch/WIN-AP-F3/, scratch/commit-msg/WIN-AP-F3-20261009.txt.\n- Closing statements. Committed: d980f8b83e35ba3d78afd40500b0cd4fced0d0bc (the module). Verified green: the 5 pins and the caller tests per the captures above; native-compare and wsl-compare show no REMOVED and no regression. Remains undone: the default-seam pin (needs the test change), the consumer-safe-paths red (ADR-0014 copy), independent review. Next-briefing adjustments: test-only fix first, then re-run the three-file captures on both hosts; brief the consumer-safe-paths finding separately.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read (obligations, CONT17/18/33 headers, WIN-AP-F3 section); route pre-check no contradiction (requested goldfish-deep Sonnet 5.5 xhigh; observed claude-sonnet-5-5); preflight run once",
+      "toolUses": 12
+    },
+    {
+      "phase": "native baseline before edits (target + two caller tests)",
+      "toolUses": 24
+    },
+    {
+      "phase": "wsl baseline before edits (target + two caller tests)",
+      "toolUses": 25
+    },
+    {
+      "phase": "native after edits (target + two caller tests)",
+      "toolUses": 32
+    },
+    {
+      "phase": "wsl after edits (target + two caller tests)",
+      "toolUses": 33
+    },
+    {
+      "phase": "consumer-safe-paths suite: 1 failure, pre-existing (ADR-0014 plugin copy), independent of this module; native/wsl compares written; diff reviewed",
+      "toolUses": 43
+    },
+    {
+      "phase": "committed d980f8b83 (module only); record checkpointed",
+      "toolUses": 46
+    },
+    {
+      "phase": "terminal: outcome partial, report bound, resultSha256 written",
+      "toolUses": 46
+    }
+  ]
+}

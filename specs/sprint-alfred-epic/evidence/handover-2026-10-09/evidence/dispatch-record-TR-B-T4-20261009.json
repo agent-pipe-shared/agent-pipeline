@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-B-T4-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "b42c8db1cc49bf9ef3bf225f4181270275ac5e6a",
+  "branch": "feat/sprint-alfred",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["2e8f28979"],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17 header, goldfish-task 455-481, TR-B-T2/T3 records and TR-G-MANIFEST shape read; first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, preflight run alone from the loaded plugin root (status ready); opening record written. Route pre-check: no A/G/S class declared; requested goldfish-deep / claude-sonnet-5-5 / xhigh, observed runtime prompt names claude-sonnet-5-5 (match)", "toolUses": 9 },
+    { "phase": "pin read: record readback ok; post-image sha256 fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641, 702208 bytes (match); live file 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40; HEAD b42c8db1cc49bf9ef3bf225f4181270275ac5e6a. red.txt: 389 tests, 374 pass, 12 fail, 3 skipped, duration_ms 717349. 21 TR-B cases: 10 RED (5 unadmitted spellings: rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching; admit pin + refuse pin each, all failing at qp4Admit step 2 with predicate '<spelling> apply scratch/notes.md', false !== true), 11 GREEN (rg/grep quoted alternation admit+refuse, rg -g and rg --glob admit+refuse, control, rg -g lane, directory Grep). Other failures: QP3-2b, QP3-2c (ERR_MODULE_NOT_FOUND, relocation noise, same as first run).", "toolUses": 15 },
+    { "phase": "stop conditions evaluated, none triggered: (1) no TR-B pin red for a reason other than its title; (2) not all 9 strict refuse pins red (4 refuse pins plus control GREEN, so step 1 holds in every shape); (3) zero pre-existing cases changed state between the first run and this one (17 fails = 2 old + 15 TR-B, now 12 = 2 old + 10 TR-B); (4) sha256 matches. Advisor consulted once (concurred). TR-B-MANIFEST.md written; consumer-safe test exit 0 (9 tests pass); commit message scratch/commit-msg/TR-B-T4.txt written; git add of the two paths done", "toolUses": 19 },
+    { "phase": "git commit refused once: fatal Unable to create .git/index.lock: File exists (exit 128), counted call 20. Retried once after the record write (T86 clause): committed 2e8f28979, 2 files changed, 12309 insertions", "toolUses": 22 },
+    { "phase": "commit checkpoint and final report written in one record write (outcome committed-pending-report as the briefing directs; independent review pending)", "toolUses": 23 }
+  ],
+  "report": {
+    "text": "independent review: pending. Implementation complete, committed (2e8f28979), PO acceptance and install ceremony not done.\n\nRoute pre-check: field 6 declares no A/G/S class. Requested route goldfish-deep, claude-sonnet-5-5 / xhigh; observed in this dispatch's runtime prompt: 'powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. Effort not directly observable (unknown). No contradiction. Ruleset 0.7.0+claude.20261008194106.da20519d.\n\n1. DoD results. (a) Pin states reported per case: passed (below). (b) TR-B-MANIFEST.md written: passed. (c) node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0 (9 tests, 9 pass). (d) One commit of exactly the post-image and the manifest, subject 'test(guard-lifecycle-ready): tranche-2 post-image pinning the TR-B read-grammar rows', trailers Dispatch: TR-B-T4-20261009 (goldfish) and AI-Assisted: true: passed (2e8f28979; the commit-msg hook raised no refusal; trailers were not re-read with git show for lack of budget). Stop conditions (all evaluated at step 1, none triggered): (1) no TR-B pin red for a reason other than its title; (2) not all 9 strict refuse pins red, 4 plus the control are GREEN so the unmodified-spelling key refusal holds in every tested shape; (3) zero pre-existing cases changed state against the first run (17 fails = QP3-2b, QP3-2c + 15 TR-B; now 12 = QP3-2b, QP3-2c + 10 TR-B; 369 -> 374 pass = the 5 TR-B cases that went green); (4) post-image sha256 matches (fd929e31...5641, 702208 bytes); index.lock hit once at commit, retried once, succeeded.\n\nPin states (21 TR-B cases): RED 10 = T74 rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching, each as an admit pin and a refuse pin; every one fails at qp4Admit (oracle step 2) with predicate '<spelling> apply scratch/notes.md', false !== true, i.e. the guard does not admit the spelling today; no failure carries a qp4Refuse frame; step 3 never ran for the five red refuse pins. GREEN 11 = T74 rg and grep quoted alternation (admit + refuse), T77 rg -g and rg --glob (admit + refuse), T74/T77 control, T77 rg -g lane characterisation, T74 directory Grep (GUARD-READ-TARGET). Old cases: QP3-2b and QP3-2c red (ERR_MODULE_NOT_FOUND, scratch-copy relocation noise, red in both runs); 389 tests vs 391 expected, 2 unexplained (T2 hypothesis unverified); 3 skipped.\n\n2. Evidence. evidence/TR-B-T-20261009/red.txt (machine-written by capture-evidence.mjs, started by TR-B-T3, wrapped exit 1; 389 tests, 374 pass, 12 fail, 3 skipped, duration_ms 717349). Command (recorded in TR-B-T2 and in the manifest with the placeholder spelling): wsl.exe -e bash -lc \"cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-B-T-20261009/red.txt --label TR-B-T-red -- node --test scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs\". This dispatch started no run. sha256sum of the post-image and the live file plus wc -c plus git rev-parse HEAD (exit 0): post-image fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641, 702208 bytes; live file 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40; HEAD b42c8db1cc49bf9ef3bf225f4181270275ac5e6a (later than the briefed ae14b4c43). node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0 (stdout). git commit exit 0: [feat/sprint-alfred 2e8f28979], 2 files changed, 12309 insertions.\n\n3. Changed files. specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs (committed: the tranche-2 post-image, unchanged since TR-B-T2/T3, sha256 verified); specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md (committed: new manifest in the TR-G-MANIFEST shape). Not committed, git-ignored: scratch/commit-msg/TR-B-T4.txt, this record.\n\n4. Deliberately not changed. scratch/dispatch-wip/TR-B-T/build.mjs, the scratch copy, the post-image bytes, every file under plugins/ and harness/, the tranche README.md, other post-images, the two relocation-noise old cases, the foreign staged and dirty files (the index still holds them; the commit was by exact pathspec).\n\n5. Deviations from spec. (a) The 80 % checkpoint notice fired at counted call 18; I continued because the remaining actions (consumer-safe test, stage, commit, record) are exactly what it permits. (b) Base cap of 22 was reached by the commit retry itself (call 22); the record write and the report are call 23, inside the closing allowance. (c) The briefing asks outcome in-progress -> committed-pending-report; the record therefore ends at committed-pending-report rather than a separate completed value, with the full report in report.text and resultSha256 left null (as in TR-B-T2/T3). (d) One advisor consultation (concurred with the stop-condition evaluation). (e) The scratch-copy sha256 and the commit trailers via git show were not checked, for lack of budget; the manifest says the scratch-copy hash was never recorded. (f) The harness attribution reminder asked for Co-Authored-By and Claude-Session lines; not added, per the briefing and GIT-03.\n\n6. Open items. No stop condition triggered; not a closing-allowance handover (work complete, only the record write used the allowance). Independent Critic review: pending (T3). PO items: install of the post-image at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs is the signed-package ceremony step; the tranche README.md is untouched. For the production change TR-B implies: five spellings must be admitted (rg -o / --only-matching / --max-columns N, grep -o / --only-matching) while still refusing the key corpus; the five red refuse pins verify step 3 only once admission lands. 389 vs 391 tests remains unexplained. GUARD-BOOTSTRAP-RECEIPT-MISSING was hit once at the first Write and cured by running the preflight alone from the loaded plugin root; index.lock was hit once at commit and cleared on the single retry (transient; cause not investigated).",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md"
+    ]
+  }
+}

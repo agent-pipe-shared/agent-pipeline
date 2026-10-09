@@ -1,0 +1,59 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+label: scripts-project-onboarding-v3-argv-closure
+exitCode: 0
+head: 3211c15eafe9d042e29ced644e0581853907a0c6
+tree: cae39dbc20f88836d4da65f38315c975eb5ba108
+dirty: true
+--- stdout ---
+✔ project-onboarding-v3 refuses an unrecognized subcommand (closed command set, not open) (2.048114ms)
+✔ project-onboarding-v3 refuses an unrecognized flag on a known, read-only subcommand (0.174053ms)
+✔ project-onboarding-v3 refuses --activate on a subcommand outside the apply-shaped set (0.319845ms)
+✔ project-onboarding-v3 refuses an unrecognized flag value for a closed enum flag (0.322105ms)
+✔ R5-8 intake-design-questions-apply accepts --answers-file (a valid in-root file applies, exit 0) (91.578274ms)
+✔ R5-8 intake-design-questions-apply refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (14.251852ms)
+✔ R5-8 intake-design-questions-apply refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (13.265291ms)
+✔ R5-8 intake-design-questions-apply rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (3.542742ms)
+✔ R5-8 intake-design-questions-apply with neither --answers-json nor --answers-file is a usage error naming both options (3.886932ms)
+✔ R5-8 intake-design-questions-replace accepts --answers-file (a valid in-root file applies, exit 0) (88.139678ms)
+✔ R5-8 intake-design-questions-replace refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (13.601261ms)
+✔ R5-8 intake-design-questions-replace refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (14.075309ms)
+✔ R5-8 intake-design-questions-replace rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (3.140461ms)
+✔ R5-8 intake-design-questions-replace with neither --answers-json nor --answers-file is a usage error naming both options (2.923028ms)
+✔ R5-8 the usage text lists --answers-file and --answers-file-sha256 for the design-question commands (0.195073ms)
+✔ R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest (0.596ms)
+✔ R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair (0.764392ms)
+✔ R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map (3.647404ms)
+✔ R5-10 a 30,720-byte multi-line non-ASCII LF answers file applies via --answers-file and matches the inline route (170.193047ms)
+✔ R5-10 a 30,720-byte multi-line non-ASCII CRLF answers file applies via --answers-file and matches the inline route (169.514772ms)
+✔ R5-10 -replace over --answers-file follows the inline rules: a different second round needs replace, replace is applied (126.331029ms)
+✔ R5-11 every answers-file refusal through the real CLI exits non-zero with its typed code and leaves the checkpoint bytes unchanged (190.531024ms)
+✔ R5-11 malformed JSON in the file is the apply function's own refusal, identical to the inline route (93.83855ms)
+✔ R5-16 the intake-generate-design reference documents the file route with the exact flag names the shape table emits (4.551814ms)
+✔ R5-16 the kickoff-design reference says a recorded consent language is not asked again (4.693938ms)
+✔ project-onboarding-v3 accepts a digest-bound existing project file without a scratch copy (80.468671ms)
+✔ project-onboarding-v3 resolves only canonical Claude prompt references after consent (171.077137ms)
+✔ intake-generate-plan defaults to a digest-stable summary and requires --verbose for the full payload (143.559204ms)
+✔ project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package (534.403237ms)
+✔ project-onboarding-v3 CLI: bootstrap bind and acknowledgement subcommands reach their own precondition errors, not 'unknown argument' (51.51099ms)
+✔ project-onboarding-v3 CLI: kickoff plan/apply --language is refused without an attended confirmation (5.035442ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff language terminal-free and labels its result unattested (99.765955ms)
+✔ project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal (59.487809ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (27.805314ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language is refused when an attended human types the wrong value (2.158502ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff --language confirmation, even carrying the correct value (2421.789333ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan/apply --profile is refused without an attended confirmation (5.043142ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff promotion terminal-free and labels its result unattested (96.700946ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (5.54152ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile is refused when an attended human types the wrong value (2.472431ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff promote --profile confirmation, even carrying the correct value (1616.104501ms)
+✔ project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --language/--profile carve-outs (plan-repair, plan-partial-authority) unaffected (0.524399ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8145.532137
+
+--- stderr ---

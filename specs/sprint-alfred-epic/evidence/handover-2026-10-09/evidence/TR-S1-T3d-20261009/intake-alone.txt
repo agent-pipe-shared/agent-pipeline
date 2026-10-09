@@ -1,0 +1,40 @@
+command: node --test "--test-name-pattern=routes its later explicit language" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: intake-alone
+exitCode: 1
+head: 393b8c8a27c3f85adb3696ccd28e270050dcd80d
+tree: 7178e0117bdedc767e058158434a83ed96f1cf70
+dirty: true
+--- stdout ---
+✖ host-managed consent CLI routes its later explicit language into private intake state (19710.546648ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22983.280571
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:455:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (19710.546648ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:519:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

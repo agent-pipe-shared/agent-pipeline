@@ -1,0 +1,46 @@
+{
+  "taskId": "HOOKREFRESH-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (Rulings 84 and 94)",
+  "agent": "goldfish-deep",
+  "outcome": "interim-uncommitted-stopped-at-budget-checkpoint",
+  "commits": [],
+  "log": [
+    { "phase": "opened: orientation; loaded-root preflight status ready (cured GUARD-BOOTSTRAP-RECEIPT-MISSING)", "toolUses": 6 },
+    { "phase": "orientation finished; commit message written; before captures taken (before.txt, closure-before.txt)", "toolUses": 30 },
+    { "phase": "F1, F2, F4 edited in four production files; after.txt and closure-after.txt taken", "toolUses": 47 },
+    { "phase": "after.txt has 1 red (F1 g, suspected environmental flake); rerun to after-rerun.txt exceeded the 600 s Bash timeout and moved to background task bmb0r4ymq; consumer-safe check passed", "toolUses": 52 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT reached; NOTHING COMMITTED (briefing stop condition 1 literally triggered by F1 h); handed back", "toolUses": 55 }
+  ],
+  "report": {
+    "summary": "Production edits for Ruling 84 F1, F2, F4 are complete in the working tree and UNCOMMITTED. 13 of 14 T6 pins and the re-pointed CHRB007 are green in after.txt. The 14th pin (F1 g) is red in after.txt with a symptom consistent with a race against concurrent edits to the shared plugin tree; this is a hypothesis, not proven. The clean rerun did not finish within the Bash timeout.",
+    "dodResults": {
+      "before.txt / after.txt": "partly: before 176 tests, 157 pass, 16 fail; after 176 tests, 172 pass, 1 fail (F1 g). The all-14-green expectation is NOT yet established.",
+      "closure-before / closure-after": "passed (red set did not grow): both runs show GMWKC01 with 26 violations, the same count; the diff of the four files contains no import line, so no edge can have been added.",
+      "check-consumer-safe-paths.test.mjs": "passed (9 of 9)",
+      "single production-only commit": "NOT DONE (deliberately)",
+      "terminal record": "this file is an INTERIM record; the terminal one overwrites it after the commit"
+    },
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/check-clone-provisioning.mjs (F1: install+current is provisioning-required)",
+      "plugins/pipeline-core/scripts/clone-hook-readiness.mjs (F1: installs only the install entries; preCommitResult null means rollback not-needed)",
+      "plugins/pipeline-core/scripts/model-role-bootstrap.mjs (F2: readOnly option, admission-pending before admit)",
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs (F1 staleMissingMix removed, blocked arm kept as explicit null; F2 readOnly true at the seam and the process entry; F4 status allowlist)"
+    ],
+    "notChanged": "No test file, hooks/, lib/guard/, harness/ or verify-suites.json. CHRB007 untouched (it is already re-pointed and committed: git status on that file is clean at my start). Left: the family-active path of runModelRoleBootstrap (prepareFamilyBootstrapProjection) does not call admitModelRoleHostBootstrap, so readOnly does not touch it; whether prepareModelFamilyInvocation writes anything was not examined.",
+    "deviations": [
+      "CHRB007 is the inverse of the briefing: it was already re-pointed (T7) in HEAD, so it is RED in before.txt and GREEN in after.txt.",
+      "F1 h (GREEN control, outside the 14 pins and CHRB007) was RED in before.txt and GREEN in after.txt: briefing stop condition 1 read literally; I committed nothing for that reason.",
+      "In-progress record was written at evidence/HOOKREFRESH-F2-20261009/dispatch-record.in-progress.json so the terminal path stayed unwritten until now; this interim record is at the terminal path because the budget checkpoint hook prescribes it.",
+      "Briefing's 'BOTH call sites' wording is muddled; the tests disambiguate: seam argument bag in observePipelineStartPreflight and the body of observeModelRoleBootstrapReadback. Both carry readOnly true."
+    ],
+    "evidenceOfFlake": "Both unexpected reds show a hook reading stale right after it was installed or refreshed (before: F1 h after refreshMandatoryHooks; after: F1 g, commit-msg listed in refreshAvailable). lib/hook-currentness.mjs compares the manifest digest of the loaded plugin tree, and parallel dispatches edit files under plugins/pipeline-core during these 60-125 s runs. HEAD moved between my captures (e64b30b72 then 972c936e6).",
+    "openItems": [
+      "Get a clean after capture: wait for evidence/HOOKREFRESH-F2-20261009/after-rerun.txt (background task bmb0r4ymq, may not survive my exit), or rerun clone-hook-readiness.partial.test.mjs alone under WSL while the plugin tree is quiet.",
+      "If all 14 pins, CHRB007 and F1 h are green: git add -- the four paths, then git commit -F scratch/commit-msg/HOOKREFRESH-F2.txt -- the four paths (message file already written with the two trailers only), then overwrite this record as terminal.",
+      "If F1 g is red on a quiet tree, that is a real defect in hop 1 (the coordinator's freshly installed commit-msg reading stale) and needs diagnosis before any commit."
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "GREP-PUSH-T-20261009b",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "resultSha256": "552e6214394826d48ca18ebf3bb01f9517bbb0e1888b6d4361331bc7abae2a1d",
+  "outcome": "stopped-without-commit",
+  "commits": [],
+  "log": [
+    {
+      "phase": "orientation-complete-record-opened",
+      "toolUseCount": 16,
+      "note": "Briefing headers CONT17/CONT18/CONT35 read; dispatch record schema read; preflight run; no repo edits yet."
+    },
+    {
+      "phase": "edit: GREP-PUSH-T block inserted into the tranche-2 guard-push test post-image; build.mjs generated the runnable body",
+      "toolUseCount": 42,
+      "note": "post-image sha256 68def38e9e29c8b7bdf7a75a0b491c5fc17d0f56ade318e2b9d7f34d60904fa5, 71 inserted lines"
+    },
+    {
+      "phase": "measure: WSL capture run exited 15 with no output; red.txt missing",
+      "toolUseCount": 43
+    },
+    {
+      "phase": "80 percent checkpoint: no commit, closing-allowance handover written",
+      "toolUseCount": 47
+    }
+  ],
+  "report": {
+    "text": "Closing-allowance handover (80 percent checkpoint reached): independent review: pending. Implementation is NOT complete and NOT committed.\n\n1. DoD results\n- DoD 1 (red.txt on WSL, admitted pins red, refused pins green, nothing else changes): NOT VERIFIABLE. The one WSL capture run exited 15, printed nothing and wrote no file; no pin has been measured.\n- DoD 2 (GREP-PUSH-MANIFEST.md): not done. DoD 3 (consumer-safe-paths exits 0): not run. DoD 4 (one commit): not made.\n- Route pre-check: requested route (field 6) sonnet, Sonnet 5.5, effort xhigh; observed identity claude-sonnet-5-5 named by this dispatch's runtime prompt; no contradiction.\n\n2. Evidence\n- node scratch/dispatch-wip/GREP-PUSH-T/build.mjs exit 0: base f6ebe7a9...0152 (125779 bytes, 2478 lines), post-image 68def38e...4fa5 (132189 bytes, 2549 lines), 71 lines inserted, 27 admitted pins counted.\n- The WSL capture (capture-evidence.mjs --out evidence/GREP-PUSH-T-20261009/red.txt --label red -- node --test on the scratch entry) exited 15 with no output; evidence/GREP-PUSH-T-20261009/red.txt does not exist.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs: appended the GREP-PUSH-T block inside the existing trc-classifier block (27 admitted pins PGM-A*, 22 refused pins PGM-R*), UNCOMMITTED and unmeasured.\n- Scratch only (git-ignored): scratch/dispatch-wip/GREP-PUSH-T/*, scratch/commit-msg/GREP-PUSH-T-20261009b.txt.\n\n4. Deliberately not changed\n- No guard post-image, live hook, lib file, other manifest, or the existing pins (T38b/c, T80a/b, T42b/c, T82b/c and T5F3a contradict the exemption by design; they are F's to flip).\n- The foreign uncommitted edits (pipeline-state.mjs, po-human-approval.mjs, sanctioned-args-onboarding.mjs, pipeline-state.test.mjs) were not touched.\n\n5. Deviations from spec\n- No commit and no manifest: the 80 percent checkpoint fired at call 44 of 55 with the measurement still missing; per the checkpoint duty I stopped rather than commit an unmeasured test (Ruling 162: the remaining edits are named below).\n\n6. Open items\n- Triggered: tool-budget checkpoint (closing-allowance handover). Stop condition 4 candidate: the WSL capture failed with exit 15 and no output; cause unknown.\n- Remaining and next-briefing adjustments are the structured closingAllowance fields of this record (remainsUndone, nextBriefingAdjustments); the first step is to diagnose exit 15, then run, then write the manifest, run consumer-safe-paths, commit by exact paths.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "runner": "claude",
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "taskId": "GREP-PUSH-T-20261009b",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "DoD 1 evidence/GREP-PUSH-T-20261009/red.txt was never produced: the single WSL capture run exited 15 with no output and wrote no file.",
+      "DoD 2 specs/sprint-alfred-epic/signed-package/tranche-2/GREP-PUSH-MANIFEST.md is not written (it needs the measured per-pin states).",
+      "DoD 3 consumer-safe-paths was not run.",
+      "DoD 4 the single commit was not made; nothing is staged or committed.",
+      "Modified and UNCOMMITTED (mine, complete as an edit, UNMEASURED): specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs carries the inserted GREP-PUSH-T block (71 lines, new lines 2459-2529: 27 admitted pins PGM-A01..A27, 22 refused pins PGM-R01..R22).",
+      "Git-ignored scratch left in place for the next run: scratch/dispatch-wip/GREP-PUSH-T/ (build.mjs, finalize.mjs, guard-push.pgm.test.mjs entry, guard-push.pgm.body.mjs, register.mjs, redirect-hooks.mjs) and scratch/commit-msg/GREP-PUSH-T-20261009b.txt (commit message, ready)."
+    ],
+    "nextBriefingAdjustments": [
+      "First diagnose exit 15 before spending a long run: read the exit-code table of plugins/pipeline-core/scripts/capture-evidence.mjs (rg -n 'exit' on that exact file), then run the same wsl.exe command WITHOUT capture-evidence (node --test on the entry) with a short smoke, and only then the capture. Hypotheses, none verified: capture-evidence refuses the invocation (label/out/dirty-tree rule), or the wsl.exe cd path was wrong.",
+      "Do not rebuild the block: it is already in the tranche-2 post-image. Re-run node scratch/dispatch-wip/GREP-PUSH-T/build.mjs only to regenerate the runnable body (post-image sha256 68def38e9e29c8b7bdf7a75a0b491c5fc17d0f56ade318e2b9d7f34d60904fa5, 132189 bytes, 2549 lines; base f6ebe7a92c349650f23500190b141ef7c255a334bc5bda29f6aeb09039210152, 125779 bytes, 2478 lines).",
+      "build.mjs prints refusedPins 23 although the block lists 22 (R01..R22): its counter matches the string [\"R somewhere else in the file. Count the real refused pins from the run output (expected total cases = base total + 49) before the commit message and manifest say 22.",
+      "F target for the manifest (measured by reading, not by a run): plugins/pipeline-core/lib/git-cmd.mjs, function commandIsGitPush, the marker rule (header comment about lines 1160-1197). It is kernel-listed (NEVER_LIFTABLE_KERNEL_PATHS, line 191 of plugins/pipeline-core/lib/guard-maintenance-window.mjs). The guard-push post-image needs no change for the exemption: it calls commandIsGitPush at line 350 and allows when it is false. Pins GREP-PUSH-F must flip or re-aim: PGC-T38b/c, T80a/b, T42b/c, T82b/c, and the HEREDOC_PAREN control PGC-T5F3a if heredoc commits are admitted. PGM-A22 (a nested NON-push git command inside a dollar-paren on diff) goes beyond the literal ruling text and must be called out in the manifest as the one pin F may contest.",
+      "Budget: this dispatch spent about 11 of 44 calls on grammar refusals (Glob and Grep on directories, a pipeline rg) and a missing bootstrap preflight; brief the exact record path and the preflight command, and state that Grep needs an existing file path.",
+      "Then: write GREP-PUSH-MANIFEST.md (template: the TR-C-T5 section of TR-C-MANIFEST.md), run consumer-safe-paths, git add the test and the manifest by exact path, git commit -F scratch/commit-msg/GREP-PUSH-T-20261009b.txt -- those two paths, then the terminal authored-commit record."
+    ]
+  }
+}

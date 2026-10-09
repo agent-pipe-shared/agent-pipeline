@@ -1,0 +1,45 @@
+command: node scratch/fanout-win-m/probe.mjs
+label: fanout-win-m
+exitCode: 0
+head: 16af5328e56196a0f019c81406539d1a25fd10ab
+tree: adcd681b81e724496b69ef0caccde46af72482f7
+dirty: true
+--- stdout ---
+probe: FANOUT-WIN-M-20261009 | platform=win32 | node=v24.20.0 | arch=x64
+tripwire: extracted verbatim from stop-fanout.test.mjs TRIPWIRE_SOURCE, 1344 chars, sha256=a37da6009b03065755f58d0e162d1642d658ced95f0e881990d8a8a67aa4c740
+config shape (SF22): mode=enforce requiresEnforcement=true platform="linux"(governor key) | real hook process, one child per Stop, own spawn log per Stop
+control: exit=0 recorded=1 line="execFileSync node.exe <- spawn-control.mjs"
+
+== Stop 1 (1st, enforce, fresh common dir)
+   box=A cfg=enforce / requiresEnforcement:true exit=0 stderrBytes=0 wallMs=1158
+   decision=block ledgerDirPreExisted=false ledgerDirAfter=true ledgerEventsForThisSession=["stop-eval","block"]
+   spawns=4 (powershell.exe=4, git=0)
+   spawn[1] spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs
+   spawn[2] spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs
+   spawn[3] spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs
+   spawn[4] spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs
+
+== Stop 2 (2nd, same box A, same common dir, same session)
+   box=A cfg=enforce / requiresEnforcement:true exit=0 stderrBytes=0 wallMs=244
+   decision=block ledgerDirPreExisted=true ledgerDirAfter=true ledgerEventsForThisSession=["stop-eval","block","stop-eval","block"]
+   spawns=0 (powershell.exe=0, git=0)
+
+== Stop 2b (supplemental: same box A, DIFFERENT session id)
+   box=A cfg=enforce / requiresEnforcement:true exit=0 stderrBytes=0 wallMs=235
+   decision=block ledgerDirPreExisted=true ledgerDirAfter=true ledgerEventsForThisSession=["stop-eval","block"]
+   spawns=0 (powershell.exe=0, git=0)
+
+== Stop 3 (no enforcement required, fresh common dir B)
+   box=B cfg=enforce / requiresEnforcement:false exit=0 stderrBytes=0 wallMs=234
+   decision=silent ledgerDirPreExisted=false ledgerDirAfter=false ledgerEventsForThisSession=[]
+   spawns=0 (powershell.exe=0, git=0)
+
+TABLE | stop | box | config | ledger dir pre-existed | decision | ledger events after | spawns | caller chain(s), innermost first
+TABLE | Stop 1 | A | enforce / requiresEnforcement:true | false | block | ["stop-eval","block"] | 4 | 4x spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs
+TABLE | Stop 2 | A | enforce / requiresEnforcement:true | true | block | ["stop-eval","block","stop-eval","block"] | 0 | (none)
+TABLE | Stop 2b | A | enforce / requiresEnforcement:true | true | block | ["stop-eval","block"] | 0 | (none)
+TABLE | Stop 3 | B | enforce / requiresEnforcement:false | false | silent | [] | 0 | (none)
+
+PROBE VALID: Stop 1 spawned 4, Stop 2 spawned 0, Stop 3 (no enforcement) spawned 0; Stops 1 and 2 both decided "block" and appended to the ledger.
+
+--- stderr ---

@@ -1,0 +1,78 @@
+{
+  "schema": "crit-rule-2b.checks.v1",
+  "phase": "before",
+  "results": [
+    {
+      "label": "check-adr-consistency.mjs",
+      "command": "node harness/scripts/check-adr-consistency.mjs",
+      "exit": 0,
+      "tail": "ADR corpus consistency: 5 classes green -- 85 numbered ADR files, 0 duplicate numbers, 0 missing status lines, 59 ADR-NNNN supersession targets resolved (0 dangling), 1/1 status-line supersession pair(s) compared and agreeing, 85 English index rows all resolving to their claimed file at their claimed number. Unparsed supersession pairs (counted, not judged): 0. NOT checked: whether an ADR's decision is reflected in the code that implements it; German reference translations below the DE-REFERENCE-BELOW marker; any supersession claim phrased other than the two literal shapes this check parses (see module header, \"CLASS 4 -- NARROWING\") -- such a pair is reported as unparsed above, never silently agreed; whether a decision recorded here is still a GOOD decision -- this check is purely mechanical cross-reference consistency, never semantic judgment.\n"
+    },
+    {
+      "label": "check-critic-contract-citations.mjs",
+      "command": "node harness/scripts/check-critic-contract-citations.mjs",
+      "exit": 0,
+      "tail": "Critic contract citations: 8 classes green — every citation this check resolves points at a target that carries its cited content. PHX-CITE-8 resolved 24 cross-file section coordinates (§-numbers and section titles) across the 3 contract files. NOT checked: rule-ID coordinates such as `roles/elephant.md` — *EL-01* (1 skipped: they name a rule, not a heading), prose after a path, bare paths without a coordinate, citations outside the 3 contract files, and German reference translations below the DE-REFERENCE-BELOW marker.\n"
+    },
+    {
+      "label": "check-critic-contract-citations.test.mjs",
+      "command": "node harness/scripts/check-critic-contract-citations.test.mjs",
+      "exit": 0,
+      "tail": "ok 12 - PHX-CITE-8 (title on a numbered section) goes red when its cited target is broken, and green again after restore\nok 13 - PHX-CITE-8 (title-only coordinate) goes red when its cited target is broken, and green again after restore\nok 14 - PHX-CITE-7 goes red on an unanchored ordinal and clears when a target defines the enumeration\nok 15 - a bogus em-dash separator before the §-number is caught\nok 16 - a bogus parenthesised title after the §-number is caught\nok 17 - a bogus title-only coordinate with an em-dash separator is caught\nok 18 - every §-coordinate the earlier matcher found is still found (corpus never shrinks)\nok 19 - the matcher covers strictly more than it did: both repaired forms are new\nok 20 - the success line reports measured coverage and names its blind spots\nok 21 - the success line's coverage count tracks the corpus rather than a constant\n# 21 checks passed\n"
+    },
+    {
+      "label": "check-critic-fail-closed.mjs",
+      "command": "node harness/scripts/check-critic-fail-closed.mjs",
+      "exit": 0,
+      "tail": "Critic fail-closed contract valid.\n"
+    },
+    {
+      "label": "check-doc-contracts.mjs",
+      "command": "node harness/scripts/check-doc-contracts.mjs",
+      "exit": 0,
+      "tail": "Documentation contracts valid: 2242 Markdown file(s), 1799 link(s), 44 anchor check(s), 41 known vendored-copy link(s) excluded, 9 immutable snapshot missing-reference exclusion(s) accepted.\n"
+    },
+    {
+      "label": "check-language-canon.mjs",
+      "command": "node harness/scripts/check-language-canon.mjs",
+      "exit": 0,
+      "tail": "language-canon: 2 embedded translations, one linked translation; 5 English-only user documents clear\n"
+    },
+    {
+      "label": "check-reference-paths.mjs",
+      "command": "node harness/scripts/check-reference-paths.mjs",
+      "exit": 0,
+      "tail": "REFERENCE-PATH reach: scanned 1566 of 5137 tracked file(s); 15419 script reference(s) resolved to a tracked file.\nREFERENCE-PATH reach: skipped 2795 record file(s) (specs/, backlog/, evidence/, docs/spec-archive/, docs/state-archive/, docs/state.md), 776 test suite(s) (*.test.mjs), 0 file(s) not readable as UTF-8 text.\nREFERENCE-PATH reach: rooted at .github, backlog, docs, evidence, governance, guardrails, harness, plugins, policies, project, roles, specs, telemetry, templates; extensions mjs, cjs, js, sh, py, ts; 5 allowlist entries.\nREFERENCE-PATH reach: NOT detected -- record surfaces are not scanned (specs/, backlog/, evidence/, docs/spec-archive/, docs/state-archive/, docs/state.md): a record naming a path that has since moved is correct as a record\nREFERENCE-PATH reach: NOT detected -- test suites (*.test.mjs) are not scanned: their path strings are synthetic fixture data, and a genuinely stale import fails when the suite runs\nREFERENCE-PATH reach: NOT detected -- only script targets are detected (mjs, cjs, js, sh, py, ts); .md link targets are check-doc-contracts.mjs's job, and .json/.yml/.toml/directory targets are detected by nothing\nREFERENCE-PATH reach: NOT detected -- a reference written without its repository-root segment (e.g. the shorthand 'scripts/foo.mjs') is not recognised as repo-relative and is skipped\nREFERENCE-PATH reach: NOT detected -- a path assembled at runtime from variables or string concatenation is invisible; only literal text is read\nREFERENCE-PATH reach: NOT detected -- '..'-relative and './'-relative references are skipped, as is any reference whose checkout prefix contains a dot (a URL rather than a checkout directory)\nREFERENCE-PATH reach: NOT detected -- existence is checked against the git index only: an untracked file present on disk still counts as missing, and a tracked path is not checked for being executable, current or correct\nReference-path check passed: no tracked file in scope names a missing script path.\n"
+    },
+    {
+      "label": "check-section-citations.mjs",
+      "command": "node harness/scripts/check-section-citations.mjs",
+      "exit": 0,
+      "tail": "SECTION-CITATION-WARN docs/adr/0021-prd-po-gate.md:13 -> §3.2 (\"step 3b\"): resolves to \"3.2 Duties\", description does not match\nSECTION-CITATION-WARN docs/adr/0021-prd-po-gate.md:90 -> §3.2 (\"Schritt 3b\"): resolves to \"3.2 Duties\", description does not match\nSection citations valid: 326 Markdown file(s), 55 citation(s) checked, 2 warning(s).\n"
+    },
+    {
+      "label": "check-vendored-template-sync.mjs",
+      "command": "node plugins/pipeline-core/scripts/check-vendored-template-sync.mjs",
+      "exit": 1,
+      "tail": "OK   goldfish-task.md: templates/prompts/goldfish-task.md == plugins/pipeline-core/templates/prompts/goldfish-task.md\nFAIL critic-review.md: templates/prompts/critic-review.md != plugins/pipeline-core/templates/prompts/critic-review.md (byte content differs)\nDRIFT DETECTED: at least one vendored dispatch template no longer matches its canonical counterpart\n"
+    },
+    {
+      "label": "check-vendored-template-sync.test.mjs",
+      "command": "node plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs",
+      "exit": 1,
+      "tail": "      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs:86:10)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+    },
+    {
+      "label": "generate-elephant-role-prohibitions.test.mjs",
+      "command": "node harness/scripts/generate-elephant-role-prohibitions.test.mjs",
+      "exit": 0,
+      "tail": "✔ firstSentence: extracts a backtick-balanced clause even when the first raw period sits inside a code span (0.0942ms)\n✔ firstSentence: falls back to the whole line (trailing colon stripped) when no sentence boundary exists (0.1542ms)\n✔ AC-7: the document carries no absolute or machine-specific path (0.6036ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 23.9988\n"
+    },
+    {
+      "label": "generate-vendored-canon.test.mjs",
+      "command": "node harness/scripts/generate-vendored-canon.test.mjs",
+      "exit": 1,
+      "tail": "      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [Array],\n    expected: [],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n"
+    }
+  ]
+}

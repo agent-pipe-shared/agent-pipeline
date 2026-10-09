@@ -1,0 +1,11 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "5428bfecc"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.mjs"
+    ]
+  }
+}

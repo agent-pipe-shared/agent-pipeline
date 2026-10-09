@@ -1,0 +1,59 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: native-before
+exitCode: 1
+head: 6305f867ffa70cbb8f96e28f8542723e091eef56
+tree: 739fe94d85b7ef2e6077854e632d00926553dd91
+dirty: true
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.7247ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.1126ms)
+✔ WPS003 rejects owner drift and reparse points (0.0858ms)
+✔ WPS004 keeps malformed observations unavailable (0.0764ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.5979ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.1409ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.3571ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.1461ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.1235ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.1934ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.3133ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.1361ms)
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1038.4389ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1105.093
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1038.4389ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'secure',
+  +   'insecure'
+  -   'secure'
+    ]
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:142:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'secure', 'insecure' ],
+    expected: [ 'secure', 'secure' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

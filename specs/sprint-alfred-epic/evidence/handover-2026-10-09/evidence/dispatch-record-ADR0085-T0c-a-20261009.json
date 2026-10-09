@@ -1,0 +1,40 @@
+{
+  "taskId": "ADR0085-T0c-a-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing family CONT17-20261009)",
+  "outcome": "stopped-guard-refused-new-path",
+  "commits": [],
+  "log": [
+    { "phase": "opening: GUARD-BOOTSTRAP-RECEIPT-MISSING cured by the named preflight (status ready), opening record written and read back", "toolUses": 7 },
+    { "phase": "orientation: CONT17/CONT15 headers, Rulings 73/77, note C1/C4/section 17, U1-U3 contract section 4, T0c predecessor record, guard-devplan harness, policy, plan-spec-state-v2 lifecycle, binding/receipt/proof modules; advisor consulted once", "toolUses": 36 },
+    { "phase": "commit message written; first Write of the new test file REFUSED by guard-testpath (PB-CONTRACT-TESTS); stop condition 'a guard refuses the new path' triggered; unrun draft saved in scratch; no retry", "toolUses": 40 }
+  ],
+  "report": {
+    "stopCondition": "briefing section 5: a guard refuses the new path",
+    "guardRefusal": {
+      "hook": "guard-testpath (plugin pipeline-core)",
+      "ruleId": "PB-CONTRACT-TESTS",
+      "targetPath": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "why": "an implementing Goldfish must not modify, weaken, skip or delete the tests that gate its own implementation (QG-04 / GF-04); a genuine test change is its own explicitly briefed task",
+      "route": "route-available-via-briefed-authorization: a PO may grant an authorization binding { targetPath, briefingDigest, expiry } before dispatch; none was granted for this dispatch",
+      "clearance": "gates.push_approval is signature, so in-session activation is refused; a signed override would be needed",
+      "overridePlanning": "No human override route was offered; planning failed with code HGO-AUDIT-LOCK-AMBIGUOUS (same code the T0c predecessor recorded)"
+    },
+    "dodResults": {
+      "newTestFile": "failed: not created (write refused)",
+      "wslCapture": "not verifiable: no file to run; draft deliberately not run",
+      "consumerSafeCheck": "not verifiable: not run (nothing to check)",
+      "commit": "failed: none made",
+      "terminalRecord": "this file"
+    },
+    "changedFiles": [],
+    "untrackedScratchOnly": [
+      "scratch/commit-msg/ADR0085-T0c-a.txt (ready commit message, two trailers, body consistent with the draft; re-check the sentence about red/green cases against the real WSL result)",
+      "scratch/dispatch-wip/ADR0085-T0c-a-test-draft.mjs.txt (complete, UNRUN draft of the test file; header carries the case inventory and assumptions A1-A12)"
+    ],
+    "routePreCheck": "requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed model identity from the runtime prompt: claude-sonnet-5-5 (match). Effort not observable (a reasoning_effort tag of 30 was visible; not mappable to a tier; disclosed, not treated as a contradiction).",
+    "recommendedNext": "Obtain the PO-granted briefed test-change authorization for the exact target path (or the briefed-authorization route the guard names), repair or explain HGO-AUDIT-LOCK-AMBIGUOUS, then re-dispatch: copy the draft to the target path (drop the DRAFT lines in its header), run it under WSL into evidence/ADR0085-T0c-a-20261009/red.txt, run the consumer-safe check, commit with git commit -F scratch/commit-msg/ADR0085-T0c-a.txt -- <path>."
+  }
+}

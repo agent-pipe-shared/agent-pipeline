@@ -1,0 +1,27 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S6-F3-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-implementor",
+  "effort": "medium",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3211c15ea",
+  "outcome": "completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "completed" },
+  "commits": ["cfd5d012b"],
+  "log": [
+    { "phase": "opening: preflight run, record created (wrongly under specs/.../evidence, stray)", "toolUses": 3 },
+    { "phase": "orientation: obligations, briefings, S6-F/F2 records, S4 manifest, captures, diff", "toolUses": 24 },
+    { "phase": "manifest written, consumer-safe-paths exit 0, commit cfd5d012b", "toolUses": 30 }
+  ],
+  "report": {
+    "text": "1. DoD: manifest written - passed. consumer-safe-paths exit 0 (1769 files) - passed. One commit cfd5d012b with the briefed subject - passed. Implementation complete; independent review pending; PO acceptance and ceremony install pending.\n2. Evidence: node harness/scripts/check-consumer-safe-paths.mjs exit 0. Manifest cites evidence/WIN-AP-S6-F-20261009/wsl-after.txt, native-after.txt, evidence/WIN-AP-S6-F2-20261009/wsl-callers-hgo.txt (read, not re-run).\n3. Changed files (committed): specs/sprint-alfred-epic/signed-package/tranche-2/WIN-AP-S6-MANIFEST.md (new); .../lib/private-boundary.mjs and .../lib/human-guard-override.mjs (post-images, unedited).\n4. Not changed: live lib/, tests, foreign uncommitted edits, post-images.\n5. Deviations: candidateCommit is the short 3211c15ea (no budget left for rev-parse to 40-hex). The wsl-after/native-after captures contain a runner-preset entry lib/private-boundary.test.mjs that does not exist (ERR_MODULE_NOT_FOUND); the manifest states it is not a test result. A stray in-progress copy of this record exists at specs/sprint-alfred-epic/evidence/dispatch-record-WIN-AP-S6-F3-20261009.json (written before I noticed the repo-root rule); untracked, delete it. Commit-time record check: record was written after the commit as the header prescribes.\n6. Open items: resolve candidateCommit to 40-hex; delete the stray record; Critic review and ceremony install pending.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/WIN-AP-S6-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/private-boundary.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/human-guard-override.mjs"
+    ]
+  }
+}

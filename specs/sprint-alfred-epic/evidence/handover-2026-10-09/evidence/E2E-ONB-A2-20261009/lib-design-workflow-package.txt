@@ -1,0 +1,38 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/design-workflow-package.test.mjs
+label: lib-design-workflow-package
+exitCode: 0
+head: f9a2a8409f256a970954be89f738bae099b44075
+tree: 3dcdb1c0ba60203f89e61c94bca76ac62d20e0d9
+dirty: true
+--- stdout ---
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (17.931897ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (50.498915ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (24.500825ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (13.157402ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (11.399463ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (22.830106ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (45.443569ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (22.612213ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (3.938247ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (14.648163ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (31.986496ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (152.747426ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (6.280433ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (16.019414ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (26.728712ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (11.572346ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (10.900645ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (11.971752ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (59.787552ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (48.44307ms)
+✔ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (99.700227ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1893.154461
+
+--- stderr ---

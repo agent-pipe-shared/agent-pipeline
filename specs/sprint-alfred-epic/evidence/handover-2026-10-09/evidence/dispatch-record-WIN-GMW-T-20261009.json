@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GMW-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "ae446410c4d112498512b7810e8c0e81a3fee72e",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      "native before: capture-evidence ... -- node --test guard-maintenance-window.test.mjs, wrapped exit 1, 61 passed 1 failed (GMW48 only), evidence/WIN-GMW-T-20261009/before.txt",
+      "native final: same command, wrapped exit 1, 62 passed 2 failed (GMW48 known red + GMW49 pin RED for the right reason), GMW50 control PASS, evidence/WIN-GMW-T-20261009/red.txt",
+      "WSL final: wrapped exit 0, 63 passed 0 failed, GMW49 SKIP [SINGLE-VOLUME], GMW50 PASS, evidence/WIN-GMW-T-20261009/wsl.txt"
+    ],
+    "remainsUndone": [
+      "the single commit of plugins/pipeline-core/lib/guard-maintenance-window.test.mjs (modified, uncommitted, complete)",
+      "check-consumer-safe-paths.test.mjs was green (exit 0, 9/9) on an earlier content of the test file but not re-run after the last control edit",
+      "resultSha256 not bound (null): no hash call is permitted inside the closing allowance"
+    ],
+    "nextBriefingAdjustments": [
+      "40 base calls is too few for test authorship with native before/after + WSL + consumer-safe + commit; brief 48+ or split verification from commit",
+      "a fixture on the checkout volume fails on WSL under a mounted Windows drive (window directory is not owner-private); the control must use the temp location on a single-volume host"
+    ]
+  },
+  "log": [
+    { "phase": "opening: record created after preflight; route pre-check passed (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from runtime prompt, effort unobservable)", "toolUses": 12 },
+    { "phase": "orientation: normaliser reached only via install-time commit tolerance (intervenedCommitsStayWithinScope); design = plugin root on temp volume, repo on checkout volume", "toolUses": 25 },
+    { "phase": "native before captured: 61 passed 1 failed (GMW48)", "toolUses": 26 },
+    { "phase": "edit: repoFixture baseDir option + GMW49 pin + GMW50 control; native after: GMW49 RED (admitted), GMW50 PASS", "toolUses": 32 },
+    { "phase": "WSL first run: GMW50 failed (owner-private on mounted drive); control placement fixed; WSL rerun exit 0; native rerun final", "toolUses": 39 },
+    { "phase": "final result greps; budget cap 40 reached; commit-message file write refused by DISPATCH-BUDGET-EXHAUSTED (attempt 41), commit not possible inside the allowance", "toolUses": 41 }
+  ],
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"],
+    "text": "CLOSING-ALLOWANCE HANDOVER: stopped without commit. independent review: pending.\n\n1. DoD results\n- native before (61 passed, 1 failed = GMW48): passed.\n- native after, final state: GMW49 pin FAIL for the right reason (install ADMITTED a cross-volume out-of-scope commit, status active); GMW50 control PASS; GMW48 unchanged known red; 62 passed 2 failed: passed (RED is the deliverable).\n- WSL after, final state: exit 0, 63 passed 0 failed, GMW49 shows 'SKIP ... [SINGLE-VOLUME]', GMW50 PASS: passed.\n- check-consumer-safe-paths.test.mjs: exit 0 (9/9) on the content before the last control edit; NOT re-run on the final content (budget): not verifiable on final state.\n- one commit of the test file: NOT DONE (see 6).\n\n2. Evidence (machine-written by capture-evidence.mjs, untracked): evidence/WIN-GMW-T-20261009/before.txt, red.txt, wsl.txt. Command: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <before|red|wsl> -- node --test plugins/pipeline-core/lib/guard-maintenance-window.test.mjs (native; wsl via wsl.exe -e bash -lc). Wrapped exits: before 1, red 1, wsl 0.\n\n3. Changed files: plugins/pipeline-core/lib/guard-maintenance-window.test.mjs (uncommitted): repoFixture gains optional baseDir (default tmpdir(), behaviour unchanged); GMW49 pin; GMW50 same-volume control.\n\n4. Deliberately not changed: every production file; GMW48 (known native red); the cross-volume question for isNeverLiftableKernelPath (no observable difference there, the kernel list compares exact strings).\n\n5. Deviations / notes\n- Route: normalizeRepoRelativePath is not exported and is reached only via installGuardMaintenanceWindow -> intervenedCommitsStayWithinScope -> pathWithinScope. No spawn fake is needed: with the repo on the checkout volume and the live plugin root on the temp volume (a real layout), an ordinary README.md commit is wrongly tolerated. No seam needed.\n- The file uses its own check() harness, so the typed skip is a printed line 'SKIP <name> [SINGLE-VOLUME]' (not a node:test skip); the probe is path.parse().root compared case-insensitively between tmpdir() and the repo-root scratch/ directory derived from the test file location, never process.platform.\n- GMW50 control uses the checkout-volume location only when the pin runs; on a single-volume host it uses the temp location, because on WSL a repo under a mounted Windows drive cannot hold the owner-private window directory (first WSL run failed GMW50 with 'window directory is not owner-private'; fixed, rerun exit 0).\n- The checkout-volume fixture lives under the repo-root scratch/ directory (git-ignored in this repository), removed by the file's own finally cleanup.\n\n6. Open items\n- Commit blocked: the Write of scratch/commit-msg/WIN-GMW-T-20261009.txt was refused by guard-dispatch-budget (DISPATCH-BUDGET-EXHAUSTED at call attempt 41 of 40); the allowance permits only record writes, git add and git commit, and git commit -F needs the message file. Dispatcher: stage plugins/pipeline-core/lib/guard-maintenance-window.test.mjs by exact pathspec and commit it with subject 'test(guard-maintenance-window): pin the cross-volume scope escape of the path normaliser' and exactly two trailers 'Dispatch: WIN-GMW-T-20261009 (goldfish)' and 'AI-Assisted: true'; re-run check-consumer-safe-paths.test.mjs first.\n- resultSha256 is null: no hash call is permitted in the allowance; the dispatcher should bind it.\n- Budget: 4 of the first 12 calls were wasted on refused or misspelled calls (Glob, rg --files with --glob, Write before preflight, Read before create); the advisor was unavailable (overloaded).\n- Route pre-check: requested claude-sonnet-5-5/xhigh, observed model claude-sonnet-5-5 (runtime prompt), effort unobservable: no contradiction."
+  }
+}

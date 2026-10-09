@@ -1,0 +1,11 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "f79f0bf9ff1404ba5f698298dd2982c57c76222e"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.test.mjs"
+    ]
+  }
+}

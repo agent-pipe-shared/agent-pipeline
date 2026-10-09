@@ -1,0 +1,70 @@
+# command: node --test --test-reporter=tap harness/scripts/check-consumer-safe-paths.test.mjs
+# host: platform=win32 node=v24.20.0
+# captured: 2026-10-09T05:12:00.603Z
+TAP version 13
+# check-consumer-safe-paths: fixture and repository checks passed
+# Subtest: a fixture naming a source-only path fails
+ok 1 - a fixture naming a source-only path fails
+  ---
+  duration_ms: 1.1393
+  type: 'test'
+  ...
+# Subtest: a clean fixture passes
+ok 2 - a clean fixture passes
+  ---
+  duration_ms: 0.6538
+  type: 'test'
+  ...
+# Subtest: an allowlisted occurrence passes
+ok 3 - an allowlisted occurrence passes
+  ---
+  duration_ms: 0.2983
+  type: 'test'
+  ...
+# Subtest: a stale allowlist entry (never matches) is itself reported
+ok 4 - a stale allowlist entry (never matches) is itself reported
+  ---
+  duration_ms: 0.265
+  type: 'test'
+  ...
+# Subtest: multiple prefix hits on one line each produce a finding
+ok 5 - multiple prefix hits on one line each produce a finding
+  ---
+  duration_ms: 0.1126
+  type: 'test'
+  ...
+# Subtest: SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+ok 6 - SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+  ---
+  duration_ms: 0.119
+  type: 'test'
+  ...
+# Subtest: every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+ok 7 - every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+  ---
+  duration_ms: 0.8784
+  type: 'test'
+  ...
+# Subtest: current repository passes with the real ALLOWLIST (AC-11)
+ok 8 - current repository passes with the real ALLOWLIST (AC-11)
+  ---
+  duration_ms: 334.7276
+  type: 'test'
+  ...
+# Subtest: real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+ok 9 - real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+  ---
+  duration_ms: 18.8287
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 432.1503
+
+# exit code: 0

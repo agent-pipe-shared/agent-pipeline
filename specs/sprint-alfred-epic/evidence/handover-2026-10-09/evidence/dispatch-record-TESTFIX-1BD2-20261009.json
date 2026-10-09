@@ -1,0 +1,52 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TESTFIX-1BD2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f929da250",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: route pre-check (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 per runtime prompt; no contradiction; not an A/G/S class); briefing files read; preflight run (ready)", "toolUses": 11 },
+    { "phase": "orientation: read both test files at the target regions, pipeline-state.mjs 3800-3870, before-pipeline-state.txt; B seam-free and key position determined; A hypothesis NOT yet run empirically", "toolUses": 28 },
+    { "phase": "80 percent checkpoint notice from guard-dispatch-budget at call 28 of 35: stopped before any edit; interim report written; handing back", "toolUses": 29 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "Goal A: hypothesis not verified empirically; no edit; no WSL run; no AFTER capture",
+      "Goal B: one-line key-list edit not made; no WSL run; no AFTER capture",
+      "Both test(...) commits",
+      "No file is left modified or uncommitted by this dispatch (only this record was created)"
+    ],
+    "nextBriefingAdjustments": [
+      "Budget: orientation alone cost 28 counted calls, because every call inside a parallel batch counts and a guard-refused call counts too. Brief A and B as two dispatches, or state a base cap of 35 with the context-reading list cut to the test regions named below.",
+      "B is ready to apply: the call at test :273-285 passes only env, pluginList, read and cwd (no runModelRoleBootstrapFn seam), so the stop condition does not fire. Insert \"mandatoryHookReadiness\" into the sorted array at :281-285 between \"installedVersion\" and \"nextAction\" (m < n). Not yet run: also check that the test file's local preflight() wrapper injects no seam.",
+      "A: the protected path TP-5 in agent-obligations.md section 2 matches harness/scripts/pipeline-state.test.mjs, so the Edit will probably be refused by guard-testpath. The briefed fallback is a held patch, but a held patch of a refused edit has to be hand-authored as a unified diff with Write (nothing exists for git diff to emit). Say so in the briefing, and say whether the hand-authored patch is acceptable.",
+      "A evidence already read: before-pipeline-state.txt shows submit-plan refused PROFILE-AUTHORITY-INVALID in PS06, PS08 and the PS08a-seal block, then the TypeError at test :1221. The intake read is inspectSelectedPlanProfile in pipeline-state.mjs :3806-3825 via readOnboardingIntakeCheckpoint (lib/onboarding-continuity.mjs :6159, not yet read: confirm what it needs from Git). freshDir (test :73-79) makes no Git repo; blocks at :1320, :1391, :2945 already git init. submitAndApprove (:848) is shared by many blocks, so a per-block git init would have to cover every caller; a freshDir-level init is the smaller diff but risks blocks that assume a non-Git dir. Decide by running one block with and without git init, which was the first DoD step.",
+      "Tooling: Glob and Grep over a directory path (lib/) were refused with GUARD-READ-TARGET; use exact file paths."
+    ]
+  },
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER (80 percent checkpoint), outcome partial. Route pre-check: requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 (runtime prompt), no contradiction. 1 Committed: nothing. 2 Verified green: nothing; no test was run by this dispatch. 3 Remains undone: all of the DoD. A (pipeline-state.test.mjs completes, hypothesis check, remaining failures listed) and B (add mandatoryHookReadiness only to the key list at preflight test :281) are untouched; no AFTER captures exist; no evidence/TESTFIX-1BD2-20261009/ directory was created. 4 Next briefing: see closingAllowance.nextBriefingAdjustments in this record (B is ready to apply and seam-free; A will likely hit the TP-5 protected-path refusal and needs an explicit held-patch instruction). Observations so far: B call site injects no runModelRoleBootstrapFn (read at :273-285); A's before-evidence (WSL) shows submit-plan PROFILE-AUTHORITY-INVALID in PS06/PS08/PS08a-seal then the :1221 TypeError, consistent with the hypothesis, but the hypothesis was not reproduced by this dispatch. Deliberately not changed: every repo file; resultSha256 left null (not computed within the closing budget). Deviations: none from the spec; the stop is the briefing's own 80 percent budget duty. Open items: verify: pending; independent review: pending (nothing to review yet); manual/browser check: not applicable; PO acceptance: open.",
+    "changedFiles": []
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-F3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "candidateCommit": "17403f21568eb41f13f3429b416c1f8cb914eb9b",
+  "commits": [
+    "c7aa931021895c6608bbb7037d0c234d763462de"
+  ],
+  "resultSha256": "d7137629adc07aa6a071a85e02b39b3310f3029e21872ca8528bd52a8e5aef2c",
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded · Project Agent-Pipeline · Calibration standard profile (briefing field 6; no calibration file named) · State briefing TR-G-F3-20261009 · Role Goldfish\n\nRoute pre-check (class G): requested route in field 6 is claude-sonnet-5-5 / xhigh (agentType goldfish-deep; no max route named). Observed from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5 ... The exact model ID is claude-sonnet-5-5\". No contradiction. The briefing does not request the MP-07 max route for a class-G dispatch; disclosed, not treated as a mismatch.\n\nImplementation complete (guard post-image and manifest section committed, not installed). independent review: pending (class G; only the Elephant dispatches the delta Critic). PO acceptance: pending.\n\n1. DoD results\n- WSL capture of the scratch test copy against the scratch copy of the edited guard post-image: passed. 99 tests, 96 pass, 3 fail. T49 (d), (e), (f), (g), (h) are GREEN (RED in red.txt). Controls (i) and (j) GREEN. The 3 fails are the three accepted 10 s runner timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40), all already red in red.txt. The two load-sensitive cases (preflight-bound base cap of 20; R7-11a) passed. Every other case is in its red.txt state; none changed.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0 (9/9), run before and again after the manifest edit.\n- node plugins/pipeline-core/scripts/check-private-identifiers.mjs --root . : passed, exit 0, {\"ok\":true,\"findings\":[]}, run before and again after the manifest edit.\n- One commit of exactly the guard post-image and the manifest: passed. c7aa931021895c6608bbb7037d0c234d763462de (2 files, +106/-6), subject as briefed, trailers exactly \"Dispatch: TR-G-F3-20261009 (goldfish)\" and \"AI-Assisted: true\". Committed by exact pathspec; the foreign staged files were not included.\n\n2. Evidence\n- evidence/TR-G-F3-20261009/green.txt. Command: wsl.exe -e bash -lc \"cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F3-20261009/green.txt --label TR-G-F3 -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-F3/guard-dispatch-budget.test.mjs\"; wrapped exit code 1 (the 3 accepted timeouts). Baseline: evidence/TR-G-T3-20261009/red.txt (99 tests, 91 pass, 8 fail).\n- Build: node scratch/dispatch-wip/TR-G-F3/build.mjs, exit 0. Guard post-image sha256 2ec5a564dc05f47d188bd3486919ee05dc9d232ba232b277ad8f76756012d808 (86028 bytes, was bad0bd5d...); scratch guard copy sha256 650867c74b2f624228442254e3479debea000f1ec790203533e96d53030fb2a0; test post-image sha256 2967751f... and scratch test copy 8fed4a7c... both equal the TR-G-T3 values (test post-image untouched); no leftover relative import specifiers.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs: F1 comparableScriptPath maps backslash to slash only on win32 (trailing-slash strip after that conversion), doc comments updated; F2 new isSingleGitClosingCommand (existing verb pattern AND no PRODUCER_ARGS_CONTROL_PATTERN character in the whole command) used by isClosingAct, doc comment of the permitted-after-cap shape set updated. GIT_CLOSING_VERB_PATTERN itself, all refusal texts and every other line unchanged.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md: appended \"## TR-G-F3\" (new sha, the two edits, pin table, scope and limits, command and result); no earlier section edited.\n- Local only, uncommitted: scratch/dispatch-wip/TR-G-F3/* (build.mjs, scratch copies, finalize.mjs), scratch/commit-msg/TR-G-F3.txt, evidence/TR-G-F3-20261009/green.txt, evidence/dispatch-record-TR-G-F3-20261009.json.\n\n4. Deliberately not changed\n- The test post-image, the live hooks under plugins/pipeline-core/hooks/, lib/, the tranche README, the other post-images and manifest sections, scratch/dispatch-wip/TR-G-F/ and TR-G-T3/.\n- The other places that map backslashes to slashes (the write-tool relative path in isClosingAct, the grant-store scan in touchesGrantStore): out of the briefed scope, left as they are.\n- The manifest's Target and TR-G-T3 sections still name the earlier guard sha bad0bd5d...; the new section says it supersedes them.\n- Foreign staged and dirty files left alone (lib/guard/sanctioned-args-onboarding.mjs, harness/scripts/pipeline-state.test.mjs, scripts/pipeline-state.mjs, scripts/po-human-approval.mjs, and the others in the starting status).\n\n5. Deviations from spec\n- None to the briefed edits. One disclosed consequence of the F2 design (the \"same control-character refusal\" the briefing names): the pattern is applied to the whole git command including quoted text, so after the working cap a git commit -m with parentheses in the message, or a path containing parentheses, is now refused, where it was admitted before. This is only a narrowing (no admission widened) and the obligations route (git commit -F file -- paths) is unaffected. It is stated in the doc comment and the manifest.\n- The record was created after one read-only git rev-parse HEAD (for candidateCommit), which is the first tool call after reading the briefing inputs and one refused Glob and one refused Write (GUARD-READ-TARGET, GUARD-BOOTSTRAP-RECEIPT-MISSING, cured with the preflight from the loaded plugin root).\n\n6. Open items\n- independent review: pending (delta Critic, Opus, per Ruling 138). PO acceptance: pending. Installing the post-image remains a signed-package step.\n- Unverified by this evidence: the win32 branch of comparableScriptPath on native Windows (T49 (d) and (e) skip there; no platform seam exists, as TR-G-T3 reported); macOS. WSL only.\n- F2 shapes beyond the three pinned ones (||, redirect, substitution, line break, git add && git commit) are refused by the same character class but have no case of their own.\n- No stop condition triggered. Tool uses about 41 of a base cap of 45; the closing allowance was not needed. Not a closing-allowance handover: committed c7aa93102..., verified green as listed, nothing remains undone from the briefed DoD, no next-briefing adjustment other than the delta Critic.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations, CONT17 header 1-17 and goldfish-task 455-481 read; bootstrap line printed; route pre-check (requested claude-sonnet-5-5/xhigh; observed Sonnet 5.5 / claude-sonnet-5-5; no contradiction); preflight run after GUARD-BOOTSTRAP-RECEIPT-MISSING; record created",
+      "toolUses": 7
+    },
+    {
+      "phase": "orientation done (Ruling 138, guard 470-660, manifest TR-G-T3 section, build.mjs, test T49 d-j); advisor consulted once; design: win32-gated backslash map (F1), isSingleGitClosingCommand using PRODUCER_ARGS_CONTROL_PATTERN on the whole command (F2)",
+      "toolUses": 21
+    },
+    {
+      "phase": "guard post-image edited (4 edits; sha256 2ec5a564...); scratch build exit 0; WSL capture green.txt wrapped exit 1: 99 tests, 96 pass, 3 fail = the three accepted 10 s timeouts; T49 (d)-(h) GREEN, (i)/(j) GREEN; consumer-safe exit 0 (9 pass); check-private-identifiers exit 0 ok:true; manifest section appended; scans re-run on final state",
+      "toolUses": 35
+    },
+    {
+      "phase": "commit c7aa931021895c6608bbb7037d0c234d763462de (2 files, trailers exact); record checkpointed; finalize next",
+      "toolUses": 38
+    },
+    {
+      "phase": "finalize: report.text, outcome and resultSha256 written in one write; independent review pending",
+      "toolUses": 41
+    }
+  ]
+}

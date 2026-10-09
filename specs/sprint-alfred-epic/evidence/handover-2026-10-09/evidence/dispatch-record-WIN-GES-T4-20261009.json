@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-T4-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "c7abe2c1a",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "648046bfb"
+  ],
+  "resultSha256": "37662f566e144f768095dca90984ade90c14bc03f8b69f9db26620dafbd8bd48",
+  "report": {
+    "text": "WIN-GES-T4-20261009 completion report (goldfish-deep, claude-sonnet-5-5 / xhigh; ruleset 0.7.0+claude.20261008194106.da20519d; candidate c7abe2c1a; commit 648046bfb).\nRoute pre-check (subject class S): requested claude-sonnet-5-5 / xhigh; observed identity \"claude-sonnet-5-5\" from this dispatch's runtime prompt; no contradiction.\nStatus: implementation complete, test-only commit made. Independent review: pending (Elephant dispatches the Critic; no receipt supplied). Not PO-accepted.\n\n1. DoD results\n- Native before/after captures (before.txt, after.txt): passed (both written). before: 59 tests, 50 pass, 1 fail, 8 skipped. after: 61 tests, 53 pass, 1 fail, 7 skipped.\n- Formerly skipped cases RUN and are green in after.txt: \"actual sanctioned v2 mint and pure observer share stable identity without writes\" and \"linked worktree observes same common identity; bare repository remains unsupported\" (both were POSIX-MODE-UNHONOURED product-fault skips in before.txt). passed.\n- Refusal cases on hardened fixtures green in after.txt (legacy v1, closed-validation drift, multiple links, oversized), plus the new WIN-GES-T4 DACL pin. passed.\n- Remaining red, named: the restricted-storage case at test line ~1138 (title \"restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure\"), identical in before.txt and after.txt: GES-RESTRICTED-PERMISSIONS \"Restricted records must not grant group or other access\", thrown from restrictedRecordsRoot (governance-event-store.mjs:272) via putRestrictedGovernanceEvent (:1730). State at capture: HEAD already contains 5a72c9b61 (WIN-HARDEN-F, \"persist only the access section so hardening stays idempotent\"), and the case is still red, with a different code than Ruling 143 named (that ruling named GES-RESTRICTED-WINDOWS-ASSURANCE). Not diagnosed, not edited, not mine.\n- WSL after run (wsl-after.txt): exit 0 (green). I did not extract test counts from it (budget); only the exit code is evidenced.\n- check-consumer-safe-paths.test.mjs: passed, 9/9, exit 0.\n- Commit of the test file with the briefed subject: passed (see section 2).\n\n2. Evidence\n- evidence/WIN-GES-T4-20261009/before.txt, after.txt, wsl-after.txt, each written by node plugins/pipeline-core/scripts/capture-evidence.mjs (native: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs, wrapped exit 1 for both, the sole failure being the unrelated restricted-storage case; WSL: same via wsl.exe -e bash -lc, wrapped exit 0).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0.\n- Commit 648046bfb: test(governance-event-store): run the existing-binding cases on win32 and make their refusals discriminate. Message in scratch/commit-msg/WIN-GES-T4-20261009.txt (trailers AI-Assisted and Dispatch only).\n\n3. Changed files\n- plugins/pipeline-core/lib/governance-event-store.test.mjs: fixture hardens its binding directory with hardenWindowsPrivateDirectory on win32 and asserts directory/file assess as secure (self-classifying red); two product-fault skips lifted and the now-dead skip constant removed; legacy, drift, links and oversized cases each prove a hardened binding accepted, apply one in-place mutation, and for links also prove acceptance returns when the mutation is undone; the former combined links/writable case is split; new WIN-GES-T4 DACL pin. The WIN-GES-T3 pin is byte-identical.\n- Uncommitted, untracked by design: evidence/WIN-GES-T4-20261009/*.txt, evidence/dispatch-record-WIN-GES-T4-20261009.json (for the dispatcher to commit).\n\n4. Deliberately not changed\n- The :1138 restricted-storage case, windows-private-state.mjs, governance-event-store.mjs (read only).\n- The symlink-alias case body, the missing-identity case, the WIN-GES-T3 pin: untouched (the symlink and missing cases now get a hardened fixture through the shared helper, which only adds a win32 precondition).\n- Not mutation-tested: discrimination is by construction (control accepted, one mutation, DACL precondition), I did not break the production predicates to watch each case turn red.\n\n5. Deviations from spec\n- \"Writable binding\" cannot discriminate on win32 (no POSIX mode): it is now its own case with a typed POSIX-MODE-UNHONOURED skip naming the equivalent. The equivalent pin compares identical bytes in a hardened and an unhardened os.tmpdir() directory and asserts the assessor does not call the latter secure. Its limit: it proves \"DACL not private\", not specifically \"a DACL granting a non-owner write\"; no hardener fixture produces that ACE without a hand-built ACL, so I did not build one.\n- Reading source (governance-event-store.mjs:910-918): the size and link-count predicates sit in validFile, before the DACL assessment, so on win32 the old oversized and links assertions already refused at their own predicate; legacy v1 and drift refused at the DACL assessment before the schema check. All four now carry a control, so the briefing's \"probably refuse at the DACL assessment\" holds for legacy/drift only. Read from source, not probed.\n- The first WSL attempt (capture-evidence wrapping wsl.exe -e bash -lc directly) was refused by GUARD-DEVPLAN-SHELL with no retry action; the working spelling puts the cd and capture-evidence inside the bash -lc string.\n\n6. Open items\n- independent review: pending; PO acceptance pending.\n- :1138 restricted-storage red remains and is outside this slice; its code differs from Ruling 143's description, which the Elephant may want to record.\n- The record's log has one gap between entries 12 and 33; the finalizer wrote the rest.\n- Tool uses: about 45 of 45 base; the closing allowance was used for the record write only. Not a closing-allowance handover: the work is complete.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: read obligations, CONT17/18/28 headers, WIN-GES-T4 section; route pre-check match (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5)",
+      "toolUses": 12
+    },
+    {
+      "phase": "finalizer tested; baseline captured (before.txt: 59 tests, 50 pass, 1 fail=:1138 restricted storage GES-RESTRICTED-PERMISSIONS, 8 skipped); editing next",
+      "toolUses": 33
+    },
+    {
+      "phase": "final: completed",
+      "toolUses": 46
+    }
+  ]
+}

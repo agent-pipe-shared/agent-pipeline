@@ -1,0 +1,13 @@
+{
+  "taskId": "HOOKREFRESH-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (Rulings 84 and 94)",
+  "agent": "goldfish-deep",
+  "outcome": "in-progress",
+  "note": "In-progress record at a distinct path; the terminal record evidence/dispatch-record-HOOKREFRESH-F2-20261009.json is written once after the commit (briefing field 3).",
+  "log": [
+    { "phase": "opened: orientation; loaded-root preflight status ready (cured GUARD-BOOTSTRAP-RECEIPT-MISSING)", "toolUses": 6 }
+  ]
+}

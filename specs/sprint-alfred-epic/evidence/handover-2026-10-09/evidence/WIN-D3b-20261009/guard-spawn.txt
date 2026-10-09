@@ -1,0 +1,14 @@
+command: node scratch/dispatch-wip/WIN-D3b/guard-spawn.mjs
+label: guard-spawn
+exitCode: 0
+head: 5e19c84c58dd3232851fba721098b98c2389b5ab
+tree: 15ce5c46f17105d376cf51142543a72d47a1b1c7
+dirty: true
+--- stdout ---
+platform win32
+[AS-IS (-Command script guard)] exit=1 stdout="" storeReadyCheck(includes "ready\n")=false
+[AS-IS (-Command script guard)] stderr="In Zeile:1 Zeichen:215\r\n+ ... s.Dispose() <tmp>\\.lock-gu ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\nUnerwartetes Token \"<tmp>\\.lock-guard\" in Ausdruck oder Anweisung.\r\n    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException\r\n    + FullyQualifiedErrorId : UnexpectedToken\r\n \r\n"
+[CONTROL (guard embedded as literal)] exit=0 stdout="ready\r\n" storeReadyCheck(includes "ready\n")=false
+[CONTROL (guard embedded as literal)] stderr=""
+
+--- stderr ---

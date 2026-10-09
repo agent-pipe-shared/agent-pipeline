@@ -1,0 +1,44 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/resume-hint.test.mjs
+label: lib-resume-hint
+exitCode: 0
+head: b46403a06df7237197a34da3b2eee5ef6a864090
+tree: 86b605a07c56d52aaf2dca61f1b826c170b4545e
+dirty: true
+--- stdout ---
+✔ rejects every dangerous shape, in the intent and in a list field alike (7.366858ms)
+✔ admits ordinary prose that merely contains a colon, slash, at-sign, dollar, pipe or angle bracket (3.307619ms)
+✔ bans credential values, not the English words for them (1.548208ms)
+✔ pins the residual the shape filter cannot close without a word list (0.385977ms)
+✔ RH-DIAG-1 a four-string card is rejected with a message that names the field (0.637011ms)
+✔ keeps the digest, byte, control-character, trim and arity contracts unchanged (1.565127ms)
+✔ NVA-BL-72 progress is an optional, additive field with the same per-entry discipline (0.739003ms)
+✔ NVA-BL-72 progress stays bounded: a raw command line or path is rejected, not carried through (3.674254ms)
+✔ NVA-BL-72 progress can carry a distilled denial description, not always the literal long guard code (0.301105ms)
+✔ NVA-BL-72 the CLI accepts a five-key card carrying progress, unmodified four-key cards unaffected (3479.949956ms)
+✔ RH-SCHEMA-DIAG-1a 'documentation-reconciliation' in intent names the field, not a bare RH-SCHEMA (0.406457ms)
+✔ RH-SCHEMA-DIAG-1b 'checked-and-divergence-filed' in scope names the field, not a bare RH-SCHEMA (0.262594ms)
+✔ resumeHintContextDetail never echoes the rejected value itself (0.110022ms)
+✔ RH-SCHEMA-DIAG-2 an invalid createdAt with a fully-valid context does not blame context (0.176923ms)
+✔ verbatimMaterialRejection rejects credentials, secrets, host paths, URLs and private identifiers (0.180054ms)
+✔ verbatimMaterialRejection admits multi-line design prose, fenced code, a quoted transcript line and a short commit reference (0.126522ms)
+✔ verbatimMaterialRejection: a full-length hex digest is still caught via opaqueToken(), not via the excluded LONG_HEX_DIGEST_SHAPE (0.094422ms)
+✔ verbatimMaterialRejection rejects empty, whitespace-only and null-byte text (0.058211ms)
+✔ NVA-RESUMEVERBATIM-1 capture carries verbatim material input and answered values across a restart, byte-identical, ask-once (6757.518659ms)
+✔ NVA-RESUMEVERBATIM-1 AC-2: a card carrying a secret-shaped materialInput chunk is refused, nothing persisted (3300.72397ms)
+✔ NVA-RESUMEVERBATIM-1 a legacy four-key card (no materialInput/values) is unaffected: no intake key on output (1572.835828ms)
+✔ resume-hint delivery: a fresh card is pending until a bootstrap records its exact digest (33.832824ms)
+✔ anyResumeHintConsumptionReceipt: no-card when no card-digest record exists (5.294753ms)
+✔ anyResumeHintConsumptionReceipt: found when a receipt from ANY session id matches, not the literal string "any" (14.492083ms)
+✔ anyResumeHintConsumptionReceipt: not-found when the consumption-receipts directory does not exist at all (9.778662ms)
+✔ anyResumeHintConsumptionReceipt: not-found when receipts exist but none match the current digest (15.806427ms)
+✔ anyResumeHintConsumptionReceipt: a corrupt receipt file is skipped, not thrown, and a valid one is still found (13.620238ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15296.356118
+
+--- stderr ---

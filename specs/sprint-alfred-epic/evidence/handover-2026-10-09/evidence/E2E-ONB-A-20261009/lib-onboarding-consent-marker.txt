@@ -1,0 +1,29 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/onboarding-consent-marker.test.mjs
+label: lib-onboarding-consent-marker
+exitCode: 0
+head: d916a54594ab35d78a8874773539ffb2c358d26a
+tree: 014f1ca54df06fd5e2d4121e754ce7e6a2a970a2
+dirty: true
+--- stdout ---
+PASS  OCM1 absent marker on a fresh root reads absent, does not block
+PASS  OCM2 recordConsentGiven writes a blocking marker
+PASS  OCM3 re-recording consent while already blocking keeps the original timestamp
+PASS  OCM4 clearConsentMarker(onboarding-complete) clears the marker and appends an audit entry
+PASS  OCM5 clearConsentMarker(po-explicit-override) clears the marker with a distinct audit reason
+PASS  OCM6 an unrecognized clear reason throws instead of clearing
+PASS  OCM7 clearing an absent marker is an idempotent no-op with no audit entry
+PASS  OCM8 a present-but-unparseable marker file still reads as blocking
+PASS  OCM9 a present marker with an unrecognized shape still reads as blocking
+
+9/9 cases passed.
+✔ plugins/pipeline-core/lib/onboarding-consent-marker.test.mjs (46.899858ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.219295
+
+--- stderr ---

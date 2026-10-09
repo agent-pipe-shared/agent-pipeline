@@ -1,0 +1,20 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs"
+label: CANDBIND-F2-before-binding
+exitCode: 0
+head: 6259c35cc394d51b7c5de5f765433f00c867303a
+tree: 2cf82d39fd54e9d1753669d013dc124af0077707
+dirty: true
+--- stdout ---
+✔ CANDBIND-a implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (596.083298ms)
+✔ CANDBIND-b the default (strict) read of the same package still refuses a HEAD that moved past the candidate (425.361077ms)
+✔ CANDBIND-c the host verifier's supplemental Advisor re-read stays strict by default once HEAD moved past the candidate (342.662846ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3662.27915
+
+--- stderr ---

@@ -1,0 +1,148 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs
+label: scripts-pipeline-start-preflight-antigravity-hard-enforcement
+exitCode: 1
+head: ae5b02b82a8a9814414dc38e5b8a0d5f5b1d9bb4
+tree: 3b4bea5b95aa8d0987ca659e7dc49c9a124dcf5b
+dirty: true
+--- stdout ---
+✔ a freshly written lock naming the current version is observed, with no warning (3.05442ms)
+✔ no lock file at all is not observed, with a clear warning naming GEMINI.md (0.417237ms)
+✔ no .git directory at all is not observed and never throws (0.277335ms)
+✔ a lock older than the freshness window is not observed, same as absent (0.955325ms)
+✔ a lock exactly at the freshness window boundary still counts as observed (inclusive) (1.012857ms)
+✔ the freshest of several session locks decides observed, even when older ones are stale (1.168229ms)
+✔ a future mtime is never trusted as evidence of freshness (0.576649ms)
+✔ a directory entry under run/ that is not a session-* name is ignored (0.537988ms)
+✔ scanning a session directory that turns out to hold no lock file at all does not throw (0.656811ms)
+✔ an injected scan failure folds into not-observed rather than throwing (fail-open) (0.412927ms)
+✔ a fresh lock naming a DIFFERENT version is not observed, exactly like an absent lock (0.801813ms)
+✔ a fresh lock with NO version field at all (an older-build body) is not observed (0.848534ms)
+✔ a fresh, version-matching lock alongside an older-build unversioned one still resolves observed via the matching entry (1.129948ms)
+✔ no currentVersion supplied at all means nothing can ever match, even a fresh version-carrying lock (0.634601ms)
+✔ an unparseable lock body (corrupted, not JSON) is not observed rather than throwing (0.767142ms)
+✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (100.449636ms)
+✔ the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready (14.808981ms)
+✔ the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed (13.280326ms)
+✔ the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed (13.461989ms)
+✔ wiring passes the preflight's own resolved version as currentVersion, not a second independently-derived one (23036.2987ms)
+✖ a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready (17117.028604ms)
+✖ a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready (16935.255567ms)
+✖ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (14.318345ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 19
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60241.155305
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:329:1
+✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (100.449636ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:344:12
+      at withTempRoot (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:129:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:330:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:431:1
+✖ a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready (17117.028604ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-refresh-required'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:441:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-refresh-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:444:1
+✖ a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready (16935.255567ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-refresh-required'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:454:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-refresh-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:466:1
+✖ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (14.318345ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      'architectureOrientation',
+      'bootstrapPayload',
+      'cloneProvisioning',
+      'concurrentSessionWarning',
+  ...
+      'installedVersion',
+  +   'mandatoryHookReadiness',
+      'nextAction',
+      'pluginRoot',
+      'rulesetSource',
+      'schema',
+      'status',
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:477:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'architectureOrientation', 'bootstrapPayload', 'cloneProvisioning', 'concurrentSessionWarning', 'effectiveDecisions', 'executionBoundary', 'handoff', 'installedPluginAttestation', 'installedSource', 'installedVersion', 'mandatoryHookReadiness', 'nextAction', 'pluginRoot', 'rulesetSource', 'schema', 'status', 'statusScope', 'version' ],
+    expected: [ 'architectureOrientation', 'bootstrapPayload', 'cloneProvisioning', 'concurrentSessionWarning', 'effectiveDecisions', 'executionBoundary', 'handoff', 'installedPluginAttestation', 'installedSource', 'installedVersion', 'nextAction', 'pluginRoot', 'rulesetSource', 'schema', 'status', 'statusScope', 'version' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

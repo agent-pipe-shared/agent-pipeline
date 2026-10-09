@@ -1,0 +1,16 @@
+STEP 04 intake-capture-apply, then inspect
+Placeholders: <repo-root-in-wsl>, <temp-repo>. Prefix CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core.
+
+04a  mkdir -p scratch && node -e "require('fs').writeFileSync('scratch/goal.txt', 'a CLI that counts words\n')" (inside <temp-repo>, manual workaround: the returned file route needs an existing regular file)
+     then: node .../project-onboarding-v3.mjs intake-capture-apply --root <temp-repo> --text-file scratch/goal.txt --text-file-sha256 $(sha256sum scratch/goal.txt | cut -d" " -f1) --activate --runner claude
+     exit code: 0
+     status: applied (pipeline.onboarding-intake-capture-apply.v1); evidence sha256 732881c0...3a8c12, 24 bytes, wrote true
+     PO answer used: product goal "a CLI that counts words" (one paragraph).
+     checkpoint: revision 1, transactionState design-questions-pending (the first capture ends collecting; no explicit "done describing" step was asked)
+     note: the capture action needed a hand-written input file and a hand-computed sha256 (manual workaround, listed as friction F5).
+
+04b  node .../project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+     exit code: 0
+     status: intake-design-questions-required; diagnostic intake_design_questions_required
+     nextAction: collect-input answersJson ("ask the PO the ONE bundled round of design questions this project still needs answered"); the output lists NO questions. applyAction intake-design-questions-apply --answers-json <JSON> --activate --runner claude; fileApplyAction --answers-file scratch/design-answers.json.
+     friction: the agent must invent the question list; the escape is {"disposition":"no-open-questions"}.

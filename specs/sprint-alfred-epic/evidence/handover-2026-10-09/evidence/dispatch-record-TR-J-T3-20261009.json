@@ -1,0 +1,79 @@
+{
+  "taskId": "TR-J-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "interim": true,
+  "stopReason": "DISPATCH-BUDGET-CHECKPOINT at call 52 of 65 (the briefing text said 75; the hook counts 65). Item 1 (commit-msg install test) is verified and committed; item 2 (toolchain R7-7e) is edited but has no after-run, so it is NOT committed. Item 3 (pre-push / pre-commit) not started.",
+  "log": [
+    { "phase": "opening: briefing + CONT15/CONT17 guard headers read, both preflights run (repo copy and loaded root)", "toolUses": 7 },
+    { "phase": "opening record written and read back", "toolUses": 10 },
+    { "phase": "orientation: both test files, snapshot module, hook-currentness, toolchain repair path; advisor consulted once", "toolUses": 29 },
+    { "phase": "baselines: commit-msg native+WSL, toolchain native+WSL (WSL needed a direct-run form, see openItems)", "toolUses": 45 },
+    { "phase": "edits: commit-msg test (committed later), toolchain R7-7e case (uncommitted)", "toolUses": 51 },
+    { "phase": "commit-msg after-run native+WSL, consumer-safe check, commit 0ad7ab3df", "toolUses": 58 },
+    { "phase": "interim record written, hand-back", "toolUses": 59 }
+  ],
+  "commits": [
+    "0ad7ab3df test(hook-install): snapshot a frozen plugin copy in the commit-msg install test (TR-J-T3) -- only plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs"
+  ],
+  "report": {
+    "dod": {
+      "commit-msg before/after, native + WSL": "passed (compared: native unchanged, WSL improved, see evidence)",
+      "toolchain before, native + WSL": "passed (captured; WSL only in the direct-run form)",
+      "toolchain after, native + WSL": "not reached (edit made, never run)",
+      "pre-push / pre-commit install tests": "not done; listed below",
+      "consumer-safe check": "passed (node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9, exit 0)",
+      "one commit of the changed test files": "partial: one commit for the commit-msg test; the toolchain test is uncommitted",
+      "terminal record": "not final: this is the interim record"
+    },
+    "evidence": [
+      "evidence/TR-J-T3-20261009/cmi-native-before.txt: win32, wrapped exit 1; tests 23, pass 21, fail 2 (CMI002, CMI018)",
+      "evidence/TR-J-T3-20261009/cmi-native-after.txt: win32, wrapped exit 1; tests 23, pass 21, fail 2 (the same CMI002, CMI018). Stderr line '# frozen plugin copy in use: commit-msg-hook-plugin-<rand>' proves the copy. State unchanged.",
+      "evidence/TR-J-T3-20261009/cmi-wsl-before.txt: wrapped exit 1; tests 23, pass 22, fail 1: CMI022 failed with GHS-SOURCE-DRIFT, i.e. a parallel writer hit the live tree (the T44/T58 symptom in the baseline itself)",
+      "evidence/TR-J-T3-20261009/cmi-wsl-after.txt: wrapped exit 0; tests 23, pass 23, fail 0, copy line present. The drift case now passes.",
+      "evidence/TR-J-T3-20261009/tcp-native-before.txt: win32, wrapped exit 0; tests 44, pass 44 (TCP040 passed, 49 s)",
+      "evidence/TR-J-T3-20261009/tcp-wsl-before.txt: FINAL contents are the direct-run baseline, wrapped exit 1; tests 44, pass 42, fail 2: TCP039 (path masking, pre-existing) and TCP040 ('the typed repair must exit 0 (got 2)', cause not captured). Earlier attempts at this path were overwritten, see openItems.",
+      "Commands: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <l> -- node --test <file>; WSL: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs ...\"; consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs (exit 0)."
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs: COMMITTED 0ad7ab3df. Frozen plugin-root copy (mkdtemp + cpSync once at load, only when PIPELINE_CORE_TEST_PLUGIN_LIB_DIR is unset), PLUGIN_LIB_DIR under it, after() removes it, three load-time assertions plus a stderr proof line; the lifecycle case's two planInstall calls now pass pluginLibDir (the currentness check reads the source tree when the marker's lib dir differs, hook-currentness.mjs:55-62). Imports after and basename added.",
+      "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs: UNCOMMITTED, UNVERIFIED. (1) new import line cpSync. (2) R7-7e case: cpSync of the plugin root into <fixture dir>/plugin-copy (removed by r77WithFixtureRepo), new assertion that repair argv[0] equals the live script, assertion that the spawned script is the copy, spawn [copy script, ...argv.slice(1)], and the exit-0 assertion message now appends stdout/stderr tails (message text only, same condition).",
+      "scratch/commit-msg/TR-J-T3.txt: commit message of the first commit (describes the commit-msg file only); write a fresh file for the toolchain commit.",
+      "evidence/TR-J-T3-20261009/*.txt: the captures above"
+    ],
+    "deliberatelyNotChanged": [
+      "The real-installer CLI case (CMI023, about line 388): kept on the LIVE installer, with a comment. Reason: installer :458 ensureHardenedPrivateDirectory (where the injected stub throws) runs before :459 publishGitHookRuntimeSnapshot, and a fresh git init repo has no marker so planInstall returns at :397-398 without a currentness inspection. The case never inventories the live tree and asserts the CLI's typed-refusal JSON, not a lib path.",
+      "harness/scripts/verify.mjs:909 lists 22 CMI ids but the file pins and registers 23 cases (the CLI typed-refusal case is the 23rd): a pre-existing mismatch in a forbidden file. No test case was added by this slice.",
+      "TCP039 under WSL fails on path masking ('<fixture>' vs the /tmp fixture path in the expected argv): pre-existing, unrelated, untouched.",
+      "CMI002 (a temp dir name containing a newline cannot exist on win32) and CMI018 fail natively before and after: pre-existing platform failures, untouched.",
+      "No production file, hooks/, lib/guard/ or harness/ file touched; pipeline-start-preflight.test.mjs untouched."
+    ],
+    "deviationsFromSpec": [
+      "Briefing field 1.2 says to keep asserting repair argv[0] is the live script 'as today'. The test did not assert that before; I ADDED the assertion (resolve(argv[0]) === R77_SCRIPT('toolchain-preflight.mjs')).",
+      "Briefing field 3 asks for ONE commit of the changed test files; the checkpoint forced a commit of the verified file only. The toolchain edit needs a second commit.",
+      "Briefing/hook budget mismatch: briefing says <= 75 tool uses, the hook enforced 65. Work stopped at the hook's checkpoint."
+    ],
+    "openItems": {
+      "next steps for the toolchain test (4 calls)": [
+        "1. Native after: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-J-T3-20261009/tcp-native-after.txt --label tcp-native-after -- node --test plugins/pipeline-core/scripts/toolchain-preflight.test.mjs. Expect tests 44, pass 44 (baseline pass 44).",
+        "2. WSL after, in the DIRECT-RUN form (see next item): expect TCP040 to turn green if the baseline exit 2 was GHS-SOURCE-DRIFT; TCP039 stays red (pre-existing). If TCP040 stays red, the new message carries the stdout/stderr tails of the child.",
+        "3. If native unchanged and WSL not worse: consumer-safe check, then git add -- the one path, a fresh message file (e.g. scratch/commit-msg/TR-J-T3b.txt, two trailers only), git commit -F ... -- the one path, then the terminal record.",
+        "4. If the copy cannot run the script (an import outside the plugin root), that is the stop condition 'cannot use a copy without changing its assertion': list and revert that hunk."
+      ],
+      "WSL form for toolchain-preflight.test.mjs": [
+        "node --test on this file fails at load under WSL with TCC-FD-WRITE / EINVAL, before and after any change: line ~769 hard-codes registerTestCaseCompletion({ cases, fd: 3, ... }), and on Linux fd 3 is an internal Node descriptor (win32 gets EBADF and the plain-file fallback). Working form: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <l> -- bash -c 'node plugins/pipeline-core/scripts/toolchain-preflight.test.mjs 3>/dev/null'\" (direct run, real fd 3). Use the same form for the after run so the pair is comparable. Redirecting 3>/dev/null outside capture-evidence and keeping node --test does NOT work."
+      ],
+      "item 3, pre-push / pre-commit install tests (not started)": [
+        "The suggested rg (PIPELINE_CORE_TEST_PLUGIN_LIB_DIR) matches only the commit-msg test. Live-lib consumers found by a different rg: pre-push-hook-install.test.mjs (:38 PLUGIN_LIB_DIR = live ../lib, no env override; many applyInstall/planInstall calls; :541 inspectGitHookSourceSnapshot double read of the live lib; :841 spawns the live installer), pre-commit-hook-install.test.mjs (:41-45 PLUGIN_ROOT/LIB/HOOKS/SCRIPTS all live; :72 spawns the live installer; :715 and :1003 applyInstall), pre-commit-hook-install.trust-anchor-bootstrap.test.mjs (:30-32 live pluginLibDir). Same fix shape applies (copy the plugin root once, point the dirs at it, after() cleanup); each needs its own 4 captures. Recommend a separate slice."
+      ],
+      "stop condition 1 (case changes state on an idle tree) did NOT fire": "The only state change is WSL CMI022, fail to pass. The before-run's own failure code (GHS-SOURCE-DRIFT) is machine evidence that the tree was NOT idle during that run: the baseline captured the very symptom the slice fixes. The idle-tree comparison that counts is native before vs after: identical (21 pass, CMI002 and CMI018 fail in both).",
+      "BRIEFING DEFECT: declared budget exceeds the enforced hook budget by 10": "Field 6 says <= 75 tool uses (+5); the DISPATCH-BUDGET-CHECKPOINT hook enforced 65 and fired at call 52. This is a briefing-vs-repo contradiction, not the run being short; it cost the second commit. Correct the follow-up briefing to the hook's number.",
+      "TCP040 WSL baseline ambiguity is load-bearing for the follow-up": "The baseline exit 2 has no captured cause. If it was GHS-SOURCE-DRIFT, TCP040 should turn green under WSL after the change. If it is a WSL-specific installer refusal (drvfs mode/ACL, or something in the --repair git-hooks path on Linux), unchanged red is the correct expected state and the fix is still valid as long as native stays 44/44. Classify from the stdout/stderr tails the new assertion message carries before deciding pass or fail; a still-red TCP040 is not a failed fix without that read. The WSL baseline file tcp-wsl-before.txt was overwritten twice (same --out path); its final contents are the direct-run form, and the after run MUST use the identical bash -c 'node <file> 3>/dev/null' form or the pair is not comparable.",
+      "not verifiable": "The process.stderr.write('# frozen plugin copy in use: ...') line at module load of commit-msg-hook-install.test.mjs. node --test passed 23/23 with it under WSL and shows the expected result natively, but whether harness/scripts/verify.mjs's suite runner treats non-empty stderr as a fault could not be checked (full Verify is forbidden on this host, harness/ forbidden to touch). If it does, drop the stderr line; the three load-time assertions remain the proof.",
+      "caveat": "cpSync of the live plugin root at load can itself race a parallel writer (ENOENT mid-copy); not seen in any of the 4 commit-msg runs, but possible on a very busy tree."
+    },
+    "status": "implementation partially complete: commit-msg part verified and committed; toolchain part edited, unverified; item 3 not started. Not PO-accepted, no independent Critic review."
+  }
+}

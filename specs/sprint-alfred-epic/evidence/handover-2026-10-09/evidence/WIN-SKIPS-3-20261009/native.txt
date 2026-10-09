@@ -1,0 +1,60 @@
+command: node --test plugins/pipeline-core/lib/dispatch-policy.test.mjs
+label: native
+exitCode: 0
+head: 03cd3eedeb763b209d0c11a87409e52419055cdb
+tree: aef88b7fe9084b6df925416f20859eb6d06576ed
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'input.txt', LF will be replaced by CRLF the next time Git touches it
+✔ DPT01 DP1 the real 2026-08-06 briefing is refused (2.4336ms)
+✔ DPT02 DP2 a references-only Critic dispatch passes (0.721ms)
+✔ DPT03 DP3 an expectation-conclusion is refused (0.4548ms)
+✔ DPT04 DP4 an implementor characterization is refused (0.3355ms)
+✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.4349ms)
+✔ DPT06 DP6 a complete Goldfish briefing passes (0.6627ms)
+✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (0.5658ms)
+✔ DPT08 DP8 a Goldfish dispatch that names no model is refused (0.4158ms)
+✔ DPT09 DP8b every budget-bearing role binds its declared cap before launch (1.9229ms)
+✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (0.894ms)
+✔ DPT11 DP8d a role without an adopted budget field receives no fabricated budget finding (0.1092ms)
+✔ DPT12 DP9 an unrelated subagent type is untouched (0.0948ms)
+✔ DPT13 DP10 a reworded steer passes -- the check is structural, not semantic (0.2844ms)
+✔ DPT14 DP11 the real critic-review.md template, filled, passes (1.2409ms)
+✔ DPT15 DP12 the real goldfish-task.md template, filled, passes (0.6862ms)
+✔ DPT16 DP13 every shipped role refuses an empty prompt before launch (1.0949ms)
+✔ DPT17 DP14 an unknown pipeline role is refused before launch (0.0752ms)
+✔ DPT18 DP15 Workflow requires the plugin prefix for every shipped role (0.8808ms)
+✔ DPT19 DP16 an unrelated host role remains outside the pipeline registry (0.078ms)
+✔ DPT20 DP17 the common envelope rejects a stale candidate tree before launch (205.6267ms)
+✔ DPT21 DP18 the common envelope rejects an unusable result destination (56.5272ms)
+✔ DPT22 DP18g one malformed packet reports independent static faults before launch (0.7246ms)
+✔ DPT23 DP18h independent role-policy faults are all log-safe and prelaunch (0.5957ms)
+✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (45.2452ms)
+✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (33.3479ms)
+✔ DPT26 DP18b a coordinator-owned result root is validated separately from candidate inputs (148.7003ms)
+✔ DPT27 DP18d explicit file destinations preserve the validated file contract (49.0816ms)
+✔ DPT28 DP18e return and stream destinations require no fabricated result path (97.2685ms)
+✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (1.6749ms)
+✔ DPT30 DP18a required source names are literal paths, never Git pathspecs (32.6429ms)
+✔ DPT31 DP18c a modified tracked source is rejected before launch (53.3746ms)
+✔ DPT32 DP19 every shipped role fails in PREPARE with zero launcher calls (298.4495ms)
+✔ DPT33 DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged (814.9415ms)
+✔ DPT34 DP21 batch execution propagates resultRoot and preserves mixed destinations (344.2284ms)
+✔ DPT35 DP22 legacy and explicit file destinations share one collision namespace (99.9618ms)
+✔ DPT36 DP23 occupied replacement after PREPARE blocks the affected launcher (200.2875ms)
+﹣ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (1.2286ms) # host limitation: symlinkSync was refused with EPERM on this host (no symlink privilege); the symlink-parent replacement case was not run
+✔ DPT38 DP24 required-input drift after PREPARE blocks the affected launcher (202.936ms)
+✔ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.1723ms)
+✔ DPT40 DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40) (0.2855ms)
+✔ DPT41 DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11) (0.4703ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 2774.2015
+
+--- stderr ---

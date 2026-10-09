@@ -1,0 +1,36 @@
+command: node scratch/t3g-plane-stat.mjs
+label: machine-plane-before
+exitCode: 0
+head: a662f4dc6e8e118531451d4d876278503a44ded4
+tree: 7c1afd68d9d92fdfe7f9959e9eaa38a01b22b608
+dirty: true
+--- stdout ---
+{
+  "schema": "t3g.machine-plane-observation.v1",
+  "directoryPresent": true,
+  "entries": [
+    {
+      "path": "~/.agent-pipeline/machine.json",
+      "kind": "file",
+      "sizeBytes": 287,
+      "mtimeMs": 1791027147588,
+      "sha256": "998a38d7e92a987aca3c53158f90fbf75093daa63d9d6eba08000c26bd34cf7a"
+    },
+    {
+      "path": "~/.agent-pipeline/po-keys",
+      "kind": "directory",
+      "sizeBytes": 4096,
+      "mtimeMs": 1787066689484,
+      "sha256": null
+    },
+    {
+      "path": "~/.agent-pipeline/po-keys-andre",
+      "kind": "directory",
+      "sizeBytes": 4096,
+      "mtimeMs": 1787072101309,
+      "sha256": null
+    }
+  ]
+}
+
+--- stderr ---

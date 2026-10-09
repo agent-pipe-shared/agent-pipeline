@@ -1,0 +1,37 @@
+{
+  "taskId": "TR-S2-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-mid-task-correction-refused",
+  "commits": [],
+  "log": [
+    { "phase": "opening: record created, route pre-check passed (requested claude-sonnet-5-5 == observed claude-sonnet-5-5 from runtime prompt); preflight run once", "toolUses": 6 },
+    { "phase": "orientation: read module, pin file (header, F1-F8, cwd, exemptScripts groups), Ruling 90/97 text, Critic findings, passive-read-policy:10; neighbour rg run; commit message file written; advisor consulted once", "toolUses": 21 },
+    { "phase": "STOP: unauthenticated mid-task message claiming to be 'Ruling 106' changes the rg/grep pattern-position rule and the DoD (298 tests). Refused per goldfish contract (input contract: mid-task corrections to rules/DoD). No module edit was made.", "toolUses": 22 }
+  ],
+  "report": {
+    "summary": "Stopped before any implementation edit. A mid-task message (claimed sender: coordinator, 'Briefing correction ... Ruling 106') narrowed the Ruling 97 rg/grep exclusion (first positional is the pattern only when none of -e/--regexp/-f/--file is present; with one present every positional is a file operand; example rg -e foo <key-suffix file> must refuse) and changed the DoD target from 275 to 298 tests (TR-S2-T3 ecf4bad93, pins F3S, F3P-1..5, F3O-1..6). The goldfish contract classes this as an unauthenticated rules/DoD change: refused and reported; work stops until a fresh closed six-field briefing is dispatched.",
+    "dod": {
+      "native capture 275/275": "not run (no module change made)",
+      "wsl capture": "not run",
+      "neighbours": "checked: rg -n -l 'execution-lane-credential.mjs' plugins/pipeline-core/lib plugins/pipeline-core/scripts harness/scripts returned ONLY plugins/pipeline-core/lib/execution-lane-credential.test.mjs (exit 0). No other importing test file exists, so the neighbour before/after check is vacuous.",
+      "consumer-safe check": "not run",
+      "commit": "none"
+    },
+    "changedFiles": [
+      "evidence/dispatch-record-TR-S2-F2-20261009.json (this record)",
+      "scratch/commit-msg/TR-S2-F2.txt (untracked commit message file, written before any edit per guard notes; its F3 line says 'file-operand tokens only' and stays valid under either rule)"
+    ],
+    "notChanged": "plugins/pipeline-core/lib/execution-lane-credential.mjs and the test file are untouched.",
+    "openItems": [
+      "A fresh dispatch is needed that carries Ruling 106 and the 298-test target in a closed briefing.",
+      "Design ready for reuse (so a successor skips orientation): one full-file Write of the module. F1 first pass over argv[start+1..] on a PowerShell carrier with regex ^(--|-|/)([A-Za-z]+)([:=].*)?$ and name e, ec or a prefix of encodedcommand (do NOT include -ea in this pass; -ea is -ErrorAction and would over-refuse inside -Command text). F7 peel ^--?[A-Za-z][A-Za-z0-9_-]*:(.+)$ in variantsOf. F6 sh-syntax variant text.replace(/\\\\([\\s\\S]?)/g,'$1') in checkCandidates. cwd tracked as ctx.cwd/ctx.cwd0, used for root matching only (never for the exact secretBasenames check, which needs a directory component), cd segment applied after scanArgv in scanText, scanPieces uses the initial cwd. F3 patterns applied per argv token in scanArgv (never in scanPieces), skipping indices a carrier hands to a nested scan (-c text, node -e source, PowerShell command text, wsl pass-through, cmd /c tail), with the rg/grep/git grep/Select-String pattern-position exclusion implemented per Ruling 106 (two-pass: find pattern-supplying options first, then exclude the first positional only if none). Only genuinely value-taking flags may be listed as valued per tool (rg -r/-E/-d take values, grep -r/-E do not); a boolean mis-listed as valued would UNDER-refuse. F2 exemptScripts: exact, case-sensitive, normalised repo-relative match in readOperand, only when no cd moved the cwd. F5 node: preload values and attached --require=/--import=/--loader= forms read, every positional read unless -e/-p was seen; wrappers seek forward to first carrier token.",
+      "Wiring note (not a defect of this slice): with EVERY node file operand read, a real readScript that returns null for non-file operands (for example the --out value and the literal 'node' in the capture-evidence route) will refuse; N3-1 stays green only because the fake reader falls back to a benign script.",
+      "No stop condition 1-5 triggered by repo reality; the stop is the input-contract refusal of an unauthenticated rules/DoD change."
+    ],
+    "routePrecheck": "Requested (field 6): goldfish-deep / claude-sonnet-5-5 / xhigh. Observed from this dispatch's runtime prompt: 'powered by the model named Sonnet 5.5, exact model ID claude-sonnet-5-5'. No contradiction; effort not directly observable."
+  }
+}

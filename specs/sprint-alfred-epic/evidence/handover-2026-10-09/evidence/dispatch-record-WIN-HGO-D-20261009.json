@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HGO-D-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "sonnet",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f06975126",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["050deb998"],
+  "resultSha256": null,
+  "report": {
+    "text": "PARTIAL (closing-allowance handover; independent review: pending). Committed 050deb998: classification report specs/sprint-alfred-epic/evidence/win-hgo-d-native-reds-2026-10-09.md. 25 reds classified from evidence/T90-T2-20261009/native.txt: 4 symlink-EPERM (test fault), 10 killed-writer helper (test fault: child lacks injected win32 private-state assurance, HGO-DACL before kill, no SIGKILL signal on win32), 1 held-lock-ambiguous (undetermined, leaning product, test.mjs:2814), 3 NVA-HGOFIX-2 host-default platform (test fault), 2 CROSSREPOGUIDANCE (undetermined, leaning test, sanitised text), 1 script-file backslash fixture (test fault), 4 T90 pins (green status NOT re-verified). Not done: fresh native run evidence/WIN-HGO-D-20261009/native.txt does not exist (whole-file run passed the 10-minute stop; background job may still be running and may write that file later). Next briefing: run the file in --test-name-pattern chunks, read acquireAuditLock 2500-2545, and get unsanitised text for CROSSREPOGUIDANCE.",
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/win-hgo-d-native-reds-2026-10-09.md"]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "orientation-done-record-opened", "toolUses": 10 },
+    { "phase": "native-run-exceeded-10min-stop; used T90 capture", "toolUses": 19 },
+    { "phase": "committed 050deb998; terminal record", "toolUses": 35 }
+  ]
+}

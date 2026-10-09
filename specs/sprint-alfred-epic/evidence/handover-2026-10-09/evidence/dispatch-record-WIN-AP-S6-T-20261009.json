@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S6-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "5cd3c2f8750830042ef25d15aa4c527166f018f2",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "39051c5d7de0fcaec9e2367c605bd925bd41ba0d"
+  ],
+  "resultSha256": "a3e0d36e92f9265339d47b25af5a7f37bf2041b2b8f00a3958a901d429275fdf",
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT18/CONT35 headers + WIN-AP-S6-T section + goldfish-task 455-481 read; preflight run; record created",
+      "toolUses": 15
+    },
+    {
+      "phase": "orientation: root-creation test, private-boundary, human-guard-override secureDirectory, ensureAgentPipelineRoot read; advisor consulted; predicted pins (f) green, (g)/(h) red",
+      "toolUses": 26
+    },
+    {
+      "phase": "implementation: 6 pins appended (f/g/h per helper); native run exit 1 = 6 failing (g x2, h x2 mine; b, c existing native DACL reds); WSL run exit 1 = 4 failing (g x2, h x2, all mine); pins (f) green on both hosts (stop condition 1: reported)",
+      "toolUses": 32
+    },
+    {
+      "phase": "committed 39051c5d7 (test file only; evidence artifacts left uncommitted, written by capture-evidence.mjs)",
+      "toolUses": 35
+    },
+    {
+      "phase": "closing: final record written, finalizer binds resultSha256 and expands the commit to 40-hex",
+      "toolUses": 38
+    }
+  ],
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded | Project agent-pipeline-share | Calibration (not named in briefing) | State briefing WIN-AP-S6-T-20261009 | Role Goldfish\nRoute pre-check: not an A/G/S class (class test-only, QG-04); requested route sonnet/xhigh; observed identity from this dispatch's runtime prompt: 'Sonnet 5.5, claude-sonnet-5-5'. No contradiction.\n\n1. DoD results\n- Pins (g) repair-in-place and (h) exactly-one PB-ROOT-REPAIRED warning, for private-boundary.ensurePrivateDirectory and human-guard-override.secureDirectory (humanGuardOverrideInternals.secureDirectory): red on both hosts for the stated reason (the helper leaves the pre-existing insecure agent-pipeline segment insecure and emits no warning, so it does not call ensureAgentPipelineRoot): passed.\n- Pins (f) fresh-repository privacy, both helpers: failed as 'red' - they are GREEN today on both hosts (both helpers already mkdir 0o700 and harden every created component). Briefed stop condition 1 fired and is reported here; the pins are kept as regression guards for the S6 production slice.\n- Every existing case unchanged: passed by diff (git commit reports 107 insertions, 0 deletions, no existing line touched) plus the artifacts: WSL existing cases (a),(b),(c),(e premise),(e) all green; native (a),(e premise),(e) green and (b),(c) red with reason 'private path DACL grants a non-owner principal', exactly the native-DACL red documented in the file header (lines 22-23). No before-run was taken.\n- One commit with the exact subject: passed (39051c5d7, 'test(agent-pipeline-root): pin the shared private-directory helpers on the hardened entry point').\n- Terminal dispatch record: passed once the finalizer ran.\n\n2. Evidence\n- Native: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-AP-S6-T-20261009/native-red.txt --label native-red -- node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs ; wrapped exit 1; 11 tests, 5 pass, 6 fail (b, c existing; g x2, h x2 mine).\n- WSL: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-AP-S6-T-20261009/wsl-red.txt --label wsl-red -- node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs\" ; wrapped exit 1; 11 tests, 7 pass, 4 fail (g x2, h x2, all mine).\n- Failure texts: (g) 'the pre-existing insecure agent-pipeline segment is still insecure after the helper ran (native status=insecure, reason=private path DACL grants a non-owner principal; WSL mode=0o755); the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)'; (h) 'expected exactly one PB-ROOT-REPAIRED warning, saw 0 (codes seen: no warning)'.\n- Record: evidence/dispatch-record-WIN-AP-S6-T-20261009.json.\n\n3. Changed files\n- plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs: appended 107 lines, pins (f)/(g)/(h) per helper, with a S6 comment block, a warning-capture helper and a lazy helper loader.\n\n4. Deliberately not changed\n- No production file; human-guard-override.test.mjs untouched (WIN-HGO-S5 edits it in parallel); the foreign uncommitted edits named in the CONT35 header untouched.\n- The file header 'expected state' paragraph (lines 19-24) is now stale ((a) and (e) are green): not mine to fix.\n- The native (b)/(c) reds belong to existing cases and were left as they are.\n\n5. Deviations from spec\n- Pins (f) are green, not red (stop condition 1); committed anyway as guards rather than dropped, because the Goal lists them. The dispatcher may drop them.\n- secureDirectory has no named export; it is reached through humanGuardOverrideInternals.secureDirectory. Both helpers are loaded by dynamic import inside the pins so a missing export can never break the existing cases in this file.\n- Orientation used about 26 calls, over the briefed 10 (a refused first Write needed the preflight path named by the refusal; the context files were larger than expected).\n\n6. Open items\n- Stop condition 1 (a pin green today) fired and is reported; this is a completed run with a disclosed DoD miss, not a closing-allowance handover. Outcome 'partial' for that reason only.\n- Artifacts bind head ef1ba84dee3113ff9bab957075d3120d81d597dc with dirty:true (the foreign uncommitted edits), not the briefed candidate 5cd3c2f87; HEAD moved during the run.\n- Left uncommitted for integration: evidence/WIN-AP-S6-T-20261009/native-red.txt, evidence/WIN-AP-S6-T-20261009/wsl-red.txt, this record (changedFiles covers only the commit).\n- Design note for the S6 production slice: the helpers receive only a path below agent-pipeline, not the git common directory, so S6 must derive the anchor from the path before calling ensureAgentPipelineRoot; the pins call both helpers one level below the segment, as production does.\n- independent review: pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs"
+    ]
+  }
+}

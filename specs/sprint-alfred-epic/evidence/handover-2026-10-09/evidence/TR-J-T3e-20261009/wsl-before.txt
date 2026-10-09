@@ -1,0 +1,55 @@
+command: node --test plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs
+label: wsl-before
+exitCode: 1
+head: e7faf494a8b7aa38293d7c895aa1b678919868cb
+tree: 5bbb5f1cf60af36410ce4dcf9fd032af6b4b6e92
+dirty: true
+--- stdout ---
+✔ RED F1 (a): current+install and refresh+install, in either order, read provisioning-required (today: blocked / HOOK-READINESS-STATE-UNSUPPORTED) (1.06878ms)
+✔ GREEN control F1 (b): the widening does not leak -- foreign, decline and unresolved entries still block or stay unresolved (0.278755ms)
+✔ RED F1 (c): a really installed pre-commit hook beside a missing commit-msg hook inspects as provisioning-required with the coordinator action (26159.802321ms)
+✔ RED F1 (d): apply installs ONLY the install entry (commit-msg); the current pre-commit hook and its marker stay byte-identical (58038.153594ms)
+✔ RED F1 (e): mirror -- a really installed commit-msg hook beside a missing pre-commit hook: only pre-commit is installed (39871.336313ms)
+✔ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (30295.574203ms)
+✔ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (92145.684293ms)
+✖ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (46116.397841ms)
+✔ CHR001 non-repository roots never trigger Git initialization or hook writes (8.222892ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 292972.847286
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:222:1
+✖ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (46116.397841ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'pre-commit-hook',
+  +   'commit-msg-hook'
+    ]
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:230:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:222:175)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'pre-commit-hook', 'commit-msg-hook' ],
+    expected: [ 'pre-commit-hook' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

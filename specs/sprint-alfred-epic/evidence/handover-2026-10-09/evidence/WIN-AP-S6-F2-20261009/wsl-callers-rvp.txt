@@ -1,0 +1,40 @@
+command: node scratch/dispatch-wip/WIN-AP-S6-F/run-callers.mjs plugins/pipeline-core/scripts/release-version-plan.test.mjs
+label: WINAPS6F2-wsl-rvp
+exitCode: 0
+head: e59ac57506428e517cfa15205a09b05ac59dd39c
+tree: 11231d03e613f9319e4716d4c9eee7f3d514a196
+dirty: true
+--- stdout ---
+=== plugins/pipeline-core/scripts/release-version-plan.test.mjs 
+PASS explicit stable patch selection preserves 0.4.7 without forcing next minor
+PASS explicit beta selection binds exact prerelease channel, version, tag and candidate
+PASS higher observed baseline constrains but does not choose an explicit target
+PASS next-minor helper remains recommendation metadata only
+PASS SemVer comparison is numeric, not lexical
+PASS prerelease, build metadata, and substituted tag fail closed
+PASS alpha, missing selection, implicit target and malformed beta identifiers fail closed
+PASS selection tag mismatch and a target not above observed stable fail closed
+PASS missing annotated or ancestral proof fails before a decision exists
+PASS stale, future, and skewed fetch observations fail closed
+PASS the durable ID binds both channels, target, and observer time
+PASS private storage uses exactly one no-replace canonical record path
+PASS sealed plan binds the exact decision and all six version surfaces
+PASS surface consistency requires exact VERSION bytes and all resolved versions
+PASS plan rejects decision substitution and candidate channel mismatch
+PASS sealed plan storage is private, immutable, and retains an explicit-ID journal
+PASS prepared plan journal recovers only its named absent or exact record
+PASS release plan completeness gate (CYB-2I-3): fresh bound non-blocking pair is a pass (empty failure array)
+PASS release plan completeness gate (CYB-2I-3): blocking verdict surfaces the shared gate's own failure line
+PASS release plan completeness gate (CYB-2I-3): missing evidence fails closed with both reasons reported
+PASS release plan completeness gate (CYB-2I-3): evidence bound to a different commit/tree than the plan's own private candidate is caught
+PASS release plan completeness gate (CYB-2I-3): requires an already-sealed plan
+PASS release plan completeness gate (CYB-2I-3): requires a caller-supplied projectDir (no process.cwd() default)
+PASS release AC8 caller (CYB-2I-3R): non-blocking verdict stores exactly what storeReleaseVersionPlan itself would
+PASS release AC8 caller (CYB-2I-3R): blocking verdict fails closed before storeReleaseVersionPlan ever runs (no record/journal written)
+PASS release AC8 caller (CYB-2I-3R): missing evidence fails closed through the orchestrator too, observed via the caller not the gate directly
+26/26 cases passed.
+WINAPS6-REDIRECT-NOT-FIRED private-boundary.mjs (0 loads)
+WINAPS6-REDIRECT-NOT-FIRED human-guard-override.mjs (0 loads)
+=== exit 0
+
+--- stderr ---

@@ -1,0 +1,32 @@
+command: node --test plugins/pipeline-core/lib/hardened-private-directory.test.mjs
+label: hpd-before
+exitCode: 0
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+✔ non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers (2.7831ms)
+✔ win32 hardens every directory it created before descending and only assesses pre-existing ones (1.8202ms)
+✔ win32 refuses a pre-existing insecure directory instead of silently re-hardening it (1.334ms)
+✔ win32 fails closed when hardening a directory it just created does not end secure (0.8659ms)
+✔ a target outside the anchor and a non-directory segment are refused on every platform (1.5063ms)
+✔ real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened (2230.3535ms)
+✔ pre-commit installer creates its private state directories with a secure DACL (1463.903ms)
+✔ commit-msg installer creates its private state directories with a secure DACL (1445.6934ms)
+✔ win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory (2.1638ms)
+✔ win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory (1.7322ms)
+✔ win32 removes only the failing created segment and never a pre-existing parent (1.3597ms)
+✔ win32 removes a failed created segment only while it is still empty and says when it could not (1.2895ms)
+✔ win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged (0.7738ms)
+✔ win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy (0.9959ms)
+✔ win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy (1.0042ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5224.2138
+
+--- stderr ---

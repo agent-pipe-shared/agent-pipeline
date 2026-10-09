@@ -1,0 +1,123 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/dispatch-policy.test.mjs
+label: CRITIC-BUDGET-T-red
+exitCode: 1
+head: 8fad54b6dd5c26d0c3bac5348bfeb43b1654cdc7
+tree: 3199399bd3fd57a5d313859088d77422c4fd420d
+dirty: true
+--- stdout ---
+✔ DPT01 DP1 the real 2026-08-06 briefing is refused (13.865399ms)
+✔ DPT02 DP2 a references-only Critic dispatch passes (12.045796ms)
+✔ DPT03 DP3 an expectation-conclusion is refused (11.911193ms)
+✔ DPT04 DP4 an implementor characterization is refused (10.861431ms)
+✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (11.553377ms)
+✔ DPT06 DP6 a complete Goldfish briefing passes (11.364842ms)
+✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (10.908384ms)
+✔ DPT08 DP8 a Goldfish dispatch that names no model is refused (12.476173ms)
+✔ DPT09 DP8b every budget-bearing role binds its declared cap before launch (91.925578ms)
+✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (38.209134ms)
+✔ DPT11 DP8d a role without an adopted budget field receives no fabricated budget finding (0.195944ms)
+✔ DPT12 DP9 an unrelated subagent type is untouched (0.151333ms)
+✔ DPT13 DP10 a reworded steer passes -- the check is structural, not semantic (11.069918ms)
+✔ DPT14 DP11 the real critic-review.md template, filled, passes (26.598368ms)
+✔ DPT15 DP12 the real goldfish-task.md template, filled, passes (30.023941ms)
+✔ DPT16 DP13 every shipped role refuses an empty prompt before launch (47.186012ms)
+✔ DPT17 DP14 an unknown pipeline role is refused before launch (0.202264ms)
+✔ DPT18 DP15 Workflow requires the plugin prefix for every shipped role (50.283521ms)
+✔ DPT19 DP16 an unrelated host role remains outside the pipeline registry (0.216974ms)
+✔ DPT20 DP17 the common envelope rejects a stale candidate tree before launch (37.9795ms)
+✔ DPT21 DP18 the common envelope rejects an unusable result destination (23.571069ms)
+✔ DPT22 DP18g one malformed packet reports independent static faults before launch (0.885637ms)
+✔ DPT23 DP18h independent role-policy faults are all log-safe and prelaunch (13.994642ms)
+✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (23.50849ms)
+✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (16.799674ms)
+✔ DPT26 DP18b a coordinator-owned result root is validated separately from candidate inputs (67.850818ms)
+✔ DPT27 DP18d explicit file destinations preserve the validated file contract (22.307468ms)
+✔ DPT28 DP18e return and stream destinations require no fabricated result path (43.053725ms)
+✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (0.473319ms)
+✔ DPT30 DP18a required source names are literal paths, never Git pathspecs (11.588837ms)
+✔ DPT31 DP18c a modified tracked source is rejected before launch (21.655334ms)
+✔ DPT32 DP19 every shipped role fails in PREPARE with zero launcher calls (190.108783ms)
+✔ DPT33 DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged (428.635674ms)
+✔ DPT34 DP21 batch execution propagates resultRoot and preserves mixed destinations (197.701372ms)
+✔ DPT35 DP22 legacy and explicit file destinations share one collision namespace (60.786599ms)
+✔ DPT36 DP23 occupied replacement after PREPARE blocks the affected launcher (108.118276ms)
+✔ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (102.349887ms)
+✔ DPT38 DP24 required-input drift after PREPARE blocks the affected launcher (107.101882ms)
+✖ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.657103ms)
+✖ DPT40 DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40) (12.327791ms)
+✖ DPT41 DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11) (12.901491ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 38
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2058.046422
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.657103ms)
+  AssertionError [ERR_ASSERTION]: Ruling 98(c): the Critic default base cap is 30, got "- **Tool budget (hard cap, first-class field):** ≤24 tool uses."
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:704:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '- **Tool budget (hard cap, first-class field):** ≤24 tool uses.',
+    expected: /^- \*\*Tool budget \(hard cap, first-class field\):\*\* ≤30 tool uses\.$/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ DPT40 DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40) (12.327791ms)
+  AssertionError [ERR_ASSERTION]: Ruling 98(c): plugins/pipeline-core/agents/critic.md raises maxTurns to 50
+  
+  40 !== 50
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:709:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 40,
+    expected: 50,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ DPT41 DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11) (12.901491ms)
+  AssertionError [ERR_ASSERTION]: default base cap
+  
+  24 !== 30
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:720:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 24,
+    expected: 30,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

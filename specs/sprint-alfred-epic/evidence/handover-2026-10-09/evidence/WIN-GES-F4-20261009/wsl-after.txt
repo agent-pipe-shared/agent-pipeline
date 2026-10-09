@@ -1,0 +1,76 @@
+command: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs
+label: wsl
+exitCode: 0
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+✔ portable append publishes canonical bytes, readback checkpoint, and source-last head (55.558311ms)
+✔ ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality (192.60604ms)
+✔ ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused (99.604782ms)
+✔ exact idempotency is a zero-write replay while a conflicting key fails closed (65.463337ms)
+✔ D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe (21.901967ms)
+✔ agent journal payloads persist only as candidate-bound, closed observational events (37.806479ms)
+✔ portable admission requires the exact effective policy and closed safe payload (33.665383ms)
+✔ A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can (54.560127ms)
+✔ A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out (30.123479ms)
+✔ verification is checkpoint-aware and queries return only validated chain records (77.232064ms)
+✔ tampering, non-canonical bytes, and forks fail before projection or query (76.525533ms)
+✔ K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query (50.942613ms)
+✔ inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present (121.678939ms)
+✔ K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery (71.166548ms)
+✔ K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record (96.760757ms)
+✔ inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere (37.65817ms)
+✔ inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences (37.888677ms)
+✔ K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file (162.957354ms)
+✔ K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept (86.508027ms)
+✔ K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK (117.130089ms)
+✔ K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths (90.696143ms)
+✔ ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members (0.121058ms)
+✔ ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable (65.079942ms)
+✔ ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged (162.195534ms)
+✔ ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim (114.628581ms)
+✔ ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature (119.748477ms)
+✔ ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode (105.949623ms)
+✔ ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork (128.354234ms)
+✔ ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature (99.85132ms)
+✔ ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now (146.444291ms)
+✔ ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too (66.286382ms)
+✔ K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception (145.099323ms)
+✔ K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL (98.087577ms)
+✔ K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream (112.335374ms)
+✔ K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection (64.276136ms)
+✔ symlink, cross-repository, and writer-owned intent fields are rejected (40.653134ms)
+✔ NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect) (48.522912ms)
+✔ NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY) (59.322832ms)
+✔ NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused (70.579637ms)
+✔ NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths (41.070119ms)
+✔ projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events (93.892202ms)
+✔ writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer (82.267234ms)
+✔ competing dead-lock recovery cannot delete a newly acquired writer lock (72.806041ms)
+✔ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (116.451189ms)
+✔ K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened (141.227262ms)
+✔ PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed (16.934145ms)
+✔ PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened (16.659831ms)
+✔ PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed (19.141821ms)
+✔ PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) (16.344224ms)
+✔ PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch (16.396104ms)
+✔ existing repository identity: missing identity refuses without creating namespace or binding (8.720554ms)
+✔ existing repository identity: legacy identity refuses without migration or changed bytes (14.194748ms)
+✔ existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes (32.58864ms)
+✔ existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding (118.561247ms)
+✔ existing repository identity: multiple links and writable binding refuse (13.766615ms)
+✔ existing repository identity: file/root symlink aliases refuse (9.252295ms)
+﹣ WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened existing-v2 binding is accepted (0.146888ms) # POSIX-MODE-HONOURED: this host honours POSIX mode bits, where the existing-binding mode predicate is correct; the pin applies only to hosts that do not
+✔ existing repository identity: oversized binding is rejected while preserving exact synthetic bytes (8.516707ms)
+✔ existing repository identity: linked worktree observes same common identity; bare repository remains unsupported (31.245362ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 58
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 4332.327783
+
+--- stderr ---

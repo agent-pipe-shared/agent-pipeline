@@ -1,0 +1,20 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs
+label: lib-design-workflow-candidate-binding
+exitCode: 0
+head: f9a2a8409f256a970954be89f738bae099b44075
+tree: 3dcdb1c0ba60203f89e61c94bca76ac62d20e0d9
+dirty: true
+--- stdout ---
+✔ CANDBIND-a implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (664.024663ms)
+✔ CANDBIND-b the default (strict) read of the same package still refuses a HEAD that moved past the candidate (566.461698ms)
+✔ CANDBIND-c the host verifier's supplemental Advisor re-read stays strict by default once HEAD moved past the candidate (554.394523ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4937.875022
+
+--- stderr ---

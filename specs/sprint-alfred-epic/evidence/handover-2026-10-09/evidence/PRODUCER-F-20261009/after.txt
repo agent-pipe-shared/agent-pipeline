@@ -1,0 +1,87 @@
+command: node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+label: native
+exitCode: 1
+head: c7abe2c1a3039fc1d77a750adeaceeaaa92c1f29
+tree: 2b53d4e4f4dbdcae66b787484828256b9a03291c
+dirty: true
+--- stdout ---
+✖ legacy Goldfish command flow renders separate exact-path argv without shell composition (4.7745ms)
+✔ legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata (0.42ms)
+✔ CLI maps repeated body/path flags exactly and never executes Git (0.6079ms)
+✔ CLI normalizes unsorted --path input to the sorted output and still refuses duplicates (0.4381ms)
+✖ generated commands create one exact-path Git commit with the required trailer block (137.8038ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (a) fixture sanity: the producer returns the stage and commit steps (0.2866ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.8221ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (c) RED by design: copyCommand.posix of each step contains no newline (0.2791ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.2918ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (e) RED by design: copyCommand.powershell of each step contains no newline (0.2409ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (a) fixture sanity: the producer returns the stage and commit steps (0.2839ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.334ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (c) RED by design: copyCommand.posix of each step contains no newline (0.2695ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.265ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (e) RED by design: copyCommand.powershell of each step contains no newline (0.2363ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (a) fixture sanity: the producer returns the stage and commit steps (0.2052ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.7564ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (c) RED by design: copyCommand.posix of each step contains no newline (0.1347ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.1704ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (e) RED by design: copyCommand.powershell of each step contains no newline (0.1154ms)
+✔ PRODUCER-T (a) RED by design: the library commit step is the message-file route and carries message and path (0.2263ms)
+✔ PRODUCER-T (b) RED by design: the in-process CLI returns the same message-file route as the library (0.2854ms)
+✔ PRODUCER-T (c) RED by design: messagePath and message follow the task id and the input text (0.1537ms)
+✔ PRODUCER-T (d) RED by design: the producer names the message file but writes nothing (0.8786ms)
+✔ PRODUCER-T (e) RED by design: every commit command rendering parses to exactly the message-file argv (0.2582ms)
+✔ PRODUCER-T (f) RED by design: with the returned message written to messagePath, the two steps create the exact-path commit (204.2147ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 24
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 621.8661
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:18:1
+✖ legacy Goldfish command flow renders separate exact-path argv without shell composition (4.7745ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(result.steps[1].command.includes("'Keep the user'"))
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:25:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:84:1
+✖ generated commands create one exact-path Git commit with the required trailer block (137.8038ms)
+  AssertionError [ERR_ASSERTION]: bash -c: fatal: could not read log file 'scratch/commit-msg/GF-42.txt': No such file or directory
+  
+  
+  128 !== 0
+  
+      at run (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:90:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:100:34)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 128,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

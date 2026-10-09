@@ -1,0 +1,13 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "3ca198f4e543d92ba81418a06664219f7c2aa542"
+  ],
+  "report": {
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-command-grammar.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/shell-grammar.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-F-MANIFEST.md"
+    ]
+  }
+}

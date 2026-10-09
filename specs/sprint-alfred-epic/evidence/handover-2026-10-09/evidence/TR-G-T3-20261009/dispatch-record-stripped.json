@@ -1,0 +1,12 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "669705780065cbc3432332a50e6cd0f90a6bfb6d"
+  ],
+  "report": {
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  }
+}

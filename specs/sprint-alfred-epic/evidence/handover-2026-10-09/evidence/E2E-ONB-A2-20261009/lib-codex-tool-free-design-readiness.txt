@@ -1,0 +1,24 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/codex-tool-free-design-readiness.test.mjs
+label: lib-codex-tool-free-design-readiness
+exitCode: 0
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ closed five-source host composition persists and verifies an exact bound receipt (3996.086689ms)
+✔ reviewed not-ready is preserved as an actual report, never converted to approval (1397.481201ms)
+✔ ready report with a blocker cannot be persisted (914.467684ms)
+✔ model tool attempt remains a distinct transport failure with no report (863.734658ms)
+✔ source or candidate drift after a clean review prevents publication (869.245948ms)
+✔ initial source mismatch and aliased inventory refuse before host invocation (101.972511ms)
+✔ uncommitted bytes cannot masquerade as a candidate-bound design source (100.593348ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8806.309208
+
+--- stderr ---

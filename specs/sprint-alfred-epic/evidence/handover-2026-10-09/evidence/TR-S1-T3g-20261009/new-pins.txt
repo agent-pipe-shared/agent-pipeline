@@ -1,0 +1,44 @@
+command: node --test "--test-name-pattern=leaves no copy of the private key" "--test-name-pattern=writes the machine plane into the injected home" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: new-pins
+exitCode: 1
+head: eae79f881a5335e1256961c745c5baba11cf651e
+tree: ea3b14c64d7191914d6e0ba1f64d1f44dd32f8af
+dirty: true
+--- stdout ---
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1650.637609ms)
+✔ the in-process setup step writes the machine plane into the injected home and never into the ambient home (14.274065ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5301.060961
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1160:1
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1650.637609ms)
+  AssertionError [ERR_ASSERTION]: a failed key derivation must leave no copy of the private key in the target directory
+  + actual - expected
+  
+  + [
+  +   'po-private.pem'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1184:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'po-private.pem' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

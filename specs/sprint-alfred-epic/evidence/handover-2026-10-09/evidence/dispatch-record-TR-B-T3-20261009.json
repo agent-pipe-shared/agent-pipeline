@@ -1,0 +1,73 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-B-T3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "9d2c4b27fd85bb3db6e03f5237cd53ad0dd94222",
+  "branch": "feat/sprint-alfred",
+  "outcome": "in-progress",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17 header, goldfish-task 455-481 read; first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, preflight run alone from the loaded plugin root (status ready); opening record written. Route pre-check: no A/G/S class declared; requested goldfish-deep / claude-sonnet-5-5 / xhigh, observed runtime prompt names claude-sonnet-5-5 (match)", "toolUses": 6 },
+    { "phase": "orientation: record readback, TR-B-T2 record, TR-G-MANIFEST shape read; sha256 check PASSED: post-image fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641 (702208 bytes) equals the expected value; live file sha256 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40 unchanged from T2; HEAD 9d2c4b27fd85bb3db6e03f5237cd53ad0dd94222", "toolUses": 10 },
+    { "phase": "WSL capture started (briefing command verbatim, Bash timeout 600000): exceeded the 600 s foreground cap and was auto-moved to a background task (id bjgsm00yi, output file empty because capture-evidence writes at the end)", "toolUses": 11 },
+    { "phase": "80 % checkpoint notice fired on call 13 (ls of evidence/TR-B-T-20261009/: red.txt still the FIRST-run file, 67559 bytes, mtime 03:56:37 +0200, i.e. not yet overwritten). Call 14 (WSL ps, diagnostic only): capture-evidence pid 582 alive at 10:46 elapsed, node --test pid 678/684 alive at 10:20 elapsed, alongside four other dispatches' WSL suites (ADR0085-F2a, TR-C-T3, T90-F2, WINPRIV-T2). No hang diagnosis possible; the machine is loaded. Hand-back, nothing committed, no pin state read for the fixed block", "toolUses": 14 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "post-image identity: sha256 equals the expected value",
+        "command": "sha256sum specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs && wc -c specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs && git rev-parse HEAD",
+        "exitCode": 0,
+        "artifact": "stdout only: fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641 for the post-image, 702208 bytes; live file 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40"
+      }
+    ],
+    "remainsUndone": [
+      "WSL capture: STILL RUNNING in the background at hand-back (task id bjgsm00yi, capture-evidence pid 582 and node --test pid 678/684 inside WSL, 10+ minutes elapsed, machine loaded by four other dispatches' WSL suites). Its result is not held; it will overwrite evidence/TR-B-T-20261009/red.txt when it finishes. red.txt on disk is still the first-run file (mtime 03:56:37 +0200, 67559 bytes).",
+      "Reading the TR-B pin states and the totals from the new red.txt: not done (no new result).",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md: not written.",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: not run.",
+      "scratch/commit-msg/TR-B-T3.txt, git add, git commit: not done; nothing committed.",
+      "Terminal dispatch record: not written (this record stays in-progress as an interim hand-back, resultSha256 null).",
+      "Left modified and UNCOMMITTED by this dispatch: none beyond this git-ignored record. Foreign state untouched: the post-image stays untracked and unchanged (sha256 verified), the index still holds the foreign staged files."
+    ],
+    "nextBriefingAdjustments": [
+      "First check whether background task bjgsm00yi finished: WSL ps for capture-evidence / trb.test, and whether evidence/TR-B-T-20261009/red.txt has an mtime newer than 03:56:37 +0200 on 2026-10-09. Do NOT launch a second capture to the same --out while pid 582 is alive; two writers race on one file.",
+      "The foreground Bash cap is 600 s and this machine is loaded by parallel WSL suites, so a continuation cannot hold the capture result in-turn. Let the Elephant (which gets a completion notification) own the capture, or accept the finished red.txt as an input artifact, and brief the continuation to start at the pin-state read.",
+      "With red.txt already finished, the remaining sequence is 8 calls: (1) rg -n \"TR-B \" evidence/TR-B-T-20261009/red.txt plus one rg for the summary lines, (2) TR-B-MANIFEST.md, (3) consumer-safe test, (4) commit message file, (5) git add -- <post-image> <manifest>, (6) git commit -F ... -- <same paths>, (7) record. Overhead before it: first Write is refused GUARD-BOOTSTRAP-RECEIPT-MISSING (run the preflight from the loaded plugin root, then retry), so allow a base cap of about 12 and keep orientation to the record and the TR-G-MANIFEST shape. The manifest content (target, hashes, command, oracle, relocation-noise cases, Not done here) is fully specified by the briefing and the TR-B-T2 record.",
+      "The stop conditions of the TR-B-T3 briefing stay in force and are not yet evaluated: a TR-B pin red for a reason other than its title, all 9 strict refuse pins red at the unmodified-spelling step (pre-existing key-read hole), more than 3 pre-existing cases changing state against the first-run states in the TR-B-T2 log (QP3-2b and QP3-2c are the expected two)."
+    ]
+  },
+  "report": {
+    "text": "INTERIM hand-back at the 80 % checkpoint (hook notice on counted call 13 of 16; the record write is call 15). independent review: pending. Implementation NOT complete. Nothing committed. This is a closing-allowance-style hand-back, not a completed run.\n\nRoute pre-check: not an A/G/S dispatch (no class declared in field 6). Requested goldfish-deep, claude-sonnet-5-5 / xhigh; observed in this dispatch's runtime prompt: 'powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. No contradiction.\n\n1. DoD results. (a) WSL capture exists, machine-written, totals and pin states reported: NOT MET. The briefing's capture command was run verbatim (call 11) and exceeded the 600 s foreground cap; it was moved to a background task (id bjgsm00yi). At call 14 it was still alive inside WSL (capture-evidence pid 582 at 10:46 elapsed, node --test pid 678/684 at 10:20), beside four other dispatches' WSL suites, so the machine is loaded; no evidence of a hang either way. evidence/TR-B-T-20261009/red.txt on disk is still the FIRST-run capture (67559 bytes, mtime 03:56:37 +0200). Totals and pin states of the rebuilt post-image: not verifiable. (b) TR-B-MANIFEST.md: not written. (c) consumer-safe test: not run. (d) commit: none; the stop condition 'post-image sha256 differs' was checked and does NOT apply (sha256 matches). Passed: post-image identity check only.\n\n2. Evidence. sha256sum specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs && wc -c <post-image> && git rev-parse HEAD, exit 0: post-image fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641, 702208 bytes (equal to the expected value); live file 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40; HEAD 9d2c4b27fd85bb3db6e03f5237cd53ad0dd94222. WSL ps: wsl.exe -e bash -lc \"ps -eo pid,etime,args | rg -n 'trb.test|capture-evidence'\", exit 0, showed pids 582/678/684 alive. No capture artifact of this dispatch exists yet.\n\n3. Changed files. evidence/dispatch-record-TR-B-T3-20261009.json (this record; evidence/ is git-ignored). No other file was written by this dispatch.\n\n4. Deliberately not changed. build.mjs, the scratch runnable copy, the post-image, every file under plugins/ and harness/, the tranche README, every foreign staged or dirty file, the index. The still-running WSL job was not killed or re-launched (killing it would discard a 10-minute run; a second capture would race on the same --out).\n\n5. Deviations. (a) Stopped at the 80 % checkpoint with the capture unfinished, as the hook directs. (b) A nested capture is running in the background and this turn ends without its result, the pattern goldfish-task.md warns against; it was forced by the 600 s foreground cap plus the checkpoint directive, and is disclosed here so the dispatcher can treat the job as live. (c) One diagnostic call (the WSL ps, call 14) was spent after the checkpoint notice; it was read-only and its result is in this hand-back. (d) The advisor was not consulted: the briefed sequence is a pure continuation and the budget did not allow it. (e) The record stays outcome in-progress with resultSha256 null, like the TR-B-T2 interim record: a stopped-without-commit classification needs a resultSha256 bound to report.text bytes, which I could not compute within the budget.\n\n6. Open items. CLOSING-ALLOWANCE-STYLE HANDOVER, 80 % checkpoint fired, no stop condition of field 5 triggered or evaluated. Committed: nothing. Verified green: the post-image sha256 identity only. Remains undone: reading the pin states and totals, TR-B-MANIFEST.md, the consumer-safe test, the commit message file, git add, git commit, the terminal record; plus the live background job (task bjgsm00yi) which will overwrite red.txt when it finishes. Next briefing: see closingAllowance.nextBriefingAdjustments in this record (check the job first, do not launch a second capture to the same --out, let the Elephant own the long capture, then a pure 8-call tail with a base cap of about 12).",
+    "changedFiles": [
+      "evidence/dispatch-record-TR-B-T3-20261009.json"
+    ]
+  }
+}

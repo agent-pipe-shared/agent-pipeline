@@ -1,0 +1,156 @@
+command: node --test plugins/pipeline-core/lib/guard-maintenance-window.test.mjs plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: wsl-before
+exitCode: 0
+head: 0f8c297c7372f91bca756bb63ca6438b00e43d7a
+tree: e35ebfb38894c0bfa92a5b852d332d6356d1c5c6
+dirty: true
+--- stdout ---
+PASS GMW01 GS-6 and TP-* are liftable; GS-1..GS-5/GS-7 and arbitrary ids are not
+PASS GMW02 prepare rejects a scope naming a non-liftable rule id
+PASS GMW03 prepare -> install -> active -> windowCoversRule -> close -> absent
+PASS global committed chat arms GMW without an anchor/proof and records chat-attributed-unattested
+PASS signature/default/uncommitted/invalid human approval remains fail-closed without an anchor
+PASS GMW04 a missing/malformed subject.expiresAtMs resolves to NOT active (fail-closed)
+PASS GMW04b editing expiresAtMs in the stored record (a plaintext-looking field) fails verification, not renews
+PASS GMW09 repeating install() with the identical {request, proof} never moves expiry later than the signed bound
+PASS GMW10 install refuses a request whose signed expiresAtMs has already passed
+PASS GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)
+PASS GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later
+PASS GMW06 a window prepared for one physical repository does not verify for another
+PASS GMW07 a tampered window.json (any byte changed post-install) fails currentGuardMaintenanceWindow
+PASS GMW11 install rejects a hand-built request naming a non-liftable rule id, bypassing prepare()
+PASS GMW12 currentGuardMaintenanceWindow/windowCoversRule never report a non-liftable id as covered, even from an already-stored record
+PASS GMW08 isNeverLiftableKernelPath matches both anchors and nothing else
+PASS F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules
+PASS GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves
+PASS GMW15 an unresolvable digest yields no lines at all -- no record, no invented description
+PASS GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest
+PASS GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line
+PASS GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)
+PASS GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded
+PASS GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature
+PASS GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable
+PASS GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it
+PASS GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install
+PASS GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)
+PASS GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches
+PASS GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree
+PASS GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD
+PASS GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one
+PASS GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent
+PASS GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the "any well-formed key" posture, unlike the CRITICAL_ACTION_KINDS ceremonies
+PASS GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking
+PASS GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance
+PASS GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke
+PASS GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path
+PASS GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope
+PASS GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this
+PASS GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit
+PASS GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range
+PASS GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope
+PASS GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping
+PASS GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot
+PASS GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path
+PASS GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs
+PASS GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case
+PASS GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line
+PASS GMW15 prepare rejects authorshipMode "elephant-direct" with a missing/malformed stage0Selfcheck
+PASS GMW16 prepare rejects authorshipMode "elephant-direct" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)
+PASS GMW17 prepare+install accept authorshipMode "elephant-direct" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status
+PASS GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check
+PASS GMW19 authorshipMode "goldfish-dispatch" never requires (or carries) a stage0Selfcheck
+PASS GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent
+PASS GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)
+PASS GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)
+PASS GMW44 repoPathIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity
+PASS GMW45 repoFingerprint hashes the /mnt/c/... and <host-path> spellings of one physical repo to the same value, and two genuinely different repos still differ
+PASS GMW46 a plain POSIX repo path is unaffected (current formula equals the pre-fix legacy one -- no migration needed for the majority case)
+PASS GMW47 a fingerprint recorded under the pre-fix legacy formula for a WSL-mount repo is still recognized as bound (repoFingerprintMatches)
+PASS GMW48 an installed window is still found end-to-end when its stored repoFingerprintSha256 fields are the pre-fix legacy value (real repo/plugin fixtures, functional level)
+
+guard-maintenance-window: 62 passed, 0 failed
+✔ plugins/pipeline-core/lib/guard-maintenance-window.test.mjs (43622.867245ms)
+✔ prepare with --authorship-mode goldfish-dispatch succeeds and carries stage0Selfcheck: null (9934.959224ms)
+✔ prepare with --authorship-mode elephant-direct and a qualifying stage-0 self-check succeeds and carries the full object (8603.838345ms)
+✔ prepare with --authorship-mode elephant-direct and a non-qualifying stage-0 self-check still fails, with the library's own not-qualified code (31.586197ms)
+✔ prepare with --authorship-mode elephant-direct but no stage-0 self-check flags fails on the CLI's own usage check (32.118059ms)
+✔ prepare with an invalid --authorship-mode value still fails, matching the library's closed-set check (31.78411ms)
+✔ prepare with no --authorship-mode at all fails on the CLI's own usage check (34.567173ms)
+✔ install appends requested+granted to the portable ledger and arms the window (17491.655901ms)
+✔ committed global chat CLI install requires neither proof nor key/anchor and reports chat attribution (19162.200868ms)
+✔ re-installing the identical still-live request skips the ledger append (no duplicate grant) (26823.037488ms)
+✔ a proof that fails verification arms nothing and still leaves a revoked(NOT_ARMED) ledger trail (17690.182764ms)
+✔ close appends a revoked(CLOSED) disposition linked to the live grant, and still narrows exactly as before (18712.871509ms)
+✔ close on an absent window is a no-op and never appends (36.935877ms)
+✔ boundary: the emitted portable decisions never carry natural-person attribution or free-form reason (18412.175957ms)
+✔ install with --attribution-key-file appends exactly one restricted attribution record with no correlator (19206.943004ms)
+✔ install without --attribution-key-file: unchanged behavior, no restricted-store interaction (18363.833615ms)
+✔ install with a corrupt/wrong-length attribution key file: install still succeeds, attribution reports failure (19303.412313ms)
+# frozen plugin copy in use: pre-commit-hook-plugin-7jFX1F
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (72.839616ms)
+✔ installed pre-commit hook rejects a staged local private pattern before Git commits (2276.40215ms)
+✔ stagedPaths: lists a newly staged file relative to HEAD (2214.267109ms)
+✔ stagedPaths: falls back to the empty-tree comparison before any commit exists (1465.011516ms)
+✔ stagedPaths: nothing staged yields an empty array, not null (1630.070022ms)
+✔ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (1485.632505ms)
+✔ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (1397.750061ms)
+✔ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (1406.084377ms)
+✔ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (1442.654919ms)
+✔ installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK (24.15794ms)
+✔ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (2433.93042ms)
+✔ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2369.237786ms)
+✔ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (2338.311031ms)
+✔ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2287.957698ms)
+✔ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (2339.115556ms)
+✔ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (2269.223549ms)
+✔ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (2358.054657ms)
+✔ installed hook: refuses a late verify rewrite when it also stages lifecycle state (2397.460438ms)
+✔ installed hook: refuses late verify recovery when committed plan approval is stale (2454.61309ms)
+✔ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (2379.316412ms)
+✔ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (2357.625169ms)
+✔ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (2495.270059ms)
+✔ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (2464.279081ms)
+✔ installed hook: admits one complete proof-bound quality package, never a widened index (3139.762537ms)
+✔ installed hook: matching signed GMW permits a non-kernel TP rewrite (2441.489888ms)
+✔ installed hook: wrong-scope signed GMW does not permit a TP rewrite (3038.659196ms)
+✔ installed hook: matching signed GMW never permits hooks.json kernel rewrite (2381.877898ms)
+✔ installed hook: staged NON-protected path is unaffected -> commit succeeds (2189.539402ms)
+✔ installed hook: nothing staged (--allow-empty) -> commit succeeds (2211.577863ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (1615.74853ms)
+✔ applyInstall then applyRemoval: removes exactly what was installed (1626.827693ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (1673.606714ms)
+✔ applyRemoval: nothing-to-remove when never installed (1341.791646ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (2094.573902ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.119913ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.126372ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (1556.367841ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (3.574417ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (1586.690705ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (1644.275186ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (1800.754048ms)
+✔ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (1514.123122ms)
+✔ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (1296.892454ms)
+✔ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (1594.020388ms)
+✔ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (1526.92322ms)
+✔ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (1349.560544ms)
+✔ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (2362.42615ms)
+✔ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (2077.650594ms)
+✔ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (2432.492121ms)
+✔ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (2114.954547ms)
+✔ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (2207.138003ms)
+✔ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (2170.27453ms)
+✔ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (1620.59627ms)
+✔ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (1351.001867ms)
+✔ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (1663.581849ms)
+✔ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (2541.474257ms)
+✔ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (2206.196803ms)
+ℹ tests 74
+ℹ suites 0
+ℹ pass 74
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 195251.199064
+
+--- stderr ---

@@ -1,0 +1,113 @@
+command: node --test --test-reporter=spec --test-name-pattern=CRITIC-CKPT-T2 scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.test.mjs
+label: CRITIC-CKPT-T2-red-ckpt
+exitCode: 1
+head: 3f7708289400d67577c46d0eb0e87ff0b71b8e8f
+tree: cef11f16a53027211d98c3510c37f6c4b2068e3e
+dirty: true
+--- stdout ---
+✖ CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED (22170.307691ms)
+✖ CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39 (18290.462229ms)
+✖ CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance (23709.927652ms)
+✔ CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today) (52283.162504ms)
+✔ CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today) (16441.018131ms)
+✔ CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today) (15237.618978ms)
+✖ CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed (13529.128059ms)
+✔ CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md path stays refused after its own cap (green today) (4187.027839ms)
+CKPT2-REDIRECT-FIRED guard-dispatch-budget.mjs (9 runner-child loads served from the tranche-2 guard post-image)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 4
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 187900.275759
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2206:1
+✖ CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED (22170.307691ms)
+  AssertionError [ERR_ASSERTION]: the Critic must be admitted for exactly 50 working calls; the first refusal was call 36: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-EXHAUSTED: this dispatch (pipeline-core:critic, agent abc123) has counted 36 tool-call attempts against a working cap of 35 (effective cap min(baseCalls=50, maxTurns=50 minus the fixed 5-closing + 10-safety reserve)).
+  The working
+  
+  35 !== 50
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2209:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 35,
+    expected: 50,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2214:1
+✖ CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39 (18290.462229ms)
+  AssertionError [ERR_ASSERTION]: the first DISPATCH-BUDGET-CHECKPOINT notice must be on call 40; notices were on calls [28, 33, 34, 35]
+  
+  28 !== 40
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2217:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 28,
+    expected: 40,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2222:1
+✖ CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance (23709.927652ms)
+  AssertionError [ERR_ASSERTION]: all 50 working calls must be admitted; call 36 was refused: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-EXHAUSTED: this dispatch (pipeline-core:critic, agent abc123) has counted 36 tool-call attempts against a working cap of 35 (effective cap min(baseCalls=50, maxTurns=50 minus the fixed 5-closing + 10-safety reserve)).
+  The working
+  
+  35 !== -1
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2225:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 35,
+    expected: -1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2253:1
+✖ CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed (13529.128059ms)
+  AssertionError [ERR_ASSERTION]: must stay refused after the cap, but it was admitted: scratch/dispatch/other/critic-notes.md
+  
+  0 !== 2
+  
+      at trgAssertRefusedAfterCap (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:1894:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2257:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

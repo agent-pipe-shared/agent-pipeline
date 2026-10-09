@@ -1,0 +1,46 @@
+08a  bash git-step.sh (sandbox only, no push, no remote)
+pre-state: .git already exists
+warning: re-init: ignored --initial-branch=main
+Reinitialized existing Git repository in <wsl-home>/tmp/e2e-onb-b3-20261009/.git/
+.git/hooks/pre-commit: 4: exec: node: not found
+COMMIT-REFUSED exit=1
+08a  bash git-step.sh (sandbox only, no push, no remote)
+pre-state: .git already exists
+warning: re-init: ignored --initial-branch=main
+Reinitialized existing Git repository in <wsl-home>/tmp/e2e-onb-b3-20261009/.git/
+BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - GIT-03-MARKER-MISSING: no exact `AI-Assisted: true` entry in the final Git trailer block
+  - GIT-03-DISPATCH-MISSING: no `Dispatch:` entry in the final Git trailer block
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+COMMIT-REFUSED exit=1
+08a  bash git-step.sh (sandbox only, no push, no remote)
+pre-state: .git already exists
+warning: re-init: ignored --initial-branch=main
+Reinitialized existing Git repository in <wsl-home>/tmp/e2e-onb-b3-20261009/.git/
+[main (root-commit) e7c7cc1] docs: add the word counter design package
+ 4 files changed, 630 insertions(+)
+ create mode 100644 pipeline.user.yaml
+ create mode 100644 specs/onboarding-c6ec83912c1e/design-input.md
+ create mode 100644 specs/onboarding-c6ec83912c1e/prd_onboarding-c6ec83912c1e.md
+ create mode 100644 specs/onboarding-c6ec83912c1e/spec.md
+== status after commit ==
+?? .claude/
+?? .gitignore
+?? AGENTS.md
+?? architecture/
+?? project/
+== last commit ==
+commit e7c7cc13e05d6568271e148fe93f19bc76fee6e8
+Author: E2E Walk <e2e@example.invalid>
+Date:   Fri Oct 9 09:08:05 2026 +0200
+
+    docs: add the word counter design package
+    
+    AI-Assisted: true
+    Dispatch: E2E-ONB-B3-20261009 (goldfish)
+
+ pipeline.user.yaml                                 | 460 +++++++++++++++++++++
+ specs/onboarding-c6ec83912c1e/design-input.md      |  16 +
+ .../prd_onboarding-c6ec83912c1e.md                 | 115 ++++++
+ specs/onboarding-c6ec83912c1e/spec.md              |  39 ++
+ 4 files changed, 630 insertions(+)

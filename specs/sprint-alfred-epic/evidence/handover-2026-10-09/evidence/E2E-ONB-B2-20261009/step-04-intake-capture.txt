@@ -1,0 +1,177 @@
+04pre  node -e const fs=require("fs");fs.mkdirSync("scratch",{recursive:true});fs.writeFileSync("scratch/goal.txt","a CLI that counts words\n")
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+
+  --- end ---
+
+04a  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-capture-apply --root <temp-repo> --text-file scratch/goal.txt --text-file-sha256 732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12 --activate --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.onboarding-intake-capture-apply.v1",
+  "root": "<temp-repo>",
+  "mutated": true,
+  "evidence": {
+    "sha256": "732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12",
+    "byteLength": 24,
+    "wrote": true
+  },
+  "checkpoint": {
+    "schema": "pipeline.onboarding-intake-checkpoint.v1",
+    "root": "<temp-repo>",
+    "revision": 1,
+    "createdAt": "2026-10-09T06:40:53.864Z",
+    "updatedAt": "2026-10-09T06:41:14.118Z",
+    "consent": {
+      "granted": true,
+      "at": "2026-10-09T06:40:53.864Z"
+    },
+    "values": {
+      "gitAuthor": null,
+      "language": "en",
+      "profile": "mini"
+    },
+    "materialInput": [
+      {
+        "sha256": "732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12",
+        "evidencePath": "intake-checkpoint-evidence/732881c016f91c1eb6d4785b0dc78309977b67baa043de4ac67c012e4d3a8c12.txt",
+        "byteLength": 24,
+        "receivedAt": "2026-10-09T06:41:14.118Z"
+      }
+    ],
+    "designQuestions": null,
+    "transactionState": "design-questions-pending",
+    "generated": null,
+    "contentSha256": "db884a91cad4ef7581eacd1230ba7619ba440cf83e6e259a3a440dc82f0ca6ba"
+  }
+}
+
+  --- end ---
+
+04b  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.project-onboarding.v4",
+  "status": "intake-design-questions-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intent": "onboarding",
+  "repository": {
+    "status": "local-valid-writable",
+    "mode": "local",
+    "gitVersion": "2.53.0",
+    "initializesGit": false,
+    "rootWritable": "passed",
+    "sessionCapability": "not-required",
+    "worktreeCapability": "not-required"
+  },
+  "runtime": {
+    "status": "readback-not-applicable",
+    "sourceSha256": "4b91f3cdb947706e7677a91607b24fa4ebcb850fd9a93dec13e2ab3e555bc831",
+    "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+    "barrierSha256": null,
+    "readbackSha256": null
+  },
+  "continuity": {
+    "status": "absent-pristine",
+    "stateSha256": null,
+    "handoverSha256": null,
+    "historySha256": null
+  },
+  "appServer": {
+    "required": false,
+    "status": "not-applicable",
+    "code": null
+  },
+  "runnerPermissions": {
+    "target": ".claude/settings.local.json",
+    "status": "pending-runtime-initialization",
+    "lanes": [
+      "Bash",
+      "PowerShell"
+    ],
+    "exactEntries": []
+  },
+  "nextAction": {
+    "kind": "collect-input",
+    "input": {
+      "name": "answersJson",
+      "encoding": "utf8",
+      "trim": true,
+      "minBytes": 2,
+      "maxBytes": 65536,
+      "singleLine": false,
+      "rejectNul": true
+    },
+    "mutation": false,
+    "requiresConfirmation": false,
+    "guidance": "ask the PO the ONE bundled round of design questions this project still needs answered. If there are genuinely no open design questions, ask for an explicit affirmative no-open-questions disposition. Replace exactly <PO_INTAKE_DESIGN_ANSWERS_JSON> in applyAction.argv with either the JSON array of {question, answer} objects or {\"disposition\":\"no-open-questions\"} as one argv data element. Never invent an answer, reconstruct the command, or ask a second round. If the answers contain a newline or exceed a few KB, write the same JSON to scratch/design-answers.json and execute fileApplyAction (the --answers-file route) instead of applyAction.",
+    "applyAction": {
+      "kind": "command",
+      "executable": "node",
+      "argv": [
+        "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "intake-design-questions-apply",
+        "--root",
+        "<temp-repo>",
+        "--answers-json",
+        "<PO_INTAKE_DESIGN_ANSWERS_JSON>",
+        "--activate",
+        "--runner",
+        "claude"
+      ],
+      "mutation": true,
+      "requiresConfirmation": true,
+      "expected": {
+        "schema": "pipeline.onboarding-intake-design-questions-apply.v1",
+        "statuses": [
+          "applied"
+        ]
+      }
+    },
+    "fileApplyAction": {
+      "kind": "command",
+      "executable": "node",
+      "argv": [
+        "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+        "intake-design-questions-apply",
+        "--root",
+        "<temp-repo>",
+        "--answers-file",
+        "scratch/design-answers.json",
+        "--activate",
+        "--runner",
+        "claude"
+      ],
+      "mutation": true,
+      "requiresConfirmation": true,
+      "expected": {
+        "schema": "pipeline.onboarding-intake-design-questions-apply.v1",
+        "statuses": [
+          "applied"
+        ]
+      }
+    },
+    "expected": {
+      "schema": "pipeline.project-onboarding.v4",
+      "statuses": [
+        "intake-design-questions-required"
+      ]
+    }
+  },
+  "diagnostics": [
+    {
+      "path": "$.continuity",
+      "code": "intake_design_questions_required",
+      "message": "material input is captured but the bundled design-question round has not been answered",
+      "guidance": "ask the PO the one bundled design-question round, then review the read-only intake-design-questions-apply action"
+    }
+  ]
+}
+
+  --- end ---
+

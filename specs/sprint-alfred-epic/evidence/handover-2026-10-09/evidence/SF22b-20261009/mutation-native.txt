@@ -1,0 +1,73 @@
+command: node --test scratch/dispatch-wip/SF22b/stop-fanout.test.mjs
+label: mutation-native
+exitCode: 1
+head: 8fad54b6dd5c26d0c3bac5348bfeb43b1654cdc7
+tree: 3199399bd3fd57a5d313859088d77422c4fd420d
+dirty: true
+--- stdout ---
+✔ SF01 shadow mode: an orchestrator Stop is silent, exits 0 and records one stop-eval (no block event) (1438.5544ms)
+✔ SF02 the default mode (no mode in the config) is shadow: silent (1651.2929ms)
+✔ SF03 enforce mode with ready slices and free slots: exit 0, block JSON with <plugin-root> substituted, stop-eval and block recorded (1444.1562ms)
+✔ SF04 stop_hook_active: true right after our own block is governed by the loop rule (no output, defied recorded) (2113.5814ms)
+✔ SF05 stop_hook_active: true with no block of ours is not our loop: it still blocks (1741.15ms)
+✔ SF06 a subagent payload (agent_id present) gets no output and no ledger line (685.1639ms)
+✔ SF07 advisory mode emits the governor's advisory text as systemMessage/additionalContext (never a block decision, no block event) (1545.8926ms)
+✔ SF08 no queue configured: the governor gets 'no queue', the hook is silent (327.0336ms)
+✔ SF09 consumer opt-out (requiresEnforcement false) is silent and never blocks (324.7489ms)
+✔ SF10 fail-open: malformed, empty or non-object stdin exits 0 with no stdout (1981.5428ms)
+✔ SF11 fail-open: a missing queue file exits 0 with no stdout (343.2526ms)
+✔ SF12 fail-open: a malformed config, a missing session id or an unusable common dir exits 0 with no stdout (1068.0342ms)
+✔ SF13 fail-open: an unreadable ledger (the ledger path is a directory) exits 0 with no stdout, even in enforce mode (380.9083ms)
+✔ SF14 fail-open: a governor that throws (PIPELINE_FANOUT_TEST_THROW=1 test seam) exits 0 with no stdout (1897.7301ms)
+✔ SF15 a launch event after the block resets the loop: the next Stop with stop_hook_active blocks again (2154.188ms)
+✔ SF16 shadow and off stay silent even when the governor would block (advisory text is an advisory/enforce channel only) (2881.8227ms)
+✔ SF17 FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent queue while implementing, invalid queue) as advisory output, never a block (2098.651ms)
+✔ SF18 implementationPhaseActive is derived from the feature state (design 3.10): implementing with no queue -> the NO-QUEUE line, any other phase or unreadable state -> silent (2752.0542ms)
+✔ SF19 a block is emitted only after its block event was durably appended: a refused append, or a result without a block event, fails open (14.1619ms)
+✔ SF20 no config or no queuePath returns silently having spawned nothing; a configured queue with an absolute commonDir flows through without a spawn (334.5534ms)
+✔ SF21 a queuePath without an absolute commonDir fails open silently: nothing spawned, the governor and the ledger are never reached (1009.0867ms)
+✔ SF22 an absolute commonDir is the only source of the git common dir: no git spawn, none outside the ledger chain, and the win32 ledger-side PowerShell spawns are a pinned known deviation from design 8 (bound 4, must drop to 0) (1557.9431ms)
+ℹ ledger-side spawns pinned (4, bound 4 on win32): ["spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs","spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs","spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs","spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs"]
+✖ SF22b steady state: a second Stop against the same common dir spawns no child process at all, with the same block decision and a real ledger append (the first Stop's one-time directory creation is SF22's) (2430.13ms)
+✔ SF23 the spawn tripwire is live: a control module that spawns through an ESM named import is recorded (81.0885ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32608.6704
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ SF22b steady state: a second Stop against the same common dir spawns no child process at all, with the same block decision and a real ledger append (the first Stop's one-time directory creation is SF22's) (2430.13ms)
+  AssertionError [ERR_ASSERTION]: the second Stop against the same common dir spawned 2 child process(es) on win32; Ruling 87: the steady state spawns none (only the first Stop creates the ledger directory)
+  + actual - expected
+  
+  + [
+  +   'spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs',
+  +   'spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs'
+  + ]
+  - []
+  
+      at file:///<repo-root>/scratch/dispatch-wip/SF22b/stop-fanout.test.mjs:577:12
+      at withBox (file:///<repo-root>/scratch/dispatch-wip/SF22b/stop-fanout.test.mjs:79:5)
+      at Object.run (file:///<repo-root>/scratch/dispatch-wip/SF22b/stop-fanout.test.mjs:556:3)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs', 'spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,72 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+label: hookrefresh-f2-closure-after
+exitCode: 1
+head: 6ebec9435e16bc6056145b4c341f4cfa969ce199
+tree: 86fbe3346787efdff1db202738783c4bdb9fea98
+dirty: true
+--- stdout ---
+FAIL GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports: AssertionError [ERR_ASSERTION]: NEVER_LIFTABLE_KERNEL_PATHS is not transitively closed (26 violation(s)):
+plugins/pipeline-core/lib/po-gate-authority.mjs imports "./git-null-device.mjs" -> plugins/pipeline-core/lib/git-null-device.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/worktree-lifecycle.mjs imports "./git-null-device.mjs" -> plugins/pipeline-core/lib/git-null-device.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pipeline-state.mjs imports "../lib/continuity-authority-drift.mjs" -> plugins/pipeline-core/lib/continuity-authority-drift.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/governance-action-artifact.mjs imports "./fs-durability.mjs" -> plugins/pipeline-core/lib/fs-durability.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/onboarding-consent-marker.mjs imports "./fs-durability.mjs" -> plugins/pipeline-core/lib/fs-durability.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pre-push-hook-install.mjs imports "../lib/hardened-private-directory.mjs" -> plugins/pipeline-core/lib/hardened-private-directory.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pre-push-hook-install.mjs imports "../lib/hook-currentness.mjs" -> plugins/pipeline-core/lib/hook-currentness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pre-push-hook-install.mjs imports "../lib/checkpoint-push-approval.mjs" -> plugins/pipeline-core/lib/checkpoint-push-approval.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pipeline-start-preflight.mjs imports "../lib/agy-start-hint.mjs" -> plugins/pipeline-core/lib/agy-start-hint.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pipeline-start-preflight.mjs imports "./toolchain-preflight.mjs" -> plugins/pipeline-core/scripts/toolchain-preflight.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pipeline-update-channel.mjs imports "../lib/agy-central-refresh.mjs" -> plugins/pipeline-core/lib/agy-central-refresh.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/guard-human-override.mjs imports "./toolchain-preflight.mjs" -> plugins/pipeline-core/scripts/toolchain-preflight.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pre-commit-hook-install.mjs imports "../lib/hardened-private-directory.mjs" -> plugins/pipeline-core/lib/hardened-private-directory.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/pre-commit-hook-install.mjs imports "../lib/hook-currentness.mjs" -> plugins/pipeline-core/lib/hook-currentness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/commit-msg-hook-install.mjs imports "../lib/hardened-private-directory.mjs" -> plugins/pipeline-core/lib/hardened-private-directory.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/commit-msg-hook-install.mjs imports "../lib/hook-currentness.mjs" -> plugins/pipeline-core/lib/hook-currentness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/check-clone-provisioning.mjs imports "../lib/hook-currentness.mjs" -> plugins/pipeline-core/lib/hook-currentness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/git-hook-footprint.mjs imports "./fs-durability.mjs" -> plugins/pipeline-core/lib/fs-durability.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/guard/evaluate.mjs imports "./env-dump-lane.mjs" -> plugins/pipeline-core/lib/guard/env-dump-lane.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/checkpoint-push-approval.mjs imports "./critical-action-authorization.mjs" -> plugins/pipeline-core/lib/critical-action-authorization.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/toolchain-preflight.mjs imports "./security-readiness/gitleaks-readiness.mjs" -> plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/toolchain-preflight.mjs imports "./security-readiness/osv-scanner-readiness.mjs" -> plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/scripts/toolchain-preflight.mjs imports "./security-readiness/semgrep-readiness.mjs" -> plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/agy-central-refresh.mjs imports "./agy-central-snapshot.mjs" -> plugins/pipeline-core/lib/agy-central-snapshot.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/critical-action-authorization.mjs imports "./fs-durability.mjs" -> plugins/pipeline-core/lib/fs-durability.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+plugins/pipeline-core/lib/agy-central-snapshot.mjs imports "./fs-durability.mjs" -> plugins/pipeline-core/lib/fs-durability.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS
+
+26 !== 0
+
+    at assertKernelClosed (file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:531:10)
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:539:3
+    at check (file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:481:5)
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:538:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+
+guard-maintenance-window-kernel-closure: 9 passed, 1 failed
+✖ plugins\pipeline-core\lib\guard-maintenance-window-kernel-closure.test.mjs (491.4235ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 498.9941
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\guard-maintenance-window-kernel-closure.test.mjs:1:1
+✖ plugins\pipeline-core\lib\guard-maintenance-window-kernel-closure.test.mjs (491.4235ms)
+  'test failed'
+
+--- stderr ---

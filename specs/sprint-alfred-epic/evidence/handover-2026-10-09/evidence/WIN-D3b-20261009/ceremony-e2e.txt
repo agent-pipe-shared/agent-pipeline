@@ -1,0 +1,44 @@
+command: node --test --test-name-pattern "ceremony runs prepare, present" plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: ceremony-e2e
+exitCode: 1
+head: 5e19c84c58dd3232851fba721098b98c2389b5ab
+tree: 15ce5c46f17105d376cf51142543a72d47a1b1c7
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: b71bcb102ccbdf8c7dd51bbe46dfa3422ecfacb345969d8419029e70e30853cf
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T02:43:13.933Z
+  candidate commit: 0b863099eb88b9ff32e0db6e654dba602da9f984
+  candidate tree: c6e37604a1a143dba709371cc1157d85f870db2d
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✖ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (3393.3532ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3747.0009
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\signing-ceremony.test.mjs:222:1
+✖ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (3393.3532ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+--- stderr ---

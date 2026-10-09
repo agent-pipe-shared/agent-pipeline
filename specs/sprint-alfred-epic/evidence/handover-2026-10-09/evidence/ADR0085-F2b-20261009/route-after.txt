@@ -1,0 +1,56 @@
+command: node --test plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: route-after
+exitCode: 0
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+✔ R1 re-read: design-workflow-package.mjs exports the re-read function (43.2957ms)
+✔ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (13.9425ms)
+✔ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (11.4198ms)
+✔ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (11.7799ms)
+✔ R5 re-read: package bytes changed after the approval are refused (item 1) (6.4254ms)
+✔ R6 re-read: a missing package file is a typed refusal (4.2795ms)
+✔ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (6.0424ms)
+✔ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (8.9572ms)
+✔ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (18.4969ms)
+✔ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (17.187ms)
+✔ R11 re-read: a package of another feature is refused (5.8432ms)
+✔ R12 re-read: malformed approval inputs are a typed input refusal (2.8408ms)
+✔ V0 v8: pipeline.plan-approval.v8 is the current approval schema (4.1612ms)
+✔ V1 v8: a signature-mode record with a proof is valid (0.3777ms)
+✔ V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid (0.1595ms)
+✔ V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid) (0.3009ms)
+✔ V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid) (0.2974ms)
+✔ V5 v8: the mode must be exactly signature or chat (0.2373ms)
+✔ V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid) (0.2812ms)
+✔ V7 v8: the plan approval carries designApproval and none of the four retired v7 fields (0.2007ms)
+✔ V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1 (0.2324ms)
+✔ V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO) (0.216ms)
+✔ V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval (0.304ms)
+✔ V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable) (0.137ms)
+✔ L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception (2.8484ms)
+✔ L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid (0.132ms)
+✔ L3 classification: other or malformed records are unknown (0.0931ms)
+✔ L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent (0.2894ms)
+✔ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (16.0343ms)
+✔ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (11.5548ms)
+✔ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (13.5403ms)
+✔ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (36.3447ms)
+✔ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (25.1581ms)
+✔ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (16.7468ms)
+✔ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (17.5707ms)
+✔ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (24.7988ms)
+✔ S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today) (3.4688ms)
+✔ S10 stored verifier: a signature made with another key over the same intent is refused (17.4046ms)
+✔ S11 stored verifier: a proof whose key is not in the configured anchors is refused (25.9355ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 429.3022
+
+--- stderr ---

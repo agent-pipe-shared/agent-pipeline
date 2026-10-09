@@ -1,0 +1,153 @@
+command: node --test --test-name-pattern T90 plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs
+label: T90-T3-native-red
+exitCode: 1
+head: a662f4dc6e8e118531451d4d876278503a44ded4
+tree: 7c1afd68d9d92fdfe7f9959e9eaa38a01b22b608
+dirty: true
+--- stdout ---
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (1.9386ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.1391ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.5072ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.1119ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.3768ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.1292ms)
+✖ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.4363ms)
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (5342.9337ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (3086.1227ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (5302.9776ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (5139.0111ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (1703.6985ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (1706.8582ms)
+✔ T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead (13616.9887ms)
+✔ T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched (4889.5963ms)
+✔ T90-T2 (seam): an injected host decides the owner the lock records (2982.8014ms)
+✔ T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous (14977.6754ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (3427.2962ms)
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1686.9827ms)
+✖ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (1678.5295ms)
+✖ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (1690.0855ms)
+✖ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (1688.2534ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.048ms) # Linux control: needs /proc on a Linux host
+✔ repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin) (17223.5471ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 18
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 69199.2839
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:4425:3
+✖ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.4363ms)
+  AssertionError [ERR_ASSERTION]: (w) .git/agent-pipeline/human-guard-overrides/audit.lock (host default): the line must say "run from the main checkout root (the directory that holds .git)": "Recovery (attended, run from the repository root, only after confirming that no other Pipeline session is running an override ceremony; on win32 the lock owner may still be live, because a busy owner is reported as ambiguous too): Remove-Item -LiteralPath '.git/agent-pipeline/human-guard-overrides/audit.lock'"
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:4431:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6532:3
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1686.9827ms)
+  AssertionError [ERR_ASSERTION]: (f) ordinary lock: recovery.files must be exactly the main-checkout-relative POSIX form .git/agent-pipeline/human-guard-overrides/audit.lock, not an absolute path (got ["<host-path>"])
+  + actual - expected
+  
+    [
+  +   '<host-path>'
+  -   '.git/agent-pipeline/human-guard-overrides/audit.lock'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6553:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '<host-path>' ],
+    expected: [ '.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6565:3
+✖ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (1678.5295ms)
+  AssertionError [ERR_ASSERTION]: (g) a separate git dir, ordinary lock: a common dir not named .git must yield NO recovery property, but error.recovery is {"files":["<host-path>"],"command":"Remove-Item -LiteralPath '<host-path>'"}
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6579:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6600:3
+✖ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (1690.0855ms)
+  AssertionError [ERR_ASSERTION]: (h) linked worktree, ordinary lock: recovery.files must be relative to the main checkout root (.git/agent-pipeline/human-guard-overrides/audit.lock), got ["<host-path>"]
+  + actual - expected
+  
+    [
+  +   '<host-path>'
+  -   '.git/agent-pipeline/human-guard-overrides/audit.lock'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6618:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '<host-path>' ],
+    expected: [ '.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6631:3
+✖ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (1688.2534ms)
+  AssertionError [ERR_ASSERTION]: (j) ordinary lock (host default): a real HGO-AUDIT-LOCK-AMBIGUOUS refusal must render the recovery as a third line, but the route text is "No human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=HGO-AUDIT-LOCK-AMBIGUOUS."
+  
+  2 !== 3
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6644:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,20 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/codex-readiness-app-server.test.mjs
+label: scripts-codex-readiness-app-server
+exitCode: 0
+head: ae5b02b82a8a9814414dc38e5b8a0d5f5b1d9bb4
+tree: 3b4bea5b95aa8d0987ca659e7dc49c9a124dcf5b
+dirty: true
+--- stdout ---
+✔ Codex app-server adapter accepts only a fresh completed schema-valid report bound to the exact candidate and sources (505.664566ms)
+✔ Codex app-server adapter rejects a report for a different candidate without returning its contents (514.770405ms)
+✔ Codex app-server adapter classifies a synchronous selected-launch failure as no child (3.119429ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1525.705801
+
+--- stderr ---

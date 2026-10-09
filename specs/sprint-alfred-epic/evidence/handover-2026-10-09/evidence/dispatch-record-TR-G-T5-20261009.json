@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-T5-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "08b896e613beb2c7084f1a8bc53247070a87e662",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "b940e6daf2d9d252f4e6d311129f10ea7449a869"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created; obligations and briefings read; preflight run once",
+      "toolUses": 9
+    },
+    {
+      "phase": "edit applied; build run",
+      "toolUses": 16
+    },
+    {
+      "phase": "terminal record written (commit, report, resultSha256 in one write)",
+      "toolUses": 39
+    }
+  ],
+  "resultSha256": "683c049bacb237abc1e587d9bc52f735b6839a6302a675887eb0b1a11c520923",
+  "report": {
+    "text": "Closing state: implementation complete, one commit (b940e6daf); independent review: pending; not PO-accepted. Closing-allowance handover: commit made at counted call 34 of 35; the record was finalized by the Elephant (T116).\n\n1. DoD results\n- T49 (j) green natively and on WSL: passed. Every other case keeps its TR-G-T4 state: passed (native 17 tests / 10 pass / 5 fail (l)(m)(n)(p)(q) / 2 skipped = red-native.txt shape; WSL 106 / 98 / 6 / 2 = red.txt shape, the six fails being the three accepted 10 s timeouts plus (l), (m), (n)).\n- (e) skip text corrected: passed (new constant TRG_SKIP_BARE_ON_WIN32, used by (e) only; (e) green on WSL, skipped natively with the new text).\n- TR-G-MANIFEST.md TR-G-T5 section (sha256, bytes, edited blocks, commands): passed.\n- consumer-safe-paths: passed, node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0, 9/9 (terminal output only).\n- One commit with the briefed subject: passed.\n\n2. Evidence\n- evidence/TR-G-T5-20261009/native.txt (wrapped exit 1): node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T5-20261009/native.txt --label TR-G-T5-native -- node --test --test-reporter=spec --test-name-pattern=\"TR-G T49\" scratch/dispatch-wip/TR-G-T5/guard-dispatch-budget.trg5.test.mjs\n- evidence/TR-G-T5-20261009/wsl.txt (wrapped exit 1): wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T5-20261009/wsl.txt --label TR-G-T5-wsl -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T5/guard-dispatch-budget.trg5.test.mjs\"\n- Redirect proof TRG5-REDIRECT-FIRED in both (native 15 loads, WSL 138), guard post-image sha256 2ec5a564...d808 unchanged.\n- New test post-image sha256 0bda864c5087f90de59216231522ae81529fe8ad8d7a44dd479092ad557e431e, 133519 bytes (previous 5dc3c294..., 133023).\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: T49 (j) builds both commands from a separator-normalised root; (e) uses its own skip text.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md: TR-G-T5 section appended.\n\n4. Deliberately not changed\n- Guard post-image, live hooks/ and lib/guard/, tranche README, other tests, pins (k)-(q), T49 (d) and its skip text, the now-unused helper trgForwardBare (left defined). Untracked evidence files and scratch are not committed.\n\n5. Deviations from spec\n- None. (j) now uses inline normalised commands rather than the shared helpers trgProducerCommand / trgForwardBare; what it asserts is unchanged.\n\n6. Open items\n- independent review: pending; PO acceptance pending.\n- Not run: (j) against the TR-G-F4 guard (expected green, no backslash remains in either token); macOS, Codex, Antigravity.\n- evidence/dispatch-record-TR-G-T5-20261009.json and evidence/TR-G-T5-20261009/* are untracked.\n- closingAllowance: committed b940e6daf (test post-image + manifest); verifiedGreen as listed above; remainsUndone none; nextBriefingAdjustments none.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  }
+}

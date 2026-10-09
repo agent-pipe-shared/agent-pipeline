@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "PRODUCER-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "6b3acec96",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "5fc1abc5d"
+  ],
+  "resultSha256": "afb0f563599da93e0aa6fb78da2c82556294ecaef5897ffe66721d0e0e01030e",
+  "report": {
+    "text": "Commit 5fc1abc5d rewrote the stale -m/--trailer paragraph in both goldfish-task.md copies to the single message-file route. check-consumer-safe-paths.test.mjs passed 9/9 (exit 0); generate-vendored-canon.mjs --check passed. Not done: resultSha256 left null (closing finalizer script scratch/finalize-PRODUCER-F2.mjs was blocked by the budget guard; the Elephant can run it), parity.txt not captured with capture-evidence.mjs, per-file git diff review skipped for budget. agent-obligations.md line 39 (both copies) names --trailer only as refused; left. independent review: pending.",
+    "changedFiles": [
+      "templates/prompts/goldfish-task.md",
+      "plugins/pipeline-core/templates/prompts/goldfish-task.md"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 8
+    },
+    {
+      "phase": "closing",
+      "toolUses": 32
+    },
+    {
+      "phase": "Elephant digest bind (Ruling 155): resultSha256 computed over the unchanged report.text",
+      "toolUses": null
+    }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

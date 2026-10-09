@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-RULE-3-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "862db7a68",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "fa4365b7d"
+  ],
+  "resultSha256": "98d79837f333989f4adf6e350becc0a10406dabc9931f0c8c1f77c05d5760e80",
+  "report": {
+    "text": "PARTIAL: part (a) canon + part (c) mirrors committed; part (b) goldfish-mechanic to Haiku/medium NOT done (stop condition 3, scope burst, with a briefing-vs-repo mismatch). independent review: pending.\n\nRoute pre-check: field 6 declares class canon/docs + agent route (no A/G/S class) and names a tier only (\"goldfish-deep, Sonnet 5.5 / xhigh\", tool-layer model sonnet). Observed from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction. GUARD-BOOTSTRAP-RECEIPT-MISSING fired once on the first Write and was cured with the preflight path it named (once).\n\n1. DoD results\n- Canon batch rule extended to EVERY Critic, dated second amendment (Ruling 158) in ADR-0014, canonical quote word-identical in the five bound places: passed (check-critic-contract-citations.mjs and its test exit 0; PHX-CITE-1 identity holds).\n- MP-07 items 3/4 and templates/prompts/critic-review.md batch-scope line aligned to every Critic: passed (edits applied, all assertions ok).\n- Vendored mirrors regenerated (4 files rewritten): passed (generate-vendored-canon.mjs, generate-vendored-canon.test.mjs, check-vendored-template-sync.mjs and its test all exit 0).\n- evidence/CRITIC-RULE-3-20261009/checks.json, all 15 commands exit 0 (12 canon checks + generate-vendored-canon.mjs + check-routing-projections.mjs + its test): passed.\n- Backlog Triage updated: passed (UPDATE line references the commit by subject, no SHA placeholder; MECH-HAIKU recorded as open item (e)).\n- One commit: passed, with a subject deviation (see 5).\n- goldfish-mechanic frontmatter model: haiku / effort: medium: NOT DONE. tier table aligned: partly (MP-27 bullet now says \"Pending route change\", the models.mechanic table row is unchanged on purpose).\n\n2. Evidence (machine-written by scratch/dispatch-wip/CRITIC-RULE-3/apply.mjs)\n- node scratch/dispatch-wip/CRITIC-RULE-3/apply.mjs edit 44 -> exit 0, evidence/CRITIC-RULE-3-20261009/edits.json (every replacement ok)\n- node scratch/dispatch-wip/CRITIC-RULE-3/apply.mjs after 45 -> exit 0, evidence/CRITIC-RULE-3-20261009/checks.json, pathspec.txt (old-quote needle count 0 in all five bound places)\n- git diff --stat on the 12 own paths before staging: 12 files, +65/-17.\n\n3. Changed files (commit fa4365b7d, 12 files)\n- docs/adr/0014-critic-contract.md: Status clause, new canonical quote, second dated amendment (Ruling 158).\n- docs/adr/0003-role-implementation-subagents.md: new canonical quote, one pointer paragraph.\n- harness/review-protocol.md, roles/critic.md, plugins/pipeline-core/skills/critic-review/SKILL.md: new canonical quote only.\n- policies/model-policy.md: MP-07 items 3/4 and the alignment bullet; MP-27 mechanic bullet gains a \"pending route change\" note.\n- templates/prompts/critic-review.md: batch-scope line covers every Critic and diff-only re-critics.\n- plugins/pipeline-core/docs/adr/0003-..., docs/adr/0014-..., roles/critic.md, templates/prompts/critic-review.md: regenerated vendored mirrors (generator output only).\n- backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: Triage UPDATE.\n\n4. Deliberately not changed\n- plugins/pipeline-core/agents/goldfish-mechanic.md (model sonnet / effort low) and plugins/pipeline-core/config/routing-authority.json, runner-mappings.json: see 6. A frontmatter-only change would turn check-routing-projections.mjs red (lines 167-171 compare frontmatter with agentAssignments).\n- models.mechanic row of the policy table (EN line 39): still sonnet/low, because it must match the registry until MECH-HAIKU lands.\n- MP-03 / MP-25 \"no weaker model for an implementing role\" wording: a Haiku mechanic is in tension with it. Left for a PO/Elephant ruling.\n- Sibling agent definitions (goldfish-implementor.md, goldfish-deep.md) that say \"goldfish-mechanic (effort low)\" and templates/prompts/goldfish-task.md line 459 \"mechanic low\": out of scope until the route moves.\n- German halves below DE markers (forbidden); docs/state.md (forbidden); the roles/elephant.md and review-protocol rows from CRITIC-RULE-2b (still consistent with the extended rule).\n\n5. Deviations from spec\n- Commit subject is \"docs(adr-0014): one batched Critic with diff-only follow-ups for every Critic\" - the briefed subject ends \"; mechanic on Haiku\", which would be false for this commit.\n- Edits applied by one script with exact-match assertions (admitted by the briefing); the dispatch record readback was done once; no final advisor call (budget); one advisor call made before editing.\n- Six tool uses were lost to refused rg flags during orientation.\n\n6. Open items\n- TRIGGERED: stop condition 3 (scope burst). Ruling 158 / briefing 1(b) assumed the mechanic pin lives in tests found by searching agents/lib/scripts/harness. The real pin is data: routing-authority.json agentAssignments {capability mechanic, effort low} (read by lib/routing-projection.mjs projectAgentFrontmatter, enforced by scripts/check-routing-projections.mjs), the Claude capability mapping in runner-mappings.json (mechanic -> sonnet) and NO haiku alias there, plus fixtures pinning sonnet/low (RP04 in check-routing-projections.test.mjs:52, p3b-runner-conformance.test.mjs:83, runner-profile-migration-v2.test.mjs:105/138, v3:81, project-onboarding-v3.test.mjs:655, runner-contracts.schema.test.mjs:76). No guard refused an edit; none was attempted.\n- Closing handover. Committed: fa4365b7d (the 12 files above). Verified green: the 15 commands in checks.json, exit 0. Remains undone: goldfish-mechanic frontmatter, registry/alias/fixture alignment, DE half of model-policy.md; no uncommitted edits of mine remain. Next briefing: dispatch MECH-HAIKU as its own slice (goldfish-deep, test-authorship adjacent): add a haiku alias to runner-mappings.json, point agentAssignments[\"...goldfish-mechanic.md\"] at it with effort medium (narrowest green path; leave duties/legacy presets for a second step), edit the frontmatter (and its comments), update the fixtures above by a separate test dispatch (QG-04), brief a cap of 55 and no regeneration needed; until it lands every mechanic dispatch passes tool-layer model haiku (Ruling 158).\n- independent review: pending (Critic receipt not supplied).\n",
+    "changedFiles": [
+      "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+      "docs/adr/0003-role-implementation-subagents.md",
+      "docs/adr/0014-critic-contract.md",
+      "harness/review-protocol.md",
+      "plugins/pipeline-core/docs/adr/0003-role-implementation-subagents.md",
+      "plugins/pipeline-core/docs/adr/0014-critic-contract.md",
+      "plugins/pipeline-core/roles/critic.md",
+      "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "policies/model-policy.md",
+      "roles/critic.md",
+      "templates/prompts/critic-review.md"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening: record created",
+      "toolUses": 11
+    },
+    {
+      "phase": "edit phase applied (see edits.json)",
+      "toolUses": 44
+    },
+    {
+      "phase": "after phase: regenerated mirrors, ran checks (checks.json)",
+      "toolUses": 45
+    },
+    {
+      "phase": "final: outcome partial",
+      "toolUses": 47
+    }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

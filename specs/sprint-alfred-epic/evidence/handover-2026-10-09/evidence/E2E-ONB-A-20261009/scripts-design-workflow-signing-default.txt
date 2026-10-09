@@ -1,0 +1,104 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs
+label: scripts-design-workflow-signing-default
+exitCode: 1
+head: ae5b02b82a8a9814414dc38e5b8a0d5f5b1d9bb4
+tree: 3b4bea5b95aa8d0987ca659e7dc49c9a124dcf5b
+dirty: true
+--- stdout ---
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (1657.246435ms)
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (1567.146047ms)
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (1547.173611ms)
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (1563.290557ms)
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (1610.16229ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9940.43505
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (1657.246435ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:67:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (1567.146047ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:75:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (1547.173611ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:84:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (1563.290557ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:97:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (1610.16229ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+--- stderr ---

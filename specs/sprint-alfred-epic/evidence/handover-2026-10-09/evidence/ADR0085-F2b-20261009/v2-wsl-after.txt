@@ -1,0 +1,18 @@
+command: node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs
+label: v2-after
+exitCode: 0
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (138091.602064ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140717.114586
+
+--- stderr ---

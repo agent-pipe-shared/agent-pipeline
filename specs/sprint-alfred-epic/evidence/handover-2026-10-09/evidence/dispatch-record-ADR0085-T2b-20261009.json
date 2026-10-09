@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-T2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "a662f4dc6e8e118531451d4d876278503a44ded4",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "stopped-without-commit"},
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": false, "guardrails": false, "security": false}
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "log": [
+    {"phase": "opening: route pre-check done (requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 from this dispatch's runtime prompt, no contradiction); obligations + CONT17 header read; directory-level Glob/Grep and rg --glob refused; preflight run from the loaded plugin root after GUARD-BOOTSTRAP-RECEIPT-MISSING", "toolUses": 13},
+    {"phase": "orientation: read C2, Ruling 136 F2b bullets, design-workflow-approval.mjs :1-240, design-approval-route.test.mjs :1-380 and :600-end, the three suites' call sites, the signing recipe (design-workflow-package.test.mjs :794-860, v2 test :143-151)", "toolUses": 28},
+    {"phase": "baseline: before.txt captured (wrapped exit 0, head a662f4dc6); read readApprovedDesignWorkflowPackage, verifyAgainstTrustAnchors, source-drift codes", "toolUses": 36},
+    {"phase": "80 percent checkpoint hook notice at counted call 36 of 45: no edit made; briefing-vs-repo contradiction found on the accept code (DWP-APPROVAL-VERIFIED vs DWP-APPROVAL-STORED-SIGNATURE-VERIFIED); closing the dispatch with a handover", "toolUses": 38}
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "S1..Sn block in plugins/pipeline-core/lib/design-approval-route.test.mjs not written",
+      "red.txt capture not taken",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs not run",
+      "the commit",
+      "enumeration of dependent existing cases only partly done (see report section 6)"
+    ],
+    "nextBriefingAdjustments": [
+      "rule the accept code before re-dispatch (S-accept code contradiction, report section 6)",
+      "hand the fixture recipe, codes and predictions of report section 6 to the next Goldfish",
+      "exact file paths only for Grep/Read; no directory Grep/Glob, no rg --glob",
+      "the next dispatch needs about 10 calls: before capture exists already, so one Edit, red capture, consumer-safe test, message file, git add, git commit, record"
+    ]
+  },
+  "resultSha256": null,
+  "report": {
+    "text": "independent review: pending. CLOSING-ALLOWANCE HANDOVER: stopped at the 80 percent checkpoint (hook notice at counted call 36 of 45) before any edit; nothing committed. A briefing-vs-repo contradiction (stop condition 2) was also found.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6); observed model identity claude-sonnet-5-5 from this dispatch's runtime prompt; no contradiction. The agent-definition frontmatter was not read.\n\n1. DoD results\n- Capture before the edit: passed (evidence/ADR0085-T2b-20261009/before.txt, wrapped exit 0).\n- New RED pins in design-approval-route.test.mjs: failed (not written).\n- Capture after the edit (red.txt): failed (not taken, nothing to capture).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: not verifiable (not run).\n- One commit of the test file: failed (nothing committed).\n- Enumeration: partly done, see section 6.\n\n2. Evidence\n- evidence/ADR0085-T2b-20261009/before.txt, written by plugins/pipeline-core/scripts/capture-evidence.mjs. Command: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T2b-20261009/before.txt --label before -- node --test plugins/pipeline-core/lib/design-approval-route.test.mjs. Wrapped exit 0, head a662f4dc6e8e118531451d4d876278503a44ded4, dirty tree. I read lines 1-12 only (R1-R5 passing); the totals were not read, 28 of 28 is expected from the ADR0085-F2a record but not confirmed by me.\n\n3. Changed files\n- none tracked. Untracked: evidence/dispatch-record-ADR0085-T2b-20261009.json (this record), evidence/ADR0085-T2b-20261009/before.txt.\n\n4. Deliberately not changed\n- every production and test file; foreign staged and dirty files.\n\n5. Deviations from spec\n- The dispatch ended at the checkpoint without delivering the goal, as the briefing's 80 percent rule requires.\n\n6. Open items\nA. STOP CONDITION 2, briefing vs repo. Field 1 says the valid signed approvals verify with ok: true, DWP-APPROVAL-VERIFIED. verifyStoredDesignWorkflowPackageSignature (design-workflow-approval.mjs:220) returns code DWP-APPROVAL-STORED-SIGNATURE-VERIFIED, and design-workflow-package.test.mjs:843 pins that code today. DWP-APPROVAL-VERIFIED is the code of the nested verifyDesignWorkflowPackageApproval (:167). The Elephant must rule which code S-accept pins; the repo-consistent choice is STORED-SIGNATURE-VERIFIED.\n\nB. FIXTURE RECIPE (read from the repo, not run). Reuse makeApprovedRepo({version}) of the R block (design-approval-route.test.mjs:212; no .git, no readiness file, no course store; args() holds repoRoot, packagePath, packageSha256, featureId, planPath, planSha256, specPath, specSha256, advisorExceptionBinding). Add imports generateKeyPairSync and sign (node:crypto), createPoApprovalIntent (./po-approval-proof.mjs), verifyAgainstTrustAnchors (./critical-human-proof-policy.mjs). Intent: createPoApprovalIntent({kind: 'design-workflow-package', featureId, planSha256, specSha256, candidate: workflowPackage.candidate, policyRevision: 'design-workflow-package-v2' (v1: '-v1'), subjectSha256: packageSha256, decision: 'approve'}) (same as makeIntent, design-workflow-approval.mjs:31). Key: generateKeyPairSync('ed25519'), pem = publicKey.export({type:'spki',format:'pem'}).toString(); anchors = [{keyReference, publicKeySha256: sha256(Buffer.from(pem))}]; proof = {schema: 'pipeline.po-approval-proof.v1', intentSha256: intent.sha256, keyReference, publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString('base64')}; proofSha256 from verifyAgainstTrustAnchors({intent, anchors, proof}).proofSha256. Approval record (exact key set, :183): {schema: 'pipeline.design-workflow-package-approval.v1', mode: 'signature', approvedBy: 'verified:' + keyReference, approvedAt, packageSha256, intentSha256, proofSha256, proof, + advisorException only for the v2 unavailable package}. Call verifyStoredDesignWorkflowPackageSignature({...fixture.args() minus advisorExceptionBinding, approval, anchors, readCandidate}); readCandidate MUST be a function that throws (candidateReader, :44, replaces any non-function with () => null).\n\nC. EXACT CODES (from the code, predictions not run). Re-read (design-workflow-package.mjs, rereadApprovedDesignWorkflowPackage): package byte drift DWP-APPROVAL-DIGEST-DRIFT; PRD/Spec current-bytes drift DWP-APPROVAL-SOURCE-DRIFT (:821; missing file DWP-SOURCE-PHYSICAL :820); exception mismatch or dropped on v2 DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING. Stored verifier: record shape DWP-APPROVAL-RECORD-SHAPE (:186, checked before any read), intent drift DWP-APPROVAL-INTENT-DRIFT (:202), approvedBy or proofSha256 mismatch DWP-APPROVAL-RECORD-DRIFT (:218). Proof invalid and key not in anchors: the code is whatever verifyPoApprovalProof (po-approval-proof.mjs, NOT read) returns, propagated through verifyAgainstTrustAnchors (critical-human-proof-policy.mjs:536; empty-key proof PO-APPROVAL-PROOF-INVALID, default last code PO-APPROVAL-TRUST-MISMATCH); read verifyPoApprovalProof for the exact strings.\n\nD. RED/GREEN PREDICTIONS (not run). Today readApprovedDesignWorkflowPackage (design-workflow-package.mjs:659) calls readDesignWorkflowPackageFromRepository with the synthetic repo (no readiness, no .git) and the throwing readCandidate. Expected RED: S-accept v1 and v2, byte drift, source drift, exception mismatch, intent drift, proof invalid, foreign key (all need the read to succeed first; the digest and exception checks sit after the read at :680-:687). Expected GREEN: record-shape pins (refused at :186 before any read), as regression guards. Confirm with red.txt.\n\nE. ENUMERATION (partial, no edits). design-workflow-package.test.mjs: import :21; case check at :794 'implementation re-verifies the stored signature against the immutable package after unrelated commits' calls :835 (ok true, STORED-SIGNATURE-VERIFIED, readCandidate returns a later candidate), :845 (RECORD-DRIFT, approvedBy), :849 (RECORD-DRIFT, proofSha256), :853 (wrong anchors, ok false). Dependency: baseFixture/materializeFixture (:58, :118) writes the package, readiness file (:63) and sources; readCandidate is not asserted. Whether the outcomes survive F2b depends on materializeFixture also writing the PRD and Spec files (:58-:82 NOT read). design-workflow-package-v2.test.mjs: import :31; calls :148 (ok true), :149 (exception dropped, ok false), :150 (replayed exception, ok false), :151 (forged proof, ok false) inside the Advisor-unavailable failure-evidence test (about :100-:157; its title was not read; the test at :37 is a different one). Dependency: a real Git repo with the package committed (:137-:138), failure and initial-context artifacts, a readinessFixture host store (linux only, win32 skips at :39), approvalInput.readCandidate = observeAdvisorCandidate(failed.root) (:139). :149-:151 assert only ok false, so they stay false for any reason (weak pins). architecture-design.test.mjs: only :200, a stub module returning TEST-DWA-UNUSED; no outcome depends on the live candidate or course store. NOT enumerated: cases reaching the verifier through production callers (for example design-workflow-package.test.mjs:862 'the implementation guard verifies the package signature and admits the explicit chat posture'); the production-caller search was not run (rg --glob is refused by the shell grammar).\n\nF. Tool budget: stopped at counted call 36 of 45 by the checkpoint notice; about 41 used at the final record write.",
+    "changedFiles": []
+  }
+}

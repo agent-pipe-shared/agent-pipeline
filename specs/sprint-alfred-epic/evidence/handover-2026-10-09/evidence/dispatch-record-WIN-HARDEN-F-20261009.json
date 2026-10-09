@@ -1,0 +1,79 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HARDEN-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "ea5401ec69812e0f9b40627d6ca1bddddf4e12eb",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "5a72c9b610938b58832d3f6d4ee58f6a6b6ff25d"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created; briefing headers read; route pre-check matched (claude-sonnet-5-5); preflight run",
+      "toolUses": 16
+    },
+    {
+      "phase": "orientation: production file, D3 note, tests read; wps-before captured (15/12/3)",
+      "toolUses": 29
+    },
+    {
+      "phase": "mechanism probe: Set-Acl cmdlet is the cause; .NET Access+Owner persist 3/3 green (V1, V3, V4)",
+      "toolUses": 33
+    },
+    {
+      "phase": "advisor consulted; before-captures of three related test files",
+      "toolUses": 35
+    },
+    {
+      "phase": "edits applied (4 hunks), commit message and capture driver written",
+      "toolUses": 40
+    },
+    {
+      "phase": "after captures: WPS014/015 green, WPS013 red, no new red elsewhere, store case moved to GES-RESTRICTED-PERMISSIONS",
+      "toolUses": 41
+    },
+    {
+      "phase": "diff reviewed (only my hunks), staged, committed",
+      "toolUses": 48
+    },
+    {
+      "phase": "terminal record written",
+      "toolUses": 50
+    },
+    {
+      "phase": "Elephant rebind (Ruling 154): the dispatch's writer had read HEAD after a concurrent commit; commits, changedFiles and the Commit line corrected to 5a72c9b61, resultSha256 recomputed over the corrected text",
+      "toolUses": 50
+    }
+  ],
+  "report": {
+    "text": "Closing state: implementation complete, one commit; independent review: pending. Not PO-accepted. Not a closing-allowance handover (all work fit the base budget).\n\n1. DoD results\n- Mechanism probe: passed (ran). Briefed hypothesis REFUTED as stated: Get-Acl returns no SACL section (SDDL has O:, G:, D: and no S:), and an object holding only Access+Owner (V2) still fails Set-Acl with PrivilegeNotHeldException from the 2nd call on; a no-op Set-Acl of an unmodified ACL on an already hardened directory fails too. So the cmdlet's persist step is the cause, not the sections the object carries. Why the cmdlet fails only from the 2nd call on was not isolated. Section-limited persist through [System.IO.Directory]::SetAccessControl (V3, V4) and Get-Acl object + .NET persist (V1) succeeded on 3 of 3 consecutive calls, with and without a child file; assessor says secure; protected=True, 1 ACE.\n- windows-private-state.test.mjs native: before 15 tests / 12 pass / 3 fail (WPS013, WPS014, WPS015); after 15 / 14 / 1 (only WPS013 red; WPS014 and WPS015 green). passed. WPS013 stays red; its failure message was not compared before/after (pre-existing fixture issue per briefing).\n- hardened-private-directory.test.mjs native after: exit 0, 44 tests / 38 pass / 0 fail / 6 skipped (before capture also exit 0; counts not compared). passed (no new red).\n- agent-pipeline-root-creation.test.mjs native: before and after both 5 / 3 pass / 2 fail, same pins (b) and (c) red, pin (a) green. passed (no new red).\n- governance-event-store.test.mjs native: before 59 / 49 pass / 2 fail / 8 skipped; after 59 / 50 / 1 / 8. The WIN-GES-T3 pin turned green (I did not isolate whether the hardener change alone caused it). The restricted-storage case (starts :1138) is still red but MOVED: before it threw 'Restricted storage Windows DACL assurance is unavailable: native Windows DACL observation failed'; after it throws GES-RESTRICTED-PERMISSIONS ('Restricted records must not grant group or other access.') at the call site :1165 (the first put). That is a POSIX-mode check on win32, a different defect, not this slice. Nothing else changed state.\n- WSL capture of windows-private-state.test.mjs: exit 0, 15 tests / 12 pass / 0 fail / 3 skipped (new cases skip). No WSL before-capture was taken, so 'unchanged' rests on the skip behaviour, not on a diff.\n- Spawns per hardener call: 2 (harden + re-observe), counted in the post-fix probe: 13 spawns for 6 calls plus one failing call on a missing path (1 spawn). passed (limit 3).\n- check-consumer-safe-paths.test.mjs: exit 0, 9 / 9. passed.\n- Commit: 5a72c9b61, the production file only, exact subject. Message carries only Dispatch and AI-Assisted trailers.\n\n2. Evidence (all under evidence/WIN-HARDEN-F-20261009/, written by capture-evidence.mjs, wrapped exit codes in brackets)\nmechanism.txt [0] (probe), mechanism-after.txt [0], wps-before.txt [1], after-windows-private-state.txt [1], after-hardened-private-directory.txt [0], before-hardened-private-directory.txt [0], before-agent-pipeline-root-creation.txt [1], after-agent-pipeline-root-creation.txt [1], before-governance-event-store.txt [1], after-governance-event-store.txt [1], wsl-windows-private-state.txt [0], after-consumer-safe-paths.txt [0], probe.mjs. Commands: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label native|wsl -- node --test <test file> (driver: scratch/dispatch/win-harden-f-a1/captures.mjs, probe: probe.mjs, both untracked scratch). Captures ran on HEAD d8b5d5a with a dirty tree, not on the candidate ea5401ec6 named in the record.\n\n3. Changed files\n- plugins/pipeline-core/lib/windows-private-state.mjs: hardener script now reads Access+Owner via [IO.Directory]::GetAccessControl and persists via [IO.Directory]::SetAccessControl (owner reset, inheritance protection and the single FullControl ACE unchanged); script wrapped in try/catch writing a fixed-marker exception TYPE name to stderr; new childFailureReason() builds a path-free reason (exit status, spawn error code, signal, exception type) for invoke(); a hardening failure is no longer worded as an observation failure; docblock notes repeatability.\n\n4. Deliberately not changed\n- Any test file (WPS013 included), governance-event-store.mjs, hardened-private-directory.mjs, hooks, lib/guard, harness. The GES-RESTRICTED-PERMISSIONS defect behind the store case. The two agent-pipeline-root-creation pins (b), (c). worktree-lifecycle.mjs (second caller of the hardener) and its tests were not run.\n\n5. Deviations from spec\n- The step-1 hypothesis was refuted rather than confirmed (see section 1); the fix shape (section-limited persist, not assess-first) is the briefed Ruling 148 shape and the probe supports it. Reason wording changed from 'observation failed' to 'hardening failed' for hardener failures, with the briefed detail appended; no test or other source pins the old string (searched plugins/ and harness/). Group is no longer re-persisted (it was never modified).\n\n6. Open items\n- independent review: pending (class S, Opus Critic follows). Not verified: elevated token, non-German locale, Codex/Antigravity on Windows, macOS (win32-only branch; POSIX paths untouched). Concurrency note: my first Edit batch ran four Edits on one file in parallel; the staged diff showed exactly my four hunks. Tool budget: the hook counted 48 at the commit; the record write is the 49th and 50th call.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/windows-private-state.mjs"
+    ]
+  },
+  "resultSha256": "84afca3a2fe8bb6baa54df635e52417089ea4d41c489881fb10232b9a4f0e705"
+}

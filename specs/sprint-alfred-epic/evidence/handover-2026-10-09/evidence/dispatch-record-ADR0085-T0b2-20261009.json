@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "ADR0085-T0b2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "agent": "goldfish-deep",
+  "outcome": "interim-handback-budget-checkpoint",
+  "commits": [],
+  "log": [
+    { "phase": "opening record written after the guard-required preflight (GUARD-BOOTSTRAP-RECEIPT-MISSING on first Write; preflight status ready)", "toolUses": 7 },
+    { "phase": "orientation: CONT15 section, Ruling 77, API contract, design note C1-C8 and section 17, harness fixture pattern, present-plan/submit-plan/approve-plan code, signature observer, policy reader, inspectArchitectureDesignDraft", "toolUses": 46 },
+    { "phase": "advisor consult (approach confirmed: write now, no more reading)", "toolUses": 40 },
+    { "phase": "commit message file written; draft test file written to scratch (never executed)", "toolUses": 53 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT at call 52 of 65 (hook budget is lower than the briefing's 70+5): stopped, nothing staged or committed", "toolUses": 54 }
+  ],
+  "report": {
+    "dod": "NOT MET. No file at the target path, no red.txt capture, no consumer-safe run, no commit. A full draft exists but was never executed, so no case is verified RED for its stated reason.",
+    "changedFiles": [
+      "scratch/drafts/ADR0085-T0b2/design-approval-route.e2e.test.mjs (UNVERIFIED draft of the target file, untracked scratch, about 330 lines, never run)",
+      "scratch/commit-msg/ADR0085-T0b2.txt (commit message, ready; ends with the two required trailers, Dispatch: ADR0085-T0b2-20261009 (goldfish))",
+      "evidence/dispatch-record-ADR0085-T0b2-20261009.json (this record)"
+    ],
+    "measured": {
+      "keyDirectoryRoute_RESOLVED": "approve-plan never reads HOME, the machine plane or the key directory. The v7 signature observer (pipeline-state.mjs:8900-8928) reads the proof from scratch/ (path = request path with 'request-' replaced by 'proof-', designWorkflowApprovalProofPath :8894) and the trust anchor from readCriticalHumanProofPolicy(dir) = project/critical-human-proof.json, schema pipeline.critical-human-proof-policy.v3 with keys exactly schema, requiredKinds, waivedKinds, trustAnchors[{keyReference, publicKeySha256}] (critical-human-proof-policy.mjs:344-358). persistExplicitDirectoryIntoMachinePlane is not needed. The key directory matters only to sign-intent, which takes --directory explicitly. Assumption in the header: the v8 route reuses that reader (C2 table, 'the same trust policy').",
+      "signStepGap": "sign-intent is NOT driven: it shells to openssl pkeyutl, has probe stubs (fakeSignSpawn/answerOpensslProbe in po-human-approval.test.mjs:297-315) and its key/passphrase handling is in flux under TR-S1. The draft signs with node:crypto in the pipeline.po-approval-proof.v1 shape {schema, intentSha256, keyReference, publicKey(spki pem), signatureBase64 = ed25519 over Buffer.from(intentSha256)}, the same way lib/architecture-design-test-fixture.mjs:156 signs. Named as a gap (A10) in the draft header.",
+      "fixtureShortcuts": "inspectArchitectureDesignDraft returns {ok:true, required:false} when the greenfield scaffold is absent (lib/architecture-design.mjs:174), so submit-plan --profile feature passes in a bare temp repo with NO materializeArchitectureDesignFixture. pipeline.user.yaml without a gates key resolves to the default 'signature' mode (do not copy PS14's human_approval: chat). State file is project/pipeline-state.json. submissionSha256 = sha256CanonicalJson(state.planSubmission) (plan-spec-state-v2.mjs:665), needed to seed the decision-V presentation.",
+      "scriptsExist": "git ls-files confirms plugins/pipeline-core/scripts/{design-advisory-admission,design-advisory-coordinator,design-course-coordinator,design-course-session,runner-design-readiness-bootstrap}.mjs and lib/{design-approval-binding,design-review-receipt,guard-devplan-policy}.mjs. lib/retired-design-codes.mjs does NOT exist (dynamic import fails: RED).",
+      "presentPlanToday": "present-plan accepts only --by and --design-workflow-package (pipeline-state.mjs:10582) and the message is 'present-plan accepts only --by <name> and optional --design-workflow-package ...'. So route cases are RED with 'flag --review-receipt missing', exit 2."
+    },
+    "draftDesign": "Nine-plus node:test cases in one file: route 1 (present-plan --review-receipt exit 0, exactly ONE line naming sign-intent, absolute --request path, request pipeline.design-approval-request.v1, no package fields, presentation without designWorkflowPackage keys); route 2 (node:crypto proof next to the request, approve-plan --design-approval-request exit 0, pipeline.plan-approval.v8 closed key set per Ruling 77a, v7 fields absent, designApproval mode signature, bindingSha256 = sha256(canonical(binding)) with canonical from lib/po-approval-proof.mjs); route 3 (designAdvisoryAdmission(state, dir, planPath, specPath) ok:true, gated on planApproval.schema being v8 so it cannot pass vacuously); route 4 (zero continuity-cas: approve exit 0 AND queueHead.dispatch null before and after AND no continuity-cas in the verb ledger); decision V (seed a v2 planPresentation by direct state write, approve-plan --by po-test, assert non-zero, a typed-code regex, the hint 'present-plan --review-receipt', no approval written); retired entry points (present-plan --design-workflow-package -> DWP-PRESENT-RETIRED, approve-plan --design-workflow-approval-request -> DWP-APPROVAL-REQUEST-RETIRED as header assumption A2, five scripts invoked with no arguments, lib/retired-design-codes.mjs holding the four codes). Route 1-4 share one memoized run. All fixture libs are imported dynamically inside the cases; nothing is imported from harness/. Fixture chain: git init, user config, README commit, committed pipeline.user.yaml, uncommitted .claude/pipeline.yaml, po-gate profile receipt (mirrors seedSubprocessPoGateAuthority), PRD with markers, Spec, design.md, traceability.md, review report, review receipt from createDesignReviewReceipt, committed project/critical-human-proof.json v3, then CLI set-feature, continuity-init, submit-plan --profile feature, with HOME/USERPROFILE pointing at a temp dir.",
+    "deviations": [
+      "The briefing's DoD asks for one terminal record written after the commit; the role contract asks for an opening in-progress record. An in-progress record was written first and is now overwritten by this single interim record; no second record will be written until a terminal one.",
+      "The hook's checkpoint (call 52 of 65) is lower than the briefing's budget (70 + 5 closing). The hook was followed; the briefing's remaining calls were not used.",
+      "One Grep was aimed at a directory (refused by guard GUARD-READ-TARGET, no effect); CONT15 forbids it and it cost one call.",
+      "The first output line (bootstrap confirmation) named 'Calibration standard profile (no calibration file named in the briefing)', because the briefing names no calibration file."
+    ],
+    "routeCheck": "Requested route (briefing field 6): goldfish-deep, claude-sonnet-5-5, effort xhigh; no A/G/S class declared. Observed: this dispatch's runtime prompt states 'The exact model ID is claude-sonnet-5-5'. No contradiction; effort is not observable from inside the run.",
+    "deliberatelyNotChanged": "No production file, no existing test file, nothing under harness/, lib/guard/, hooks/. The other dirty and staged files in the tree are foreign and untouched.",
+    "unverifiedRisksForTheNextRun": [
+      "The draft was never executed. Expect fixture debugging: the first RED must show 'present-plan accepts only --by ...' (flag missing); any PO-GATE-*, PROFILE-*, or continuity code at fixture build is a fixture bug to fix before committing.",
+      "Unmeasured: whether submit-plan --profile feature accepts the fixture without further profile sources (inspectSelectedPlanProfile), whether the HOME/USERPROFILE override upsets the CLI on win32, whether continuity-init needs the exact request shape copied from the harness (the draft copies lifecycleContinuity).",
+      "rmSync of the po-gate private dirs may fail on win32 after hardenWindowsPrivateDirectory; the draft wraps removal in try/catch.",
+      "designAdvisoryAdmission may be synchronous or async; the draft awaits it either way."
+    ],
+    "nextStep": "Re-dispatch (or continue) with this exact order: (1) copy scratch/drafts/ADR0085-T0b2/design-approval-route.e2e.test.mjs to plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs and delete its first DRAFT-UNVERIFIED line; (2) run the native capture: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0b-20261009/red.txt --label red -- node --test plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs, Bash timeout 600000 (the capture creates the directory); (3) fix fixture failures only (at most two iterations) until the first failure of every route case is the missing flag; (4) node --test harness/scripts/check-consumer-safe-paths.test.mjs; (5) git add -- <path>, then git commit -F scratch/commit-msg/ADR0085-T0b2.txt -- <path>; (6) rewrite this record once as the terminal record with commits and the changed files. Budget needed: about 12 tool uses if the draft runs cleanly, 18 with two fixture fixes."
+  }
+}

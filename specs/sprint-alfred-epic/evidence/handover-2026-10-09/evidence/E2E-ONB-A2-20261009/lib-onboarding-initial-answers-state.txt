@@ -1,0 +1,23 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/onboarding-initial-answers-state.test.mjs
+label: lib-onboarding-initial-answers-state
+exitCode: 0
+head: 2e875d0218b2b6aec32fbd59996284c3d5525d2e
+tree: d466d5fc6a9e37481f7fee6a8de8487508056bf6
+dirty: true
+--- stdout ---
+✔ local first-answer receipt retains its historical path and never creates state (10.127802ms)
+✔ the no-Git read fallback does not hide a malformed ancestor control (2.135057ms)
+✔ linked worktrees resolve the local answer receipt under the canonical shared Git directory (29.4142ms)
+✔ host-managed first-answer paths stay in the private runtime, not reserved controls (0.429507ms)
+✔ unknown repository capabilities do not silently select local state (0.303515ms)
+✔ host-managed creation owns only the private tree and rejects an alias (1.023737ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 184.056429
+
+--- stderr ---

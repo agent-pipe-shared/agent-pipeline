@@ -1,0 +1,257 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs
+label: mech-haiku-after-runner-profile-migration-v2
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  v0: exact historical Public opus and sonnet aliases are closed compatibility spellings
+FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning
+PASS  v2: original source bytes stay exact; inspect and plan do not mutate
+FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  inspect and plan: a live lock blocks parsing without reclamation
+FAIL  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'invalid-baseline'
+           ^
+
+FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')
+FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+PASS  apply: every rename-after-effect fault rolls all targets back without false success
+FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+-   0,
+-   0,
+    1,
++   1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+PASS  path safety: .claude/settings.json symlink fails closed
+PASS  path safety: .claude/pipeline.yaml symlink fails closed
+PASS  path safety: .codex/config.toml symlink fails closed
+PASS  path safety: .codex/agents/implementor.toml symlink fails closed
+PASS  path safety: .codex/agents/critic.toml symlink fails closed
+PASS  path safety: pipeline.user.yaml symlink fails closed
+PASS  path safety: .claude parent symlink fails closed before an outside write
+PASS  path safety: .codex parent symlink fails closed before an outside write
+FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+
+17 failure(s):
+- v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: preserved Claude routes and exact Codex routes never claim effective identities: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: accepted Terra aliases become requested frozen selectors without an effective-model claim: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: current Astra and Luna selectors reconcile to frozen V2 cells: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- inspect and plan: no journal means no transient lock or persistent write: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'invalid-baseline'
+           ^
+
+- apply: forged or mutated public plans fail closed before any write: Cannot set properties of undefined (setting 'path')
+- apply: writes only declared targets, commits source last, and preserves I2 unowned bytes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+- apply: post-rename journal durability failure rolls back cleanly and permits a later plan: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+- recovery: a crash during rollback retains proof until a later inspect can clean it: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+- apply: staged write fault leaves bytes intact and never reports success: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+- recovery: durable interruption restores preimages before parsing and corrupt journals fail closed: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- recovery: a journal cannot widen the frozen I2 ownership boundary: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+-   0,
+-   0,
+    1,
++   1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+- historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+✖ plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs (1760.182485ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1767.029341
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs:1:1
+✖ plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs (1760.182485ms)
+  'test failed'
+
+--- stderr ---

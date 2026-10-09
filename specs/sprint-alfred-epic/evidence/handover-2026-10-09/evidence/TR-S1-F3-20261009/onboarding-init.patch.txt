@@ -1,0 +1,40 @@
+command: git diff -- plugins/pipeline-core/scripts/onboarding-init.mjs
+label: TR-S1-F3-uncommitted
+exitCode: 0
+head: 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a
+tree: ef25c511aca6ec7d0c36d66ae6b4bdea1a4fe4e0
+dirty: true
+--- stdout ---
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index dd65e62e6..5658db4dc 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -547,16 +547,16 @@ export function applyTrustAnchorBootstrap({
+     && currentAnchors[0].publicKeySha256 === authority.publicKeySha256;
+   if (currentAnchors.length > 0 && !anchoredAlready) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
+ 
+-  if (recoveringNewAuthority) {
+-    try {
+-      atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
+-        schema: "pipeline.po-key-directory.v1",
+-        poKeyDirectory: targetDirectory,
+-        updatedAt: new Date().toISOString(),
+-      }, null, 2)}\n`);
+-    } catch {
+-      return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
+-    }
++  // Bootstrap owns the repository pointer on every path that reaches here: the setup child writes the machine
++  // plane only (decision AC), so the pointer binding this repository to its key directory is written here.
++  try {
++    atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
++      schema: "pipeline.po-key-directory.v1",
++      poKeyDirectory: targetDirectory,
++      updatedAt: new Date().toISOString(),
++    }, null, 2)}\n`);
++  } catch {
++    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
+   }
+   const repositoryPointer = parseJsonFile(repositoryPointerPath, read);
+   if (resolve(repositoryPointer?.poKeyDirectory ?? ".") !== targetDirectory) {
+
+--- stderr ---

@@ -1,0 +1,21 @@
+=== WIN-AP-S5-D probe 3 ===
+
+##### BASE: TEMP volume
+-- OLD hardener script (Get-Acl + Set-Acl), first call
+   call 1: OLD-OK [exit 0]
+   assess after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+-- PROTOTYPE FIX, called twice on the same directory
+   call 1: FIXED-OK ownerWasSelf=True [exit 0]
+   call 2: FIXED-OK ownerWasSelf=True [exit 0]
+   assess after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+##### BASE: CHECKOUT volume (<repo-root>/scratch)
+-- OLD hardener script (Get-Acl + Set-Acl), first call
+   call 1: OLD-OK [exit 0]
+   assess after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+-- PROTOTYPE FIX, called twice on the same directory
+   call 1: FIXED-OK ownerWasSelf=True [exit 0]
+   call 2: FIXED-OK ownerWasSelf=True [exit 0]
+   assess after => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+
+(fixtures removed)

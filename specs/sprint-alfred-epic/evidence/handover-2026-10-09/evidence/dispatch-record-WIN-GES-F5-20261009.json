@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-F5-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f06975126",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "f70f97ec6"
+  ],
+  "resultSha256": "d2809a8c9fe540292968588a1e6881c7cd778e660e56acf5dfa82698edd5a2ba",
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded · Project agent-pipeline-share · Calibration pipeline.json · State briefing WIN-GES-F5-20261009 · Role Goldfish\n\nRoute pre-check (class S): requested goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet; observed from this dispatch's own runtime prompt: \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction.\n\nImplementation complete, independent review: pending. Commit f70f97ec6.\n\n1. DoD results\n- `:1138` restricted-storage case: passed (native red -> green).\n- No other case changes state: passed (61 cases compared, exactly 1 changed: `:1138` fail -> pass). Native 61/53/1/7 -> 61/54/0/7. WSL 61/59/0/2 identical to the prior WSL capture, 0 changed.\n- consumer-safe-paths exits 0: passed (\"Consumer-safe-path check passed: 1769 tracked file(s) ... 152 allowlist entries (all used)\").\n- One commit of the module with the briefed subject: passed (f70f97ec6).\n\n2. Evidence (repo-root `evidence/WIN-GES-F5-20261009/`, written by `scratch/dispatch-wip/WIN-GES-F5-20261009/capture.mjs`, sanitised of host paths)\n- `before.txt` (native, whole file, exitCode 1), `after.txt` (native, exitCode 0, includes the per-case state comparison against before.txt), `wsl-after.txt` (WSL, exitCode 0, compared against `evidence/WIN-GES-T4-20261009/wsl-after.txt`).\n- Command: `node --test plugins/pipeline-core/lib/governance-event-store.test.mjs` (native); the same inside WSL via `wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node scratch/dispatch-wip/WIN-GES-F5-20261009/capture.mjs ...\"`.\n- consumer-safe-paths: `node harness/scripts/check-consumer-safe-paths.mjs`, exit 0 (stdout only, no file).\n- The evidence files and the scratch scripts are NOT in the commit (briefed scope: one commit of the module); they are untracked.\n\n3. Changed files\n- `plugins/pipeline-core/lib/governance-event-store.mjs`: new `assertRestrictedChildPrivate` (win32: create -> `hardenWindowsPrivateDirectory`, existing -> `assessWindowsPrivatePath`; POSIX: the old mode check, same code and message); `restrictedRecordsRoot` and `restrictedAuxiliaryRoot` use it and derive `created` from the `mkdir({recursive})` return value.\n\n4. Deliberately not changed\n- Tests, `hardened-private-directory.mjs`, every other production file, and the D1 mode-unrecorded host class: untouched as briefed.\n- The two helpers keep no injectable `io` seam (unlike `assertRestrictedRoot`): they are not exported and tests are forbidden in this slice, so a seam would be untested surface. The win32 branch is exercised by the real native PowerShell assessor in `:1138`.\n- `assertRestrictedRoot` still hardens an already-existing store root when called with `create: true` (flag-based, not creation-based). Out of scope; the new helpers are creation-based instead (see deviations).\n\n5. Deviations / judgment calls (flagged for the Elephant, each a one-token flip)\n- Typed code: the briefing says \"otherwise the existing typed refusal\". I kept `GES-RESTRICTED-PERMISSIONS`, the only code the briefing names for these two helpers, so POSIX and win32 share one typed refusal. The alternative `GES-RESTRICTED-WINDOWS-ASSURANCE` (what `assertRestrictedRoot` throws, and what `:1277-1287` pin for the root) would be a one-token change. The win32 message now appends the assessor's status and reason (path-free per Ruling 154); the POSIX message is byte-identical.\n- \"A root this call creates is hardened\": implemented literally via the `mkdir` return value, not via the `create` flag. Consequence: `put` hardens `records` only on the call that creates it and later calls (and `restrictedStatus`, `findRestrictedIdempotency`) assess it. This costs one PowerShell assessment per `records` access on win32.\n- The capture headers record `head: b9040293...`, not the briefed candidate `f06975126`: HEAD advanced under concurrent work. I did not touch the module before the edit; its pre-edit `git status` entry was clean.\n\n6. Open items\n- Independent Critic review: pending (S class; only the Elephant dispatches it).\n- Not verified: `:1138` and the rest of the file pass natively and under WSL, but no other suite that imports the restricted helpers was run (single targeted test file, as briefed).\n- The dispatch record was finalized with a scratch script (`finalize.mjs`) in one write; the commit SHA was taken from the commit output.\n- Tool budget: about 49 of 55 used; no closing-allowance handover needed, nothing left uncommitted in scope.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 12
+    },
+    {
+      "phase": "closing: record finalized (commit -> report -> outcome in one write)",
+      "toolUses": 50
+    }
+  ]
+}

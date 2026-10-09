@@ -1,0 +1,51 @@
+{
+  "taskId": "TR-S1-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial-stopped-budget-and-briefing-mismatch",
+  "commits": ["0388fd0fe"],
+  "log": [
+    {"phase": "opening: bootstrap line, preflight (status ready), commit-message files, opening record kept in scratch/commit-msg/TR-S1-T2-opening-record.json", "toolUses": 10},
+    {"phase": "step 1 committed 0388fd0fe (195 insertions, the TR-S1 pins, unchanged)", "toolUses": 18},
+    {"phase": "step 2 scoping: ~90 keyFixture() call sites, 89 sign-intent/authorize-critical invocations; advisor consulted; decided to measure instead of half-migrating", "toolUses": 28},
+    {"phase": "measurement: temporary simulated gate in the test-local runHumanApproval wrapper, WSL run to evidence/TR-S1-T2-20261009/simulated-gate.txt, wrapper reverted (git status of the file empty)", "toolUses": 34},
+    {"phase": "final-state WSL run to after.txt, consumer-safe check, terminal record", "toolUses": 41}
+  ],
+  "report": {
+    "dodResults": {
+      "step1CommitTR-S1-pins": "passed (0388fd0fe, one file, 195 insertions, no deletions)",
+      "step2MoveUnencryptedFixtures": "NOT DONE - stopped (budget exhausted plus briefing-vs-repo mismatch, see openItems)",
+      "wslCaptureAfterTxt": "passed for the committed state: 170 tests, 165 pass, 5 fail = exactly the 4 TR-S1 pins (1, 3, 4, 5) plus pre-existing NVA-SWEEP-F2f-REWORK. Trivially identical to the red-wsl.txt baseline because step 2 changed nothing.",
+      "consumerSafe": "passed (exit 0, 9 of 9)",
+      "secondCommit": "not made",
+      "terminalRecord": "written once, after the last (only) commit"
+    },
+    "evidence": [
+      "evidence/TR-S1-T2-20261009/after.txt  cmd: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T2-20261009/after.txt --label after -- node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs\"  wrapped exit 1 (the 5 expected reds)",
+      "evidence/TR-S1-T2-20261009/simulated-gate.txt  same command with a TEMPORARY simulated gate (reverted, never committed); wrapped exit 1; measurement only",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs  exit 0"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs (committed in 0388fd0fe; the TR-S1-T pins, unchanged; working tree now clean for this file)"
+    ],
+    "deliberatelyNotChanged": [
+      "scripts/po-human-approval.mjs and every production file",
+      "scratch/tr-s1-t-commit.txt (forbidden trailer lines, not reused)",
+      "scratch/commit-msg/TR-S1-T2-step2.txt was written but is UNUSED (no second commit)",
+      "foreign staged/dirty files in the shared checkout (untouched)"
+    ],
+    "deviations": [
+      "The role contract wants an opening in-progress record; the briefing wants the evidence/ record written ONCE after the last commit. The scratchpad path was refused (GUARD-CROSS-REPO-MUTATION), so the opening record lives at scratch/commit-msg/TR-S1-T2-opening-record.json and this file is the single evidence/ write.",
+      "A temporary, reverted edit of the test-local runHumanApproval wrapper was used purely to measure which cases a gate would turn red. It was never committed; the file is byte-identical to 0388fd0fe."
+    ],
+    "openItems": [
+      "STOP CONDITION: budget (40 uses) exhausted and the briefing premise (Ruling 75 A4: a fixture swap) does not hold. Moving a proceeding case needs three coordinated edits, not one: (a) encrypted fixture, (b) a passphrase-aware spawn, because production has no -passin and relies on openssl's interactive prompt (po-human-approval.mjs line 928 uses dependencies.spawn ?? spawnSync); the REQUIRES_OPENSSL cases use REAL openssl today, so they need fakeSignSpawn(privateKeyPem, passphrase) or a wrapper that appends -passin pass:<x>, (c) isTTY: true, because line 1174 refuses an encrypted key without an attended terminal. This is the NVA-SIGNONCE-1 pattern (test lines 1199-1240).",
+      "SUBJECT-CHANGING CLASS (needs a dispatcher decision): the encrypted path skips the typed confirmation (NVA-SIGNONCE-1). Cases about the confirmation prompt or cancellation cannot move without changing what they prove. Leave-and-list candidates, confirmed red under the simulated gate: 'sign-intent cancels on a mismatched confirmation' (1171), 'NVA-W5-TTYSIGN ... UNPROTECTED key' (1393), 'NVA-SIGNONCE-1 unencrypted ... mismatched confirmation' (1602), 'sign-intent cancels on an empty confirmation answer' (1984), 'authorize-critical still requires the literal word approve' (2510 and the fixtureDirs variant 4467), 'NVA-BL-74 cancellation semantics ... German prompt' (4175), and likely 'sign-intent signs a digest end-to-end ... after an accepted confirmation naming the digest' (634, judgment call). Pin 4 is green under the simulation by construction.",
+      "EMPIRICAL INVENTORY: under a simulated EARLIEST-placed gate (sign-intent/authorize-critical refuse an unencrypted po-private.pem found via --directory or PIPELINE_PO_APPROVAL_DIRECTORY, before everything else) about 77 cases turn red; the full list is in evidence/TR-S1-T2-20261009/simulated-gate.txt (the failing list is printed twice in that file). It is a SUPERSET: cases that fail on validation before the key is touched (DWP nested 89/97/105, AC-19 135, authorize-critical input/feature-id cases 2372/2434/2567/2584, tamper/reject cases 786/801/856/923, SWEEP-F2 request-path cases 956/975/996/1064/1089/1106) stay green if TR-S1-F places the gate later. Ruling 75 A2 puts it before any spawn, so the F slice's placement decides the true set. Also red in the simulation: the R7-6 block (about 25 cases: 4753-5521; their shared lever is r76KeyFixture at 4649 and r76Sign at 4654 - NOT inspected, so whether it is a one-line lever is unknown), the NVA-SIGENTRY-1 / disclosure cases 2822-2958, NVA-BL-74 4143/4202/4238, authorize-critical 2211-2469/4316-4412, 3090 (env route), 3970 (PO-KEYDIR-01(B)).",
+      "NOT SIMULATED (flag, decide scope): cases resolving the directory via the machine plane or a plain-home flow (3245, 3394), the *-fork-disposition cases (1763-1961, sign via commands the briefing does not name), approve-critical (2109, 2690) and the setup recover/already-exists cases (484, 585, GF-104, GF-112), which pin 3 says the gate also refuses. They sit outside A4 as worded but will turn red under the gate; TR-S1-F's 'only the four pins red' claim depends on them.",
+      "RECOMMENDED NEXT STEP: a follow-up dispatch sized for the real work, or a dispatcher decision on the confirmation-class cases first. Cheapest design is a CENTRAL lever, not ~60 per-case edits: extend the test-local runHumanApproval wrapper (test line 79) so that for sign-intent/authorize-critical it re-encrypts the fixture key IN PLACE with the same keypair (same public key, so trust-policy and anchors stay valid), injects isTTY: true and a -passin spawn wrapper, with an explicit opt-out marker for the leave-and-list cases above. Verify per iteration with the simulated gate (re-add it temporarily) until its reds are only the listed opt-outs plus the pins. Budget at least 40 more uses.",
+      "Remaining manual work for the PO: none beyond the dispatcher's scoping decision. Nothing is pushed. Implementation of step 2 is NOT complete; step 1 is committed but not Critic-reviewed."
+    ]
+  }
+}

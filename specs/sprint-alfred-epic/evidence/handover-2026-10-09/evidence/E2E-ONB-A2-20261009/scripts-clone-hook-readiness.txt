@@ -1,0 +1,19 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs
+label: scripts-clone-hook-readiness
+exitCode: 0
+head: 43ec720deeda9f3cec4bc6079736b80c0187b827
+tree: b68172361c4a408c7b13e7ecb57c6b59e117c0a6
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: clone-hook-readiness-plugin-wgo5YR
+✔ CHR001 non-repository roots never trigger Git initialization or hook writes (5.920194ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4255.06601
+
+--- stderr ---

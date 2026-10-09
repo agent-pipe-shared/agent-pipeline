@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-CKPT-F2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "e2888858572655a8ca63dbe57de7fa0a32a9b5ec",
+  "resultSha256": null,
+  "outcome": "in-progress",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [],
+  "log": [
+    {
+      "phase": "opening: briefing + predecessor record read, candidate resolved, preflight run at the refusal-named path, record created",
+      "toolUses": 13
+    }
+  ],
+  "report": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

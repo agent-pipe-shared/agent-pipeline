@@ -1,0 +1,14 @@
+{
+  "taskId": "R6-F2b2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "commits": [],
+  "log": [{"phase": "opening", "toolUses": 4}, {"phase": "edit-refused", "toolUses": 10}],
+  "report": {
+    "changedFiles": [],
+    "stop": "guard-testpath refused Edit on plugins/pipeline-core/scripts/pipeline-state.mjs: Rule PB-SANCTIONED-WRITER; override planning failed code=HGO-AUDIT-LOCK-AMBIGUOUS; briefed test-change route: no-route-for-this-target; gates.push_approval=signature.",
+    "dod": "not run: no edit applied, no AFTER captures, no commit"
+  }
+}

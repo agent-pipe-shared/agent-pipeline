@@ -1,0 +1,117 @@
+command: node --test "--test-name-pattern=ADOPT-SIGN-T|NVA-SIGNONCE-1: sign-intent skips|refuses ordinary apply" plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs
+label: adopt-sign-t-red
+exitCode: 1
+head: eba5e5a11b933ce5696e48b67bb92a345f16b4e3
+tree: 9954574a776acbf76f7669d2e2c299c2ae490935
+dirty: true
+--- stdout ---
+▶ Adoption authority anti-forgery and durable readback
+  ✔ refuses ordinary apply, then verifies a real detached signature and later legitimate commits (152.103902ms)
+✔ Adoption authority anti-forgery and durable readback (153.91688ms)
+▶ ADOPT-SIGN-T: adoption request file for the signing ceremony
+  ✖ ADOPT-SIGN-T: prepare --out writes the request JSON byte-identical to its stdout form (1225.950214ms)
+  ✖ ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing (578.310343ms)
+✖ ADOPT-SIGN-T: adoption request file for the signing ceremony (1804.650083ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 31595657b2c9b9d7e7d7a348b0f153697d23f06f46a12f736a7dd65b959e6e84
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✖ ADOPT-SIGN-T: sign-intent --request signs an adoption request by its intent.sha256, discloses the adoption and writes the --intent-sha256 proof shape (53.561476ms)
+✖ ADOPT-SIGN-T: sign-intent --request refuses an adoption request whose intent.sha256 does not match, before any confirmation or signing (45.148855ms)
+✔ NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-protected private key, but still prints the disclosure (18.035827ms)
+ℹ tests 6
+ℹ suites 2
+ℹ pass 2
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2610.716814
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/architecture-adoption.test.mjs:465:3
+✖ ADOPT-SIGN-T: prepare --out writes the request JSON byte-identical to its stdout form (1225.950214ms)
+  AssertionError [ERR_ASSERTION]: prepare must accept --out <scratch path>: file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:481
+        throw new Error(`Unknown or incomplete option: ${arg}`);
+              ^
+  
+  Error: Unknown or incomplete option: --out
+      at runCli (file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:481:13)
+      at file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:580:3
+      at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+      at async node:internal/modules/esm/loader:639:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+  
+  Node.js v24.15.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.test.mjs:470:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1619:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/architecture-adoption.test.mjs:476:3
+✖ ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing (578.310343ms)
+  AssertionError [ERR_ASSERTION]: the refusal must be about the path, not an unrecognised --out flag
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.test.mjs:484:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:481\n      throw new Error(`Unknown or incomplete option: ${arg}`);\n            ^\n\nError: Unknown or incomplete option: --out\n    at runCli (file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:481:13)\n    at file://<repo-root>/plugins/pipeline-core/scripts/architecture-adoption.mjs:580:3\n    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)\n    at async node:internal/modules/esm/loader:639:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)\n\nNode.js v24.15.0\n',
+    expected: /Unknown or incomplete option/u,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:453:1
+✖ ADOPT-SIGN-T: sign-intent --request signs an adoption request by its intent.sha256, discloses the adoption and writes the --intent-sha256 proof shape (53.561476ms)
+  Error: --request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:523:32)
+      at executeHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:2053:52)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:1747:10)
+      at callWithLever (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:152:42)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:165:50)
+      at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:473:16
+      at captureStdout (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:644:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:472:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:501:1
+✖ ADOPT-SIGN-T: sign-intent --request refuses an adoption request whose intent.sha256 does not match, before any confirmation or signing (45.148855ms)
+  AssertionError [ERR_ASSERTION]: the refusal must be adoption-specific, not the generic missing-field refusal
+      at Object.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:525:16)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.throws (node:assert:759:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:522:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)',
+    expected: /adoption.*request does not bind/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

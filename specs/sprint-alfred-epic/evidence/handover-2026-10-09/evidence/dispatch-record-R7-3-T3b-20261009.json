@@ -1,0 +1,57 @@
+{
+  "taskId": "R7-3-T3b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (feat/sprint-alfred)",
+  "outcome": "committed-red-pin",
+  "commits": [
+    { "sha": "1af634bde44b2d8101b8a37ede4242c8fc81cdd3", "subject": "test(design-workflow): pin the wrong candidate tree and a true deletion entry", "files": ["plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs"] }
+  ],
+  "log": [
+    { "phase": "opening: preflight run (hook-required), orientation reads; first record landed in specs/sprint-alfred-epic/evidence/ by mistake (same slip as the predecessor), relocated to repo-root evidence/ and the stray removed", "toolUses": 16 },
+    { "phase": "advisor consulted once before editing; helper option + EVDESC-h + EVDESC-i written, node --check clean", "toolUses": 22 },
+    { "phase": "WSL capture, consumer-safe check, commit 1af634bde, terminal record", "toolUses": 29 }
+  ],
+  "report": {
+    "route": "requested (field 6): goldfish-deep, claude-sonnet-5-5, effort xhigh, no A/G/S class named. Observed: this dispatch's runtime prompt names the model as Sonnet 5.5 with exact id claude-sonnet-5-5 (matches). Effort is not observable from inside the dispatch; not verified. Route pre-check not triggered (no A/G/S class declared).",
+    "dod": [
+      "WSL capture evidence/R7-3-T3-20261009/red.txt: passed. 9 old cases (a, b, b0, c1, c2, d, e, f, g) green; EVDESC-h RED; EVDESC-i green in its real state; po-gate-authority.test.mjs and pipeline-state-rebind-runner.test.mjs gain no new red (29 pass, 1 fail overall, the 1 fail is EVDESC-h). Wrapped exit code 1 is the intended RED.",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9.",
+      "One commit of the test file via git commit -F scratch/commit-msg/R7-3-T3b.txt -- <path>: passed, 1af634bde44b2d8101b8a37ede4242c8fc81cdd3, one file, trailers Dispatch: R7-3-T3b-20261009 (goldfish) and AI-Assisted: true only.",
+      "Terminal record evidence/dispatch-record-R7-3-T3b-20261009.json: this file."
+    ],
+    "evidence": [
+      "evidence/R7-3-T3-20261009/red.txt, written by capture-evidence.mjs. Command: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/R7-3-T3-20261009/red.txt --label R7-3-T3-red -- node --test --test-reporter=spec plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs plugins/pipeline-core/lib/po-gate-authority.test.mjs plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs\"; wrapped exit code 1 (the one red case is EVDESC-h).",
+      "EVDESC-h observed pair (the deliverable of the case): reader refused:DAC-FINAL-ENDPOINT, approval refused:DAC-FINAL-ENDPOINT; expected refused:DWP2-CURRENT-CANDIDATE at both. So the candidate rule admits a wrong candidate.tree with commit == HEAD (empty diff, design-workflow-package-v2.mjs:135 via isEvidenceOnlyDescendant :59-70) and a downstream binding (verifyUnavailableRevisionChain, :80) refuses with a different code.",
+      "EVDESC-i: green. Construction worked on the first WSL run (amend of the root candidate commit before the Advisor course is created). Control passed: after committing the bound set the tracked artifact is an M entry and the other bound paths A, and attempt() is ok/ok. After git rm + commit, diff-tree shows a true D entry for evidence/readiness.json, HEAD~2 is the candidate, and attempt() is refused:DWP2-CURRENT-CANDIDATE at both entry points.",
+      "node --check on the test file: exit 0 (before the WSL run). consumer-safe: exit 0."
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs: opt-in trackedAtCandidate option on unavailableAdvisorPackage (amend before the course is created; mkdirSync evidence made recursive; base candidate threaded into the route and dispatch), new cases EVDESC-h and EVDESC-i, plus the predecessor's header/import edit kept unchanged. COMMITTED in 1af634bde.",
+      "scratch/commit-msg/R7-3-T3b.txt: commit message file, untracked scratch.",
+      "evidence/R7-3-T3-20261009/red.txt: machine-written capture, untracked.",
+      "evidence/dispatch-record-R7-3-T3b-20261009.json: this record, untracked."
+    ],
+    "notChanged": [
+      "Production files, lib/test-design-workflow-fixture.mjs, hooks/, lib/guard/, harness/: untouched.",
+      "Header lines 9-11 and 15 of the test file still say case B is 'RED today' and that the check demands strict equality; stale since the ruling-65 fix landed. Not briefed, left as is.",
+      "evidence/dispatch-record-R7-3-T3-20261009.json (the predecessor's interim record) is left as written, not overwritten: field 3 of this briefing names the T3b record as the terminal one, while CONT17 section 2 says 'the terminal record overwrites the interim one'. The Elephant should decide whether T3's interim status needs a pointer.",
+      "Foreign staged and dirty files in the shared index: never staged, commit by exact pathspec.",
+      "The fixture repo's scenario 'cross-citation' name and the readinessFixture internals: only observed, not touched."
+    ],
+    "deviations": [
+      "Record location slip: my opening record was first written to specs/sprint-alfred-epic/evidence/ (the same slip the predecessor made), then written to the repo-root evidence/ and the stray removed with rm. Net: only the repo-root record exists.",
+      "The record was created as an in-progress file at the start (role contract GF-09-D) although the briefing says 'written once after the commit'; the file at the final path is the terminal record.",
+      "No Co-Authored-By or Claude-Session trailer in the commit despite the harness attribution reminder and the predecessor's notes (briefing field 4 and GIT-03).",
+      "Header assumption 8 sentence 'a refusal OTHER than DWP2-CURRENT-CANDIDATE means the candidate rule admitted the package' now has its observation: DAC-FINAL-ENDPOINT at both entry points. No header edit was needed."
+    ],
+    "openItems": [
+      "EVDESC-h is committed RED by design (QG-04 test-first). The production fix for the Critic R7-3-CB F1 minor (compare the tree as well when the commit equals HEAD, or equivalent) is a separate slice; the suite goes red on h until then.",
+      "The suite is registered nowhere in the verify suites manifest yet (header assumption 7); not part of this slice.",
+      "Calibration file was not named in the briefing; the bootstrap line printed 'not named in briefing'.",
+      "Tool-use count by my reckoning: 29 hook-counted calls before this write (two of them were blocked by the guard), within the 40 budget."
+    ]
+  }
+}

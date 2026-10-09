@@ -1,0 +1,72 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-T3g-20261009",
+  "agentType": "goldfish-deep",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "candidateCommit": "a662f4dc6e8e118531451d4d876278503a44ded4",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "a055f078f0b0df6b5715b2aff644f8f60d6d482e"
+  ],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations, CONT17 header, goldfish-task 455-481, T3f record read; preflight run after GUARD-BOOTSTRAP-RECEIPT-MISSING; record created",
+      "toolUses": 7
+    },
+    {
+      "phase": "orientation: Ruling 137, T3f diff, po-human-approval 270-381 and 1830-1899, onboarding-init 500-580, machine-plane homedirFn; real WSL machine plane recorded before (machine-plane-before.txt)",
+      "toolUses": 25
+    },
+    {
+      "phase": "step 1 targeted-1/2/3: pin (c) green x3 (1.66 s, 2.41 s, 1.32 s); approval cell and reuse case red, approval cell at onboarding-init.mjs:561 in all three runs, reuse case read at :561 in run 1; language case red at LINE-ENDINGS as in the T3c baseline",
+      "toolUses": 35
+    },
+    {
+      "phase": "added the RED key-copy pin (fails with po-private.pem) and the machine-plane isolation pin (green) after pin (c); new-pins.txt; check-consumer-safe-paths 9/9 exit 0",
+      "toolUses": 41
+    },
+    {
+      "phase": "step 4 whole-file splits whole-1 (24 tests, exit 0), whole-2 (23, exit 1), whole-3 (10, exit 1) plus whole-file-compare.txt: 0 changed, 3 added, 52 of 52 in-file baseline cases covered; real machine plane identical after",
+      "toolUses": 47
+    },
+    {
+      "phase": "commit message written; interim record before commit; budget checkpoint fired at call 48",
+      "toolUses": 50
+    },
+    {
+      "phase": "committed a055f078f0b0df6b5715b2aff644f8f60d6d482e (one file); final record written; independent review pending",
+      "toolUses": 54
+    }
+  ],
+  "report": {
+    "text": "independent review: pending. Implementation complete for the briefed test-only scope; three cases are RED by design (see the per-pin table), so this is not a green suite and not PO-accepted.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6, derived from the goldfish-deep definition); observed model identity claude-sonnet-5-5, quoted from this dispatch runtime prompt ('You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5.'); effort not observable. No contradiction. The title says class S while field 6 names xhigh and no MP-07 max route; I took field 6 as written and flag it for the dispatcher (open items).\n\n1. DoD results\n- Step 1 re-measure (targeted-1/2/3, 4 cases each, WSL): passed. Each run 4 tests, 1 pass, 3 fail. Pin (c) green in all three (1658 ms, 2411 ms, 1321 ms). The approval cell (keeps chat keyless) red at TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED in all three runs; the reuse case red at the same code, read explicitly in run 1 (in runs 2 and 3 I read only that it failed, not its code). Nothing fails earlier than onboarding-init.mjs:561-564, so stop condition 1 did not fire. The third failing case (host-managed consent CLI routes its later explicit language) fails at INTAKE-GENERATE-LINE-ENDINGS-REFUSED / LINE-ENDINGS-GIT-FAILED, identical to the TR-S1-T3c baseline.\n- Step 2 machine-plane isolation: passed in both forms. (a) Test form: new green pin, the in-process setup writes the plane into the injected homedirFn home and creates no .agent-pipeline in a decoy ambient home (HOME and USERPROFILE pointed at the decoy during the call). (b) Observation form: the real WSL machine plane (machine.json sha256 998a38d7e92a987aca3c53158f90fbf75093daa63d9d6eba08000c26bd34cf7a, 287 bytes, mtimeMs 1791027147588; plus the two po-keys directories, mtimes unchanged) is identical before the runs and after all splits (machine-plane-before.txt versus the tail of whole-file-compare.txt). Because the test can assert it, no separate machine-plane.txt was written.\n- Step 3 RED pin: passed as a RED pin. It fails at the intended assertion with actual ['po-private.pem'] versus expected [] after its preconditions (no child error, no signal, non-zero status, stderr matches 'openssl failed') all held.\n- Step 4 whole-file split capture: passed with caveats. Three captures cover all 52 in-file baseline cases plus the 3 new ones (55 distinct tests); 0 cases changed state against evidence/TR-S1-T3c-20261009/wsl.txt. The splits overlap on 2 cases (a failed first-anchor action..., a new-key post-setup failure replays...), so they are not a partition. The compare script lists 5 baseline cases as missing: they are the maintenance-window ceremony and signing-ceremony cases from signing-ceremony.test.mjs, because the T3c baseline command ran both signing-ceremony.test.mjs and onboarding-init.test.mjs. They are not in this file and were not run.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9 of 9 (host Windows, stdout only).\n- One commit of the test file only: passed. a055f078f0b0df6b5715b2aff644f8f60d6d482e, 1 file (169 insertions, 14 deletions), subject as briefed, trailers exactly Dispatch: TR-S1-T3g-20261009 (goldfish) and AI-Assisted: true, body lists every assertion-shape change old -> new.\n\nPer-pin table\n| pin | state | reason |\n| setup --existing-key ... with no terminal fails closed (pin c) | pass x3 (plus once in whole-3) | non-zero exit, 'openssl failed', no authority record, no public key, no machine pointer |\n| setup --existing-key ... leaves no copy of the private key in the target directory (new) | RED by design | leftover po-private.pem; copy at po-human-approval.mjs:1869 precedes derivation at :1874 |\n| the in-process setup step writes the machine plane into the injected home and never into the ambient home (new) | pass | plane valid in injected home, decoy home has no .agent-pipeline |\n| approval cell (keeps chat keyless ...) | RED, correct per Ruling 137 | onboarding-init.mjs:561-564 REPOSITORY-POINTER-READBACK-FAILED, fixed by TR-S1-F3 |\n| reuse case (signature anchor reuses a key ...) | RED, correct per Ruling 137 | same site, second step with a real spawned setup |\n| host-managed consent CLI routes its later explicit language | RED, unchanged | LINE-ENDINGS-GIT-FAILED, same as T3c baseline, out of scope |\n\n2. Evidence (all machine-written by capture-evidence.mjs under evidence/TR-S1-T3g-20261009/; host check is stdout only)\n- machine-plane-before.txt: node scratch/t3g-plane-stat.mjs, exit 0.\n- targeted-1.txt, targeted-2.txt, targeted-3.txt: wsl.exe -e bash -lc (cd repo; node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... -- node --test --test-name-pattern='keeps chat keyless' --test-name-pattern='reuses a key already at the canonical' --test-name-pattern='routes its later explicit language' --test-name-pattern='no terminal fails closed' plugins/pipeline-core/scripts/onboarding-init.test.mjs); each wrapped exit 1, 4 tests, 1 pass, 3 fail.\n- new-pins.txt: same wrapper, patterns 'leaves no copy of the private key' and 'writes the machine plane into the injected home'; exit 1 (the RED pin), 2 tests, 1 pass, 1 fail.\n- whole-1.txt: pattern driveOnboardingInit; exit 0, 24 tests, 24 pass.\n- whole-2.txt: patterns recovery, initial answer, intake language, host-managed, later-language, public re-entry, maintenance-window, SigningCeremony, portable lifecycle, DEFAULT_STEP_CAP; exit 1, 23 tests, 22 pass, 1 fail (the unchanged language case).\n- whole-3.txt: patterns signature-anchor, signature anchor, new-key bootstrap, new-key post-setup, first-anchor, existing-key, plus the two new-pin fragments; exit 1, 10 tests, 7 pass, 3 fail (approval cell, reuse case, RED pin).\n- whole-file-compare.txt: node scratch/t3g-compare.mjs, exit 0; per-name baseline versus now, ADDED 3, CHANGED 0, OVERLAP 2, and the real machine plane after the runs.\n- Host: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, 9 pass.\n- Captures record dirty: true and heads that moved during my run (a662f4dc6, eae79f88, 588b8455) because foreign slices commit into the shared tree; the test file content that ran is the content committed (no edit after the new-pins run).\n\n3. Changed files\n- plugins/pipeline-core/scripts/onboarding-init.test.mjs (committed a055f078f): the T3f base kept (runHumanApproval import, encryptedKeyPem, passinSpawn, inProcessSetup, approval cell and reuse case in-process, pin c) plus two new cases after pin (c). Assertion-shape changes are exactly the ones in the commit body; no assertion was deleted beyond the reuse-case setup.status check that the T3f record already lists.\n- Untracked evidence only: evidence/TR-S1-T3g-20261009/*, this record. Scratch (ignored, not durable): scratch/t3g-plane-stat.mjs, scratch/t3g-compare.mjs, scratch/commit-msg/TR-S1-T3g-20261009.txt.\n\n4. Deliberately not changed\n- Every production file, including the foreign dirty po-human-approval.mjs and pipeline-state.mjs; hooks/, lib/guard/, harness/. Foreign staged and dirty files were left alone; the commit used an exact pathspec and contains one file.\n- The host-managed consent CLI case (red at LINE-ENDINGS, unchanged from baseline).\n- Pin (c)'s assertions.\n\n5. Deviations from spec\n- I added a second new case beyond the one RED pin: the machine-plane isolation pin (green). Step 2 allows a pin as one of the two forms, and a test could assert it, so I chose it; it is listed in the commit body.\n- The CONT15 header that the CONT17 header points to was not read, as the dispatch limited me to the CONT17 header.\n- The whole-file splits are overlapping substring groups, not a partition by construction; coverage is proved by the name set in whole-file-compare.txt (52 of 52 in-file baseline cases present), not by the patterns themselves.\n- The interim record (outcome committed-pending-report, commits empty) was written before the commit so a record-checking commit hook would find a terminal outcome; this final write adds the SHA.\n- resultSha256 stays null: for kind authored-commit the briefing template binds it only for read-only and stopped-without-commit kinds.\n\n6. Open items\n- No stop condition fired. Not a closing-allowance handover: the work finished inside the base cap (about 54 of 60 calls).\n- Suite state after this commit is intentionally not green: approval cell and reuse case need TR-S1-F3 (onboarding-init writes the repository pointer on every path); the RED key-copy pin needs the po-human-approval.mjs fix (copy before derivation), gated on the TR-S1-F2 integration per Ruling 137.\n- Platform matrix: all measurements are WSL (Linux). The new machine-plane isolation pin and the two key cells were not run on native Windows or macOS (no full verify on Windows per standing rule); pin (c) and the RED pin are skipped on win32 by design. The isolation pin changes process.env HOME and USERPROFILE for one synchronous call and restores them in finally; the file runs its tests sequentially.\n- Briefing note: the title says class S, field 6 names xhigh with no MP-07 max route and no modelOverride; the dispatcher should confirm that is intended.\n- Committed: a055f078f0b0df6b5715b2aff644f8f60d6d482e (test file only). Verified green: pin c x3, isolation pin, whole-1, check-consumer-safe-paths (exit 0). Remains undone: nothing in scope; the three RED cases above are expected-red. Next briefing: TR-S1-F3, then the key-copy fix, then rerun the whole-3 split to flip the three cases.\n- independent review: pending (Elephant dispatches the Critic).",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+    ]
+  }
+}

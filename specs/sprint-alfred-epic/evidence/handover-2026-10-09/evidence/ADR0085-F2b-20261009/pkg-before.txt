@@ -1,0 +1,62 @@
+command: node --test plugins/pipeline-core/lib/design-workflow-package.test.mjs
+label: pkg-before
+exitCode: 1
+head: f43bc8564f61cf98456cf76b5384eb84cee996d8
+tree: e136eac7f47e318f5cf8c3ede44b9924e404ba95
+dirty: true
+--- stdout ---
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (4.8838ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (4.0615ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (1.6648ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (1.927ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (1.1397ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (1.7052ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (4.9734ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (1.8765ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (0.3568ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (1.3721ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (83.8189ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (423.5443ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (35.5163ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (44.0115ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (78.4887ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (1.002ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (0.8365ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (1.1618ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (178.4363ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (390.2246ms)
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (541.6954ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 20
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1926.6957
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (541.6954ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+  
+  false !== true
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.test.mjs:936:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

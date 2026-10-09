@@ -1,0 +1,140 @@
+=== WIN-AP-S5-D probe ===
+platform=win32 node=v24.20.0
+fixed powershell present=true
+
+##### BASE: TEMP volume (the S6-F pin placement: os.tmpdir())
+base=<tmpdir>
+-- identity / volume (as seen from a path on this base)
+identity=<host>\<user>
+elevatedAdmin=False
+volumeFormat=NTFS
+psVersion=5.1.26100.9549
+[exit 0]
+-- ACL of the base directory itself
+owner=<host>\<user>
+accessRulesProtected=False
+  ace S-1-5-21-992893401-1228925270-2043025271-2663445211 Allow Modify, Synchronize inherited=False flags=ContainerInherit, ObjectInherit
+  ace <host>\CodexSandboxUsers Allow Modify, Synchronize inherited=False flags=ContainerInherit, ObjectInherit
+  ace <host>\CodexSandboxUsers Allow ReadAndExecute, Synchronize inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace <host>\<user> Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Directory, Archive
+[exit 0]
+
+-- variant E: ensureAgentPipelineRoot(<fresh .git>) -- what storagePaths now calls
+E result: {"path":"<drive>:/\Users\\<user>\\<host-temp-path>","created":true,"repaired":false,"advisory":null,"detail":null}
+
+-- variant H: mkdir(agent-pipeline, 0o700) then hardenWindowsPrivateDirectory(dir)
+ACL of .git (the parent) before:
+owner=<host>\<user>
+accessRulesProtected=False
+  ace <host>\CodexSandboxUsers Allow Modify, Synchronize inherited=True flags=ContainerInherit, ObjectInherit
+  ace S-1-5-21-992893401-1228925270-2043025271-2663445211 Allow Modify, Synchronize inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace <host>\<user> Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Hidden, Directory
+[exit 0]
+ACL of agent-pipeline before:
+owner=<host>\<user>
+accessRulesProtected=False
+  ace <host>\CodexSandboxUsers Allow Modify, Synchronize inherited=True flags=ContainerInherit, ObjectInherit
+  ace S-1-5-21-992893401-1228925270-2043025271-2663445211 Allow Modify, Synchronize inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+  ace <host>\<user> Allow FullControl inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Directory
+[exit 0]
+H hardenWindowsPrivateDirectory => {"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private"}
+ACL of agent-pipeline after:
+owner=<host>\<user>
+accessRulesProtected=True
+  ace <host>\<user> Allow FullControl inherited=False flags=ContainerInherit, ObjectInherit
+attributes=Directory
+[exit 0]
+
+-- variant S: stepwise hardener script (as shipped)
+STEPWISE-OK
+[exit 0]
+
+-- variant N: stepwise hardener script WITHOUT SetOwner and without the Owner section
+STEPWISE-OK
+[exit 0]
+
+##### BASE: CHECKOUT volume (the GMW49/GMW50 placement: <repo-root>/scratch)
+base=<repo-root>\scratch
+-- identity / volume (as seen from a path on this base)
+identity=<host>\<user>
+elevatedAdmin=False
+volumeFormat=NTFS
+psVersion=5.1.26100.9549
+[exit 0]
+-- ACL of the base directory itself
+owner=<host>\<user>
+accessRulesProtected=False
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=None
+  ace VORDEFINIERT\Administratoren Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=None
+  ace NT-AUTORIT�T\SYSTEM Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow Modify, Synchronize inherited=True flags=None
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow -536805376 inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Benutzer Allow ReadAndExecute, Synchronize inherited=True flags=None
+  ace VORDEFINIERT\Benutzer Allow -1610612736 inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Directory
+[exit 0]
+
+-- variant E: ensureAgentPipelineRoot(<fresh .git>) -- what storagePaths now calls
+E threw PrivateBoundaryError/PB-WINDOWS-ASSURANCE: private-state directory Windows assurance is unavailable for agent-pipeline: native Windows DACL hardening failed (exit 1, UnauthorizedAccessException). The directory was created by this call and has been removed again.
+
+-- variant H: mkdir(agent-pipeline, 0o700) then hardenWindowsPrivateDirectory(dir)
+ACL of .git (the parent) before:
+owner=<host>\<user>
+accessRulesProtected=False
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=None
+  ace VORDEFINIERT\Administratoren Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=None
+  ace NT-AUTORIT�T\SYSTEM Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow Modify, Synchronize inherited=True flags=None
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow -536805376 inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Benutzer Allow ReadAndExecute, Synchronize inherited=True flags=None
+  ace VORDEFINIERT\Benutzer Allow -1610612736 inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Hidden, Directory
+[exit 0]
+ACL of agent-pipeline before:
+owner=<host>\<user>
+accessRulesProtected=False
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=None
+  ace VORDEFINIERT\Administratoren Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=None
+  ace NT-AUTORIT�T\SYSTEM Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow Modify, Synchronize inherited=True flags=None
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow -536805376 inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Benutzer Allow ReadAndExecute, Synchronize inherited=True flags=None
+  ace VORDEFINIERT\Benutzer Allow -1610612736 inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Directory
+[exit 0]
+H hardenWindowsPrivateDirectory => {"status":"unavailable","reason":"native Windows DACL hardening failed (exit 1, UnauthorizedAccessException)"}
+ACL of agent-pipeline after:
+owner=<host>\<user>
+accessRulesProtected=False
+  ace VORDEFINIERT\Administratoren Allow FullControl inherited=True flags=None
+  ace VORDEFINIERT\Administratoren Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\SYSTEM Allow FullControl inherited=True flags=None
+  ace NT-AUTORIT�T\SYSTEM Allow 268435456 inherited=True flags=ContainerInherit, ObjectInherit
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow Modify, Synchronize inherited=True flags=None
+  ace NT-AUTORIT�T\Authentifizierte Benutzer Allow -536805376 inherited=True flags=ContainerInherit, ObjectInherit
+  ace VORDEFINIERT\Benutzer Allow ReadAndExecute, Synchronize inherited=True flags=None
+  ace VORDEFINIERT\Benutzer Allow -1610612736 inherited=True flags=ContainerInherit, ObjectInherit
+attributes=Directory
+[exit 0]
+
+-- variant S: stepwise hardener script (as shipped)
+STEPWISE-FAIL step=Directory.SetAccessControl type=System.UnauthorizedAccessException hresult=0x80070005 message=Es wurde versucht, einen nicht autorisierten Vorgang auszuf�hren.
+[exit 1]
+
+-- variant N: stepwise hardener script WITHOUT SetOwner and without the Owner section
+STEPWISE-OK
+[exit 0]
+
+(fixtures removed)

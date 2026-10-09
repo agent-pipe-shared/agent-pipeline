@@ -1,0 +1,21 @@
+{
+  "taskId": "HOOKREFRESH-F2-20261009",
+  "note": "Final report. The terminal path evidence/dispatch-record-HOOKREFRESH-F2-20261009.json already holds the immutable INTERIM record (outcome interim-uncommitted-stopped-at-budget-checkpoint, commits empty), written at the budget checkpoint before the rerun finished; the guard (GUARD-DISPATCH-RECORD-COLLISION) refuses to overwrite it. This file carries the final facts.",
+  "outcome": "implementation-complete-committed-critic-and-po-acceptance-pending",
+  "commits": [
+    { "sha": "fa8aaf39d", "subject": "fix(hook-readiness): provision a partial mandatory-hook pair and keep the preflight readback read-only (Ruling 84)" }
+  ],
+  "changedFiles": [
+    "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
+    "plugins/pipeline-core/scripts/clone-hook-readiness.mjs",
+    "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
+  ],
+  "evidence": {
+    "before": "evidence/HOOKREFRESH-F2-20261009/before.txt (176 tests, 157 pass, 16 fail: 14 pins, CHRB007, and F1 h as a spurious race red)",
+    "after": "evidence/HOOKREFRESH-F2-20261009/after.txt (176 tests, 172 pass, 1 fail: F1 g, a race)",
+    "afterRerun": "evidence/HOOKREFRESH-F2-20261009/after-rerun.txt (176 tests, 173 pass, 0 fail, 3 todo, exit 0), the authoritative after capture",
+    "closure": "evidence/HOOKREFRESH-F2-20261009/closure-before.txt and closure-after.txt (GMWKC01: 26 violations in both; the commit adds no import line)",
+    "consumerSafe": "node --test harness/scripts/check-consumer-safe-paths.test.mjs: 9 of 9 pass"
+  }
+}

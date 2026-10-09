@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "candidateCommit": "4ade16cc182fddeb34c3a4aa3521bc769ddd7881",
+  "commits": [
+    "669705780065cbc3432332a50e6cd0f90a6bfb6d"
+  ],
+  "resultSha256": "2cdfab6f39287817b4c1d94fa6b1cfded2289e1bd8927427fa8cef47b910ee0b",
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded · Project agent-pipeline-share · Calibration not named in briefing field 6 (profile: standard) · State briefing TR-G-T3-20261009 · Role Goldfish\n\nRoute pre-check (class G): requested claude-sonnet-5-5 / xhigh (field 6, agentType goldfish-deep; no max route named). Observed from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5 ... The exact model ID is claude-sonnet-5-5\". No contradiction. The briefing does not request the MP-07 max route for a class-G dispatch; disclosed, not treated as a mismatch.\n\nImplementation complete (test post-image and manifest section committed, not installed). independent review: pending (class G; only the Elephant dispatches the Critic). PO acceptance: pending.\n\n1. DoD results\n- WSL capture of the scratch test copy against the scratch copy of the CURRENT guard post-image: passed. 99 tests, 91 pass, 8 fail. T49 (d), (e), (f), (g), (h) are RED, each with \"0 !== 2 ... but it was admitted\" (admitted today, the right reason). T49 (i) and (j) controls GREEN. T49 (a)-(c), T37, T57, T34 keep their TR-G-F state. The 8 reds are those five plus the three accepted 10 s runner timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40). The two load-sensitive TR-G-F reds (preflight-bound base cap of 20; R7-11a) passed in this run.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0 (9/9).\n- Private-identifier scan: passed, exit 0, {\"ok\":true,\"findings\":[]}, via plugins/pipeline-core/scripts/check-private-identifiers.mjs (briefed path does not exist, Deviation 1). No identity substitution was needed.\n- One commit of exactly the two paths: passed. 669705780065cbc3432332a50e6cd0f90a6bfb6d, subject as briefed, trailers exactly \"Dispatch: TR-G-T3-20261009 (goldfish)\" and \"AI-Assisted: true\".\n\n2. Evidence\n- evidence/TR-G-T3-20261009/red.txt. Command: wsl.exe -e bash -lc \"cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T3-20261009/red.txt --label TR-G-T3 -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T3/guard-dispatch-budget.test.mjs\"; wrapped exit code 1. Baseline: evidence/TR-G-F-20261009/green.txt (92 tests, 87 pass, 5 fail).\n- Build: node scratch/dispatch-wip/TR-G-T3/build.mjs, exit 0. Guard post-image sha256 bad0bd5db55cbc362074f640e77d33dc9c2540a3bc915a0fb4c4fe2142b23d79 (read only, unchanged); scratch guard copy sha256 e0fb78707d4b8bb4552dfc86d0a8171720e058f7f18cc7439c8ac04caf01b18a equals the TR-G-F value (the guard under test is the delivered post-image); new test post-image sha256 2967751fb1c536eda5a8bcbbd2d50923d0293b9c95cd728604771b68a275b019 (127070 bytes, LF); scratch test copy sha256 8fed4a7c0a20b16aff0fe04e6a135b9821328a9b928eb33c99bbc0f1dd07bb7a.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0. node plugins/pipeline-core/scripts/check-private-identifiers.mjs --root ., exit 0.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: TR-G T49 (d)-(j), helpers and a comment block inserted after T49 (c); no earlier line changed.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md: appended \"## TR-G-T3 pins\" (new sha, pin table, scope and limits, command, result); no other section edited.\n- Local only, uncommitted: scratch/dispatch-wip/TR-G-T3/* (build.mjs, scratch copies, report.txt, finalize.mjs), scratch/commit-msg/TR-G-T3.txt, evidence/TR-G-T3-20261009/red.txt, evidence/dispatch-record-TR-G-T3-20261009.json.\n\n4. Deliberately not changed\n- The guard post-image, the live hooks under plugins/pipeline-core/hooks/, lib/, the tranche README, other post-images and manifests, scratch/dispatch-wip/TR-G-F/.\n- The manifest's Target section (its test sha 33411458... is now stale; the new section says it supersedes it) and its \"Not done here\" adjacent-oddity bullet (the F2 gap), both left per field 4.\n- F2 shapes beyond the three briefed (git add && git commit, ||, a redirect, a substitution, a line break) are not pinned; they belong to the TR-G-F3 design and its Critic.\n\n5. Deviations from spec\n1. The identity scan ran from plugins/pipeline-core/scripts/check-private-identifiers.mjs; the briefed harness/scripts/check-private-identifiers.mjs does not exist (MODULE_NOT_FOUND). Same script TR-G-F ran.\n2. The win32 admission control was NOT built: there is no platform seam. The guard reads process.platform directly in comparableScriptPath and the runner has no platform field (dependencies.platform exists only in the counter-lock code). Per the briefing nothing was invented; instead (d) and (e) carry a win32 skip (the file's existing platform-skip idiom), because on win32 that spelling is rightly admitted before and after the fix. Declared in the manifest.\n3. T49 (h) uses \"git commit -F <f> -- <p> | <other>\" rather than the briefed bare \"git commit -F <f> | <other>\", so its prefix equals the admitted control form in (i). Same shape class.\n4. Beyond the briefed list: control (j) (forward-slash producer spellings, quoted and bare, stay admitted) so (e) is provably refused for the backslash; (e) and (j) assert the plugin root has no whitespace or quotes so the bare spelling is meaningful.\n5. The two load-sensitive TR-G-F reds went green this run: timing variation, not this edit (tests were only added).\n\n6. Open items\n- independent review: pending. PO acceptance: pending. TR-G-F3 (guard fix) is expected to turn (d)-(h) green; not verified, the fix does not exist yet.\n- The win32 branch stays unverified (no native-Windows run, by design); macOS unverified. A host-gated native-win32 admission case is possible but unverifiable from the WSL capture; not built, dispatcher's call.\n- No stop condition triggered. One GUARD-BOOTSTRAP-RECEIPT-MISSING refusal was cured with the preflight, one directory Glob was refused (GUARD-READ-TARGET) as the dispatch warned. Tool uses about 44 of a base cap of 50; the closing allowance was not needed.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations, CONT17 header 1-17 and goldfish-task 455-481 read; preflight run once after GUARD-BOOTSTRAP-RECEIPT-MISSING; record created; the bootstrap line and the route pre-check (requested claude-sonnet-5-5/xhigh; observed Sonnet 5.5 / claude-sonnet-5-5; no contradiction) are carried at the head of the final report",
+      "toolUses": 9
+    },
+    {
+      "phase": "orientation done (Ruling 138, manifest, build.mjs, test T49 block, guard 480-650); advisor consulted once; no platform seam in the guard (process.platform read directly, runner has no platform field)",
+      "toolUses": 21
+    },
+    {
+      "phase": "test post-image edited (T49 d-j, 127070 bytes, sha256 2967751f...); scratch build.mjs exit 0 (guard scratch sha e0fb7870... equals TR-G-F); WSL capture red.txt: 99 tests, 91 pass, 8 fail = 5 new refusal pins RED (admitted, exit 0 expected 2) + 3 known 10 s timeouts; controls (i), (j) GREEN; the two load-sensitive TR-G-F reds passed this run",
+      "toolUses": 30
+    },
+    {
+      "phase": "consumer-safe exit 0 (9 pass); check-private-identifiers (plugins/pipeline-core/scripts path; briefed harness/scripts path does not exist) exit 0 ok:true; manifest section appended; commit 669705780065cbc3432332a50e6cd0f90a6bfb6d (2 files, trailers exact); record checkpointed",
+      "toolUses": 39
+    },
+    {
+      "phase": "finalize: outcome and report.text written together with resultSha256 in one write; independent review pending",
+      "toolUses": 44
+    }
+  ]
+}

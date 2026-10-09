@@ -1,0 +1,36 @@
+command: node --test plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs
+label: after
+exitCode: 0
+head: 935f32f9b1d6538163738e22e3aba6c6bb97ae6e
+tree: 27d1ed631abaff6b6a6022e268ec90d81e2cfbbf
+dirty: true
+--- stdout ---
+✔ GUARD valid readback returns the journal and runs exactly the read-only inspect command (11.792773ms)
+✔ GUARD a valid document with the wrong schema is its own error, distinct from empty and invalid, with no retry (4.977775ms)
+✔ GUARD malformed output (truncated object) is INVALID, exec runs once, and no retry is offered (4.809411ms)
+✔ GUARD malformed output (plain text) is INVALID, exec runs once, and no retry is offered (4.943034ms)
+✔ GUARD malformed output (truncated mid-document) is INVALID, exec runs once, and no retry is offered (5.055785ms)
+✔ GUARD a child that fails outright propagates unchanged and is not retyped as a readback code or retry (4.75963ms)
+✔ GUARD empty readback (empty string) raises the EMPTY code after exactly one exec call and changes no state (6.018725ms)
+✔ GUARD empty readback (whitespace only) raises the EMPTY code after exactly one exec call and changes no state (7.237777ms)
+✔ GUARD empty readback (undefined (no output at all)) raises the EMPTY code after exactly one exec call and changes no state (5.957873ms)
+✔ GUARD empty readback (null) raises the EMPTY code after exactly one exec call and changes no state (6.066485ms)
+✔ RETRY empty readback (empty string) carries ONE exact, read-only, host-boundary nextAction (5.462894ms)
+✔ RETRY empty readback (whitespace only) carries ONE exact, read-only, host-boundary nextAction (4.861092ms)
+✔ RETRY empty readback (undefined (no output at all)) carries ONE exact, read-only, host-boundary nextAction (5.979493ms)
+✔ RETRY empty readback (null) carries ONE exact, read-only, host-boundary nextAction (4.985814ms)
+✔ RETRY the nextAction is bounded to one attempt, plain serialisable data, and identical for every empty variant (19.50817ms)
+✔ RETRY the host follows the nextAction once: a retry that returns valid output yields the journal (9.708804ms)
+✔ RETRY a second empty readback after the retry stays the typed EMPTY refusal and never loops (9.518601ms)
+✔ RETRY invalid output after the retry is INVALID with no further retry (9.584262ms)
+✔ RETRY the retry flow changes no lifecycle state (10.464759ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2726.545795
+
+--- stderr ---

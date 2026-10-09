@@ -1,0 +1,26 @@
+command: node --test --test-name-pattern=T90-T plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: native
+exitCode: 0
+head: 6212dbd800da362f733db053565d4291f0b36eac
+tree: 3179ab8da8a0057275956bc9c158bbcbb7ea79a2
+dirty: true
+--- stdout ---
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (6363.2241ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (3746.6092ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (6408.0411ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (6205.0436ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (6490.3577ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (2082.8618ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (4173.6659ms)
+✔ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (3959.2561ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.088ms) # Linux control: needs /proc on a Linux host
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 39811.9743
+
+--- stderr ---

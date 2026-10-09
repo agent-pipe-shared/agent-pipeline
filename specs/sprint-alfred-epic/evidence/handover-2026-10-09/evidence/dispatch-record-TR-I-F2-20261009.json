@@ -1,0 +1,46 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-I-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["98b81b479fb3f92aa8a798f7ae8525353162e226"],
+  "resultSha256": null,
+  "report": {
+    "text": "TR-I-F2-20261009 implementation complete; independent review: pending; PO acceptance pending. Route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the runtime prompt, effort not observable; no contradiction. (1) DoD: test-case-completion.test.mjs 0 fail on native (11/11) and WSL (the two outside-Verify pins green); bootstrap-payload-measure no longer fails with TCC-FD-WRITE; no failing case absent from wsl-before.txt (3 reds remain, all in baseline: VCR01, WINVERIFY, ALFRED-RF1); consumer-safe check passed 9/9; one commit of the production file only, passed. (2) Evidence: evidence/TR-I-F2-20261009/wsl-before.txt (wrapped exit 1; 152 tests, 146 pass, 6 fail), wsl-after.txt (wrapped exit 1; 156 tests, 153 pass, 3 fail), native.txt (wrapped exit 0; 11/11), consumer-safe node --test exit 0. Test count 152 to 156: in wsl-before bootstrap-payload-measure.test.mjs was one file-level failure (died at load), in wsl-after it loads and runs its individual cases. (3) Changed: plugins/pipeline-core/lib/test-case-completion.mjs, commit 98b81b479fb3f92aa8a798f7ae8525353162e226. (4) Not changed: createTestCaseCompletionRecorder still writes without the signal (pins :64/:80/:298 require it); validateChannel integer range check and the TCC-OUTPUT-BOUND preflight still run on the registration route (read as: never touches fd 3, not never arithmetic-checks the configured number); the 3 baseline reds; all tests. (5) Deviations: EBADF tolerance clause removed as unreachable; parameter renamed plainFileFallback to registrationRoute (old name described the deleted mechanism), not amended. (6) Open: one DAA-DWP2-FAILURE-DRIFT refusal on an Edit retried once per T96; preflight reported dutyNotRuntimeLive differing for templates/prompts/goldfish-task.md among others (not acted on); criticRequired T3 untouched.",
+    "changedFiles": ["plugins/pipeline-core/lib/test-case-completion.mjs"]
+  },
+  "log": [
+    { "phase": "opening: preflight run twice (repo-local then loaded-plugin-root, after GUARD-BOOTSTRAP-RECEIPT-MISSING), route pre-check passed (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from runtime prompt; effort unobservable)", "toolUses": 7 },
+    { "phase": "orientation done (production file, test pins, Ruling 107/113); advisor consulted once", "toolUses": 18 },
+    { "phase": "baseline WSL: evidence/TR-I-F2-20261009/wsl-before.txt, wrapped exit 1, tests 152 pass 146 fail 6 (VCR01, outside-Verify plain-file pin, outside-Verify fd3 pin, bootstrap-payload-measure, WINVERIFY, ALFRED-RF1)", "toolUses": 21 },
+    { "phase": "edit made (registration route inert from construction when no Verify signal; EBADF tolerance clause removed as unreachable); one DAA-DWP2-FAILURE-DRIFT refusal retried once per T96", "toolUses": 25 },
+    { "phase": "after WSL: evidence/TR-I-F2-20261009/wsl-after.txt, wrapped exit 1, tests 156 pass 153 fail 3 (only baseline reds VCR01, WINVERIFY, ALFRED-RF1)", "toolUses": 28 },
+    { "phase": "native: evidence/TR-I-F2-20261009/native.txt wrapped exit 0, 11/11; consumer-safe check exit 0, 9/9", "toolUses": 30 },
+    { "phase": "committed 98b81b479 (single production file, exact pathspec); record checkpointed", "toolUses": 37 },
+    { "phase": "final: advisor close-out consulted, record finalized", "toolUses": 39 }
+  ]
+}

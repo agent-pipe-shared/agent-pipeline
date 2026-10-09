@@ -1,0 +1,39 @@
+command: timeout 540 node --test --test-reporter=spec --test-name-pattern=TR-G scratch/dispatch-wip/CRITIC-CKPT-T3/guard-dispatch-budget.ckpt3.test.mjs
+label: CRITIC-CKPT-F2-tr-g
+exitCode: 0
+head: 43ec720deeda9f3cec4bc6079736b80c0187b827
+tree: b68172361c4a408c7b13e7ecb57c6b59e117c0a6
+dirty: true
+--- stdout ---
+✔ TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted (3521.249887ms)
+✔ TR-G T49 (b): after the working cap nothing but the named closing acts is admitted (control, green today) (4410.823994ms)
+✔ TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused (5495.42939ms)
+✔ TR-G T49 (d): after the working cap, a quoted producer path with a backslash before the script name is refused on a POSIX host (3782.94762ms)
+✔ TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host (3867.049371ms)
+✔ TR-G T49 (f): after the working cap, `git add <x> && <other>` is refused -- only one simple git command is a closing act (3983.844822ms)
+✔ TR-G T49 (g): after the working cap, `git add <x>; <other>` is refused (3788.890276ms)
+✔ TR-G T49 (h): after the working cap, `git commit -F <f> | <other>` is refused (3417.098567ms)
+✔ TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control, green today) (3576.783799ms)
+✔ TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today) (3523.774203ms)
+✔ TR-G T49 (k): after the working cap, a relative spelling of the producer script stays refused (control, green today) (3496.988804ms)
+✔ TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path (3515.626079ms)
+✔ TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb (3117.227249ms)
+✔ TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike (3844.400726ms)
+✔ TR-G T49 (o): after the working cap, the exact admitted producer command (quoted, and bare with forward slashes) and `git commit -F <f> -- <p>` stay admitted (control, green today) (4831.058409ms)
+﹣ TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused (0.04228ms) # TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)
+﹣ TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused (0.02687ms) # TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)
+✔ TR-G T37 (a): a second same-role child under one parent tool id is bound per dispatch, or its refusal names the re-dispatch action (2601.255091ms)
+✔ TR-G T37 (b): concurrent launches under DISTINCT parent tool ids each resolve their own binding (control, green today) (2689.812891ms)
+✔ TR-G T57 (Ruling 115, TR-K4 clause 2): this guard's own denial shows the budget charge -- counted attempts, working cap and remaining closing slots (green today) (4099.627854ms)
+✔ TR-G T34: a governance state change between two guard calls takes effect on the second call -- the scope observation recomputes (invariant for a future cache, green today) (8827.674202ms)
+CKPT3-REDIRECT-FIRED guard-dispatch-budget.mjs (20 runner-child loads served from the tranche-2 guard post-image)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 88910.786077
+
+--- stderr ---

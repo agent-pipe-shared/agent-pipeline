@@ -1,0 +1,93 @@
+command: git diff -- plugins/pipeline-core/lib/design-workflow-package.mjs plugins/pipeline-core/lib/design-workflow-approval.mjs
+label: R4-S3b-uncommitted-diff
+exitCode: 0
+head: a8dba59ffce7de7028f7b772d6a587964089832b
+tree: 5722ab60465d507c386923ef8e49b97689ebd08c
+dirty: true
+--- stdout ---
+diff --git a/plugins/pipeline-core/lib/design-workflow-approval.mjs b/plugins/pipeline-core/lib/design-workflow-approval.mjs
+index d6a575be8..f555a64c9 100644
+--- a/plugins/pipeline-core/lib/design-workflow-approval.mjs
++++ b/plugins/pipeline-core/lib/design-workflow-approval.mjs
+@@ -50,11 +50,12 @@ function candidateReader(readCandidate) {
+  */
+ export function createDesignWorkflowPackageApprovalRequest({
+   repoRoot, packagePath, featureId, planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath,
++  roleRoutePreflight, evidenceBindings,
+ } = {}) {
+   if (!ID.test(featureId ?? "") || !SAFE_PATH.test(planPath ?? "") || !SHA256.test(planSha256 ?? "")
+     || !SAFE_PATH.test(specPath ?? "") || !SHA256.test(specSha256 ?? "")) return { ok: false, code: "DWP-APPROVAL-BINDING" };
+   const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot, packagePath, readCandidate: candidateReader(readCandidate),
+-    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
++    ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath, roleRoutePreflight, evidenceBindings });
+   if (!packageRead.ok) return packageRead;
+   const pkg = packageRead.workflowPackage;
+   if (pkg.featureId !== featureId) return { ok: false, code: "DWP-APPROVAL-FEATURE-MISMATCH" };
+@@ -83,6 +84,8 @@ export function validateDesignWorkflowPackageApprovalRequest({
+   verifyReadinessExecution,
+   trustedAdvisorExecutablePath,
+   allowUnrelatedCommits = false,
++  roleRoutePreflight,
++  evidenceBindings,
+ } = {}) {
+   if (!exact(request, ["schema", "packagePath", "packageSha256", "approvalIntent", ...(Object.hasOwn(request ?? {}, "advisorException") ? ["advisorException"] : [])])
+     || request.schema !== DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA
+@@ -96,7 +99,8 @@ export function validateDesignWorkflowPackageApprovalRequest({
+       trustedAdvisorExecutablePath, advisorExceptionBinding: request.advisorException ?? null,
+     })
+     : readDesignWorkflowPackageFromRepository({ repoRoot, packagePath: request.packagePath,
+-      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath });
++      readCandidate: candidateReader(readCandidate), ...(verifyReadinessExecution ? { verifyReadinessExecution } : {}), trustedAdvisorExecutablePath,
++      roleRoutePreflight, evidenceBindings });
+   if (!packageRead.ok) return packageRead;
+   const pkg = packageRead.workflowPackage;
+   if (canonical(designWorkflowAdvisorExceptionBinding(packageRead)) !== canonical(request.advisorException ?? null)) return { ok: false, code: "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING" };
+@@ -116,9 +120,11 @@ export function validateDesignWorkflowPackageApprovalRequest({
+ export function verifyDesignWorkflowPackageApproval({
+   repoRoot, request, proof, anchors, packagePath, featureId, planPath, planSha256, specPath, specSha256,
+   readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits = false,
++  roleRoutePreflight, evidenceBindings,
+ } = {}) {
+   const checked = validateDesignWorkflowPackageApprovalRequest({ repoRoot, request, packagePath, featureId,
+-    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits });
++    planPath, planSha256, specPath, specSha256, readCandidate, verifyReadinessExecution, trustedAdvisorExecutablePath, allowUnrelatedCommits,
++    roleRoutePreflight, evidenceBindings });
+   if (!checked.ok) return checked;
+   const verified = verifyAgainstTrustAnchors({ intent: request.approvalIntent, anchors, proof });
+   if (!verified.verified) return { ok: false, code: verified.code ?? "DWP-APPROVAL-PROOF-INVALID" };
+diff --git a/plugins/pipeline-core/lib/design-workflow-package.mjs b/plugins/pipeline-core/lib/design-workflow-package.mjs
+index f6d1d9874..3b543bd9b 100644
+--- a/plugins/pipeline-core/lib/design-workflow-package.mjs
++++ b/plugins/pipeline-core/lib/design-workflow-package.mjs
+@@ -492,6 +492,11 @@ export function validateDesignWorkflowPackage({
+       : advisorReceipt.observed.status === "permission-denied" ? "permission-denied"
+         : advisorReceipt.observed.status === "unavailable" ? "capacity-unavailable" : "invalid-output";
+     if (advisor.exception.failureCode !== failureClass) return fail("DWP-ADVISOR-FAILURE-CODE");
++    // The proposed rationale may state only facts the receipt and trail contain:
++    // the single admitted text is the deterministic one generated from them.
++    if (advisor.exception.rationale !== designWorkflowAdvisorExceptionRationale({ advisorReceipt, attemptTrail })) {
++      return fail("DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED");
++    }
+   }
+ 
+   if (candidate !== undefined && (!validCandidate(candidate)
+@@ -525,6 +530,8 @@ export function readDesignWorkflowPackageFromRepository({
+   requireReadinessExecution = true,
+   verifyReadinessExecution = verifyDesignReadinessHostExecution,
+   trustedAdvisorExecutablePath,
++  roleRoutePreflight = null,
++  evidenceBindings = null,
+ } = {}) {
+   if (typeof readCandidate !== "function" || !safeRepoPath(packagePath)) {
+     return fail("DWP-READER-INPUT");
+@@ -573,6 +580,8 @@ export function readDesignWorkflowPackageFromRepository({
+     repoRoot,
+     verifyReadinessExecution,
+     requireReadinessExecution,
++    roleRoutePreflight,
++    evidenceBindings,
+     // At package creation/presentation the exact Git candidate must match.
+     // After an approval, consumers may re-read the same immutable package
+     // following unrelated commits; the observed HEAD is still sampled twice
+
+--- stderr ---

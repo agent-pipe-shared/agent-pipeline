@@ -1,0 +1,50 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs
+label: lib-codex-onboarding-capabilities
+exitCode: 0
+head: f06b434a2ae709ae34641f92856cd69aa907e47f
+tree: 7bf1b6176112a71f82c0a3867658cf425e7196df
+dirty: true
+--- stdout ---
+✔ onboarding observes an empty root as local-uninitialized and binds only a reviewed Git-init claim (4.151147ms)
+✔ bootstrap observes a local-uninitialized root without claiming a Git-init mutation (2.237966ms)
+✔ a fresh Codex root with only an empty read-only .git mount is host-managed (0.477568ms)
+✔ the WSL cross-view recognizer distinguishes an existing protected Git tree from a fresh empty mount (14.061749ms)
+✔ a restarted Codex session accepts only a kickoff-bound initialized host Git mount (18.774366ms)
+✔ initialized host projection remains observable from a read-only hook without a root write probe (5.279796ms)
+✔ local repository capability accepts a physical .git directory and a registered .git file worktree (29.208597ms)
+✔ host-managed observation requires exact empty non-writable physical controls and never invokes Git (0.867954ms)
+✔ host-managed is observed but remains unqualified for session and dispatch (0.904775ms)
+✔ a writable, nonempty, symlinked, or incomplete declared host-control layout fails closed (1.435753ms)
+✔ missing and too-old Git map exactly to git-unavailable before session side effects (0.872054ms)
+✔ a completed status-zero WSL EPERM Git version probe remains available (0.470228ms)
+✔ treeSnapshot tolerates an entry that vanishes between readdirSync and lstatSync (0.397216ms)
+✔ treeSnapshot excludes only named Git lock files, not .git/ wholesale (1.099837ms)
+✔ root and Git-control write probes map to distinct closed statuses and leave no bytes (18.308808ms)
+✔ root aliases, .git symlinks, and unregistered escaping .git files are rejected before probes (88.847958ms)
+✔ a one-off transient repository-discovery failure is retried and recovers (46.861415ms)
+✔ a persistent repository-discovery failure still reports control-path-invalid after the bounded retry (72.069166ms)
+✔ session intent performs and fully rolls back one real cleanup-descriptor probe (27.816244ms)
+✔ two synchronized real session probes keep concurrent descriptor ownership and both finish ready (113.450981ms)
+✔ a probe that created descriptor directories removes them after a peer observed them as preexisting (283.522617ms)
+✔ a live foreign descriptor concurrently occupying a newly-created probe directory does not downgrade session capability (137.854341ms)
+✔ a non-descriptor entry preventing cleanup still reports session capability unavailable (80.548535ms)
+✔ dispatch intent performs real session and detached-worktree probes with zero refs, bytes, or descriptors left (48.860357ms)
+✔ fault injection after session creation rolls back the exact descriptor and reports session unavailable (32.302838ms)
+✔ session capability diagnosis redacts the failed descriptor lifecycle stage (30.247113ms)
+✔ fault injection after worktree creation rolls back the exact worktree and reports worktree unavailable (46.868044ms)
+✔ foreign target and administration content is preserved instead of recursively removed (36.478346ms)
+✔ an entry replaced after validation is atomically captured, rejected, and restored (34.830599ms)
+✔ injected root-probe failure rolls back its exact temporary paths and stops before Git (10.99974ms)
+✔ NVA-B-INODE2-1 root capability probe cleanup preserves foreign content written under the same identity (48.640003ms)
+✔ P0 repair: existing protected Codex Git projection reports host-managed with passed session/dispatch capability (66.908222ms)
+✔ P0 regression: a normal exact Codex project runtime layout does not hide a protected existing Git projection (15.552624ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1458.406235
+
+--- stderr ---

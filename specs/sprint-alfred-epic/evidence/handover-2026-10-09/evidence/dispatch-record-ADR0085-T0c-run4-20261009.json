@@ -1,0 +1,60 @@
+{
+  "taskId": "ADR0085-T0c-run4-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing ADR0085-T0c-run4-20261009)",
+  "outcome": "completed-b-landed",
+  "commits": ["56ec8c380185712f5b7c09fae6c5c615c5e5ff1c"],
+  "log": [
+    { "phase": "opening: interim record created at the repo-root evidence path (the first attempt, under specs/.../evidence, was refused GUARD-BOOTSTRAP-RECEIPT-MISSING before anything landed); preflight run from the loaded plugin root (status ready); route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 (runtime prompt), effort unobservable (numeric reasoning_effort 30), no contradiction", "toolUses": 9 },
+    { "phase": "orientation: CONT17/CONT15 headers, run3 record, scratch b.test.mjs, governance-scope.mjs applyDecision + enrollmentHistory, A post-image header, README, enroll-diagnostic; advisor consulted", "toolUses": 18 },
+    { "phase": "the ONE fixture fix (enrollFixture moved to right after advisorHostFixture) plus removal of the diagnostic JSON.stringify; WSL capture: control green, target red DWP2-DURABLE-FAILURE", "toolUses": 25 },
+    { "phase": "header edits in scratch (DRAFT paragraph removed, Target path, measured 'today', enroll-first note), commit message file, post-image Write, diff against scratch, one whitespace slip in scratch repaired, final WSL capture, sha256sum, file", "toolUses": 37 },
+    { "phase": "README block, consumer-safe check exit 0, git add, git commit 56ec8c380, full sha, this terminal record", "toolUses": 46 }
+  ],
+  "report": {
+    "headline": "Draft B landed as a tranche-2 post-image in one commit (56ec8c380). Control green, target red with today's real refusal DWP2-DURABLE-FAILURE. Implementation complete; independent Critic review and PO acceptance pending (not 'done').",
+    "routePreCheck": "requested (field 6): goldfish-deep, claude-sonnet-5-5, xhigh. Observed: the runtime prompt of this dispatch names 'Sonnet 5.5' with exact model ID claude-sonnet-5-5. Model matches; effort not directly observable (the prompt carries a numeric reasoning_effort 30 that cannot be mapped to a tier name from direct evidence), disclosed, no contradiction.",
+    "dodResults": {
+      "check1_bWslCapture": "passed: evidence/ADR0085-T0c-b-20261009/red-run4.txt, written by capture-evidence.mjs; command wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0c-b-20261009/red-run4.txt --label red-run4 -- node --test scratch/dispatch-wip/t0c-run/b.test.mjs\"; wrapped exit 1 (expected: RED); head ad96ef730; control passes, target fails (Edit lane exit 2, package re-read {ok:false, code:DWP2-DURABLE-FAILURE}); tests 3, pass 1, fail 2 (parent fails by propagation). Final scratch bytes = post-image bytes except the 14 import lines and the GUARD line.",
+      "check2_sha256": "passed: sha256sum of the post-image = e11f1a405b59bed85a7b712860548c0c4a6888529af541a9636ac54b7e64973d (exit 0; file reports ASCII text, no CRLF); recorded in the README.",
+      "check3_consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9 tests, 9 pass, 0 fail, exit 0 (console output only).",
+      "check4_commit": "passed: git add -- <2 paths>, then git commit -F scratch/commit-msg/ADR0085-T0c-run4.txt -- <2 paths>; commit 56ec8c380185712f5b7c09fae6c5c615c5e5ff1c, 2 files changed, 301 insertions, 14 deletions; subject exactly as briefed; trailers Dispatch: ADR0085-T0c-run4-20261009 (goldfish) and AI-Assisted: true only (no Co-Authored-By, no Claude-Session).",
+      "check5_terminalRecord": "passed: this file, terminal state written after the commit (an interim in-progress record occupied the same path first; see deviations)."
+    },
+    "evidence": [
+      "evidence/ADR0085-T0c-b-20261009/red-run4.txt: command above; wrapped exit 1; head ad96ef730",
+      "git diff --no-index -U0 and --stat (scratch b.test.mjs vs post-image): 15 insertions, 15 deletions, exactly 13 lib/scripts import lines plus the lifecycle-ready import plus the GUARD line; console output only",
+      "sha256sum and file on the post-image: console output only",
+      "git diff --stat on README before staging: 21 insertions, 14 deletions, exactly the replaced B block (no foreign edits swept in)"
+    ],
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs (NEW, committed: the B post-image)",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/README.md (committed: B subsection replaced by an A-shaped block with target path, post-image path, sha256, WSL command, state, RED reason, fixture note, evidence)",
+      "scratch/dispatch-wip/t0c-run/b.test.mjs (untracked scratch: enrollFixture moved first, diagnostic JSON.stringify removed from the throw, header finalized, one whitespace slip repaired)",
+      "scratch/commit-msg/ADR0085-T0c-run4.txt (untracked commit message file)",
+      "evidence/ADR0085-T0c-b-20261009/red-run4.txt (machine-written capture, untracked)",
+      "evidence/dispatch-record-ADR0085-T0c-run4-20261009.json (this terminal record)"
+    ],
+    "hypothesisResult": "Confirmed in mechanism, refined in cause. governance-scope.mjs applyDecision writes state 'declined' when plan.decision==='enroll' and enrollment history is retained (line 301 ternary, line 294 retained). enrollmentHistory() (lines 151-159) lists .claude/pipeline-state.json, which B wrote at the line right before enrollFixture, so the history was non-empty. That alone is sufficient. Whether the coordinator's writes under the git common dir also count (the intake checkpoint paths) was not isolated; moving the enrollment to right after advisorHostFixture removes both.",
+    "deliberatelyNotChanged": "Nothing under plugins/, harness/, existing tests, the tranche-2 patch files or A's post-image. No write under plugins/pipeline-core/hooks/. Exactly one fixture fix. The Bash-lane assertion of the target case was not made independent of the Edit-lane assertion (so the Bash lane's refusal today is unmeasured). The README's pre-existing evidence pointers for A (untracked captures) untouched.",
+    "deviationsFromSpec": [
+      "B's header carried an incorrect prediction of today's refusal (DWP2-PHYSICAL-OR-GIT via readUnavailablePackage); it was replaced by the measured DWP2-DURABLE-FAILURE (design-workflow-package-v2.mjs:97), with a note that the Bash lane is not measured. The briefing asked to record the code as 'today'; removing the wrong prediction goes slightly beyond that.",
+      "B's header also gained one bullet naming the enroll-first ordering in the fixture route (explains the one fixture fix).",
+      "The briefing's step 3 import-path recipe was stale (the draft header said ../../plugins/...; the real imports are ../../../plugins/pipeline-core/{lib,scripts,hooks}/). The full three-level prefix was replaced: 12 lib imports, 1 scripts import, the guard-lifecycle-ready import and the GUARD URL (15 lines).",
+      "README: the B block is A-shaped but has two extra bullets (Fixture, and a longer Evidence bullet) beyond A's.",
+      "Record: the role contract asks for an opening record, the briefing for one terminal record after the commit. An interim in-progress record was written to the evidence path as the opening act and overwritten by this terminal record. My first Write targeted specs/sprint-alfred-epic/evidence/ (wrong directory) and was refused by GUARD-BOOTSTRAP-RECEIPT-MISSING before anything landed.",
+      "The edit tool dropped a trailing space once (const git =(...args)) in the scratch copy, which a diff against the post-image caught; it was repaired and the final capture was run after the repair.",
+      "The post-image was written by the Write tool from the scratch bytes, not copied by a tool; the diff against the scratch is the proof of equality."
+    ],
+    "openItems": [
+      "Independent Critic review of commit 56ec8c380 and PO acceptance are pending; implementation complete, not done.",
+      "The README cites untracked evidence captures (red-run4.txt, red.txt, enroll-diagnostic.txt, and A's captures); they are session-local unless tracked.",
+      "The Bash-lane assertion in the target case is shadowed by the Edit-lane assertion; once the F slice lands both must be green, but today only the Edit lane's refusal is measured.",
+      "The ceremony still has to copy both post-images (A and B) into plugins/pipeline-core/hooks/.",
+      "Guard notes met: GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the preflight from the loaded plugin root), GUARD-PARSE-UNSUPPORTED and GUARD-READ-SCOPE-OUTSIDE-ROOT on composed or out-of-root Bash reads (re-issued as simple in-root commands), GUARD-OPERATOR-UNAPPROVED on a git diff piped to head (re-issued without the pipe).",
+      "Budget: about 46 of 50 hook-counted calls used; DISPATCH-BUDGET-CHECKPOINT fired at call 40; nothing further started after it except the staged commit steps and this record."
+    ]
+  }
+}

@@ -1,0 +1,689 @@
+command: node --test plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs
+label: before
+exitCode: 1
+head: e8dcc8c79f9c404065fcf7e4e4ca23097ce91402
+tree: 5e3baccecbd03ae71859facda665c1618c9771b9
+dirty: true
+--- stdout ---
+✔ project-onboarding-v3 refuses an unrecognized subcommand (closed command set, not open) (1.9573ms)
+✔ project-onboarding-v3 refuses an unrecognized flag on a known, read-only subcommand (0.4489ms)
+✔ project-onboarding-v3 refuses --activate on a subcommand outside the apply-shaped set (0.4657ms)
+✔ project-onboarding-v3 refuses an unrecognized flag value for a closed enum flag (0.479ms)
+✖ R5-8 intake-design-questions-apply accepts --answers-file (a valid in-root file applies, exit 0) (8545.8604ms)
+✖ R5-8 intake-design-questions-apply refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (40.0066ms)
+✖ R5-8 intake-design-questions-apply refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (39.4136ms)
+✖ R5-8 intake-design-questions-apply rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (44.2662ms)
+✖ R5-8 intake-design-questions-apply with neither --answers-json nor --answers-file is a usage error naming both options (105.3027ms)
+✖ R5-8 intake-design-questions-replace accepts --answers-file (a valid in-root file applies, exit 0) (8886.851ms)
+✖ R5-8 intake-design-questions-replace refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (40.8633ms)
+✖ R5-8 intake-design-questions-replace refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (39.7222ms)
+✖ R5-8 intake-design-questions-replace rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (39.4341ms)
+✖ R5-8 intake-design-questions-replace with neither --answers-json nor --answers-file is a usage error naming both options (107.9345ms)
+✖ R5-8 the usage text lists --answers-file and --answers-file-sha256 for the design-question commands (0.237ms)
+✖ R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest (0.9131ms)
+✖ R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair (0.1684ms)
+✔ R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map (0.4033ms)
+✖ R5-10 a 30,720-byte multi-line non-ASCII LF answers file applies via --answers-file and matches the inline route (16811.3221ms)
+✖ R5-10 a 30,720-byte multi-line non-ASCII CRLF answers file applies via --answers-file and matches the inline route (16803.1152ms)
+✖ R5-10 -replace over --answers-file follows the inline rules: a different second round needs replace, replace is applied (8086.4763ms)
+✖ R5-11 every answers-file refusal through the real CLI exits non-zero with its typed code and leaves the checkpoint bytes unchanged (8862.5127ms)
+✖ R5-11 malformed JSON in the file is the apply function's own refusal, identical to the inline route (9321.5049ms)
+✔ R5-16 the intake-generate-design reference documents the file route with the exact flag names the shape table emits (0.3634ms)
+✔ R5-16 the kickoff-design reference says a recorded consent language is not asked again (0.5041ms)
+✔ project-onboarding-v3 accepts a digest-bound existing project file without a scratch copy (10503.4578ms)
+✖ project-onboarding-v3 resolves only canonical Claude prompt references after consent (5477.3053ms)
+✔ intake-generate-plan defaults to a digest-stable summary and requires --verbose for the full payload (18872.2269ms)
+✔ project-onboarding-v3 CLI: mini retains early acknowledgement while feature and epic wait for the final package (71077.9886ms)
+✔ project-onboarding-v3 CLI: bootstrap bind and acknowledgement subcommands reach their own precondition errors, not 'unknown argument' (334.1424ms)
+✔ project-onboarding-v3 CLI: kickoff plan/apply --language is refused without an attended confirmation (29.8899ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff language terminal-free and labels its result unattested (432.0061ms)
+✖ project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal (540.2514ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (119.6699ms)
+✔ project-onboarding-v3 CLI: kickoff plan --language is refused when an attended human types the wrong value (15.4892ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff --language confirmation, even carrying the correct value (309.0669ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan/apply --profile is refused without an attended confirmation (28.2742ms)
+✔ project-onboarding-v3 CLI: committed global chat makes kickoff promotion terminal-free and labels its result unattested (385.8944ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile passes the confirmation gate once a human confirms it via the injectable attended-terminal seam (29.7341ms)
+✔ project-onboarding-v3 CLI: kickoff promote plan --profile is refused when an attended human types the wrong value (15.1943ms)
+✔ project-onboarding-v3 CLI: a real spawned subprocess with a plain piped (non-TTY) stdin cannot complete the kickoff promote --profile confirmation, even carrying the correct value (290.7662ms)
+✔ project-onboarding-v3 CLI: the kickoff chat-gate leaves unrelated --language/--profile carve-outs (plan-repair, plan-partial-authority) unaffected (0.8447ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 22
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186530.3401
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:147:3
+✖ R5-8 intake-design-questions-apply accepts --answers-file (a valid in-root file applies, exit 0) (8545.8604ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:152:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /unknown argument/u,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:157:3
+✖ R5-8 intake-design-questions-apply refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (40.0066ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:163:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /INTAKE-DESIGN-ANSWERS-AMBIGUOUS/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:167:3
+✖ R5-8 intake-design-questions-apply refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (39.4136ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file-sha256
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:173:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file-sha256\n",
+    expected: /INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:177:3
+✖ R5-8 intake-design-questions-apply rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (44.2662ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:187:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /--answers-file requires/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:195:3
+✖ R5-8 intake-design-questions-apply with neither --answers-json nor --answers-file is a usage error naming both options (105.3027ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-DESIGN-QUESTIONS-EMPTY: intake design-questions apply requires answered questions or an explicit no-open-questions disposition
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:200:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'INTAKE-DESIGN-QUESTIONS-EMPTY: intake design-questions apply requires answered questions or an explicit no-open-questions disposition\n',
+    expected: /--answers-json/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:147:3
+✖ R5-8 intake-design-questions-replace accepts --answers-file (a valid in-root file applies, exit 0) (8886.851ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:152:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /unknown argument/u,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:157:3
+✖ R5-8 intake-design-questions-replace refuses --answers-json together with --answers-file as INTAKE-DESIGN-ANSWERS-AMBIGUOUS (40.8633ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:163:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /INTAKE-DESIGN-ANSWERS-AMBIGUOUS/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:167:3
+✖ R5-8 intake-design-questions-replace refuses --answers-file-sha256 without --answers-file as INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE (39.7222ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file-sha256
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:173:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file-sha256\n",
+    expected: /INTAKE-ANSWERS-FILE-DIGEST-WITHOUT-FILE/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:177:3
+✖ R5-8 intake-design-questions-replace rejects an empty or flag-shaped --answers-file value and a non-hex digest at parse time (39.4341ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:187:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /--answers-file requires/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:195:3
+✖ R5-8 intake-design-questions-replace with neither --answers-json nor --answers-file is a usage error naming both options (107.9345ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-DESIGN-QUESTIONS-EMPTY: intake design-questions apply requires answered questions or an explicit no-open-questions disposition
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:200:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'INTAKE-DESIGN-QUESTIONS-EMPTY: intake design-questions apply requires answered questions or an explicit no-open-questions disposition\n',
+    expected: /--answers-json/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:206:1
+✖ R5-8 the usage text lists --answers-file and --answers-file-sha256 for the design-question commands (0.237ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:208:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\n",
+    expected: /--answers-file\b/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:212:1
+✖ R5-9 both design-question shapes carry the exactly-one-of answers pair and the optional digest (0.9131ms)
+  AssertionError [ERR_ASSERTION]: intake-design-questions-apply
+  + actual - expected
+  
+    [
+      '--root',
+  +   '--answers-json'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:216:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '--root', '--answers-json' ],
+    expected: [ '--root' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:222:1
+✖ R5-9 the shared emission and hint helpers carry the file route, and refuse both or neither of the pair (0.1684ms)
+  TypeError: intake-design-questions-apply requires --answers-json
+      at automatedMutatingApplyArgv (file:///<repo-root>/plugins/pipeline-core/lib/onboarding-argv-shapes.mjs:131:36)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:226:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:256:3
+✖ R5-10 a 30,720-byte multi-line non-ASCII LF answers file applies via --answers-file and matches the inline route (16811.3221ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:265:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:256:3
+✖ R5-10 a 30,720-byte multi-line non-ASCII CRLF answers file applies via --answers-file and matches the inline route (16803.1152ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:265:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:282:1
+✖ R5-10 -replace over --answers-file follows the inline rules: a different second round needs replace, replace is applied (8086.4763ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:288:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:298:1
+✖ R5-11 every answers-file refusal through the real CLI exits non-zero with its typed code and leaves the checkpoint bytes unchanged (8862.5127ms)
+  AssertionError [ERR_ASSERTION]: Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]
+  Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]
+         intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>
+         node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate
+  unknown argument: --answers-file
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:324:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: "Marker repair: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-spec-marker-plan|intake-spec-marker-apply> --root <project-dir> [--plan-sha256 <sha256> --activate]\nUsage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-generate-plan --root <project-dir> [--summary|--verbose]\n       intake consent/capture accepts exactly one of --text <text>, --text-file <path> [--text-file-sha256 <sha256>], or --text-turn-ref <closed Claude reference JSON>\n       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array|no-open-questions-disposition> --activate\nunknown argument: --answers-file\n",
+    expected: /INTAKE-ANSWERS-FILE-MISSING/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:333:1
+✖ R5-11 malformed JSON in the file is the apply function's own refusal, identical to the inline route (9321.5049ms)
+  AssertionError [ERR_ASSERTION]: no second parser verdict for the file route
+  + actual - expected
+  
+  + undefined
+  - 'INTAKE-DESIGN-QUESTIONS-EMPTY'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:343:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'INTAKE-DESIGN-QUESTIONS-EMPTY',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:478:1
+✖ project-onboarding-v3 resolves only canonical Claude prompt references after consent (5477.3053ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'available'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:491:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'available',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\project-onboarding-v3-argv-closure.test.mjs:701:1
+✖ project-onboarding-v3 CLI: invalid, uncommitted, and unreadable global modes retain the kickoff terminal refusal (540.2514ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /CHAT-GATE-NOT-ATTENDED/. Input:
+  
+  '{\n' +
+    '  "schema": "pipeline.project-onboarding.v4",\n' +
+    '  "status": "invalid",\n' +
+    '  "root": "<host-path>",\n' +
+    '  "runner": null,\n' +
+    '  "intent": "onboarding",\n' +
+    '  "repository": {\n' +
+    '    "status": "local-valid-writable",\n' +
+    '    "mode": "local",\n' +
+    '    "gitVersion": "2.55.0.windows.5",\n' +
+    '    "initializesGit": false,\n' +
+    '    "rootWritable": "passed",\n' +
+    '    "sessionCapability": "not-required",\n' +
+    '    "worktreeCapability": "not-required"\n' +
+    '  },\n' +
+    '  "runtime": {\n' +
+    '    "status": "not-observed",\n' +
+    '    "sourceSha256": null,\n' +
+    '    "targetsSha256": null,\n' +
+    '    "barrierSha256": null,\n' +
+    '    "readbackSha256": null\n' +
+    '  },\n' +
+    '  "continuity": {\n' +
+    '    "status": "unavailable",\n' +
+    '    "stateSha256": null,\n' +
+    '    "handoverSha256": null,\n' +
+    '    "historySha256": null\n' +
+    '  },\n' +
+    '  "appServer": {\n' +
+    '    "required": false,\n' +
+    '    "status": "not-requested",\n' +
+    '    "code": null\n' +
+    '  },\n' +
+    '  "runnerPermissions": {\n' +
+    '    "target": ".claude/settings.local.json",\n' +
+    '    "status": "not-observed",\n' +
+    '    "lanes": [\n' +
+    '      "Bash",\n' +
+    '      "PowerShell"\n' +
+    '    ],\n' +
+    '    "exactEntries": []\n' +
+    '  },\n' +
+    '  "nextAction": {\n' +
+    '    "kind": "command",\n' +
+    '    "executable": "node",\n' +
+    '    "argv": [\n' +
+    '      "<host-path>",\n' +
+    '      "plan-source-recovery",\n' +
+    '      "--root",\n' +
+    '      "<host-path>",\n' +
+    '      "--runner",\n' +
+    '      "codex"\n' +
+    '    ],\n' +
+    '    "mutation": false,\n' +
+    '    "requiresConfirmation": false,\n' +
+    '    "expected": {\n' +
+    '      "schema": "pipeline.project-onboarding-source-recovery.v1",\n' +
+    '      "statuses": [\n' +
+    '        "recoverable",\n' +
+    '        "unrepairable"\n' +
+    '      ]\n' +
+    '    }\n' +
+    '  },\n' +
+    '  "diagnostics": [\n' +
+    '    {\n' +
+    '      "path": "$.source",\n' +
+    '      "code": "source_invalid",\n' +
+    '      "message": "pipeline.user.yaml is not a valid V3 source",\n' +
+    '      "guidance": "review the closed source recovery disposition"\n' +
+    '    }\n' +
+    '  ],\n' +
+    '  "humanApproval": {\n' +
+    '    "mode": "chat-attributed-unattested",\n' +
+    '    "kind": "kickoff-language"\n' +
+    '  }\n' +
+    '}\n'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs:712:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n  "schema": "pipeline.project-onboarding.v4",\n  "status": "invalid",\n  "root": "<host-path>",\n  "runner": null,\n  "intent": "onboarding",\n  "repository": {\n    "status": "local-valid-writable",\n    "mode": "local",\n    "gitVersion": "2.55.0.windows.5",\n    "initializesGit": false,\n    "rootWritable": "passed",\n    "sessionCapability": "not-required",\n    "worktreeCapability": "not-required"\n  },\n  "runtime": {\n    "status": "not-observed",\n    "sourceSha256": null,\n    "targetsSha256": null,\n    "barrierSha256": null,\n    "readbackSha256": null\n  },\n  "continuity": {\n    "status": "unavailable",\n    "stateSha256": null,\n    "handoverSha256": null,\n    "historySha256": null\n  },\n  "appServer": {\n    "required": false,\n    "status": "not-requested",\n    "code": null\n  },\n  "runnerPermissions": {\n    "target": ".claude/settings.local.json",\n    "status": "not-observed",\n    "lanes": [\n      "Bash",\n      "PowerShell"\n    ],\n    "exactEntries": []\n  },\n  "nextAction": {\n    "kind": "command",\n    "executable": "node",\n    "argv": [\n      "<host-path>",\n      "plan-source-recovery",\n      "--root",\n      "<host-path>",\n      "--runner",\n      "codex"\n    ],\n    "mutation": false,\n    "requiresConfirmation": false,\n    "expected": {\n      "schema": "pipeline.project-onboarding-source-recovery.v1",\n      "statuses": [\n        "recoverable",\n        "unrepairable"\n      ]\n    }\n  },\n  "diagnostics": [\n    {\n      "path": "$.source",\n      "code": "source_invalid",\n      "message": "pipeline.user.yaml is not a valid V3 source",\n      "guidance": "review the closed source recovery disposition"\n    }\n  ],\n  "humanApproval": {\n    "mode": "chat-attributed-unattested",\n    "kind": "kickoff-language"\n  }\n}\n',
+    expected: /CHAT-GATE-NOT-ATTENDED/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

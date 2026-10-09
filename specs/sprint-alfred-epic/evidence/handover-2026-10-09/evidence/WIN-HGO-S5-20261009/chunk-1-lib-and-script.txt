@@ -1,0 +1,51 @@
+command: node --test "--test-name-pattern=security and authority boundaries" --test-name-pattern=NVA-W4-01B "--test-name-pattern=pipeline author repair binds" --test-name-pattern=NOVA-HGOELIG-4 "--test-name-pattern=a recovery guard excludes" --test-name-pattern=NVA-HGOFIX-2 --test-name-pattern=NVA-CROSSREPOGUIDANCE-1 plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs
+label: WIN-HGO-S5-chunk-1
+exitCode: 1
+head: 94704e2ee9fb2d12959abc84ddc30309b4ecee28
+tree: ded73c107d6736a4f957cc6d2e4eb1e4027f0de5
+dirty: true
+--- stdout ---
+﹣ security and authority boundaries return typed recovery without an ambient bypass (1.7519ms) # symlink (type=dir) unavailable (EPERM): enable Windows Developer Mode or run elevated
+﹣ NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command (0.0941ms) # symlink (type=dir) unavailable (EPERM): enable Windows Developer Mode or run elevated
+﹣ pipeline author repair binds one exact source root and action without State readiness (0.0618ms) # symlink (type=dir) unavailable (EPERM): enable Windows Developer Mode or run elevated
+✔ a recovery guard excludes a second reclaimer and a raced replacement is never unlinked (39129.3349ms)
+﹣ NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target (0.2932ms) # symlink (type=dir) unavailable (EPERM): enable Windows Developer Mode or run elevated
+﹣ NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable platform seam, provable from a POSIX host (0.1048ms) # a backslash is a path separator on win32; a single component containing one cannot exist there
+﹣ NVA-HGOFIX-2: crossBoundaryTarget()'s :792 hardBoundaryPath() check is intentionally unnormalized on POSIX, and its platform seam reaches the win32 branch (0.0702ms) # a backslash is a path separator on win32; a single component containing one cannot exist there
+✖ NVA-HGOFIX-2: eligibility()'s Bash argv-token normalization (:1385) is win32-only; POSIX behavior is unchanged (216.3745ms)
+✔ NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinator's own root, and the ceremony runs against exactly that root (12700.9393ms)
+✔ NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET root, which is the only root its ceremony can be run against (16774.1645ms)
+﹣ NVA-HGOFIX-2: the external-path check does not misread a POSIX in-repository file whose name merely contains a backslash as external (1.3581ms) # a backslash is a path separator on win32; a single component containing one cannot exist there
+ℹ tests 11
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 7
+ℹ todo 0
+ℹ duration_ms 69256.8787
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:4854:1
+✖ NVA-HGOFIX-2: eligibility()'s Bash argv-token normalization (:1385) is win32-only; POSIX behavior is unchanged (216.3745ms)
+  AssertionError [ERR_ASSERTION]: a token merely CONTAINING a backslash must not be misread as a hard-boundary path on POSIX
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:4861:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

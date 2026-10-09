@@ -1,0 +1,57 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-SIGN-F-20261009",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "37862e2953e3de7d413a2dc290b8e31e179a032e",
+  "resultSha256": "126bb4c89481a8d46d26113d282577a8176c5de2e0b55686bcc01b830b7c8266",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "37862e2953e3de7d413a2dc290b8e31e179a032e"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created after reading obligations, CONT17/18/35 headers+section, ADOPT-SIGN-T record, preflight",
+      "toolUses": 10
+    },
+    {
+      "phase": "pins green (after.txt exit 0), suites run (only the known red), consumer-safe-paths exit 0, committed",
+      "toolUses": 50
+    },
+    {
+      "phase": "terminal record written by assemble script",
+      "toolUses": 52
+    }
+  ],
+  "report": {
+    "text": "ADOPT-SIGN-F-20261009: completion report (class S, production, signing CLI). Independent review: pending.\nBootstrap line: printed after the opening reads (not as the very first output line), ruleset 0.7.0+claude.20261008194106.da20519d.\nRoute pre-check: requested goldfish-deep / sonnet (Sonnet 5.5) / effort xhigh. Observed (own runtime prompt): 'powered by the model named Sonnet 5.5', id claude-sonnet-5-5. Effort not directly observable. No contradiction.\n\n1. DoD results\n- Four ADOPT-SIGN-T pins green (WSL): passed. The two prepare --out pins and the two sign-intent --request pins show as passing in after.txt (lines 12, 13, 38, 39); the wrapped exit code is 0, so the selected neighbours (refuses ordinary apply; NVA-SIGNONCE-1) are green too.\n- WSL run of po-human-approval.test.mjs, signing-ceremony.test.mjs, architecture-adoption.test.mjs: passed with no new red. The wrapped exit code is 1 and the only failing test is the known NVA-SWEEP-F2f-REWORK ('sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path', suites.txt lines 133 and 458). I did not touch that code path.\n- consumer-safe-paths (harness/scripts/check-consumer-safe-paths.mjs, run natively, single script): passed, wrapped exit code 0.\n- One commit with the briefed subject: passed, 37862e2953e3de7d413a2dc290b8e31e179a032e.\n- Terminal record: this file. Independent review: pending (Elephant dispatch only).\n\n2. Evidence (repo-root evidence/ is gitignored: on disk, not committed)\n- evidence/ADOPT-SIGN-F-20261009/after.txt: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADOPT-SIGN-F-20261009/after.txt --label adopt-sign-f-after -- node --test --test-name-pattern='ADOPT-SIGN-T|NVA-SIGNONCE-1: sign-intent skips|refuses ordinary apply' plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs\"; wrapped exit 0.\n- evidence/ADOPT-SIGN-F-20261009/suites.txt: same wrapper under timeout 570, label adopt-sign-f-suites, running node --test on po-human-approval.test.mjs, signing-ceremony.test.mjs, architecture-adoption.test.mjs; wrapped exit 1 (the single known red above).\n- evidence/ADOPT-SIGN-F-20261009/consumer-safe-paths.txt: capture-evidence --label adopt-sign-f-csp -- node harness/scripts/check-consumer-safe-paths.mjs; wrapped exit 0.\n\n3. Changed files (commit 37862e2953e3de7d413a2dc290b8e31e179a032e)\n- plugins/pipeline-core/scripts/architecture-adoption.mjs: prepare --out. Boundary checked lexically BEFORE the request is built (a relative value resolves against --root; outside scratch/, the scratch dir itself, or another command refuses with a message naming scratch/ and exits 1, writing nothing); then the filesystem half (symlinked scratch/, real parent outside real scratch/, symlink/hardlink/non-regular existing target all refuse). One byte string feeds the file and stdout, so the file is byte-identical to the stdout form by construction. A one-line 'adoption request written: scratch/...' note goes to stderr.\n- plugins/pipeline-core/scripts/po-human-approval.mjs: sign-intent --request accepts pipeline.adoption-approval-request.v1 via intent.sha256; new describeAdoptionApprovalRequest() discloses digest, decision, decision ref, every scope entry, rationale, dates, candidate and repository fingerprint from the request alone; a non-binding request throws 'the adoption approval request does not bind its exact subject and intent digest' before assertSigningReadyBeforePrompt, confirmation, key access or signing. Proof shape and scratch mirror unchanged (scratchSiblingPath already maps adoption-request-1.json to adoption-proof-1.json).\n\nDesign choice (describer): it does NOT call verifyAdoptionAuthority() (that rebinds repository fingerprint, candidate and live snapshot; the pin's signing root has none of them, and a PO may sign a request for another root) and no forbidden lib file was touched. It requires: exact top-level keys; intent.sha256 equal to the sign-intent digest and to sha256(canonical(intent.value)); sha256(canonical(subject)) equal to subjectSha256 and to intent.value.subjectSha256; intent.value.kind 'architecture-adoption', policyRevision 'adoption-authority-v1', decision and candidate agreeing with the subject; strict shapes for every disclosed field. Free text (decision ref, rationale, each scope entry) is rendered through JSON.stringify so a hostile request cannot inject a disclosure line. The plan/spec digest derivation is NOT repeated here: verifyAdoptionAuthority() re-derives the full intent at apply time, so this is disclosure, never authority.\n\n4. Deliberately not changed\n- No test file; no other production file; the foreign uncommitted edits (pipeline-state.mjs, sanctioned-args-onboarding.mjs, harness pipeline-state.test.mjs, etc.) were never staged.\n- The known-red NVA-SWEEP-F2f-REWORK case and sign-intent's scratch-mirror hardening were left untouched.\n- Chat-mode adoption requests are signable too (request mode is disclosed on its own line, not refused): not pinned and not asked for.\n\n5. Deviations from spec\n- Orientation used roughly 27 tool calls, not 10 (two guard refusals on a Write/Bash and three blind lookups for the consumer-safe-paths script cost extra); no known-red regression introduced.\n- The budget notice fired at call 44 with the pins green and suites captured; the remaining calls went to the consumer-safe-paths check, commit and record only.\n- Native Windows runs of the two changed scripts' test files were not done (WSL only, per the briefing); the writeScratchOut parent-containment expression is correct but awkwardly phrased (outsideScratch plus an explicit equal-to-scratch exemption); a cleanup is cosmetic.\n- No negative tests exist for the extra hardening (symlinked scratch, hardlinked target, --out on a non-prepare command, relative --out): tests were forbidden for this slice, so those paths are exercised only by reading.\n\n6. Open items\n- Independent review: pending (class S, signing CLI: the Elephant should dispatch the Critic).\n- No stop condition triggered; no pin needed a test change; no existing signing case turned red beyond the known one.\n- Follow-up candidates for the Elephant: (a) a test-only slice for the unpinned --out hardening and the adoption describer's refusal branches; (b) if the PO wants the full intent derivation checked at sign time, a lib change exporting the intent derivation from architecture-adoption-authority.mjs (out of scope here).\n",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+      "plugins/pipeline-core/scripts/po-human-approval.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

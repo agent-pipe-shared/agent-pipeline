@@ -1,0 +1,22 @@
+command: node --test --test-name-pattern "signed GMW" plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: native-after
+exitCode: 0
+head: a662f4dc6e8e118531451d4d876278503a44ded4
+tree: 7c1afd68d9d92fdfe7f9959e9eaa38a01b22b608
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-Rucujh
+# win32 witness privacy: 3 diagnostic witness file(s) assessed secure in one DACL batch
+✔ installed hook: matching signed GMW permits a non-kernel TP rewrite (16493.4426ms)
+✔ installed hook: wrong-scope signed GMW does not permit a TP rewrite (16070.827ms)
+✔ installed hook: matching signed GMW never permits hooks.json kernel rewrite (15637.4488ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49632.6687
+
+--- stderr ---

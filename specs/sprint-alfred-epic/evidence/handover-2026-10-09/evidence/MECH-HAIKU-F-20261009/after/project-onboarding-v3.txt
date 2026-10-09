@@ -1,0 +1,506 @@
+command: node --test --test-timeout=600000 plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+label: mech-haiku-after-project-onboarding-v3
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+project-onboarding-v3 controller: malformed coordinates, partition coverage, and child failure outcomes fail closed
+ORIGINAL184 CHILD START chunk=0 shard=0 index=0 pid=132710 mono_ns=3890430872844
+ORIGINAL184 CHILD START chunk=0 shard=1 index=1 pid=132711 mono_ns=3890432519082
+ORIGINAL184 CHILD START chunk=0 shard=2 index=2 pid=132712 mono_ns=3890434138169
+ORIGINAL184 CHILD START chunk=0 shard=3 index=3 pid=132718 mono_ns=3890435425231
+ORIGINAL184 CHILD START chunk=0 shard=4 index=4 pid=132722 mono_ns=3890436684761
+ORIGINAL184 CHILD START chunk=0 shard=5 index=5 pid=132725 mono_ns=3890438080075
+ORIGINAL184 CALLBACK START shard=1 index=1 pid=132711 mono_ns=3892735752024
+ORIGINAL184 CALLBACK START shard=3 index=3 pid=132718 mono_ns=3892735898827
+PASS  session capability failure phase is optional, closed, and retained only for its matching failure
+ORIGINAL184 CALLBACK END shard=1 index=1 pid=132711 mono_ns=3892757191478 elapsed_ms=21.439 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=13 pid=132711 mono_ns=3892757244019
+ORIGINAL184 CALLBACK START shard=0 index=0 pid=132710 mono_ns=3893260466993
+PASS  repository capability failures map exactly and stop before source/runtime inspection
+ORIGINAL184 CALLBACK END shard=0 index=0 pid=132710 mono_ns=3893305168043 elapsed_ms=44.701 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=12 pid=132710 mono_ns=3893305203843
+ORIGINAL184 CALLBACK START shard=4 index=4 pid=132722 mono_ns=3893330128567
+ORIGINAL184 CALLBACK START shard=2 index=2 pid=132712 mono_ns=3893393433822
+PASS  host-managed session and dispatch map to repository-mode-unsupported before later stages
+ORIGINAL184 CALLBACK END shard=2 index=2 pid=132712 mono_ns=3893411847416 elapsed_ms=18.414 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=14 pid=132712 mono_ns=3893411883607
+ORIGINAL184 CALLBACK START shard=5 index=5 pid=132725 mono_ns=3893457382641
+PASS  host-bound dispatch smoke observes and rolls back real session/worktree capability in a spaced root
+ORIGINAL184 CALLBACK END shard=3 index=3 pid=132718 mono_ns=3894183531330 elapsed_ms=1447.633 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=15 pid=132718 mono_ns=3894183570690
+PASS  runner-permission drift is repaired before a neutral PO authority decision, then exposes that decision again
+ORIGINAL184 CALLBACK END shard=3 index=15 pid=132718 mono_ns=3928795964069 elapsed_ms=34612.393 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=27 pid=132718 mono_ns=3928796042510
+PASS  general PRD/Spec drift exposes the same neutral read-only decision plan for all intents
+ORIGINAL184 CALLBACK END shard=2 index=14 pid=132712 mono_ns=3932789426242 elapsed_ms=39377.543 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=26 pid=132712 mono_ns=3932789467622
+PASS  App Server is observed only on the ready path and exactly once for required intents
+ORIGINAL184 CALLBACK END shard=4 index=4 pid=132722 mono_ns=3934679371975 elapsed_ms=41349.243 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=16 pid=132722 mono_ns=3934679434236
+FAIL  exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable -- B8 producer/guard command drift: partial po-authority-rebind-plan
++ actual - expected
+
+  {
++   exitCode: 2,
++   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature "kickoff-8fed00b58c45fed6" lifecycle is "invalid".\n' +
++     'Plan: specs/kickoff-8fed00b58c45fed6/prd_kickoff-8fed00b58c45fed6.md\n' +
++     'File: .pipeline-opaque-execution\n' +
++     'Why: The feature is still in draft design and has no implementation authority.\n' +
++     'Detected as a shell write to a dev-plan-gated path (lane: opaque-script-execution).\n' +
++     'Why: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\n' +
++     "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above.\n" +
++     '\n' +
++     'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
++     'Reason: planning the route failed with code=HGO-GIT.\n'
+-   exitCode: 0,
+-   stderr: ''
+  }
+
+ORIGINAL184 CALLBACK END shard=1 index=13 pid=132711 mono_ns=3935528896696 elapsed_ms=42771.653 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=25 pid=132711 mono_ns=3935528945867
+PASS  nonportable cleanup authority keeps a null nextAction when privatization is unavailable
+ORIGINAL184 CALLBACK END shard=0 index=12 pid=132710 mono_ns=3943770260729 elapsed_ms=50465.057 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=24 pid=132710 mono_ns=3943770301739
+PASS  runtime-current bootstrap exposes cleanup recovery before App Server or session start
+ORIGINAL184 CALLBACK END shard=5 index=5 pid=132725 mono_ns=3950273372321 elapsed_ms=56815.990 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=17 pid=132725 mono_ns=3950273444213
+PASS  V4 authority drift reopens the historical approval instead of rebinding it
+ORIGINAL184 CALLBACK END shard=5 index=17 pid=132725 mono_ns=3950286494424 elapsed_ms=13.050 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=29 pid=132725 mono_ns=3950286526054
+PASS  an unknown runner keeps the Codex-strength barrier and a manual action, never the Codex launcher
+ORIGINAL184 CALLBACK END shard=3 index=27 pid=132718 mono_ns=3967793049682 elapsed_ms=38997.007 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=39 pid=132718 mono_ns=3967793114844
+PASS  the codex runtime apply is unchanged: bound executable, frozen .codex digests, barrier durable before mutation
+ORIGINAL184 CALLBACK END shard=2 index=26 pid=132712 mono_ns=3970550756681 elapsed_ms=37761.289 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=38 pid=132712 mono_ns=3970550803992
+PASS  a pending Codex restart barrier never gates a Claude session, and that session leaves it untouched
+ORIGINAL184 CALLBACK END shard=1 index=25 pid=132711 mono_ns=3976549456692 elapsed_ms=41020.511 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=37 pid=132711 mono_ns=3976549500852
+PASS  neutral PO decision apply requires all transactional V4 postimage readbacks to become ready
+ORIGINAL184 CALLBACK END shard=4 index=16 pid=132722 mono_ns=3977865974684 elapsed_ms=43186.540 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=28 pid=132722 mono_ns=3977866015815
+PASS  a runner without a native runtime readback publishes no barrier and proceeds to the next real step
+ORIGINAL184 CALLBACK END shard=0 index=24 pid=132710 mono_ns=3979170717116 elapsed_ms=35400.415 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=36 pid=132710 mono_ns=3979170760426
+PASS  restart action for the codex runner is unchanged: still the Codex launcher (regression pin)
+ORIGINAL184 CALLBACK END shard=5 index=29 pid=132725 mono_ns=3990797273561 elapsed_ms=40510.748 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=41 pid=132725 mono_ns=3990797320182
+PASS  the barrier's runner exemption is the same set the V3 bootstrap authority already exempts
+ORIGINAL184 CALLBACK END shard=4 index=28 pid=132722 mono_ns=4021253877574 elapsed_ms=43387.862 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=40 pid=132722 mono_ns=4021253955566
+PASS  public CLI emits typed inspect, plan, and explicit-apply results
+ORIGINAL184 CALLBACK END shard=0 index=36 pid=132710 mono_ns=4021282152909 elapsed_ms=42111.392 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=48 pid=132710 mono_ns=4021282212560
+PASS  a seeded configuration leaves project verification to the shipped baseline
+ORIGINAL184 CALLBACK END shard=5 index=41 pid=132725 mono_ns=4038256064194 elapsed_ms=47458.744 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=53 pid=132725 mono_ns=4038256116565
+PASS  shared command renderer derives one copy-safe line from exact argv in a spaced root
+ORIGINAL184 CALLBACK END shard=5 index=53 pid=132725 mono_ns=4038256668394 elapsed_ms=0.552 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=65 pid=132725 mono_ns=4038256702115
+PASS  apply-portable-seed --activate surfaces the push-approval-setup ask-step for every repository, pre-filled from the machine default
+ORIGINAL184 CALLBACK END shard=3 index=39 pid=132718 mono_ns=4067331355359 elapsed_ms=99538.241 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=51 pid=132718 mono_ns=4067331401469
+PASS  apply-portable-seed --activate surfaces the missing-author-identity ask-step through the real CLI path
+ORIGINAL184 CALLBACK END shard=1 index=37 pid=132711 mono_ns=4081180976616 elapsed_ms=104631.476 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=49 pid=132711 mono_ns=4081181068657
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/directory-fsync
+ORIGINAL184 CALLBACK END shard=5 index=65 pid=132725 mono_ns=4104772990147 elapsed_ms=66516.288 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=77 pid=132725 mono_ns=4104773017158
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/close
+ORIGINAL184 CALLBACK END shard=5 index=77 pid=132725 mono_ns=4108554937229 elapsed_ms=3781.920 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=89 pid=132725 mono_ns=4108554978019
+PASS  initial author proposal follows Git author environment and author.* precedence without granting consent
+ORIGINAL184 CALLBACK END shard=2 index=38 pid=132712 mono_ns=4130875266904 elapsed_ms=160324.463 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=50 pid=132712 mono_ns=4130875354986
+PASS  NVA-R24-TRUSTANCHOR: a pre-existing key directory is reused byte-for-byte, never written to, by the onboarding transaction
+ORIGINAL184 CALLBACK END shard=3 index=51 pid=132718 mono_ns=4133170396351 elapsed_ms=65838.995 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=63 pid=132718 mono_ns=4133170440072
+PASS  apply-portable-seed records baseline-only verification without a PO question
+ORIGINAL184 CALLBACK END shard=4 index=40 pid=132722 mono_ns=4135560571394 elapsed_ms=114306.616 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=52 pid=132722 mono_ns=4135560616324
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PACKAGE-REQUIRED; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+FAIL  kickoff choosing a language different from the portable-seed default reaches a consistent authority without the mismatch/drift repair chain -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=5 index=89 pid=132725 mono_ns=4162513457366 elapsed_ms=53958.479 outcome=throw
+ORIGINAL184 CALLBACK START shard=5 index=101 pid=132725 mono_ns=4162513495636
+FAIL  the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2) -- Cannot find module '/tmp/secgate-installed-fixture-xOObs5/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-xOObs5/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+ORIGINAL184 CALLBACK END shard=5 index=101 pid=132725 mono_ns=4162664895110 elapsed_ms=151.399 outcome=throw
+ORIGINAL184 CALLBACK START shard=5 index=113 pid=132725 mono_ns=4162664922260
+PASS  the PO's answered author identity is written to local git config only, never global
+ORIGINAL184 CALLBACK END shard=5 index=113 pid=132725 mono_ns=4162687774599 elapsed_ms=22.852 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=125 pid=132725 mono_ns=4162687832810
+PASS  NVA-R24-TRUSTANCHOR: a freshly bootstrapped anchor is actually accepted by the same resolution the signed override ceremony uses -- no HGO-TRUST-ANCHOR-MISSING deadlock
+ORIGINAL184 CALLBACK END shard=4 index=52 pid=132722 mono_ns=4183650721798 elapsed_ms=48090.105 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=64 pid=132722 mono_ns=4183650766499
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/close
+ORIGINAL184 CALLBACK END shard=3 index=63 pid=132718 mono_ns=4184851431075 elapsed_ms=51680.991 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=75 pid=132718 mono_ns=4184851473976
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/write
+ORIGINAL184 CALLBACK END shard=3 index=75 pid=132718 mono_ns=4188289658908 elapsed_ms=3438.185 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=87 pid=132718 mono_ns=4188289699609
+PASS  NVA-V6-ANCHORREPORT: a broken pointer and a malformed policy each raise their own distinct, informational ask; a genuine no-key machine now raises its own distinct ask too (NVA-V17-NOKEYASK)
+ORIGINAL184 CALLBACK END shard=0 index=48 pid=132710 mono_ns=4192008462918 elapsed_ms=170726.250 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=60 pid=132710 mono_ns=4192008530679
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/rename
+ORIGINAL184 CALLBACK END shard=4 index=64 pid=132722 mono_ns=4230166059255 elapsed_ms=46515.293 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=76 pid=132722 mono_ns=4230166100446
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/file-fsync
+ORIGINAL184 CALLBACK END shard=4 index=76 pid=132722 mono_ns=4232959308049 elapsed_ms=2793.208 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=88 pid=132722 mono_ns=4232959348120
+PASS  a local kickoff provisions its PO profile inside the confirmed kickoff action
+ORIGINAL184 CALLBACK END shard=3 index=87 pid=132718 mono_ns=4234863550222 elapsed_ms=46573.851 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=99 pid=132718 mono_ns=4234863592213
+PASS  NVA-R24-TRUSTANCHOR: trustAnchorAvailability reports the real absent/present state at the ready gate
+ORIGINAL184 CALLBACK END shard=2 index=50 pid=132712 mono_ns=4238162684945 elapsed_ms=107287.330 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=62 pid=132712 mono_ns=4238162753406
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/fstat
+ORIGINAL184 CALLBACK END shard=0 index=60 pid=132710 mono_ns=4243431402812 elapsed_ms=51422.872 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=72 pid=132710 mono_ns=4243431439543
+PASS  runtime target preflight maps every reversible probe permission failure without residue EPERM/directory-fsync
+ORIGINAL184 CALLBACK END shard=0 index=72 pid=132710 mono_ns=4246427183820 elapsed_ms=2995.744 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=84 pid=132710 mono_ns=4246427255261
+PASS  NVA-V17-NOKEYASK: a machine with no PO signing key gets one structured public-driver bootstrap action on both absence states and composition paths
+ORIGINAL184 CALLBACK END shard=1 index=49 pid=132711 mono_ns=4261991776601 elapsed_ms=180810.708 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=61 pid=132711 mono_ns=4261991857313
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PACKAGE-REQUIRED; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+FAIL  a real fresh local kickoff is immediately a valid canonical PO authority -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=4 index=88 pid=132722 mono_ns=4283638615494 elapsed_ms=50679.267 outcome=throw
+ORIGINAL184 CALLBACK START shard=4 index=100 pid=132722 mono_ns=4283638653765
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/file-fsync
+ORIGINAL184 CALLBACK END shard=2 index=62 pid=132712 mono_ns=4294791831273 elapsed_ms=56629.078 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=74 pid=132712 mono_ns=4294791889384
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/fstat
+ORIGINAL184 CALLBACK END shard=2 index=74 pid=132712 mono_ns=4297764060433 elapsed_ms=2972.171 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=86 pid=132712 mono_ns=4297764105283
+PASS  runtime plan preimage drift preserves external bytes and maps to exact projection repair
+ORIGINAL184 CALLBACK END shard=0 index=84 pid=132710 mono_ns=4298061283312 elapsed_ms=51634.028 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=96 pid=132710 mono_ns=4298061338163
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+PASS  kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles
+ORIGINAL184 CALLBACK END shard=5 index=125 pid=132725 mono_ns=4312616268501 elapsed_ms=149928.436 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=137 pid=132725 mono_ns=4312616311952
+PASS  Git capability rejects nonzero, missing-status, and non-EPERM spawn results
+ORIGINAL184 CALLBACK END shard=5 index=137 pid=132725 mono_ns=4312629896780 elapsed_ms=13.585 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=149 pid=132725 mono_ns=4312629915880
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/write
+ORIGINAL184 CALLBACK END shard=1 index=61 pid=132711 mono_ns=4319591015731 elapsed_ms=57599.158 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=73 pid=132711 mono_ns=4319591052732
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/create
+ORIGINAL184 CALLBACK END shard=1 index=73 pid=132711 mono_ns=4322513005778 elapsed_ms=2921.953 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=85 pid=132711 mono_ns=4322513046969
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify codex -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=0 index=96 pid=132710 mono_ns=4352480038879 elapsed_ms=54418.701 outcome=throw
+ORIGINAL184 CALLBACK START shard=0 index=108 pid=132710 mono_ns=4352480114480
+Push approved by "po" for commit 3ea2f83467deb8ac07d2d388319d52f875a18145 (2026-10-09T07:05:45.855Z).
+PASS  public kickoff plan/apply carries goal as one argv element and reconstructs the bound plan
+ORIGINAL184 CALLBACK END shard=2 index=86 pid=132712 mono_ns=4360080930927 elapsed_ms=62316.826 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=98 pid=132712 mono_ns=4360081006518
+PASS  manifest-only repair is source/preimage/plan bound, confirmed, and read back
+ORIGINAL184 CALLBACK END shard=5 index=149 pid=132725 mono_ns=4360250585217 elapsed_ms=47620.669 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=161 pid=132725 mono_ns=4360250623677
+FAIL  NVA-SOURCERECOVERY-1: the recoverable source-recovery paths are unchanged by the repairCommand fix -- Expected values to be strictly equal:
++ actual - expected
+
++ 'unrepairable'
+- 'recoverable'
+
+ORIGINAL184 CALLBACK END shard=5 index=161 pid=132725 mono_ns=4360264600031 elapsed_ms=13.976 outcome=throw
+ORIGINAL184 CALLBACK START shard=5 index=173 pid=132725 mono_ns=4360264618051
+PASS  the seeded push gate refuses an unapproved push and admits it after the shipped commands
+ORIGINAL184 CALLBACK END shard=3 index=99 pid=132718 mono_ns=4360974154419 elapsed_ms=126110.562 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=111 pid=132718 mono_ns=4360974218570
+Push approved by "po" for commit 641213e300937ddc1fbb2efb4af5e3cb53a47dd9 (2026-10-09T07:06:13.441Z).
+PASS  the seeded security gate refuses a push with missing security evidence and admits it after the shipped scan command runs (SECGATE-1)
+ORIGINAL184 CALLBACK END shard=4 index=100 pid=132722 mono_ns=4387654126196 elapsed_ms=104015.472 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=112 pid=132722 mono_ns=4387654168267
+PASS  the commit-msg hook onboarding installs rejects a structurally broken provenance block
+ORIGINAL184 CALLBACK END shard=0 index=108 pid=132710 mono_ns=4404763280935 elapsed_ms=52283.166 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=120 pid=132710 mono_ns=4404763361777
+PASS  H3 manifest repair fails closed on V4 readback failure
+ORIGINAL184 CALLBACK END shard=5 index=173 pid=132725 mono_ns=4410966948136 elapsed_ms=50702.330 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=185 pid=132725 mono_ns=4410966988017
+PASS  partial authority planner requires an explicit V3 selection and hashes preserved user projections
+ORIGINAL184 CALLBACK END shard=5 index=185 pid=132725 mono_ns=4410996703292 elapsed_ms=29.715 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=197 pid=132725 mono_ns=4410996721872
+FAIL  NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=2 index=98 pid=132712 mono_ns=4412304648270 elapsed_ms=52223.642 outcome=throw
+ORIGINAL184 CALLBACK START shard=2 index=110 pid=132712 mono_ns=4412304713731
+PASS  once an owned .gitignore's ask is fulfilled with ordinary tools, the evidence-circle can never reopen
+ORIGINAL184 CALLBACK END shard=3 index=111 pid=132718 mono_ns=4415660901642 elapsed_ms=54686.683 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=123 pid=132718 mono_ns=4415660991343
+PASS  a claude-onboarded root completes kickoff promotion and observes the project as claude, not codex
+ORIGINAL184 CALLBACK END shard=0 index=120 pid=132710 mono_ns=4458904842307 elapsed_ms=54141.481 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=132 pid=132710 mono_ns=4458904886408
+PASS  a promotion plan produced for one runner does not validate an apply for another
+ORIGINAL184 CALLBACK END shard=3 index=123 pid=132718 mono_ns=4468873030044 elapsed_ms=53212.039 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=135 pid=132718 mono_ns=4468873127046
+PASS  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity antigravity
+ORIGINAL184 CALLBACK END shard=5 index=197 pid=132725 mono_ns=4471293853537 elapsed_ms=60297.132 outcome=pass
+ORIGINAL184 CALLBACK START shard=5 index=209 pid=132725 mono_ns=4471293884617
+PASS  a recognized read-only host control layout receives portable onboarding without an overwrite attempt
+ORIGINAL184 CALLBACK END shard=3 index=135 pid=132718 mono_ns=4472660359788 elapsed_ms=3787.233 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=147 pid=132718 mono_ns=4472660415929
+PASS  validateManifest never offers a repair when a second, unrelated defect survives adding schema
+ORIGINAL184 CALLBACK END shard=3 index=147 pid=132718 mono_ns=4472678617888 elapsed_ms=18.202 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=159 pid=132718 mono_ns=4472678644948
+PASS  runtime apply permission races roll back every byte and remove the exact restart barrier
+ORIGINAL184 CALLBACK END shard=1 index=85 pid=132711 mono_ns=4475007758796 elapsed_ms=152494.712 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=97 pid=132711 mono_ns=4475007830997
+PASS  the hook onboarding installs actually fires: blocks a push the gate would refuse, allows one it would admit
+ORIGINAL184 CALLBACK END shard=2 index=110 pid=132712 mono_ns=4483919371302 elapsed_ms=71614.658 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=122 pid=132712 mono_ns=4483919442863
+PASS  onboarding asks for a commit author it cannot name, and never invents one
+ORIGINAL184 CALLBACK END shard=4 index=112 pid=132722 mono_ns=4488545854299 elapsed_ms=100891.686 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=124 pid=132722 mono_ns=4488545922850
+PASS  legacy close-feature refusal preserves a ready feature for the coordinator-backed finish-feature lifecycle
+ORIGINAL184 CALLBACK END shard=0 index=132 pid=132710 mono_ns=4518693488066 elapsed_ms=59788.602 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=144 pid=132710 mono_ns=4518693521746
+PASS  manifest repair admits a Claude-default, Claude-invoked V3 source (NVA-MANIFESTRUNNER-1)
+ORIGINAL184 CALLBACK END shard=3 index=159 pid=132718 mono_ns=4521603321025 elapsed_ms=48924.676 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=171 pid=132718 mono_ns=4521603346016
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity -- BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CALLBACK END shard=1 index=97 pid=132711 mono_ns=4525602356484 elapsed_ms=50594.525 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=109 pid=132711 mono_ns=4525602398174
+PASS  a kickoff plan produced for one runner does not validate an apply for another
+ORIGINAL184 CALLBACK END shard=2 index=122 pid=132712 mono_ns=4531954627274 elapsed_ms=48035.184 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=134 pid=132712 mono_ns=4531954696445
+PASS  existing unmanaged projects plan read-only while partial and symlink roots fail closed
+ORIGINAL184 CALLBACK END shard=2 index=134 pid=132712 mono_ns=4532038421139 elapsed_ms=83.725 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=146 pid=132712 mono_ns=4532038451780
+PASS  validateManifest offers a repair for a schema-less-but-otherwise-valid manifest, and self-heals only when asked
+ORIGINAL184 CALLBACK END shard=2 index=146 pid=132712 mono_ns=4532050895888 elapsed_ms=12.444 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=158 pid=132712 mono_ns=4532050923049
+PASS  a project that already owns a pre-push hook is never overwritten by onboarding
+ORIGINAL184 CALLBACK END shard=1 index=109 pid=132711 mono_ns=4544648139968 elapsed_ms=19045.742 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=121 pid=132711 mono_ns=4544648220810
+PASS  an apply-shaped runtime-attestation-required exits non-zero; the same status stays a resting point for inspect/plan
+ORIGINAL184 CALLBACK END shard=4 index=124 pid=132722 mono_ns=4544666576962 elapsed_ms=56120.654 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=136 pid=132722 mono_ns=4544666606862
+PASS  H3 manifest repair rolls back owned output on publication race
+ORIGINAL184 CALLBACK END shard=3 index=171 pid=132718 mono_ns=4551398491293 elapsed_ms=29795.145 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=183 pid=132718 mono_ns=4551398512313
+PASS  remote adoption rolls back the checked-out branch when its owned upstream bind fails
+ORIGINAL184 CALLBACK END shard=3 index=183 pid=132718 mono_ns=4551401364293 elapsed_ms=2.852 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=195 pid=132718 mono_ns=4551401379023
+PASS  Codex bootstrap accepts a dual-runner source whose default runner is Claude
+ORIGINAL184 CALLBACK END shard=0 index=144 pid=132710 mono_ns=4554201836570 elapsed_ms=35508.315 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=156 pid=132710 mono_ns=4554201867291
+PASS  F-B V3 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused
+ORIGINAL184 CALLBACK END shard=5 index=209 pid=132725 mono_ns=4555900629783 elapsed_ms=84606.745 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 6/6: 15 passed, 3 failed
+kickoff choosing a language different from the portable-seed default reaches a consistent authority without the mismatch/drift repair chain: Expected values to be strictly equal:
+
+2 !== 0
+
+the fixture's own security-scan.mjs call graph, deployed with no repo root above it (installed-plugin shape), resolves gitleaks to the plugin-shipped default config and completes a clean scan (SECGATE-2): Cannot find module '/tmp/secgate-installed-fixture-xOObs5/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/secgate-installed-fixture-xOObs5/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+NVA-SOURCERECOVERY-1: the recoverable source-recovery paths are unchanged by the repairCommand fix: Expected values to be strictly equal:
++ actual - expected
+
++ 'unrepairable'
+- 'recoverable'
+
+ORIGINAL184 CHILD END chunk=0 shard=5 index=5 pid=132725 mono_ns=4555931457032 elapsed_ms=665493.377 outcome=fail
+PASS  source recovery planner distinguishes invalid authority and unsupported runner transitions
+ORIGINAL184 CALLBACK END shard=2 index=158 pid=132712 mono_ns=4565051178734 elapsed_ms=33000.256 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=170 pid=132712 mono_ns=4565051207764
+PASS  omitting the runner on a direct kickoff promotion call is a caller error, not a silent Codex default
+ORIGINAL184 CALLBACK END shard=1 index=121 pid=132711 mono_ns=4574002575443 elapsed_ms=29354.355 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=133 pid=132711 mono_ns=4574002625984
+PASS  an existing unmanaged project receives an additive adoption plan
+ORIGINAL184 CALLBACK END shard=4 index=136 pid=132722 mono_ns=4575480278689 elapsed_ms=30813.672 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=148 pid=132722 mono_ns=4575480322210
+FAIL  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity claude -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'language',
+    'profile',
+-   'projectDescription'
+  ]
+
+ORIGINAL184 CALLBACK END shard=3 index=195 pid=132718 mono_ns=4583839539212 elapsed_ms=32438.160 outcome=throw
+ORIGINAL184 CALLBACK START shard=3 index=207 pid=132718 mono_ns=4583839562392
+PASS  manifest repair atomically preserves a target that appears at publication
+ORIGINAL184 CALLBACK END shard=0 index=156 pid=132710 mono_ns=4586335570757 elapsed_ms=32133.703 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=168 pid=132710 mono_ns=4586335594038
+PASS  H3 manifest repair rolls back owned output on fsync failure
+ORIGINAL184 CALLBACK END shard=2 index=170 pid=132712 mono_ns=4596353072836 elapsed_ms=31301.865 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=182 pid=132712 mono_ns=4596353096386
+PASS  remote adoption rejects a remote .codex and rolls back only its owned Git transaction
+ORIGINAL184 CALLBACK END shard=2 index=182 pid=132712 mono_ns=4596355470618 elapsed_ms=2.374 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=194 pid=132712 mono_ns=4596355486938
+PASS  loadManifest offers the same repair from an on-disk schema-less file, and plan-manifest-repair surfaces it instead of the generic dead end
+ORIGINAL184 CALLBACK END shard=4 index=148 pid=132722 mono_ns=4604379468920 elapsed_ms=28899.147 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=160 pid=132722 mono_ns=4604379490441
+PASS  portable seed is manifest-valid, then onboarding owns the runtime initialization transaction
+ORIGINAL184 CALLBACK END shard=1 index=133 pid=132711 mono_ns=4611155532484 elapsed_ms=37152.906 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=145 pid=132711 mono_ns=4611155564194
+PASS  H3 manifest repair rejects target appearance race: symlink
+ORIGINAL184 CALLBACK END shard=0 index=168 pid=132710 mono_ns=4617851722717 elapsed_ms=31516.129 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=180 pid=132710 mono_ns=4617851751327
+FAIL  remote branch adoption plans read-only, preserves .codex, and advances only to the branch authority migration -- {"schema":"pipeline.project-onboarding.v4","status":"invalid","root":"/tmp/project onboarding v3 matrix with spaces-Lt5Dht","runner":null,"intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.40.1","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"not-observed","sourceSha256":null,"targetsSha256":null,"barrierSha256":null,"readbackSha256":null},"continuity":{"status":"unavailable","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-observed","lanes":["Bash","PowerShell"],"exactEntries":[]},"nextAction":{"kind":"command","executable":"node","argv":["<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs","plan-source-recovery","--root","/tmp/project onboarding v3 matrix with spaces-Lt5Dht","--runner","codex"],"mutation":false,"requiresConfirmation":false,"expected":{"schema":"pipeline.project-onboarding-source-recovery.v1","statuses":["recoverable","unrepairable"]}},"diagnostics":[{"path":"$.source","code":"source_invalid","message":"pipeline.user.yaml is not a valid V3 source","guidance":"review the closed source recovery disposition"}]}
++ actual - expected
+
++ 'invalid'
+- 'migration-required'
+
+ORIGINAL184 CALLBACK END shard=0 index=180 pid=132710 mono_ns=4617869373095 elapsed_ms=17.622 outcome=throw
+ORIGINAL184 CALLBACK START shard=0 index=192 pid=132710 mono_ns=4617869388505
+PASS  source recovery planner admits a Claude-default, Claude-invoked current V3 source (NVA-MANIFESTRUNNER-1)
+ORIGINAL184 CALLBACK END shard=4 index=160 pid=132722 mono_ns=4633887330195 elapsed_ms=29507.840 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=172 pid=132722 mono_ns=4633887355606
+PASS  F4 runtime probe cleanup preserves foreign content when the probe inode number is reused
+ORIGINAL184 CALLBACK END shard=3 index=207 pid=132718 mono_ns=4641569841300 elapsed_ms=57730.279 outcome=pass
+B8 producer/guard command classes in shard: 2
+
+project-onboarding-v3 chunk 1/2 shard 4/6: 17 passed, 1 failed
+all three runners execute the exact returned consent and design-question actions without repeating durable Git identity claude: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'language',
+    'profile',
+-   'projectDescription'
+  ]
+
+ORIGINAL184 CHILD END chunk=0 shard=3 index=3 pid=132718 mono_ns=4641610010823 elapsed_ms=751174.586 outcome=fail
+PASS  an invalid generated manifest is never accepted as a current fresh authority
+ORIGINAL184 CALLBACK END shard=1 index=145 pid=132711 mono_ns=4642827079996 elapsed_ms=31671.516 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=157 pid=132711 mono_ns=4642827103246
+PASS  a fresh greenfield onboarding populates both manifest tiers without ever reaching a mixed authority status
+ORIGINAL184 CALLBACK END shard=0 index=192 pid=132710 mono_ns=4648547992748 elapsed_ms=30678.604 outcome=pass
+ORIGINAL184 CALLBACK START shard=0 index=204 pid=132710 mono_ns=4648548042459
+PASS  H3 manifest repair preserves foreign content when the published inode number is reused
+ORIGINAL184 CALLBACK END shard=4 index=172 pid=132722 mono_ns=4663437256330 elapsed_ms=29549.901 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=184 pid=132722 mono_ns=4663437282790
+PASS  remote adoption refuses a normal initialized Git repository before remote observation
+ORIGINAL184 CALLBACK END shard=4 index=184 pid=132722 mono_ns=4663438300708 elapsed_ms=1.018 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=196 pid=132722 mono_ns=4663438316108
+PASS  manifest repair never quarantines a foreign post-publication target
+ORIGINAL184 CALLBACK END shard=1 index=157 pid=132711 mono_ns=4670051263782 elapsed_ms=27224.161 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=169 pid=132711 mono_ns=4670051288163
+PASS  a source consumer never receives an automatic runner-permission repair
+ORIGINAL184 CALLBACK END shard=0 index=204 pid=132710 mono_ns=4678514192892 elapsed_ms=29966.150 outcome=pass
+B8 producer/guard command classes in shard: 0
+
+project-onboarding-v3 chunk 1/2 shard 1/6: 16 passed, 2 failed
+the public onboarding handover is executable for every runner with baseline-only and configured verify codex: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+remote branch adoption plans read-only, preserves .codex, and advances only to the branch authority migration: {"schema":"pipeline.project-onboarding.v4","status":"invalid","root":"/tmp/project onboarding v3 matrix with spaces-Lt5Dht","runner":null,"intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.40.1","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"not-observed","sourceSha256":null,"targetsSha256":null,"barrierSha256":null,"readbackSha256":null},"continuity":{"status":"unavailable","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-observed","lanes":["Bash","PowerShell"],"exactEntries":[]},"nextAction":{"kind":"command","executable":"node","argv":["<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs","plan-source-recovery","--root","/tmp/project onboarding v3 matrix with spaces-Lt5Dht","--runner","codex"],"mutation":false,"requiresConfirmation":false,"expected":{"schema":"pipeline.project-onboarding-source-recovery.v1","statuses":["recoverable","unrepairable"]}},"diagnostics":[{"path":"$.source","code":"source_invalid","message":"pipeline.user.yaml is not a valid V3 source","guidance":"review the closed source recovery disposition"}]}
++ actual - expected
+
++ 'invalid'
+- 'migration-required'
+
+ORIGINAL184 CHILD END chunk=0 shard=0 index=0 pid=132710 mono_ns=4678561913697 elapsed_ms=788131.041 outcome=fail
+PASS  a confirmed first-round language is visible as a default, not forced on later intake
+ORIGINAL184 CALLBACK END shard=2 index=194 pid=132712 mono_ns=4686871655884 elapsed_ms=90516.169 outcome=pass
+ORIGINAL184 CALLBACK START shard=2 index=206 pid=132712 mono_ns=4686871684545
+PASS  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity codex
+ORIGINAL184 CALLBACK END shard=4 index=196 pid=132722 mono_ns=4697970021824 elapsed_ms=34531.706 outcome=pass
+ORIGINAL184 CALLBACK START shard=4 index=208 pid=132722 mono_ns=4697970049645
+PASS  H3 manifest repair rejects target appearance race: hardlink
+ORIGINAL184 CALLBACK END shard=1 index=169 pid=132711 mono_ns=4700309097795 elapsed_ms=30257.810 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=181 pid=132711 mono_ns=4700309124186
+PASS  remote adoption rejects a remote .agents and preserves the target control mount
+ORIGINAL184 CALLBACK END shard=1 index=181 pid=132711 mono_ns=4700313493213 elapsed_ms=4.369 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=193 pid=132711 mono_ns=4700313510653
+PASS  source runner permission observation preserves lifecycle actions and ready-only fields
+ORIGINAL184 CALLBACK END shard=2 index=206 pid=132712 mono_ns=4720601192692 elapsed_ms=33729.508 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 3/6: 17 passed, 1 failed
+NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+ORIGINAL184 CHILD END chunk=0 shard=2 index=2 pid=132712 mono_ns=4720649604130 elapsed_ms=830215.466 outcome=fail
+FAIL  v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required) -- digest is not defined
+ORIGINAL184 CALLBACK END shard=1 index=193 pid=132711 mono_ns=4739528399606 elapsed_ms=39214.889 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=205 pid=132711 mono_ns=4739528426026
+PASS  F4 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused
+ORIGINAL184 CALLBACK END shard=4 index=208 pid=132722 mono_ns=4761563380655 elapsed_ms=63593.331 outcome=pass
+B8 producer/guard command classes in shard: 0
+
+project-onboarding-v3 chunk 1/2 shard 5/6: 17 passed, 1 failed
+a real fresh local kickoff is immediately a valid canonical PO authority: Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CHILD END chunk=0 shard=4 index=4 pid=132722 mono_ns=4761593390088 elapsed_ms=871156.705 outcome=fail
+PASS  a ready consumer with malformed permission shapes receives only the typed read-only repair plan
+ORIGINAL184 CALLBACK END shard=1 index=205 pid=132711 mono_ns=4826964828511 elapsed_ms=87436.402 outcome=pass
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 2/6: 15 passed, 3 failed
+exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable: B8 producer/guard command drift: partial po-authority-rebind-plan
++ actual - expected
+
+  {
++   exitCode: 2,
++   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature "kickoff-8fed00b58c45fed6" lifecycle is "invalid".\n' +
++     'Plan: specs/kickoff-8fed00b58c45fed6/prd_kickoff-8fed00b58c45fed6.md\n' +
++     'File: .pipeline-opaque-execution\n' +
++     'Why: The feature is still in draft design and has no implementation authority.\n' +
++     'Detected as a shell write to a dev-plan-gated path (lane: opaque-script-execution).\n' +
++     'Why: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\n' +
++     "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above.\n" +
++     '\n' +
++     'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
++     'Reason: planning the route failed with code=HGO-GIT.\n'
+-   exitCode: 0,
+-   stderr: ''
+  }
+
+the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity: BLOCKED (agent-pipeline commit-msg): commit message violates GIT-03.
+  - staged lifecycle policy denied or could not verify this commit: GUARD-DEVPLAN-LIFECYCLE (architecture/baseline.json), GUARD-DEVPLAN-LIFECYCLE (architecture/fitness-model.json), GUARD-DEVPLAN-LIFECYCLE (architecture/map/application.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/index.md), GUARD-DEVPLAN-LIFECYCLE (architecture/map/inventory.json), GUARD-DEVPLAN-LIFECYCLE (src/index.mjs).
+Human operators retain Git's hook-bypass mechanism. Automated agents must not use it.
+
+v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required): digest is not defined
+ORIGINAL184 CHILD END chunk=0 shard=1 index=1 pid=132711 mono_ns=4827006893687 elapsed_ms=936574.375 outcome=fail
+
+project-onboarding-v3: 216 cases across 2 sequential chunks of 6 shards, 6 shards failed
+chunk 0 shard 0: exit 1
+chunk 0 shard 1: exit 1
+chunk 0 shard 2: exit 1
+chunk 0 shard 3: exit 1
+chunk 0 shard 4: exit 1
+chunk 0 shard 5: exit 1
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (939354.04935ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 939361.72825
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:1:1
+✖ plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (939354.04935ms)
+  'test failed'
+
+--- stderr ---

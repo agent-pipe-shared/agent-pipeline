@@ -1,0 +1,48 @@
+command: git diff -- plugins/pipeline-core/lib/guard-maintenance-window.mjs
+label: gmw-uncommitted
+exitCode: 0
+head: 4ade16cc182fddeb34c3a4aa3521bc769ddd7881
+tree: f2924516c0a36f8d44f35ff4c08149d011c1b592
+dirty: true
+--- stdout ---
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 9943c9438..10953aa1f 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -67,6 +67,7 @@ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+ import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+ import { chatAttributionRecord } from "./chat-gate-ceremony.mjs";
+ import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
++import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+ import { LEGACY_GUARD_CONFIG, NEUTRAL_GUARD_CONFIG, resolveProjectAuthorityPaths } from "./project-authority.mjs";
+ import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
+ 
+@@ -189,6 +190,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/feature-package-topology.mjs",
+   "plugins/pipeline-core/lib/gate-estimate.mjs",
+   "plugins/pipeline-core/lib/git-cmd.mjs",
++  // WIN-GES-F3: storagePaths() creates the private `agent-pipeline` segment through this
++  // module (GMWKC01: a new import from a kernel file extends the list). Its own imports,
++  // private-boundary.mjs and windows-private-state.mjs, are already listed.
++  "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+   "plugins/pipeline-core/lib/human-guard-override.mjs",
+   "plugins/pipeline-core/lib/human-role-labels.mjs",
+   "plugins/pipeline-core/lib/machine-plane.mjs",
+@@ -851,7 +856,14 @@ function writeAtomic(path, bytes) {
+  * owner-private check (`safePrivateFile`) still runs on every read.
+  */
+ function storagePaths(common, { create = true } = {}) {
+-  const directory = join(common, "agent-pipeline", "guard-maintenance-window");
++  const privateSegment = join(common, "agent-pipeline");
++  const directory = join(privateSegment, "guard-maintenance-window");
++  // The intermediate `agent-pipeline` segment is created (hardened on win32) or, when it
++  // already exists, assessed and refused if insecure -- anchored at the Git common
++  // directory this call already holds, exactly as the hook installer does. Only the leaf
++  // keeps secureDirectory's own contract: a recursive mkdir alone leaves the segment it
++  // introduces with an inherited DACL on native Windows, which the installer then refuses.
++  if (create) ensureHardenedPrivateDirectory(common, privateSegment);
+   const base = create ? secureDirectory(directory) : directory;
+   return { base, request: join(base, "request.json"), window: join(base, "window.json") };
+ }
+
+--- stderr ---

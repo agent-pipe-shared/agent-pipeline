@@ -1,0 +1,69 @@
+{
+  "taskId": "TR-S2-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-as-intended",
+  "supersedes": "the in-progress opening record written at the start of this dispatch",
+  "commits": [
+    {
+      "sha": "8bb83c3c18dd06851cccfcd4ec6d6b02ed84e0d1",
+      "subject": "test(execution-lane-credential): pin the Ruling 90 fix set (RED)",
+      "paths": ["plugins/pipeline-core/lib/execution-lane-credential.test.mjs"]
+    }
+  ],
+  "log": [
+    { "phase": "opening: orientation done, preflight ready", "toolUses": 15 },
+    { "phase": "commit message written, header assumptions 3/6/10 amended, 144 cases added", "toolUses": 29 },
+    { "phase": "native capture, consumer-safe check, commit", "toolUses": 47 }
+  ],
+  "report": {
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs", "why": "Ruling 90 RED pins (F1, F3-F8, cwd, exemptScripts); header assumptions 3, 6, 10 amended, 11-13 added" }
+    ],
+    "evidence": {
+      "capture": "evidence/TR-S2-T2-20261009/red.txt",
+      "captureCommand": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S2-T2-20261009/red.txt --label red -- node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "captureExit": 1,
+      "captureNote": "native win32; capture head e64b30b72, dirty true (the test file was uncommitted at capture; the committed content is identical)",
+      "totals": { "tests": 275, "pass": 177, "fail": 98, "skipped": 0, "todo": 0 },
+      "consumerSafe": { "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exit": 0, "pass": 9, "fail": 0 }
+    },
+    "existingCases": "131 existing cases unchanged and green; only header comment lines were edited (no case body touched)",
+    "red": {
+      "F1": "26 red (F1-1, F1-2, F1-3, F1-4, F1-5a..g, F1-6a, F1-6b; both tools): admitted. The carrier stops at the first positional word, at a value flag outside PS_VALUE_FLAGS, or at the end of -Command/-File; /enc and --EncodedCommand are not recognised",
+      "F3": "23 red (F3-1..F3-9 both tools, F3-10 bash, F3-11 both tools): admitted, because secretPatterns is ignored. F3-F1, F3-F2 (bash): a malformed secretPatterns is ignored, so admitted",
+      "F4": "8 red (F4-1..F4-4, both tools): admitted, because a positional .ps1 is command text and is never read",
+      "F5": "17 red (F5-1a..e, F5-2, F5-3 both tools; F5-4 sudo -u, F5-5 timeout -s, F5-6 env -u, bash): admitted, because node skips preload values and reads only the first file operand, and a wrapper option with a non-numeric value stops dispatch",
+      "F6": "5 red (F6-1..F6-5, bash): admitted, because every backslash is read as a path separator",
+      "F7": "4 red (F7-1, F7-2 powershell; F7-3 both tools): admitted, because the -Name:value token starts with a dash so no peel or path match sees the value",
+      "cwd": "11 red (CWD-1, CWD-2 both tools; CWD-3, CWD-7 powershell; CWD-4, CWD-5, CWD-6 bash; CWD-F1, CWD-F2 bash): admitted, because targets.cwd is ignored and relative tokens never match",
+      "exemptScripts": "4 red (EX-1, EX-2, both tools): REFUSED with ELC-SECRET-BASENAME from the file content where the exemption must admit"
+    },
+    "greenNew": {
+      "total": 46,
+      "controls": "F1-C1, F1-C2; F3-C1..C4; F4-C1, F4-C2; F5-C1..C4; F7-C1; F8-C1; CWD-C1..C4; all as ruled admitted",
+      "F8": "F8-1..F8-4 (null reader refuses): green because the behaviour is implemented (module :394-398); this is a coverage pin, not a RED",
+      "exemptNegatives": "EX-3..EX-6 (command-line key path, option key path, non-exempt same content, exact-list): green today and must stay green after the fix",
+      "sanity": "CWD-0 (fixture arithmetic)"
+    },
+    "deviations": [
+      "Opening in-progress record written at the start (role contract) and overwritten by this terminal record, where the briefing said written once after the commit",
+      "CWD cd pin uses a cd operand that is not protected by itself (the key store parent); the literal 'cd <key dir>; cat registry.json' is already refused today via the cd operand (A3-7) and would not be RED",
+      "F8 lands green, not RED, as the module already implements it",
+      "Added assumptions 11-13 for ratification: pattern matching is on the basename (bare or qualified) and case-insensitive; a malformed secretPatterns or non-absolute cwd refuses; token-wise means every argv token including after -Command and -File",
+      "Extras beyond the briefed list: F1-3/F1-4, F5-2, F5-6, EX-2 (plain node on an exempt path), EX-4, EX-6 (exact list), F3-3/F3-4/F3-9/F3-10/F3-11, CWD-2/CWD-5/CWD-6, malformed-input pins"
+    ],
+    "notChanged": [
+      "the module, evaluate.mjs, hooks/, lib/guard/, harness/",
+      "no existing case; no single-quote control for F6 (it would over-constrain an implementation that over-refuses, which Ruling 90 allows)",
+      "attached preload forms (--import=<file>), the .env.example exceptions of the passive policy, cd - / pushd / subshells, other spellings of an exempt path: named in header assumption 10 as not pinned"
+    ],
+    "openItems": [
+      "Tension for the Elephant/PO: the briefed F3 pins force basename patterns to apply to BARE names (cat <env-prefixed name>, cat <id_ public key>). In production wiring the real patterns include the pem suffix, so 'rg -n po-private.pem docs/' (N3-4 intent, bare basename admitted) would refuse. The default fixture carries no secretPatterns, so N3-4 and MATCH-BARE stay green; the wiring decision is open",
+      "Route disclosure: requested model claude-sonnet-5-5 matches the observed runtime identity; the dispatch carried a reasoning_effort tag of 30 against the requested xhigh",
+      "The advisor tool was rate-limited and was not consulted",
+      "Foreign untracked/modified files in the tree were not touched; the evidence capture and this record are untracked by design"
+    ]
+  }
+}

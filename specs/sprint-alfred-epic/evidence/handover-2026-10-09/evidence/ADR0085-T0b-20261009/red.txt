@@ -1,0 +1,269 @@
+command: node --test plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+label: red
+exitCode: 1
+head: 63ba0c32cb3e6cf960b0ea9a615c5081c1fb2c72
+tree: 7ace42f8b46b4caf3b8e93d8a15571a35bc4824e
+dirty: true
+--- stdout ---
+✖ route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (19259.9178ms)
+ℹ present-plan exit 2; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+✖ route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record (0.2509ms)
+ℹ present-plan exit 2; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+✖ route 3: the boundary library admits the approved v8 record (0.1598ms)
+✖ route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.166ms)
+✖ decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (22734.618ms)
+ℹ approve-plan exit 2; stderr: Error: approve-plan requires the exact complete design-workflow package previously presented (DWP-PACKAGE-PHYSICAL); no authority was written.
+✖ retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (18379.7928ms)
+ℹ present-plan exit 2; stderr: Error: present-plan requires one complete, current design-workflow package (DWP-PACKAGE-PHYSICAL); no presentation or approval lock was recorded.
+✖ retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (20888.445ms)
+ℹ approve-plan exit 2; stderr: Error: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.
+✖ retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (257.9352ms)
+ℹ design-advisory-coordinator.mjs exit 2; output: DESIGN-ADVISORY-COORDINATOR-FAILED: error: DAC-CLI-RUNNER
+✖ retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (47.0226ms)
+ℹ design-advisory-admission.mjs exit 2; output: DESIGN-ADVISORY-ADMISSION-FAILED: DAA-CLI-USAGE: usage: design-advisory-admission.mjs <plan|apply|inspect> --repo-root <path> --feature <id> --plan <repo-path> --spec <repo-path> [--receipt-id <id> --native-available <true|false> --decision <accept|decline> --rationale-file <repo-path> --expected-pu
+✖ retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (39.1718ms)
+ℹ design-course-session.mjs exit 2; output: DESIGN-COURSE-ROOT-UNSAFE
+✖ retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (37.2192ms)
+ℹ design-course-coordinator.mjs exit 2; output: DESIGN-COURSE-CLI-USAGE
+✖ retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (236.6803ms)
+ℹ runner-design-readiness-bootstrap.mjs exit 64; output: DESIGN-READINESS-RUNNER-BOOTSTRAP-FAILED: usage: runner-design-readiness-bootstrap.mjs --runner <claude|antigravity> --repo-root <absolute-path> --dispatch-id <id> --queue-revision <n> --receipt <repo-path> --source <input|prd|spec|design|traceability> <repo-path> (repeat --source five times) [--adv
+✖ retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (0.6155ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 0
+ℹ fail 13
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 81989.7766
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:267:1
+✖ route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (19259.9178ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:270:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:286:1
+✖ route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record (0.2509ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0 first; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:289:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:310:1
+✖ route 3: the boundary library admits the approved v8 record (0.1598ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0 first; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:312:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:325:1
+✖ route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.166ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0; stderr: Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:327:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:334:1
+✖ decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (22734.618ms)
+  AssertionError [ERR_ASSERTION]: the refusal names present-plan --review-receipt; stderr: Error: approve-plan requires the exact complete design-workflow package previously presented (DWP-PACKAGE-PHYSICAL); no authority was written.
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:354:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:360:1
+✖ retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (18379.7928ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /DWP-PRESENT-RETIRED/u. Input:
+  
+  '\n' +
+    'Error: present-plan requires one complete, current design-workflow package (DWP-PACKAGE-PHYSICAL); no presentation or approval lock was recorded.\n'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:365:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\nError: present-plan requires one complete, current design-workflow package (DWP-PACKAGE-PHYSICAL); no presentation or approval lock was recorded.\n',
+    expected: /DWP-PRESENT-RETIRED/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:369:1
+✖ retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (20888.445ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /DWP-APPROVAL-REQUEST-RETIRED/u. Input:
+  
+  '\n' +
+    'Error: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.\n'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:375:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '\nError: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.\n',
+    expected: /DWP-APPROVAL-REQUEST-RETIRED/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:386:3
+✖ retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (257.9352ms)
+  AssertionError [ERR_ASSERTION]: output names DESIGN-ADVISORY-COURSE-RETIRED
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:386:3
+✖ retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (47.0226ms)
+  AssertionError [ERR_ASSERTION]: output names DESIGN-ADVISORY-COURSE-RETIRED
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:386:3
+✖ retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (39.1718ms)
+  AssertionError [ERR_ASSERTION]: output names DESIGN-COURSE-RETIRED
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:386:3
+✖ retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (37.2192ms)
+  AssertionError [ERR_ASSERTION]: output names DESIGN-COURSE-RETIRED
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:386:3
+✖ retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (236.6803ms)
+  AssertionError [ERR_ASSERTION]: output names DESIGN-COURSE-RETIRED
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\design-approval-route.e2e.test.mjs:400:1
+✖ retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (0.6155ms)
+  AssertionError [ERR_ASSERTION]: lib/retired-design-codes.mjs imports: Cannot find module '<host-path>' imported from <host-path>
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:402:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

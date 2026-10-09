@@ -1,0 +1,24 @@
+command: node --import ./scratch/dispatch-wip/WIN-AP-S4/redirect.mjs plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs
+label: WIN-AP-S4-after
+exitCode: 0
+head: 648046bfba85bc472f7675171dd3f63726ecd388
+tree: 045d1cede60e40cb63261f5228bda887d20235aa
+dirty: true
+--- stdout ---
+✔ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (1446.8899ms)
+✔ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (1228.1649ms)
+✔ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (1246.7097ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (901.9714ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (1832.4455ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6659.4037
+WINAPS4-REDIRECT-FIRED bootstrap-receipt.mjs (1 loads)
+WINAPS4-REDIRECT-FIRED denial-telemetry.mjs (1 loads)
+
+--- stderr ---

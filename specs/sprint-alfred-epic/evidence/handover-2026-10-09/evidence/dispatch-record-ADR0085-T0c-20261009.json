@@ -1,0 +1,43 @@
+{
+  "taskId": "ADR0085-T0c-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing family CONT15-20261009)",
+  "outcome": "interim-budget-checkpoint-handback",
+  "commits": [],
+  "log": [
+    { "phase": "orientation: briefing, spec sections 0/1.1/2(C1,C2,C4)/3/4/5, guard-devplan.mjs 440-579, guard-devplan-policy.mjs 1-213, plan-spec-state-v2.mjs lifecycle, critical-human-proof-policy.mjs, po-approval-proof.mjs, U1-U3 contract, existing guard-devplan.test.mjs fixtures", "toolUses": 29 },
+    { "phase": "preflight run (GUARD-BOOTSTRAP-RECEIPT-MISSING cured once), commit-msg file and scratch wip record written", "toolUses": 31 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT fired at hook-counted call 40 of 50 (the hook counts each parallel call separately; I had issued about 29 tool messages). Stopped before writing the test file; this interim record written instead.", "toolUses": 41 }
+  ],
+  "report": {
+    "changedFiles": [],
+    "untrackedScratchOnly": [
+      "scratch/commit-msg/ADR0085-T0c.txt (ready commit message, two trailers; body says v8 cases RED and v7/mini/absent-store cases green; re-check that sentence against the real WSL result before committing)",
+      "scratch/dispatch-wip/ADR0085-T0c-20261009.json (GF-09-D opening record, kept in scratch because the briefing demands the canonical record be written once)"
+    ],
+    "dodResults": {
+      "newTestFile": "failed: not created (budget checkpoint)",
+      "wslCapture red.txt": "failed: not run, no file to run",
+      "consumerSafeCheck": "not verifiable: not run",
+      "commit": "failed: none made",
+      "terminalRecord": "this file is INTERIM, written once; a continuation must overwrite it after the commit"
+    },
+    "routePreCheck": "requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed model identity from runtime prompt: claude-sonnet-5-5 (match). A reasoning_effort tag of 30 was visible in the envelope; not mappable to a tier, disclosed, not treated as a contradiction.",
+    "findingsForContinuation": [
+      "RED REASON 1 (lifecycle layer): plan-spec-state-v2.mjs currentApproval (:498-538) and validCurrentPlanApproval (:370-385) recognise approval schemas v2..v7 only. A pipeline.plan-approval.v8 record is not a valid approval, so derivePlanLifecycle returns PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED and guard-devplan.mjs blocks at :554-578 with the lifecycle text, never reaching designAdvisoryAdmission (:505-515). Every v8 case is therefore red today for two stacked reasons (slice 4 record/validator, slice 7 boundary branch). A refusal case must assert the code DAA-PO-APPROVAL-MODE-MISMATCH in stderr (designAdvisoryRemediation prints '(<code>)', policy :205-207), otherwise it passes vacuously on the lifecycle block.",
+      "RED REASON 2 (v7 plus absent course store): the v7 branch (policy :103-152) calls readApprovedDesignWorkflowPackage, whose v2 'unavailable' path reads the private course store (design-workflow-package-v2.mjs :57-94, catch-all DWP2-PHYSICAL-OR-GIT :142). With the store absent this refuses today; C2 (re-read mode) makes it admit. That is the likely intended RED for 'course store absent' and 'this repo v7 shape'. Building a valid v7 package fixture is the expensive part: the existing guard-devplan.test.mjs has only v2/v3 fixtures (v2AuthorityState :732-757), no v7. Live shape: project/pipeline-state.json:597-651 (planApproval v7, signature mode, advisorException kind advisor-unavailable, package evidence/design-course/sprint-alfred-epic/r5d.package.json). Suggest splitting the slice: T0c-a = v8 cases (chat admitted under chat config, chat record under signature config refused with the code, signature record under chat config accepted, course store absent for v8), T0c-b = v7 shape.",
+      "MODE SOURCE (spec C1(e)): readHumanApprovalMode(root) (critical-human-proof-policy.mjs :211-236) reads gates.human_approval from repo-root pipeline.user.yaml and honours it only when it is a regular, non-symlink file byte-equal to HEAD:pipeline.user.yaml (committedBytes :101-140). Fixture: git init, set user.name/user.email, write 'gates:\\n  human_approval: chat\\n', git add and commit it. Absent or uncommitted resolves to signature (the 'chat record refused' direction can use an absent file).",
+      "SIGNATURE FIXTURE needs no trust-policy file: readCriticalHumanProofPolicy (:335-409) returns ok with no anchors when project/critical-human-proof.json is absent, and the boundary passes anchors [] (policy :129-131). Build with node:crypto generateKeyPairSync('ed25519'); intent = createPoApprovalIntent({kind:'design-approval', featureId, planSha256, specSha256, candidate:{commit,tree}, policyRevision:'design-approval-v1', subjectSha256: bindingSha256, decision:'approve'}) from lib/po-approval-proof.mjs; signatureBase64 = sign(null, Buffer.from(intent.sha256,'utf8'), privateKey); proof = {schema:'pipeline.po-approval-proof.v1', intentSha256, keyReference, publicKey: PEM, signatureBase64}; proofSha256 = sha256(canonical(proof)). NOT checked: how verifyAgainstTrustAnchors (:536) matches keyReference when the anchor set is empty.",
+      "REAL BINDING FIXTURES are available from existing modules (static import is safe, they exist): lib/design-review-receipt.mjs createDesignReviewReceipt, lib/design-approval-binding.mjs createDesignApprovalBinding/createDesignApprovalRequest. Record shape per spec C4 (P1 amended): {schema:'pipeline.design-approval.v1', mode:'signature'|'chat', approvedBy, approvedAt, bindingSha256, intentSha256, proofSha256, proof}; chat mode has intentSha256/proofSha256/proof all null, a chat record carrying a proof is invalid.",
+      "HARNESS TO COPY from plugins/pipeline-core/hooks/guard-devplan.test.mjs: freshDir/enrollFixture (git init plus governance enrollment, :76-113), writeManifest with gates.dev-plan.mode blocking (:119-122, :170), writeState (:123-126), runGuard spawning the hook with CLAUDE_PROJECT_DIR (:136-144), verifyAdvisorLanes for the direct and shell lanes (:56-70, shell lane via evaluateLifecycleReadyGuard). Lifecycle prerequisites for reaching the admission: planSubmission (PLAN_SUBMISSION :184-195), activeFeature.phase 'implementation', planApproved true, approval submissionSha256 = sha256CanonicalJson(submission), profileSha256 equal, poGateAuthority with matching plan/spec digests, priorInvalidationSha256 null.",
+      "GUARD NOTES HIT: first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the named preflight, once). A 'sed ... | cut' pipeline was refused GUARD-OPERATOR-UNAPPROVED and the guard then failed to plan an override with HGO-AUDIT-LOCK-AMBIGUOUS (observation only, nothing was bypassed)."
+    ],
+    "ambiguitiesNotResolved": [
+      "The note does not fix the v8 planApproval key set. Spec C4 says designApproval replaces the four designWorkflow*/designAdvisorAdmissionSha256 fields; the natural reading is the v7 key set minus those four plus designApproval. Mini-profile v8 value of designApproval is not stated either. These must go in the test header as assumptions.",
+      "The note does not say where the boundary obtains the BINDING (sources, bound companion digests) to compare with current files: the record carries only bindingSha256, and the request holding the binding lives in scratch/. S17 text says the boundary compares PRD, Spec and bound companion digests. A companion-drift boundary case cannot be written until the Elephant says where the binding bytes live (state field, tracked path, or PRD/Spec-only comparison via poGateAuthority). Per stop condition 5 this is a judgment call, not mine: I wrote no case for it."
+    ],
+    "recommendedNextDispatch": "Either grant about 40 more hook-counted calls to this dispatch, or dispatch two follow-ups (T0c-a v8 cases, T0c-b v7 shape) using this record; state the binding-location answer in the briefing. The test file path stays plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs; import production modules dynamically per case so a missing branch never crashes the whole file; run under WSL with the briefing's capture-evidence command; commit with git commit -F scratch/commit-msg/ADR0085-T0c.txt -- <file>."
+  }
+}

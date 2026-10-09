@@ -1,0 +1,52 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-T6-20261009",
+  "agentType": "goldfish-deep",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "candidateCommit": "d8b5d5a64",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "56d8b25bc8d6a719fa702b772959986434c39ae2"
+  ],
+  "resultSha256": "4a40db5bb1b7e0571d975013d1ef6a4cfa1f6698bb7131afdafac05e7acdf838",
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations, CONT17/18/26 headers, CONT26 TR-S1-T6 section, goldfish-task 455-481, F3 record shape read; two GUARD-BOOTSTRAP-RECEIPT-MISSING refusals (repo-relative preflight did not satisfy the guard, the exact plugin-root form did); record created",
+      "toolUses": 14
+    },
+    {
+      "phase": "final: completed",
+      "toolUses": 40
+    }
+  ],
+  "report": {
+    "text": "COMPLETED, commit 56d8b25bc8d6a719fa702b772959986434c39ae2. Implementation complete; independent review: pending (the Elephant dispatches the Critic); not PO-accepted.\n\nBootstrap: ruleset 0.7.0+claude.20261008194106.da20519d, Project Agent-Pipeline (shared tree), Calibration not named in the briefing, State briefing TR-S1-T6-20261009, Role Goldfish.\nRoute pre-check: field 6 declares class test-only (QG-04), not ARCHITECTURE/GUARDRAIL/SECURITY, so the pre-check was not triggered. Requested claude-sonnet-5-5 / xhigh; observed identity claude-sonnet-5-5, quoted from this dispatch runtime prompt (\"You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5.\"); effort not observable. No contradiction.\n\n1. DoD results\n- head.txt (rewired test file against the tracked module, whole-3 pattern set, WSL): passed as a measurement. 10 tests, 7 pass, 3 fail, wrapped exit 1. The three reds are the approval cell (\"public onboarding driver keeps chat keyless...\"), the key-copy pin (\"...leaves no copy of the private key...\") and the reuse case (\"signature anchor reuses a key already at the canonical directory path...\"). That is the same 7/3 count that TR-S1-F3's brief gave as the T3g whole-3 baseline; I did not run a per-case compare file against the T3g capture. The rollback matrix test (\"first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary\") is GREEN at HEAD, so the rewired cell result today is green.\n- with-fix.txt (same test file as a rebased scratch copy, against a scratch copy of onboarding-init.mjs with the archived F3 hunk applied, WSL): passed. 11 tests, 9 pass, 2 fail, wrapped exit 1. Only the key-copy pin and the known language case (\"host-managed consent CLI routes its later explicit language into private intake state\") are red. The approval cell and the reuse case flipped to pass (the briefed F3 effect). The rollback matrix test is GREEN with the fix, which is the F3 regression this slice removes. It runs all seven cells, so no other cell changed state.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9 of 9 (host Windows, stdout only, no machine-written artifact).\n- One commit of the test file with the briefed subject: passed (56d8b25bc8d6a719fa702b772959986434c39ae2).\n\nWhat the cell now does: the setup child writes the authority file only and returns 0 (the Ruling 137 contract). The injected read dependency of applyTrustAnchorBootstrap serves a pointer naming another directory, only for the repository-pointer path (agent-pipeline/po-key-directory.json) and only after setup has run, so the pre-setup conflict read still sees the real absent file. The cell asserts ok === false, the code TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED (new, only for this cell), no ROLLBACK-FAILED suffix, and the unchanged exact-preimage assertions for repository policy bytes, pointer absence and machine-pointer absence.\nHonest limit: HEAD and the fix produce the same code. At HEAD the module never writes the pointer on this path, so the failure is the injected mismatch; with the fix the bootstrap writes the pointer itself, the readback then refuses the mismatch, and the existing snapshot restore must unlink the written pointer (pointer-absence assertion). The test does not separately assert that the pointer was written before the readback; I built no probe for that. The unwritable-pointer-path variant (code TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED) was not needed and not built.\n\n2. Evidence (machine-written by capture-evidence.mjs; exact command and wrapped exit code are in each file header)\n- evidence/TR-S1-T6-20261009/head.txt, wrapped exit 1: wsl.exe -e bash -lc (cd repo; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T6-20261009/head.txt --label head -- node --test --test-name-pattern <the 8 whole-3 patterns> plugins/pipeline-core/scripts/onboarding-init.test.mjs).\n- evidence/TR-S1-T6-20261009/with-fix.txt, wrapped exit 1: same, label with-fix, the 8 whole-3 patterns plus 'routes its later explicit language', target scratch/dispatch-wip/tr-s1-t4/onboarding-init.test.mjs.\n- Both captures record dirty: true and different heads (6b3acec96 for head.txt, c28ea5619 for with-fix.txt) because foreign slices commit into the shared tree; the test file edit was the same uncommitted content in both runs.\n- Scratch copies were generated by scratch/dispatch-wip/tr-s1-t4/tool.mjs build: the hunk is parsed from evidence/TR-S1-F3-20261009/onboarding-init.patch.txt (16/16 lines, preimage found exactly once), imports rebased, scratch module sha256 369319bf7b8f3187a79f4d2bbe9086fa90c174a65394d6ed3bc8c48e9f022cc0. scratch/ is git-ignored, so the scratch copies and the helper are not durable; the evidence files are.\n- consumer-safe-paths: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0.\n\n3. Changed files\n- plugins/pipeline-core/scripts/onboarding-init.test.mjs (committed): the repository-pointer-readback cell gains expectedCode and a read factory; checkRollbackCell tracks whether setup ran, passes the read option through, and asserts the code when a cell declares one. The other six cells are untouched.\n- Untracked, not committed: evidence/TR-S1-T6-20261009/head.txt, with-fix.txt, this dispatch record.\n\n4. Deliberately not changed\n- The tracked onboarding-init.mjs (HEAD, never modified), every other test file, hooks/, lib/guard/, harness/. The foreign dirty and staged files in the shared tree. No push.\n\n5. Deviations from spec\n- with-fix.txt runs the whole-3 patterns plus the language-case pattern, because the briefed expectation names the language case, which lives outside the whole-3 split. head.txt is whole-3 only, as briefed.\n- The with-fix capture exceeded the 600 s foreground timeout, was moved to the background by the harness, and finished (wrapped exit 1, expected reds only).\n- The 80 % budget notice arrived at call 32 while the with-fix capture was in flight. I made no further edits; I used the remaining working calls only to finish the briefed verification and the one briefed commit. The per-commit interim record checkpoint is merged into the single terminal write the briefing asks for.\n- GUARD-BOOTSTRAP-RECEIPT-MISSING fired twice: the repo-relative preflight did not satisfy the guard, the exact plugin-root form it named did.\n\n6. Open items\n- independent review: pending. PO acceptance pending.\n- F3b can now re-apply the archived hunk and rerun the whole-3 split; with-fix.txt is the pre-measurement of that state.\n- If the Critic wants proof that the bootstrap writes the pointer before the readback, a second cell or probe (unwritable pointer path, or an asserted written-before-read flag) is the follow-up; it would be red at HEAD, so it belongs after F3b, not before.\n- Closing-allowance handover: not applicable (the work finished inside the base cap). Committed: 56d8b25bc8d6a719fa702b772959986434c39ae2. Verified green: see section 1. Remains undone: none of the briefed DoD.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+    ]
+  }
+}

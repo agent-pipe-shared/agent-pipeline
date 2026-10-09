@@ -1,0 +1,2048 @@
+command: node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs
+label: after
+exitCode: 1
+head: 0e7c39b65fcdc348fe4d8c898c33cb2d99c5909c
+tree: a2b2417012ed3844a96ff2d44ab065a8f632599c
+dirty: true
+--- stdout ---
+▶ TR-S2 a2 positives: the execution lane refuses a credential target
+  ✔ A2-1 [bash] node -e naming po-private.pem in the native key directory (5.5125ms)
+  ✔ A2-1 [powershell] node -e naming po-private.pem in the native key directory (0.5783ms)
+  ✔ A2-2a [bash] a path inside the native key-directory pointer (no secret basename involved) (0.3712ms)
+  ✔ A2-2a [powershell] a path inside the native key-directory pointer (no secret basename involved) (0.3105ms)
+  ✔ A2-2b [bash] a path inside the WSL key-directory pointer (no secret basename involved) (0.2809ms)
+  ✔ A2-3 [bash] ~/.ssh/id_ed25519 (0.3262ms)
+  ✔ A2-4a [bash] an APPDATA credential file named by its literal path (0.2698ms)
+  ✔ A2-4a [powershell] an APPDATA credential file named by its literal path (0.2509ms)
+  ✔ A2-4b [powershell] an APPDATA credential file via $env:APPDATA (assumption 4) (0.3441ms)
+  ✔ A2-4c [bash] an APPDATA credential file via %APPDATA% (assumption 4) (0.2761ms)
+  ✔ A2-5 [bash] python -c reading the key (0.2008ms)
+  ✔ A2-5 [powershell] python -c reading the key (0.2097ms)
+  ✔ A2-6 [bash] bash -c 'cat <key>' (0.3163ms)
+  ✔ A2-7 [bash] a scratch/ script whose content names the key (1.105ms)
+  ✔ A2-7 [powershell] a scratch/ script whose content names the key (0.7132ms)
+✔ TR-S2 a2 positives: the execution lane refuses a credential target (13.1035ms)
+▶ TR-S2 a3 positives: every executable, not a list of interpreters
+  ✔ A3-1 [bash] raw openssl pkeyutl -sign -inkey <key path> (0.4277ms)
+  ✔ A3-1 [powershell] raw openssl pkeyutl -sign -inkey <key path> (0.2202ms)
+  ✔ A3-2 [bash] openssl pkey -in <key path> (1.282ms)
+  ✔ A3-2 [powershell] openssl pkey -in <key path> (0.1763ms)
+  ✔ A3-3 [bash] openssl ... -passin file:<path in a protected root> (0.1857ms)
+  ✔ A3-3 [powershell] openssl ... -passin file:<path in a protected root> (0.1807ms)
+  ✔ A3-4 [bash] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.1423ms)
+  ✔ A3-4 [powershell] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.1255ms)
+  ✔ A3-5 [bash] wsl.exe -e cat /mnt/<drive>/<home-path> (0.3439ms)
+  ✔ A3-5 [powershell] wsl.exe -e cat /mnt/<drive>/<home-path> (0.1965ms)
+  ✔ A3-6 [bash] the MSYS spelling /<drive>/<home-path> (0.1127ms)
+  ✔ A3-7 [bash] bash -lc "cd ~/.ssh; cat id_ed25519" (the cd operand is matched itself) (0.1324ms)
+  ✔ A3-8 [bash] cp <key path> scratch/k (0.1435ms)
+  ✔ A3-8 [powershell] cp <key path> scratch/k (0.122ms)
+  ✔ A3-9 [bash] cmd.exe /c type <credential path> (0.1013ms)
+  ✔ A3-10 [bash] powershell.exe -Command "Get-Content <key path>" (0.0896ms)
+  ✔ A3-10 [powershell] powershell.exe -Command "Get-Content <key path>" (0.1319ms)
+  ✔ A3-11 [powershell] PowerShell-tool type <key path> (0.1502ms)
+  ✔ A3-12 [powershell] PowerShell-tool copy <key path> scratch/k (0.148ms)
+  ✔ A3-13a [bash] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.2501ms)
+  ✔ A3-13a [powershell] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.2566ms)
+  ✔ A3-13b [bash] powershell.exe -enc <base64> is refused outright (0.3187ms)
+  ✔ A3-13b [powershell] powershell.exe -enc <base64> is refused outright (0.3326ms)
+  ✔ A3-13c [bash] pwsh -EncodedCommand <base64> is refused outright (0.2598ms)
+  ✔ A3-13c [powershell] pwsh -EncodedCommand <base64> is refused outright (0.1954ms)
+✔ TR-S2 a3 positives: every executable, not a list of interpreters (6.7098ms)
+▶ TR-S2 a3 positive A3-14 / FAULT: a classifier fault refuses (I7)
+  ✔ A3-14a [bash] a throwing readScript on a script operand refuses (no exception, no null) (0.283ms)
+  ✔ A3-14b [powershell] a throwing readScript refuses under the powershell tool as well (0.1964ms)
+  ✔ A3-14c [bash] null targets refuse even for a command that names nothing protected (0.1412ms)
+  ✔ A3-14d [bash] malformed targets (a non-array root list) refuse (0.1587ms)
+✔ TR-S2 a3 positive A3-14 / FAULT: a classifier fault refuses (I7) (0.9025ms)
+▶ TR-S2 negatives: ordinary commands stay admitted
+  ✔ N2-1 [bash] node -e naming a repository file (0.3731ms)
+  ✔ N2-1 [powershell] node -e naming a repository file (1.0019ms)
+  ✔ N2-2 [bash] node --test on a tracked test file (0.3201ms)
+  ✔ N2-2 [powershell] node --test on a tracked test file (0.3622ms)
+  ✔ N3-1 [bash] the prescribed WSL suite route (T78, L83) stays admitted (0.4195ms)
+  ✔ N3-1 [powershell] the prescribed WSL suite route (T78, L83) stays admitted (0.5343ms)
+  ✔ N3-2 [bash] openssl version (0.14ms)
+  ✔ N3-2 [powershell] openssl version (0.1713ms)
+  ✔ N3-3 [bash] cp scratch/a scratch/b (0.1564ms)
+  ✔ N3-3 [powershell] cp scratch/a scratch/b (0.1795ms)
+  ✔ N3-4 [bash] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.1393ms)
+  ✔ N3-4 [powershell] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.1548ms)
+✔ TR-S2 negatives: ordinary commands stay admitted (4.2853ms)
+▶ TR-S2 CARR: every carrier of the Inputs list tokenizes its inline source again
+  ✔ CARR-1 [bash] node --eval (0.2835ms)
+  ✔ CARR-1 [powershell] node --eval (0.1022ms)
+  ✔ CARR-2 [bash] node -p (0.097ms)
+  ✔ CARR-2 [powershell] node -p (0.0934ms)
+  ✔ CARR-3 [bash] node --print (0.0969ms)
+  ✔ CARR-3 [powershell] node --print (0.3394ms)
+  ✔ CARR-4 [bash] sh -c (0.105ms)
+  ✔ CARR-5 [bash] dash -c (0.097ms)
+  ✔ CARR-6 [bash] zsh -c (0.107ms)
+  ✔ CARR-7 [bash] bash -lc (combined flags) (0.1087ms)
+  ✔ CARR-8 [bash] wsl.exe -- <argv> (after the -- separator) (0.193ms)
+  ✔ CARR-8 [powershell] wsl.exe -- <argv> (after the -- separator) (0.1614ms)
+  ✔ CARR-9 [bash] wsl.exe --exec <argv> (0.121ms)
+  ✔ CARR-9 [powershell] wsl.exe --exec <argv> (0.1162ms)
+  ✔ CARR-10 [bash] pwsh -Command (0.1012ms)
+  ✔ CARR-10 [powershell] pwsh -Command (0.1923ms)
+  ✔ CARR-11 [bash] powershell.exe -c (0.4385ms)
+  ✔ CARR-11 [powershell] powershell.exe -c (0.1325ms)
+  ✔ CARR-12 [bash] cmd.exe /k (0.1493ms)
+  ✔ CARR-12 [powershell] cmd.exe /k (0.1225ms)
+  ✔ CARR-13 [bash] python script operand (content names the key) (0.4054ms)
+  ✔ CARR-13 [powershell] python script operand (content names the key) (0.1912ms)
+  ✔ CARR-14 [bash] bash script operand (content names ~/.ssh/id_ed25519) (0.4031ms)
+  ✔ CARR-15 [bash] sh script operand (content names ~/.ssh/id_ed25519) (0.1449ms)
+  ✔ CARR-16 [bash] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.2009ms)
+  ✔ CARR-16 [powershell] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.2368ms)
+  ✔ CARR-17 [bash] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.1693ms)
+  ✔ CARR-17 [powershell] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.2144ms)
+  ✔ CARR-18 [bash] powershell.exe -File <script> (content names the key) (0.2932ms)
+  ✔ CARR-18 [powershell] powershell.exe -File <script> (content names the key) (0.4914ms)
+✔ TR-S2 CARR: every carrier of the Inputs list tokenizes its inline source again (6.5582ms)
+▶ TR-S2 MATCH positives: equals-or-inside a protected root; directory component + secret basename
+  ✔ MATCH-ROOT-EQ [bash] the key directory itself (0.3169ms)
+  ✔ MATCH-ROOT-EQ [powershell] the key directory itself (0.1764ms)
+  ✔ MATCH-ROOT-EQ-SLASH [bash] the key directory with a trailing separator (0.1089ms)
+  ✔ MATCH-ROOT-EQ-SLASH [powershell] the key directory with a trailing separator (0.1537ms)
+  ✔ MATCH-MACHINE [bash] a file inside a machine-plane root (no secret basename involved) (0.134ms)
+  ✔ MATCH-MACHINE [powershell] a file inside a machine-plane root (no secret basename involved) (0.3759ms)
+  ✔ MATCH-BASENAME-DIR [bash] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.2061ms)
+  ✔ MATCH-BASENAME-DIR [powershell] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.1552ms)
+  ✔ MATCH-BASENAME-DOT [bash] ./id_ed25519 (the ./ is a directory component) (0.1149ms)
+  ✔ MATCH-BACKSLASH [bash] the same key file spelled with backslashes in a quoted token (both separators accepted) (0.1361ms)
+✔ TR-S2 MATCH positives: equals-or-inside a protected root; directory component + secret basename (2.3422ms)
+▶ TR-S2 MATCH negatives: not equal to and not inside a protected root
+  ✔ MATCH-BARE [bash] a bare secret basename with no directory component does not match (0.1479ms)
+  ✔ MATCH-BARE [powershell] a bare secret basename with no directory component does not match (0.0869ms)
+  ✔ MATCH-SIBLING [bash] a sibling directory whose name only starts like the key directory is not inside it (1.0859ms)
+  ✔ MATCH-SIBLING [powershell] a sibling directory whose name only starts like the key directory is not inside it (0.1211ms)
+  ✔ MATCH-PARENT [bash] the parent of a machine-plane root is not inside it (0.1176ms)
+  ✔ MATCH-PARENT [powershell] the parent of a machine-plane root is not inside it (0.1018ms)
+  ✔ MATCH-SCRIPT-BENIGN [bash] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.183ms)
+  ✔ MATCH-SCRIPT-BENIGN [powershell] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.1419ms)
+  ✔ MATCH-SCRIPT-BENIGN-SH [bash] a bash script operand with benign content is admitted (0.3643ms)
+  ✔ MATCH-PS-BENIGN [powershell] PowerShell-tool Get-Content on a repository doc is admitted (0.1192ms)
+  ✔ MATCH-PS-COPY-BENIGN [powershell] PowerShell-tool copy between scratch files is admitted (0.1274ms)
+✔ TR-S2 MATCH negatives: not equal to and not inside a protected root (2.8151ms)
+▶ TR-S2 NORM: each spelling normalises to a native absolute path before matching
+  ✔ NORM-OPT-EQ [bash] an option-attached --opt=<path> (0.2286ms)
+  ✔ NORM-OPT-EQ [powershell] an option-attached --opt=<path> (0.1004ms)
+  ✔ NORM-FILE-COLON [bash] an option-attached file:<path> on a non-openssl executable (0.1302ms)
+  ✔ NORM-FILE-COLON [powershell] an option-attached file:<path> on a non-openssl executable (0.1676ms)
+  ✔ NORM-AT [bash] an option-attached @<path> (curl --data-binary @file) (0.1308ms)
+  ✔ NORM-AT [powershell] an option-attached @<path> (curl --data-binary @file) (0.0942ms)
+  ✔ NORM-CYGDRIVE [bash] the /cygdrive/<drive>/ spelling (0.3257ms)
+  ✔ NORM-MNT [bash] the /mnt/<drive>/ spelling of a credential root (0.1375ms)
+  ✔ NORM-MNT [powershell] the /mnt/<drive>/ spelling of a credential root (0.1476ms)
+  ✔ NORM-MSYS [bash] the MSYS /<drive>/ spelling of a credential root (0.1161ms)
+  ✔ NORM-MNT-KEYDIR [bash] the /mnt/<drive>/ spelling of the key directory (0.093ms)
+  ✔ NORM-MNT-KEYDIR [powershell] the /mnt/<drive>/ spelling of the key directory (0.134ms)
+  ✔ NORM-UNC-WSL-DOLLAR [powershell] the \\wsl$\<distro>\ spelling maps to the distro path (0.1346ms)
+  ✔ NORM-UNC-WSL-LOCALHOST [powershell] the \\wsl.localhost\<distro>\ spelling maps to the distro path (0.1075ms)
+  ✔ NORM-HOME-DOLLAR [bash] $HOME (0.1222ms)
+  ✔ NORM-HOME-BRACES [bash] ${HOME} (0.0962ms)
+  ✔ NORM-USERPROFILE-PCT [bash] %USERPROFILE% (0.1072ms)
+  ✔ NORM-USERPROFILE-ENV [powershell] $env:USERPROFILE (0.3463ms)
+  ✔ NORM-HOME-WSL [bash] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.1537ms)
+  ✔ NORM-HOME-WSL [powershell] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.1303ms)
+  ✔ NORM-HOME-WSL-DOLLAR [bash] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.1293ms)
+  ✔ NORM-HOME-WSL-DOLLAR [powershell] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.1494ms)
+  ✔ NORM-HOME-NATIVE [bash] outside a WSL carrier, ~ resolves to the native home (credential set holds only the native .ssh root) (0.086ms)
+✔ TR-S2 NORM: each spelling normalises to a native absolute path before matching (3.7746ms)
+▶ TR-S2-T2 F1: an encoded command is refused wherever its token sits in the carrier's argv
+  ✖ F1-1 [bash] a value flag outside the carrier's list hides -enc (the Critic's case) (1.1008ms)
+  ✖ F1-1 [powershell] a value flag outside the carrier's list hides -enc (the Critic's case) (0.2471ms)
+  ✖ F1-2 [bash] a positional word before -e (0.203ms)
+  ✖ F1-2 [powershell] a positional word before -e (0.2224ms)
+  ✖ F1-3 [bash] -Command text followed by -e (command-text tokens are argv tokens too) (0.2055ms)
+  ✖ F1-3 [powershell] -Command text followed by -e (command-text tokens are argv tokens too) (0.4193ms)
+  ✖ F1-4 [bash] script arguments after -File (the -File operand does not end the scan) (0.2453ms)
+  ✖ F1-4 [powershell] script arguments after -File (the -File operand does not end the scan) (0.2094ms)
+  ✖ F1-5a [bash] the spelling -e behind a positional word (0.226ms)
+  ✖ F1-5a [powershell] the spelling -e behind a positional word (0.214ms)
+  ✖ F1-5b [bash] the spelling -ec behind a positional word (0.1817ms)
+  ✖ F1-5b [powershell] the spelling -ec behind a positional word (0.1808ms)
+  ✖ F1-5c [bash] the spelling -enc behind a positional word (0.3419ms)
+  ✖ F1-5c [powershell] the spelling -enc behind a positional word (0.1697ms)
+  ✖ F1-5d [bash] the spelling -EncodedC behind a positional word (0.1664ms)
+  ✖ F1-5d [powershell] the spelling -EncodedC behind a positional word (0.1397ms)
+  ✖ F1-5e [bash] the spelling -ENCODEDCOMMAND behind a positional word (1.1693ms)
+  ✖ F1-5e [powershell] the spelling -ENCODEDCOMMAND behind a positional word (0.1967ms)
+  ✖ F1-5f [bash] the spelling /enc behind a positional word (0.1673ms)
+  ✖ F1-5f [powershell] the spelling /enc behind a positional word (0.1696ms)
+  ✖ F1-5g [bash] the spelling --EncodedCommand behind a positional word (0.1558ms)
+  ✖ F1-5g [powershell] the spelling --EncodedCommand behind a positional word (0.1343ms)
+  ✖ F1-6a [bash] /enc as the first token (the / prefix) (0.132ms)
+  ✖ F1-6a [powershell] /enc as the first token (the / prefix) (0.1294ms)
+  ✖ F1-6b [bash] --EncodedCommand as the first token (the -- prefix) (0.3098ms)
+  ✖ F1-6b [powershell] --EncodedCommand as the first token (the -- prefix) (0.1438ms)
+✖ TR-S2-T2 F1: an encoded command is refused wherever its token sits in the carrier's argv (7.717ms)
+▶ TR-S2-T2 F1 controls: harmless PowerShell carriers stay admitted
+  ✔ F1-C1 [bash] -ExecutionPolicy Bypass -File <harmless script> (0.1862ms)
+  ✔ F1-C1 [powershell] -ExecutionPolicy Bypass -File <harmless script> (0.107ms)
+  ✔ F1-C2 [bash] -NoProfile -NoLogo -Command Get-Date (0.0941ms)
+  ✔ F1-C2 [powershell] -NoProfile -NoLogo -Command Get-Date (0.0893ms)
+✔ TR-S2-T2 F1 controls: harmless PowerShell carriers stay admitted (0.5587ms)
+▶ TR-S2-T2 F3 positives: a name matching a secret suffix or prefix is a target
+  ✖ F3-1 [bash] openssl pkeyutl -sign -inkey <a copy with a key-file suffix> (the Critic's case) (0.2219ms)
+  ✖ F3-1 [powershell] openssl pkeyutl -sign -inkey <a copy with a key-file suffix> (the Critic's case) (0.1084ms)
+  ✖ F3-2 [bash] a directory-qualified file with the .key-style suffix (0.1007ms)
+  ✖ F3-2 [powershell] a directory-qualified file with the .key-style suffix (0.1207ms)
+  ✖ F3-3 [bash] the PKCS#12 suffix (0.1498ms)
+  ✖ F3-3 [powershell] the PKCS#12 suffix (0.1083ms)
+  ✖ F3-4 [bash] the PFX suffix (0.1115ms)
+  ✖ F3-4 [powershell] the PFX suffix (0.0988ms)
+  ✖ F3-5 [bash] the env-file prefix on a bare name (assumption 11) (0.097ms)
+  ✖ F3-5 [powershell] the env-file prefix on a bare name (assumption 11) (0.0934ms)
+  ✖ F3-6 [bash] the env-file prefix on a directory-qualified name (0.1009ms)
+  ✖ F3-6 [powershell] the env-file prefix on a directory-qualified name (0.1069ms)
+  ✖ F3-7 [bash] the id_ prefix on a bare public-key name (assumption 11) (0.17ms)
+  ✖ F3-7 [powershell] the id_ prefix on a bare public-key name (assumption 11) (0.142ms)
+  ✖ F3-8 [bash] the id_ prefix on a directory-qualified name (0.3211ms)
+  ✖ F3-8 [powershell] the id_ prefix on a directory-qualified name (0.1217ms)
+  ✖ F3-9 [bash] suffix matching is case-insensitive (assumption 11) (0.1672ms)
+  ✖ F3-9 [powershell] suffix matching is case-insensitive (assumption 11) (0.1164ms)
+  ✖ F3-10 [bash] inside a bash -c source (0.1471ms)
+  ✖ F3-11 [bash] inside a node -e source (0.2194ms)
+  ✖ F3-11 [powershell] inside a node -e source (0.1243ms)
+✖ TR-S2-T2 F3 positives: a name matching a secret suffix or prefix is a target (3.4573ms)
+▶ TR-S2-T2 F3 controls: names that only resemble a pattern, and empty lists, stay admitted
+  ✔ F3-C1 [bash] a suffix in the middle of a name is not a suffix (0.1087ms)
+  ✔ F3-C1 [powershell] a suffix in the middle of a name is not a suffix (0.0681ms)
+  ✔ F3-C2 [bash] a name that only starts like the id_ prefix (0.0759ms)
+  ✔ F3-C2 [powershell] a name that only starts like the id_ prefix (0.077ms)
+  ✔ F3-C3 [bash] a name that only starts like the env-file prefix (0.2646ms)
+  ✔ F3-C3 [powershell] a name that only starts like the env-file prefix (0.0652ms)
+  ✔ F3-C4 [bash] empty suffix and prefix lists match nothing (0.0754ms)
+  ✔ F3-C4 [powershell] empty suffix and prefix lists match nothing (0.0716ms)
+✔ TR-S2-T2 F3 controls: names that only resemble a pattern, and empty lists, stay admitted (0.9318ms)
+▶ TR-S2-T2 F3 malformed: a malformed secretPatterns refuses even for a command that names nothing
+  ✖ F3-F1 [bash] secretPatterns is not an object (0.1369ms)
+  ✖ F3-F2 [bash] secretPatterns.suffixes is not an array (0.1007ms)
+✖ TR-S2-T2 F3 malformed: a malformed secretPatterns refuses even for a command that names nothing (0.3593ms)
+▶ TR-S2-T2 F4: pwsh and powershell.exe read a first positional .ps1 as a script
+  ✖ F4-1 [bash] pwsh <script> without -File (content names the key) (0.2188ms)
+  ✖ F4-1 [powershell] pwsh <script> without -File (content names the key) (0.132ms)
+  ✖ F4-2 [bash] powershell.exe <script> without -File (0.1381ms)
+  ✖ F4-2 [powershell] powershell.exe <script> without -File (0.11ms)
+  ✖ F4-3 [bash] the positional .ps1 after other flags (0.1368ms)
+  ✖ F4-3 [powershell] the positional .ps1 after other flags (0.1205ms)
+  ✖ F4-4 [bash] the .ps1 test is case-insensitive (0.4603ms)
+  ✖ F4-4 [powershell] the .ps1 test is case-insensitive (0.1593ms)
+✖ TR-S2-T2 F4: pwsh and powershell.exe read a first positional .ps1 as a script (1.6329ms)
+▶ TR-S2-T2 F4 controls: harmless content and non-script words stay admitted
+  ✔ F4-C1 [bash] a positional .ps1 with harmless content (1.1608ms)
+  ✔ F4-C1 [powershell] a positional .ps1 with harmless content (0.1672ms)
+  ✔ F4-C2 [bash] a positional word that is not a .ps1 is command text, never read as a script (0.1574ms)
+  ✔ F4-C2 [powershell] a positional word that is not a .ps1 is command text, never read as a script (0.1103ms)
+✔ TR-S2-T2 F4 controls: harmless content and non-script words stay admitted (1.6931ms)
+▶ TR-S2-T2 F5: every script a carrier executes or preloads is read
+  ✖ F5-1a [bash] node -r <file>: the preload value is read (content names the key) (0.2502ms)
+  ✖ F5-1a [powershell] node -r <file>: the preload value is read (content names the key) (0.1483ms)
+  ✖ F5-1b [bash] node --require <file>: the preload value is read (content names the key) (0.1497ms)
+  ✖ F5-1b [powershell] node --require <file>: the preload value is read (content names the key) (0.1432ms)
+  ✖ F5-1c [bash] node --import <file>: the preload value is read (content names the key) (0.1444ms)
+  ✖ F5-1c [powershell] node --import <file>: the preload value is read (content names the key) (0.1383ms)
+  ✖ F5-1d [bash] node --loader <file>: the preload value is read (content names the key) (0.1326ms)
+  ✖ F5-1d [powershell] node --loader <file>: the preload value is read (content names the key) (0.1407ms)
+  ✖ F5-1e [bash] node --experimental-loader <file>: the preload value is read (content names the key) (0.1411ms)
+  ✖ F5-1e [powershell] node --experimental-loader <file>: the preload value is read (content names the key) (0.1345ms)
+  ✖ F5-2 [bash] a preload value is read even when -e carries the inline source (0.1772ms)
+  ✖ F5-2 [powershell] a preload value is read even when -e carries the inline source (0.1383ms)
+  ✖ F5-3 [bash] the SECOND node file operand is read (0.1746ms)
+  ✖ F5-3 [powershell] the SECOND node file operand is read (0.1429ms)
+  ✖ F5-4 [bash] sudo -u root bash <script>: the wrapper's option value does not hide the carrier (0.2066ms)
+  ✖ F5-5 [bash] timeout -s KILL 5 node <script> (0.1855ms)
+  ✖ F5-6 [bash] env -u NAME node <script> (0.1442ms)
+✖ TR-S2-T2 F5: every script a carrier executes or preloads is read (2.9428ms)
+▶ TR-S2-T2 F5 controls: the same shapes with harmless content stay admitted
+  ✔ F5-C1 [bash] a preload value and a file operand, both harmless (0.1725ms)
+  ✔ F5-C1 [powershell] a preload value and a file operand, both harmless (0.1147ms)
+  ✔ F5-C2 [bash] two harmless node file operands (0.1135ms)
+  ✔ F5-C2 [powershell] two harmless node file operands (0.1059ms)
+  ✔ F5-C3 [bash] sudo -u root bash <harmless script> (0.1099ms)
+  ✔ F5-C4 [bash] timeout -s KILL 5 node <harmless script> (0.0855ms)
+✔ TR-S2-T2 F5 controls: the same shapes with harmless content stay admitted (0.7965ms)
+▶ TR-S2-T2 F6: under the Bash tool a path is also checked with backslash escapes removed
+  ✖ F6-1 [bash] an escaped letter at the end of the key-directory name (0.1719ms)
+  ✖ F6-2 [bash] an escaped letter inside the key store name (the Critic's keyst\ore spelling) (0.1492ms)
+  ✖ F6-3 [bash] an escaped letter inside a secret basename that has a directory component (0.1197ms)
+  ✖ F6-4 [bash] an escaped letter inside a credential-root directory under ~ (0.1256ms)
+  ✖ F6-5 [bash] an escaped letter inside a bash -c source (0.1618ms)
+✖ TR-S2-T2 F6: under the Bash tool a path is also checked with backslash escapes removed (0.8136ms)
+▶ TR-S2-T2 F7: a PowerShell -Name:value token is split at the first colon and its value is checked
+  ✖ F7-1 [powershell] Get-Content -Path:<key directory file>, unquoted, backslashes (0.1906ms)
+  ✖ F7-2 [powershell] Get-Content -LiteralPath:<key directory file>, unquoted, forward slashes (0.2142ms)
+  ✖ F7-3 [bash] the same inside a pwsh -Command source (0.1751ms)
+  ✖ F7-3 [powershell] the same inside a pwsh -Command source (0.2372ms)
+✖ TR-S2-T2 F7: a PowerShell -Name:value token is split at the first colon and its value is checked (0.9188ms)
+▶ TR-S2-T2 F7 control: a harmless -Name:value stays admitted
+  ✔ F7-C1 [powershell] Get-Content -Path:docs/readme.md (0.1772ms)
+✔ TR-S2-T2 F7 control: a harmless -Name:value stays admitted (0.2476ms)
+▶ TR-S2-T2 F8: a readScript that returns null refuses
+  ✔ F8-1 [bash] node <script> with an unreadable script (0.1983ms)
+  ✔ F8-1 [powershell] node <script> with an unreadable script (0.1175ms)
+  ✔ F8-2 [bash] bash <script> with an unreadable script (0.1187ms)
+  ✔ F8-3 [bash] python <script> with an unreadable script (0.1191ms)
+  ✔ F8-3 [powershell] python <script> with an unreadable script (0.1715ms)
+  ✔ F8-4 [bash] powershell.exe -File <script> with an unreadable script (0.838ms)
+  ✔ F8-4 [powershell] powershell.exe -File <script> with an unreadable script (0.1756ms)
+✔ TR-S2-T2 F8: a readScript that returns null refuses (1.8911ms)
+▶ TR-S2-T2 F8 control: an empty script is readable
+  ✔ F8-C1 [bash] node <script> whose content is the empty string (0.1622ms)
+  ✔ F8-C1 [powershell] node <script> whose content is the empty string (0.1559ms)
+✔ TR-S2-T2 F8 control: an empty script is readable (0.3897ms)
+▶ TR-S2-T2 cwd fixture sanity
+  ✔ CWD-0 the relative key-directory spelling leads from the cwd to the key directory (0.1356ms)
+✔ TR-S2-T2 cwd fixture sanity (0.1926ms)
+▶ TR-S2-T2 cwd positives: relative tokens resolve against targets.cwd and cd segments update it
+  ✖ CWD-1 [bash] a ../ path from the cwd into the key directory (0.2842ms)
+  ✖ CWD-1 [powershell] a ../ path from the cwd into the key directory (0.2084ms)
+  ✖ CWD-2 [bash] the same with a forward-slash cwd (0.17ms)
+  ✖ CWD-2 [powershell] the same with a forward-slash cwd (0.2424ms)
+  ✖ CWD-3 [powershell] PowerShell backslash spelling (0.1971ms)
+  ✖ CWD-4 [bash] cd to the key store's parent, then a relative path into the key directory (0.2281ms)
+  ✖ CWD-5 [bash] the same joined with && (0.1654ms)
+  ✖ CWD-6 [bash] two cd segments accumulate (0.167ms)
+  ✖ CWD-7 [powershell] PowerShell: cd to the key store's parent, then a relative path (0.1794ms)
+✖ TR-S2-T2 cwd positives: relative tokens resolve against targets.cwd and cd segments update it (2.0853ms)
+▶ TR-S2-T2 cwd controls: harmless relative paths stay admitted
+  ✔ CWD-C1 [bash] a relative harmless file (0.1606ms)
+  ✔ CWD-C1 [powershell] a relative harmless file (0.1286ms)
+  ✔ CWD-C2 [bash] cd into a harmless repo directory, then a relative file (0.1043ms)
+  ✔ CWD-C3 [bash] cd to the key store's parent, then a sibling of the key directory (0.1298ms)
+  ✔ CWD-C4 [powershell] PowerShell: a relative harmless file (0.1205ms)
+✔ TR-S2-T2 cwd controls: harmless relative paths stay admitted (0.753ms)
+▶ TR-S2-T2 cwd malformed: a cwd that is not an absolute path refuses even for a command that names nothing
+  ✖ CWD-F1 [bash] a relative cwd (0.1508ms)
+  ✖ CWD-F2 [bash] a non-string cwd (0.1266ms)
+✖ TR-S2-T2 cwd malformed: a cwd that is not an absolute path refuses even for a command that names nothing (0.3285ms)
+▶ TR-S2-T2 exemptScripts positives: the content of an exempt path is not scanned
+  ✖ EX-1 [bash] node --test <exempt path> whose content names a key path (1.175ms)
+  ✖ EX-1 [powershell] node --test <exempt path> whose content names a key path (0.2899ms)
+  ✖ EX-2 [bash] node <exempt path> (the exemption is by path, not by the --test flag) (0.3617ms)
+  ✖ EX-2 [powershell] node <exempt path> (the exemption is by path, not by the --test flag) (0.3148ms)
+✖ TR-S2-T2 exemptScripts positives: the content of an exempt path is not scanned (2.2489ms)
+▶ TR-S2-T2 exemptScripts negatives: the command line and every other file are still scanned
+  ✔ EX-3 [bash] a key path as an operand on the command line of an exempt run (0.1926ms)
+  ✔ EX-3 [powershell] a key path as an operand on the command line of an exempt run (0.1816ms)
+  ✔ EX-4 [bash] a key path in an option value on the command line of an exempt run (0.18ms)
+  ✔ EX-4 [powershell] a key path in an option value on the command line of an exempt run (0.2222ms)
+  ✔ EX-5 [bash] a non-exempt file with the same content (0.1996ms)
+  ✔ EX-5 [powershell] a non-exempt file with the same content (0.217ms)
+  ✔ EX-6 [bash] the list is exact: a path that only extends an exempt path is not exempt (0.2264ms)
+  ✔ EX-6 [powershell] the list is exact: a path that only extends an exempt path is not exempt (0.1771ms)
+✔ TR-S2-T2 exemptScripts negatives: the command line and every other file are still scanned (1.8157ms)
+▶ TR-S2-T3 F3 fixture sanity: the names under test are what the pins say they are
+  ✔ F3S-0 the policy key name is an exact secret basename, the pattern-only name is not (0.125ms)
+  ✔ F3S-1 the fixture carries the production pattern set: four suffixes, two prefixes (0.0605ms)
+✔ TR-S2-T3 F3 fixture sanity: the names under test are what the pins say they are (0.2485ms)
+▶ TR-S2-T3 F3 pattern position: a secret-looking name searched FOR is not a target
+  ✔ F3P-1 [bash] rg -n <key name> docs/ (the first positional is the pattern; N3-4 under the production patterns) (0.1765ms)
+  ✔ F3P-1 [powershell] rg -n <key name> docs/ (the first positional is the pattern; N3-4 under the production patterns) (0.1279ms)
+  ✔ F3P-2 [bash] grep -rn <key name> docs (the first positional is the pattern) (0.1707ms)
+  ✔ F3P-2 [powershell] grep -rn <key name> docs (the first positional is the pattern) (0.1374ms)
+  ✔ F3P-3 [bash] rg -e <key name> docs/ (the value of -e is the pattern) (0.1453ms)
+  ✔ F3P-3 [powershell] rg -e <key name> docs/ (the value of -e is the pattern) (0.1394ms)
+  ✔ F3P-4 [bash] rg --regexp=<key name> docs/ (the attached value of --regexp is the pattern) (0.1316ms)
+  ✔ F3P-4 [powershell] rg --regexp=<key name> docs/ (the attached value of --regexp is the pattern) (0.1137ms)
+  ✔ F3P-5 [bash] rg -n <id_ name> . (the id_ prefix, in the pattern position) (0.1074ms)
+  ✔ F3P-5 [powershell] rg -n <id_ name> . (the id_ prefix, in the pattern position) (0.1083ms)
+✔ TR-S2-T3 F3 pattern position: a secret-looking name searched FOR is not a target (1.5709ms)
+▶ TR-S2-T3 F3 file operand: a secret-looking name in a file-operand position is a target
+  ✖ F3O-1 [bash] cat <key name> (Ruling 97: refuses under the production pattern set) (0.274ms)
+  ✖ F3O-1 [powershell] cat <key name> (Ruling 97: refuses under the production pattern set) (0.1431ms)
+  ✖ F3O-2 [bash] rg -n foo <key name> (the second positional is a file operand) (0.2071ms)
+  ✖ F3O-2 [powershell] rg -n foo <key name> (the second positional is a file operand) (0.1452ms)
+  ✔ F3O-3 [bash] grep foo docs/<key name> (a directory-qualified file operand; also the exact-name rule) (0.1344ms)
+  ✔ F3O-3 [powershell] grep foo docs/<key name> (a directory-qualified file operand; also the exact-name rule) (0.0942ms)
+  ✖ F3O-4 [powershell] type <key name> (PowerShell: type is Get-Content) (0.1143ms)
+  ✖ F3O-5 [bash] rg -n foo -- <id_ name> (after --, every word is an operand) (0.1192ms)
+  ✖ F3O-5 [powershell] rg -n foo -- <id_ name> (after --, every word is an operand) (0.1204ms)
+  ✖ F3O-6 [bash] grep foo docs/<pattern-only name> (extra: only the pattern rule can refuse this one) (0.1055ms)
+  ✖ F3O-6 [powershell] grep foo docs/<pattern-only name> (extra: only the pattern rule can refuse this one) (0.0995ms)
+✖ TR-S2-T3 F3 file operand: a secret-looking name in a file-operand position is a target (1.7462ms)
+▶ TR-S2 PURE: the module is pure
+  ✔ PURE-1 the module source imports neither fs nor child_process (1.629ms)
+✔ TR-S2 PURE: the module is pure (1.6683ms)
+ℹ tests 298
+ℹ suites 32
+ℹ pass 191
+ℹ fail 107
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 226.831
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-1 [bash] a value flag outside the carrier's list hides -enc (the Critic's case) (1.1008ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] powershell.exe -PSConsoleFile x.psc1 -enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-1 [powershell] a value flag outside the carrier's list hides -enc (the Critic's case) (0.2471ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] powershell.exe -PSConsoleFile x.psc1 -enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-2 [bash] a positional word before -e (0.203ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-2 [powershell] a positional word before -e (0.2224ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-3 [bash] -Command text followed by -e (command-text tokens are argv tokens too) (0.2055ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -Command Get-Date -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-3 [powershell] -Command text followed by -e (command-text tokens are argv tokens too) (0.4193ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -Command Get-Date -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-4 [bash] script arguments after -File (the -File operand does not end the scan) (0.2453ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -File ok.ps1 -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-4 [powershell] script arguments after -File (the -File operand does not end the scan) (0.2094ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -File ok.ps1 -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5a [bash] the spelling -e behind a positional word (0.226ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5a [powershell] the spelling -e behind a positional word (0.214ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -e RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5b [bash] the spelling -ec behind a positional word (0.1817ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -ec RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5b [powershell] the spelling -ec behind a positional word (0.1808ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -ec RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5c [bash] the spelling -enc behind a positional word (0.3419ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5c [powershell] the spelling -enc behind a positional word (0.1697ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5d [bash] the spelling -EncodedC behind a positional word (0.1664ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -EncodedC RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5d [powershell] the spelling -EncodedC behind a positional word (0.1397ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -EncodedC RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5e [bash] the spelling -ENCODEDCOMMAND behind a positional word (1.1693ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo -ENCODEDCOMMAND RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5e [powershell] the spelling -ENCODEDCOMMAND behind a positional word (0.1967ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo -ENCODEDCOMMAND RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5f [bash] the spelling /enc behind a positional word (0.1673ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo /enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5f [powershell] the spelling /enc behind a positional word (0.1696ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo /enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5g [bash] the spelling --EncodedCommand behind a positional word (0.1558ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile foo --EncodedCommand RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-5g [powershell] the spelling --EncodedCommand behind a positional word (0.1343ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile foo --EncodedCommand RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-6a [bash] /enc as the first token (the / prefix) (0.132ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] powershell.exe /enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-6a [powershell] /enc as the first token (the / prefix) (0.1294ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] powershell.exe /enc RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-6b [bash] --EncodedCommand as the first token (the -- prefix) (0.3098ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] powershell.exe --EncodedCommand RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F1-6b [powershell] --EncodedCommand as the first token (the -- prefix) (0.1438ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] powershell.exe --EncodedCommand RwBlAHQALQBEAGEAdABlAA==, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-1 [bash] openssl pkeyutl -sign -inkey <a copy with a key-file suffix> (the Critic's case) (0.2219ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] openssl pkeyutl -sign -inkey scratch/copy.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-1 [powershell] openssl pkeyutl -sign -inkey <a copy with a key-file suffix> (the Critic's case) (0.1084ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] openssl pkeyutl -sign -inkey scratch/copy.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-2 [bash] a directory-qualified file with the .key-style suffix (0.1007ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat x/server.key, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-2 [powershell] a directory-qualified file with the .key-style suffix (0.1207ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat x/server.key, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-3 [bash] the PKCS#12 suffix (0.1498ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat scratch/bundle.p12, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-3 [powershell] the PKCS#12 suffix (0.1083ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat scratch/bundle.p12, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-4 [bash] the PFX suffix (0.1115ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat scratch/bundle.pfx, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-4 [powershell] the PFX suffix (0.0988ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat scratch/bundle.pfx, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-5 [bash] the env-file prefix on a bare name (assumption 11) (0.097ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat .env.production, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-5 [powershell] the env-file prefix on a bare name (assumption 11) (0.0934ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat .env.production, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-6 [bash] the env-file prefix on a directory-qualified name (0.1009ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat config/.env.production, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-6 [powershell] the env-file prefix on a directory-qualified name (0.1069ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat config/.env.production, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-7 [bash] the id_ prefix on a bare public-key name (assumption 11) (0.17ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat id_rsa.pub, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-7 [powershell] the id_ prefix on a bare public-key name (assumption 11) (0.142ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat id_rsa.pub, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-8 [bash] the id_ prefix on a directory-qualified name (0.3211ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat ssh/id_rsa, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-8 [powershell] the id_ prefix on a directory-qualified name (0.1217ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat ssh/id_rsa, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-9 [bash] suffix matching is case-insensitive (assumption 11) (0.1672ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat x/SERVER.KEY, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-9 [powershell] suffix matching is case-insensitive (assumption 11) (0.1164ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat x/SERVER.KEY, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-10 [bash] inside a bash -c source (0.1471ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] bash -c 'cat x/server.key', got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-11 [bash] inside a node -e source (0.2194ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node -e "require('fs').readFileSync('scratch/copy.pem')", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-11 [powershell] inside a node -e source (0.1243ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node -e "require('fs').readFileSync('scratch/copy.pem')", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-F1 [bash] secretPatterns is not an object (0.1369ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] openssl version, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3-F2 [bash] secretPatterns.suffixes is not an array (0.1007ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] openssl version, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-1 [bash] pwsh <script> without -File (content names the key) (0.2188ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-1 [powershell] pwsh <script> without -File (content names the key) (0.132ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-2 [bash] powershell.exe <script> without -File (0.1381ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] powershell.exe scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-2 [powershell] powershell.exe <script> without -File (0.11ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] powershell.exe scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-3 [bash] the positional .ps1 after other flags (0.1368ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -NoProfile scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-3 [powershell] the positional .ps1 after other flags (0.1205ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -NoProfile scratch/x.ps1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-4 [bash] the .ps1 test is case-insensitive (0.4603ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh scratch/X.PS1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F4-4 [powershell] the .ps1 test is case-insensitive (0.1593ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh scratch/X.PS1, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1a [bash] node -r <file>: the preload value is read (content names the key) (0.2502ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node -r scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1a [powershell] node -r <file>: the preload value is read (content names the key) (0.1483ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node -r scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1b [bash] node --require <file>: the preload value is read (content names the key) (0.1497ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node --require scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1b [powershell] node --require <file>: the preload value is read (content names the key) (0.1432ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node --require scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1c [bash] node --import <file>: the preload value is read (content names the key) (0.1444ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node --import scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1c [powershell] node --import <file>: the preload value is read (content names the key) (0.1383ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node --import scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1d [bash] node --loader <file>: the preload value is read (content names the key) (0.1326ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node --loader scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1d [powershell] node --loader <file>: the preload value is read (content names the key) (0.1407ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node --loader scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1e [bash] node --experimental-loader <file>: the preload value is read (content names the key) (0.1411ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node --experimental-loader scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-1e [powershell] node --experimental-loader <file>: the preload value is read (content names the key) (0.1345ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node --experimental-loader scratch/hook.mjs scratch/main.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-2 [bash] a preload value is read even when -e carries the inline source (0.1772ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node --import scratch/hook.mjs -e "console.log(1)", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-2 [powershell] a preload value is read even when -e carries the inline source (0.1383ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node --import scratch/hook.mjs -e "console.log(1)", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-3 [bash] the SECOND node file operand is read (0.1746ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] node scratch/main.mjs scratch/second.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-3 [powershell] the SECOND node file operand is read (0.1429ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] node scratch/main.mjs scratch/second.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-4 [bash] sudo -u root bash <script>: the wrapper's option value does not hide the carrier (0.2066ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] sudo -u root bash scratch/x.sh, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-5 [bash] timeout -s KILL 5 node <script> (0.1855ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] timeout -s KILL 5 node scratch/x.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F5-6 [bash] env -u NAME node <script> (0.1442ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] env -u FIXTURE_NAME node scratch/x.mjs, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F6-1 [bash] an escaped letter at the end of the key-directory name (0.1719ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat <host-path> got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F6-2 [bash] an escaped letter inside the key store name (the Critic's keyst\ore spelling) (0.1492ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat <host-path> got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F6-3 [bash] an escaped letter inside a secret basename that has a directory component (0.1197ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat some/where/po-pri\vate.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F6-4 [bash] an escaped letter inside a credential-root directory under ~ (0.1256ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat ~/.s\sh/config, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F6-5 [bash] an escaped letter inside a bash -c source (0.1618ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] bash -c 'cat <host-path>', got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F7-1 [powershell] Get-Content -Path:<key directory file>, unquoted, backslashes (0.1906ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] Get-Content -Path:<host-path> got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F7-2 [powershell] Get-Content -LiteralPath:<key directory file>, unquoted, forward slashes (0.2142ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] Get-Content -LiteralPath:<host-path> got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F7-3 [bash] the same inside a pwsh -Command source (0.1751ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] pwsh -Command "Get-Content -Path:<host-path>", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F7-3 [powershell] the same inside a pwsh -Command source (0.2372ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] pwsh -Command "Get-Content -Path:<host-path>", got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-1 [bash] a ../ path from the cwd into the key directory (0.2842ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat ../fixture-keystore/po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-1 [powershell] a ../ path from the cwd into the key directory (0.2084ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat ../fixture-keystore/po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-2 [bash] the same with a forward-slash cwd (0.17ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat ../fixture-keystore/po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-2 [powershell] the same with a forward-slash cwd (0.2424ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat ../fixture-keystore/po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-3 [powershell] PowerShell backslash spelling (0.1971ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] Get-Content ..\fixture-keystore\po-keys\registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-4 [bash] cd to the key store's parent, then a relative path into the key directory (0.2281ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cd ../fixture-keystore; cat po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-5 [bash] the same joined with && (0.1654ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cd ../fixture-keystore && cat po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-6 [bash] two cd segments accumulate (0.167ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cd ..; cd fixture-keystore; cat po-keys/registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-7 [powershell] PowerShell: cd to the key store's parent, then a relative path (0.1794ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cd ..\fixture-keystore; Get-Content po-keys\registry.json, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-F1 [bash] a relative cwd (0.1508ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] openssl version, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ CWD-F2 [bash] a non-string cwd (0.1266ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] openssl version, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ EX-1 [bash] node --test <exempt path> whose content names a key path (1.175ms)
+  AssertionError [ERR_ASSERTION]: expected null (admitted) for [bash] node --test plugins/pipeline-core/lib/exempt-fixture.test.mjs, got {"refused":true,"code":"ELC-SECRET-BASENAME","lane":"execution-lane-credential","reason":"the command names a protected target (secretBasenames)"}
+  + actual - expected
+  
+  + {
+  +   code: 'ELC-SECRET-BASENAME',
+  +   lane: 'execution-lane-credential',
+  +   reason: 'the command names a protected target (secretBasenames)',
+  +   refused: true
+  + }
+  - null
+  
+      at assertAdmitted (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:224:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:247:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { refused: true, code: 'ELC-SECRET-BASENAME', lane: 'execution-lane-credential', reason: 'the command names a protected target (secretBasenames)' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ EX-1 [powershell] node --test <exempt path> whose content names a key path (0.2899ms)
+  AssertionError [ERR_ASSERTION]: expected null (admitted) for [powershell] node --test plugins/pipeline-core/lib/exempt-fixture.test.mjs, got {"refused":true,"code":"ELC-SECRET-BASENAME","lane":"execution-lane-credential","reason":"the command names a protected target (secretBasenames)"}
+  + actual - expected
+  
+  + {
+  +   code: 'ELC-SECRET-BASENAME',
+  +   lane: 'execution-lane-credential',
+  +   reason: 'the command names a protected target (secretBasenames)',
+  +   refused: true
+  + }
+  - null
+  
+      at assertAdmitted (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:224:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:247:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { refused: true, code: 'ELC-SECRET-BASENAME', lane: 'execution-lane-credential', reason: 'the command names a protected target (secretBasenames)' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ EX-2 [bash] node <exempt path> (the exemption is by path, not by the --test flag) (0.3617ms)
+  AssertionError [ERR_ASSERTION]: expected null (admitted) for [bash] node plugins/pipeline-core/lib/exempt-fixture.test.mjs, got {"refused":true,"code":"ELC-SECRET-BASENAME","lane":"execution-lane-credential","reason":"the command names a protected target (secretBasenames)"}
+  + actual - expected
+  
+  + {
+  +   code: 'ELC-SECRET-BASENAME',
+  +   lane: 'execution-lane-credential',
+  +   reason: 'the command names a protected target (secretBasenames)',
+  +   refused: true
+  + }
+  - null
+  
+      at assertAdmitted (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:224:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:247:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { refused: true, code: 'ELC-SECRET-BASENAME', lane: 'execution-lane-credential', reason: 'the command names a protected target (secretBasenames)' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ EX-2 [powershell] node <exempt path> (the exemption is by path, not by the --test flag) (0.3148ms)
+  AssertionError [ERR_ASSERTION]: expected null (admitted) for [powershell] node plugins/pipeline-core/lib/exempt-fixture.test.mjs, got {"refused":true,"code":"ELC-SECRET-BASENAME","lane":"execution-lane-credential","reason":"the command names a protected target (secretBasenames)"}
+  + actual - expected
+  
+  + {
+  +   code: 'ELC-SECRET-BASENAME',
+  +   lane: 'execution-lane-credential',
+  +   reason: 'the command names a protected target (secretBasenames)',
+  +   refused: true
+  + }
+  - null
+  
+      at assertAdmitted (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:224:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:247:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { refused: true, code: 'ELC-SECRET-BASENAME', lane: 'execution-lane-credential', reason: 'the command names a protected target (secretBasenames)' },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-1 [bash] cat <key name> (Ruling 97: refuses under the production pattern set) (0.274ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] cat po-private.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-1 [powershell] cat <key name> (Ruling 97: refuses under the production pattern set) (0.1431ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] cat po-private.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-2 [bash] rg -n foo <key name> (the second positional is a file operand) (0.2071ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] rg -n foo po-private.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-2 [powershell] rg -n foo <key name> (the second positional is a file operand) (0.1452ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] rg -n foo po-private.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-4 [powershell] type <key name> (PowerShell: type is Get-Content) (0.1143ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] type po-private.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-5 [bash] rg -n foo -- <id_ name> (after --, every word is an operand) (0.1192ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] rg -n foo -- id_ed25519, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-5 [powershell] rg -n foo -- <id_ name> (after --, every word is an operand) (0.1204ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] rg -n foo -- id_ed25519, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-6 [bash] grep foo docs/<pattern-only name> (extra: only the pattern rule can refuse this one) (0.1055ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [bash] grep foo docs/fixture-sign.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:239:9
+✖ F3O-6 [powershell] grep foo docs/<pattern-only name> (extra: only the pattern rule can refuse this one) (0.0995ms)
+  AssertionError [ERR_ASSERTION]: expected a refusal object for [powershell] grep foo docs/fixture-sign.pem, got null
+      at assertRefused (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:213:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:246:42)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,26 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/design-course-session.test.mjs
+label: scripts-design-course-session
+exitCode: 0
+head: ae5b02b82a8a9814414dc38e5b8a0d5f5b1d9bb4
+tree: 3b4bea5b95aa8d0987ca659e7dc49c9a124dcf5b
+dirty: true
+--- stdout ---
+✔ K3C001 Advisor command selection stays on the canonical producer for all runners (25.844578ms)
+✔ K3C002 readiness uses the existing runner producer and requires Codex's host descriptor (30.230746ms)
+✔ K3C003 native Advisor exception requires hash-matched terminal no-child evidence (24.541047ms)
+✔ K3C004 full-course execution requires explicit confirmation (0.306094ms)
+✔ K3C005 submission inspection derives committed five-source refs and agent-owned authoring without inheriting Git context (105.356932ms)
+✔ K3C006 confirmed course reaches one unsigned final package through actual producer-result contracts (41.482928ms)
+✔ K3C007 R7-3b: the inspection's advisor command names a tracked output prefix under specs/<feature-id>/evidence/ (21.842207ms)
+✔ K3C008 R7-3b: the --run-v2 course accepts and writes every digest-bound artifact under the tracked prefix (21.577221ms)
+✔ K3C009 R7-3: a git-ignored preparation path is refused as a bound path (11.230994ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 373.366978
+
+--- stderr ---

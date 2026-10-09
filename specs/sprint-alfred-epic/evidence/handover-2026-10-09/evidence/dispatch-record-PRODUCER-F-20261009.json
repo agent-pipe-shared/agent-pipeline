@@ -1,0 +1,65 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "PRODUCER-F-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "c754022f6",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "6b3acec96"
+  ],
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 8
+    },
+    {
+      "phase": "implement",
+      "toolUses": 28
+    },
+    {
+      "phase": "verify",
+      "toolUses": 31
+    },
+    {
+      "phase": "commit",
+      "toolUses": 37
+    },
+    {
+      "phase": "Elephant digest bind (Ruling 154): resultSha256 computed over the unchanged report.text",
+      "toolUses": null
+    }
+  ],
+  "resultSha256": "06cff74885a32ca5ecac667811fcb3ed9196be113450377a425e883a54be03a1",
+  "report": {
+    "text": "PRODUCER-F: commit 6b3acec96. Native capture evidence/PRODUCER-F-20261009/after.txt: 24 pass, 2 fail; the two fails are exactly the two allowed legacy -m/--trailer cases; PRODUCER-T (a)-(f) green. check-consumer-safe-paths.test.mjs exit 0 (9/9). The lib now returns message, messagePath and a commit step [commit,-F,messagePath,--,...paths]; the CLI wrapper needed no change; both goldfish-task.md copies edited in the commit-route passage only. Independent review: pending. resultSha256 left null: no hashing tool call was available within the budget.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+      "templates/prompts/goldfish-task.md",
+      "plugins/pipeline-core/templates/prompts/goldfish-task.md"
+    ]
+  }
+}

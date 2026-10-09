@@ -1,0 +1,42 @@
+command: node --test --test-name-pattern=F3: --test-name-pattern=F4: "--test-name-pattern=confirmed first-round language" "--test-name-pattern=genuinely fresh repository" plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+label: ONB-T-red-project-onboarding-v3
+exitCode: 1
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: the suite must declare all 216 stable callbacks
+
+218 !== 216
+
+    at file:///<repo-root>/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:10440:10 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 218,
+  expected: 216,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.20.0
+✖ plugins\pipeline-core\lib\project-onboarding-v3.test.mjs (364.2236ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 370.1458
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\project-onboarding-v3.test.mjs:1:1
+✖ plugins\pipeline-core\lib\project-onboarding-v3.test.mjs (364.2236ms)
+  'test failed'
+
+--- stderr ---

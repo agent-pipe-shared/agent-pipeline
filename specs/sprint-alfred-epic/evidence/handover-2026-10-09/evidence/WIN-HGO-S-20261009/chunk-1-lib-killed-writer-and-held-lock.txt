@@ -1,0 +1,63 @@
+command: node --test "--test-name-pattern=an authenticated killed genesis writer" "--test-name-pattern=SIGKILL during ordinary lock publication" "--test-name-pattern=SIGKILL after create-only publication" "--test-name-pattern=SIGKILL during recovery-guard publication" "--test-name-pattern=SIGKILL after recovery-guard publication" "--test-name-pattern=a real killed audit writer is reclaimed" "--test-name-pattern=repair-audit uses the same killed-owner reclamation" "--test-name-pattern=a writer recovers when the prior dead-owner reclaimer" "--test-name-pattern=legacy, malformed, unauthenticated and cross-host audit locks" "--test-name-pattern=a recovery guard excludes a second reclaimer" "--test-name-pattern=failed repair or ordinary append never removes" plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: WIN-HGO-S-chunk-1
+exitCode: 1
+head: 434a01bb172b4fd7179543bf20c2362893f0c228
+tree: a609d5a3eac154688b08096f549fb5661b734440
+dirty: true
+--- stdout ---
+✔ an authenticated killed genesis writer can finish the first audit entry (13764.4029ms)
+✔ SIGKILL during ordinary lock publication never exposes an empty canonical lock and reacquisition succeeds (2239.4847ms)
+✔ SIGKILL after create-only publication finalizes the authenticated ordinary lock before reclamation (5168.2815ms)
+✔ SIGKILL during recovery-guard publication leaves no canonical recovery lock and reclamation retries safely (7100.3372ms)
+✔ SIGKILL after recovery-guard publication finalizes its authenticated twin and safely retries reclamation (7657.4011ms)
+✔ a real killed audit writer is reclaimed by the next ordinary append without rewriting prior bytes (26283.7613ms)
+✔ repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes (29234.5206ms)
+✔ a writer recovers when the prior dead-owner reclaimer was itself killed (30704.5718ms)
+✔ legacy, malformed, unauthenticated and cross-host audit locks remain typed fail-closed (67611.2123ms)
+✖ a recovery guard excludes a second reclaimer and a raced replacement is never unlinked (18358.5371ms)
+✔ a failed repair or ordinary append never removes the active repair writer's lock (30619.3569ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239010.6446
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:2579:1
+✖ a recovery guard excludes a second reclaimer and a raced replacement is never unlinked (18358.5371ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  HumanGuardOverrideError: audit lock recovery owner state is ambiguous
+      at Object.afterRecoveryGuardFn (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2590:16)
+      at Object.acquireAuditLock (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2574:40)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2588:47)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: HumanGuardOverrideError: audit lock recovery owner state is ambiguous
+        at ambiguousAuditLockRefusal (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2460:17)
+        at clearAbandonedAuditRecovery (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2527:11)
+        at Object.acquireAuditLock (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2545:3)
+        at file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2590:57
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at Object.afterRecoveryGuardFn (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2590:16)
+        at Object.acquireAuditLock (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2574:40)
+        at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2588:47)
+        at Test.runInAsyncScope (node:async_hooks:227:14),
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+--- stderr ---

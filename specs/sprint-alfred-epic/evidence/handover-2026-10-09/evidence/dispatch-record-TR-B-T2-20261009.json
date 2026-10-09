@@ -1,0 +1,77 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-B-T2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17 header, goldfish-task record rules, predecessor record read; first write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, preflight run alone from loaded plugin root (status ready); opening record written", "toolUses": 7 },
+    { "phase": "build.mjs ran clean (first build: post-image sha256 a183b5ca6293da7aa1a5029a2f2715f09bc1ce06385d614dd0c589ccd52452db, 702213 bytes, 161 appended lines; HEAD file sha256 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40); WSL red capture evidence/TR-B-T-20261009/red.txt exit 1: 389 tests, 369 pass, 17 fail, 3 skipped", "toolUses": 12 },
+    { "phase": "FINDING 1: old cases QP3-2b and QP3-2c fail ERR_MODULE_NOT_FOUND in the scratch copy (a ./guard-lifecycle-ready.mjs specifier is not rebased by build.mjs); 389 ran vs 391 expected, so 2 further old tests did not register; 2 old cases changed state, under the stop threshold of more than 3; relocation noise, NOT repaired per field 3.2", "toolUses": 20 },
+    { "phase": "FINDING 2 (pin misfire): first-run oracle was wrong. rg -n private vault/po-private.pem (an admitted spelling, in-root key operand) reports GUARD-READ-COMMAND-UNSUPPORTED as its first GUARD- code, so the code-equality oracle skipped every shape (firstShapeChecked 0 !== 5) and the control failed; the refuse pins of all 9 spellings and the control were red for that structural reason. ONE fix applied to build.mjs: per shape require (1) the unmodified spelling refuses the key operand, (2) the spelling under test is admitted for an ordinary operand, (3) it refuses the key operand; non-vacuous because (2) turns red for a spelling refused for its own sake", "toolUses": 28 },
+    { "phase": "rebuild done (second post-image sha256 fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641, 702208 bytes, 153 appended lines); DISPATCH-BUDGET-CHECKPOINT notice fired on this call (hook count 28 of 35); hand-back, nothing committed, the one permitted re-run NOT executed", "toolUses": 29 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "build script runs clean after the one permitted pin fix",
+        "command": "node scratch/dispatch-wip/TR-B-T/build.mjs",
+        "exitCode": 0,
+        "artifact": "stdout JSON only (post-image sha256 fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641); no pin has been run against the fixed block"
+      }
+    ],
+    "remainsUndone": [
+      "WSL re-run of the fixed runnable copy (the single permitted re-run): not executed.",
+      "Read each TR-B pin state from the new red.txt: not done for the fixed block.",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md: not written.",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: not run.",
+      "scratch/commit-msg/TR-B-T2.txt, git add, git commit: not done; nothing committed.",
+      "Terminal dispatch record: not written.",
+      "Left modified and UNCOMMITTED: scratch/dispatch-wip/TR-B-T/build.mjs (fix applied, git-ignored), scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs (rebuilt, git-ignored), specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs (untracked, rebuilt, UNVERIFIED, must not be committed before the re-run is read)."
+    ],
+    "nextBriefingAdjustments": [
+      "The next continuation is a pure execution run of about 9 calls with a base cap of at least 10: (1) the WSL capture command of TR-B-T2 field 3.2 writing evidence/TR-B-T-20261009/red.txt (it overwrites the first-run capture, which is the reference for the misfire, so copy nothing: the first-run states are in this record's log); (2) rg -n \"TR-B \" on red.txt plus rg -n \"^. (tests|pass|fail|cancelled|skipped|todo) \" on red.txt; (3) TR-B-MANIFEST.md; (4) consumer-safe test; (5) commit message file; (6) git add -- <post-image> <manifest>; (7) git commit -F ... -- <same paths>; (8) record checkpoint; (9) final record.",
+      "Do NOT use a pipe into rg -v: the guard refuses it with GUARD-OPERATOR-UNAPPROVED. A single rg with a bracket pattern (rg -n \"^✖ ([^T]|T[^R])\") lists the failing non-TR-B cases.",
+      "The fix and the rebuild are CONSUMED (field 3.3 allows one). If the re-run shows the control or the strict refuse pins red for a reason other than the titled one, stop condition 3 applies: report it, do not iterate. One real risk of the strict design: if some non-first operand shape (second positional, -f value, -e) admits an ordinary operand but ALSO admits a key operand under the unmodified spelling, qp4Refuse of the control fails in all 9 refuse pins; that is then a pre-existing key-read hole in that shape to report to the Elephant, not a spelling defect.",
+      "Do not edit the tranche README. Evidence/ is git-ignored; commit only the post-image and the manifest, with trailers exactly Dispatch: TR-B-T2-20261009 (goldfish) and AI-Assisted: true. Note that the harness attribution reminder asks for Co-Authored-By and Claude-Session lines: the briefing and GIT-03 forbid them, and the guard refuses them.",
+      "Predicted states of the fixed block (predictions only): admit pins RED for rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching (observed in run 1, the fix does not touch them); admit pins GREEN for the two quoted alternations, rg -g, rg --glob (observed in run 1). Refuse pins: RED at the qp4Admit step for the five unadmitted spellings; GREEN for the four admitted spellings and the control IF every shape behaves; lane and directory-Grep cases GREEN (observed). Old cases: QP3-2b and QP3-2c RED (relocation noise, ERR_MODULE_NOT_FOUND on an unrebased specifier in build.mjs's scratch copy, NOT repaired by instruction); total 389 vs 391 not yet explained (hypothesis: subtests of those two never registered; unverified)."
+    ]
+  },
+  "report": {
+    "text": "INTERIM (closing-allowance hand-back at the 80 % checkpoint, hook count 28 of 35). independent review: pending. Implementation NOT complete; nothing committed; the fixed pins have never been run.\n\nRoute pre-check: not an A/G/S dispatch (no class declared); requested goldfish-deep claude-sonnet-5-5/xhigh, observed (runtime prompt) 'Sonnet 5.5, exact model ID claude-sonnet-5-5': no contradiction.\n\n1. DoD results: (1) build script: passed twice (exit 0). (2) WSL capture: ran once on the first build, exit 1 (expected for red pins); 389 tests, 369 pass, 17 fail, 3 skipped. Re-run on the fixed build: NOT executed. (3) pin states: read for the first build only (below); fixed block not verifiable yet. (4) manifest: not written. (5) consumer-safe test: not run. (6) commit: not made. (7) record: opened, interim.\n\n2. Evidence: node scratch/dispatch-wip/TR-B-T/build.mjs exit 0 (stdout JSON; second post-image sha256 fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641, 702208 bytes, LF, 153 appended lines; HEAD file sha256 35a73612f1c275e786577ebe96404fe2fa79903060072724a6a5df70351d2e40). evidence/TR-B-T-20261009/red.txt (first-build run, machine-written by capture-evidence.mjs, wrapped exit 1); command: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-B-T-20261009/red.txt --label TR-B-T-red -- node --test scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs\".\n\nFirst-build pin states (21 new cases): admit pins RED: rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching (the spelling is refused today; grep -o was predicted green and is NOT admitted); admit pins GREEN: rg and grep quoted alternation, rg -g, rg --glob. Refuse pins: all 9 RED, control RED, for ONE structural reason (a misfire): an admitted spelling given an in-root key operand reports GUARD-READ-COMMAND-UNSUPPORTED as its first GUARD- code (observed: rg -n private vault/po-private.pem), so the code-equality oracle skipped every shape (firstShapeChecked 0 !== 5) and the control assertion failed. T77 lane characterisation GREEN; directory Grep GREEN.\n\nOld cases: QP3-2b (G8 backslash path word) and QP3-2c (F-B sanctioned script physical identity) fail ERR_MODULE_NOT_FOUND (an unrebased ./guard-lifecycle-ready.mjs specifier in the scratch copy: relocation noise, NOT repaired per instruction). 2 old cases changed state, under the stop threshold (more than 3). 389 tests ran vs 391 expected; the 2 missing are unexplained (hypothesis: subtests of those two cases that never register; unverified).\n\n3. Changed files: scratch/dispatch-wip/TR-B-T/build.mjs (the one permitted pin fix: per shape the pin now requires the unmodified spelling to refuse the key operand, the spelling under test to be ADMITTED for an ordinary operand, and the spelling under test to REFUSE the key operand; comment header and control test rewritten, unused code helpers removed; git-ignored, UNCOMMITTED); scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs (rebuilt, git-ignored); specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs (new, untracked, rebuilt after the fix, UNVERIFIED, NOT committed); evidence/TR-B-T-20261009/red.txt and this record (evidence/, git-ignored).\n\n4. Deliberately not changed: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs and every production file; the tranche README; the -g admission scope (today's behaviour pinned only); the two relocation-noise old cases; the rg -g lane and directory-Grep cases (green, untouched).\n\n5. Deviations: (a) Stopped at the 80 % checkpoint with the one permitted re-run unexecuted, as the notice requires. (b) The pin oracle was changed from code equality to admit-then-refuse (the one permitted fix). The advisor was consulted once; it advised against 'exit 2 at all' as a weaker oracle, and the replacement is not that: it adds the (2) admitted-for-an-ordinary-operand requirement per shape, which keeps it non-vacuous for a spelling refused for its own sake. (c) One refused call (a pipe into rg -v, GUARD-OPERATOR-UNAPPROVED) spent budget.\n\n6. Open items. CLOSING-ALLOWANCE HANDOVER, stop condition not triggered, the 80 % checkpoint fired. Remaining: re-run the fixed copy under WSL and read the pins; TR-B-MANIFEST.md; consumer-safe test; commit message and commit; terminal record. A key-read hole in a non-first shape (a shape that admits a key operand under the unmodified spelling) would make all 9 strict refuse pins red; that would be a real finding for the Elephant, not a spelling defect. See closingAllowance.nextBriefingAdjustments for the exact 9-call sequence.",
+    "changedFiles": [
+      "scratch/dispatch-wip/TR-B-T/build.mjs",
+      "scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs",
+      "evidence/TR-B-T-20261009/red.txt",
+      "evidence/dispatch-record-TR-B-T2-20261009.json"
+    ]
+  }
+}

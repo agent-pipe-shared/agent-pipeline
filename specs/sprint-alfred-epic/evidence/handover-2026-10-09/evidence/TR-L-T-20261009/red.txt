@@ -1,0 +1,117 @@
+command: node --test --test-reporter=spec scratch/dispatch-wip/TR-L-T/guard-testpath.test.mjs scratch/dispatch-wip/TR-L-T/guard-testpath-override.test.mjs
+label: TR-L-T-red
+exitCode: 1
+head: 88ff139b3da9f9c3c7d1d366b6acc1717befbadf
+tree: 7db07e1ae88a2756b412685e13273aaa48c8de01
+dirty: true
+--- stdout ---
+PASS OT01 a protected test path is refused with no capability armed
+PASS OT02 signature mode refuses in-session activation and offers the signed route (ADR-0059 Decision 3/4)
+PASS OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route
+PASS OT04 chat mode offers the audited route, with a real request digest
+PASS OT05 chat mode says on its face that the override is attribution, not proof
+PASS OT06 an unusable override store leaves the refusal exactly as it was
+PASS OT07 an unrelated file is untouched by any of this
+PASS OT08 the guard consults the override before it refuses, not after
+PASS OT09 the mode is read from pipeline.user.yaml, which GS-1 protects
+PASS OT10 an armed capability admits exactly the edit it was bound to
+PASS OT11 a capability bound to a different edit does not admit this one
+PASS OT12 the capability is single-use: the same edit is refused again
+PASS OT13 an in-session write drifts the repository an armed capability is bound to, which fails closed with HGO-DRIFT
+PASS OT14 a protected test path under plugins/pipeline-core gets no plain route
+PASS OT15 an uncommitted chat setting does not admit the chat-mode continuation
+PASS OT16 the same setting, committed, is honoured
+PASS OT17 modifying a committed chat setting drops it to the strongest mode
+PASS OT18 the push proof is not waived by an uncommitted setting either
+PASS OT19 the in-session activation path itself refuses every committed mode but chat
+PASS OT20 T84 a capability spent on one hunk leaves every other hunk, and the revert, under the same refusal and route
+FAIL OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane: T84: the restore to committed bytes was refused (lane=git-working-tree-write, rule=TP-3)
++ actual - expected
+
++ {
++   candidate: 'harness/scripts/verify.mjs',
++   lane: 'git-working-tree-write',
++   rule: {
++     id: 'TP-3',
++     re: /harness\/scripts\/verify\.mjs$/iu,
++     reason: 'the single verify-gate script'
++   }
++ }
+- null
+
+PASS OT22 T84 a restore from any ref but HEAD, and every other writer of the protected path, stays refused
+FAIL OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted: T84: the committed-bytes restore of a staged file was refused (lane=git-working-tree-write, rule=TP-3)
++ actual - expected
+
++ {
++   candidate: 'harness/scripts/verify.mjs',
++   lane: 'git-working-tree-write',
++   rule: {
++     id: 'TP-3',
++     re: /harness\/scripts\/verify\.mjs$/iu,
++     reason: 'the single verify-gate script'
++   }
++ }
+- null
+
+
+guard-testpath-override: 21 passed, 2 failed
+✖ scratch/dispatch-wip/TR-L-T/guard-testpath-override.test.mjs (112393.542548ms)
+PASS  TP01 block  Edit on configured protected test file
+PASS  TP02 block  Edit on a shipped baseline guard hook
+PASS  TP03 block  Write on configured protected test file (Write tool, not just Edit)
+PASS  TP04 block  path with backslashes (Windows) still matches (normalization)
+PASS  TP05 block  missing project config still keeps the shipped minimum active
+PASS  TP06 block  broken JSON is baseline-only and cannot remove static protection
+PASS  TP07 allow  no file_path at all
+PASS  TP08 block  explicit config id is used in the block message
+PASS  TP09 real armed GMW window scoped to TP-1 lifts the matching Edit
+PASS  TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule
+PASS  TP10 block  chat mode names its own next step (authorize --activate), not signature's
+PASS  TP11 block  chat mode's own next step still names authorize --activate given a relative path
+PASS  TP12 block  a route-less denial (Pipeline source) names the planner status it actually got
+PASS  TP13 block  the same fixture still offers a real route for an ordinary protected path
+PASS  TP15 block  test path refusal clearly states route-available-via-briefed-authorization
+PASS  TP16 block  non-test path refusal clearly states no-route-for-this-target
+PASS  TP17 allow  briefed test-change authorization admits exact target with matching digest
+PASS  TP18 block  briefed test-change authorization blocks when presenting mismatching digest
+PASS  TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes)
+PASS  TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again
+PASS  TP21 block  T84 the decision for the file does not depend on how its path is spelled
+✔ TPC001 TP01 block  Edit on configured protected test file (5059.117772ms)
+✔ TPC002 TP02 block  Edit on a shipped baseline guard hook (1707.505537ms)
+✔ TPC003 TP03 block  Write on configured protected test file (Write tool, not just Edit) (1713.469999ms)
+✔ TPC004 TP04 block  path with backslashes (Windows) still matches (normalization) (1976.807359ms)
+✔ TPC005 TP05 block  missing project config still keeps the shipped minimum active (1820.285189ms)
+✔ TPC006 TP06 block  broken JSON is baseline-only and cannot remove static protection (3513.340506ms)
+✔ TPC007 TP07 allow  no file_path at all (1739.29531ms)
+✔ TPC008 TP08 block  explicit config id is used in the block message (3419.832434ms)
+✔ TPC009 TP09 real armed GMW window scoped to TP-1 lifts the matching Edit (25249.162931ms)
+✔ TPC010 TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule (24076.349684ms)
+✔ TPC011 TP10 block  chat mode names its own next step (authorize --activate), not signature's (3846.626276ms)
+✔ TPC012 TP11 block  chat mode's own next step still names authorize --activate given a relative path (1837.117677ms)
+✔ TPC013 TP12 block  a route-less denial (Pipeline source) names the planner status it actually got (3914.363867ms)
+✔ TPC014 TP13 block  the same fixture still offers a real route for an ordinary protected path (1819.053101ms)
+✔ TPC015 TP15 block  test path refusal clearly states route-available-via-briefed-authorization (1691.394165ms)
+✔ TPC016 TP16 block  non-test path refusal clearly states no-route-for-this-target (1706.851244ms)
+✔ TPC017 TP17 allow  briefed test-change authorization admits exact target with matching digest (3308.022644ms)
+✔ TPC018 TP18 block  briefed test-change authorization blocks when presenting mismatching digest (1685.591764ms)
+✔ TPC019 TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes) (7850.870354ms)
+✔ TPC020 TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again (8039.455205ms)
+✔ TPC021 TP21 block  T84 the decision for the file does not depend on how its path is spelled (6385.42308ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 21
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 113930.143053
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/TR-L-T/guard-testpath-override.test.mjs:1:1
+✖ scratch/dispatch-wip/TR-L-T/guard-testpath-override.test.mjs (112393.542548ms)
+  'test failed'
+
+--- stderr ---

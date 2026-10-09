@@ -1,0 +1,68 @@
+{
+  "taskId": "FANOUT-WIN-M-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing FANOUT-WIN-M-20261009)",
+  "outcome": "measurement-complete",
+  "outcomeClassification": "evidence-only dispatch; no commit by design; PO/Critic acceptance not applicable to a measurement but the Elephant must still read the evidence before using it for Ruling 82(a)",
+  "commit": null,
+  "changedFiles": [],
+  "untrackedArtifacts": [
+    "scratch/fanout-win-m/probe.mjs",
+    "evidence/FANOUT-WIN-M-20261009/spawns.txt",
+    "evidence/dispatch-record-FANOUT-WIN-M-20261009.json"
+  ],
+  "toolUses": 22,
+  "routeCheck": {
+    "requested": "goldfish-deep, claude-sonnet-5-5, xhigh (field 6; no A/G/S class declared, 'hook-path measurement')",
+    "observed": "runtime prompt: 'You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5.'",
+    "result": "match"
+  },
+  "evidence": {
+    "artifact": "evidence/FANOUT-WIN-M-20261009/spawns.txt",
+    "command": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/FANOUT-WIN-M-20261009/spawns.txt --label fanout-win-m -- node scratch/fanout-win-m/probe.mjs",
+    "wrappedExitCode": 0,
+    "probeVerdictLine": "PROBE VALID: Stop 1 spawned 4, Stop 2 spawned 0, Stop 3 (no enforcement) spawned 0; Stops 1 and 2 both decided \"block\" and appended to the ledger.",
+    "platform": "win32 x64, node v24.20.0"
+  },
+  "log": [
+    "opening: record created (after GUARD-BOOTSTRAP-RECEIPT-MISSING on the first Write; ran the preflight named by the refusal from the loaded plugin root, status ready; retried the write)",
+    "orientation: predecessor record, SF22 + tripwire section of stop-fanout.test.mjs, decideStop, ensureLedgerDirectory, capture-evidence usage; advisor consulted once before writing",
+    "probe written (scratch/fanout-win-m/probe.mjs): extracts TRIPWIRE_SOURCE verbatim from the test file text, one real hook child per Stop, own spawn log per Stop, tripwire control, validity gates",
+    "capture landed (tool use 19): exit 0, PROBE VALID, spawns 4 / 0 / 0 (+ supplemental 0)",
+    "terminal record written (this file, finalized in place; it is the same file created at opening, not a second record)"
+  ],
+  "report": {
+    "dodResults": {
+      "nativeCaptureViaCaptureEvidence": "passed (wrapped exit 0, evidence/FANOUT-WIN-M-20261009/spawns.txt)",
+      "tableOfSpawnsPerStopWithCallerChains": "passed (below)",
+      "noCommit": "passed (none made; no tracked-file write)",
+      "terminalRecordWrittenOnce": "passed with a disclosed nuance: the file was created at opening as an in-progress record (GF-09-D) and finalized in place by this write; there is one file, no second record"
+    },
+    "table": [
+      { "stop": "Stop 1 (1st)", "box": "A, fresh common dir", "config": "enforce / requiresEnforcement:true", "ledgerDirPreExisted": false, "decision": "block", "ledgerEventsAfter": ["stop-eval", "block"], "spawns": 4, "chains": "4x spawnSync powershell.exe <- windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs", "wallMs": 1158 },
+      { "stop": "Stop 2 (2nd, same common dir, same session)", "box": "A", "config": "enforce / requiresEnforcement:true", "ledgerDirPreExisted": true, "decision": "block", "ledgerEventsAfter": ["stop-eval", "block", "stop-eval", "block"], "spawns": 0, "chains": "(none)", "wallMs": 244 },
+      { "stop": "Stop 2b (supplemental: same common dir, different session id)", "box": "A", "config": "enforce / requiresEnforcement:true", "ledgerDirPreExisted": true, "decision": "block", "ledgerEventsAfter": ["stop-eval", "block"], "spawns": 0, "chains": "(none)", "wallMs": 235 },
+      { "stop": "Stop 3 (no enforcement required)", "box": "B, fresh common dir", "config": "enforce / requiresEnforcement:false", "ledgerDirPreExisted": false, "decision": "silent", "ledgerEventsAfter": [], "spawns": 0, "chains": "(none)", "ledgerDirCreated": false, "wallMs": 234 }
+    ],
+    "answerForRuling82a": "Only the FIRST ledger-writing Stop against a given git common dir spawns powershell.exe (4 spawns, all spawnSync, all via windows-private-state.mjs > private-boundary.mjs > fanout-ledger.mjs > stop-fanout.mjs, i.e. ensureLedgerDirectory -> ensurePrivateDirectory on directory CREATION). A second real-process Stop against the already-existing common dir (same session, and also a different session) spawns 0, with the same block decision and a real ledger append, so the 0 is a measurement, not a fail-open. A Stop where enforcement is not required (boolean requiresEnforcement:false) takes the silent path, writes no ledger event, does not even create the ledger directory, and spawns 0. This matches the code reading in fanout-ledger.mjs:170-194 (existing directory = lstat branch only) and the predecessor's FANOUT-WIN-F finding. Consequence: the backlog item's premise 'on every Stop' does not hold in steady state; SF22 pins 4 only because every SF22 sandbox is a fresh common dir, so SF22 can only ever observe the first-Stop case.",
+    "changedFiles": "none tracked. Untracked: scratch/fanout-win-m/probe.mjs (probe), evidence/FANOUT-WIN-M-20261009/spawns.txt (machine-written capture), this record.",
+    "deliberatelyNotChanged": [
+      "plugins/pipeline-core/hooks/stop-fanout.test.mjs, stop-fanout.mjs, lib/fanout-ledger.mjs, lib/private-boundary.mjs, lib/windows-private-state.mjs: read-only per the briefing; SF22's constant LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 and the backlog item text were not touched even though this measurement qualifies their wording",
+      "the pre-existing dirty/staged foreign files in the shared tree (capture header says dirty: true)",
+      "not measured: the config-without-boolean route (observeGovernanceScope -> git spawns), which SF22 itself excludes; a damaged or racing ledger directory (ensureLedgerDirectory retry/sleepSync path); a Stop after the ledger directory was deleted mid-session (expected to behave like Stop 1, inferred from the code, not measured); non-win32 platforms and the other runners (the hook is the Claude Stop adapter; SF22 already pins 0 spawns off win32); wall times are single-run, indicative only"
+    ],
+    "deviationsFromSpec": [
+      "Tripwire reuse: the test file exports nothing and executes its whole corpus on import (assert cases.length===23, registerTestCaseCompletion), so no import-based reuse is possible. Not treated as the stop condition because a faithful reuse was possible: the probe reads the test file as TEXT and evaluates its TRIPWIRE_SOURCE array literal verbatim (1344 chars, sha256 a37da6009b03065755f58d0e162d1642d658ced95f0e881990d8a8a67aa4c740, printed in the capture; control spawn recorded). The sandbox, config, payload and hook-invocation shape were COPIED from the file (same keys, platform:'linux' governor key, session id, CLAUDE_PROJECT_DIR ''). For an import-based reuse the following would need exporting from a side-effect-free module: TRIPWIRE_SOURCE (or tripwire), spawnRecords, sandbox, configFor, hook, stopPayload, isPowerShell.",
+      "One supplemental Stop (2b, different session id) beyond the three briefed rows; it is labelled supplemental and does not change the answer.",
+      "Dispatch-record handling as disclosed under DoD (created at opening, finalized in place)."
+    ],
+    "openItems": [
+      "Guard events, none routed around: the first Write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the preflight from the loaded plugin root, status ready); one of my own Bash calls (two ls commands joined with ';') was refused with GUARD-PARSE-UNSUPPORTED and not retried in that shape.",
+      "Elephant decision for Ruling 82(a): the evidence supports re-scoping the item to first-Stop-per-common-dir latency (about 1.2 s once vs about 0.24 s afterwards on this machine, single run) rather than per-Stop spawns. Whether that residual is worth a fix, and whether SF22 should gain a second-Stop case (a hooks/ edit, forbidden here), is the Elephant's/PO's call.",
+      "Platform matrix: measured native win32 x64 / node v24.20.0 only; no WSL, macOS, Codex or agy measurement was in scope."
+    ]
+  }
+}

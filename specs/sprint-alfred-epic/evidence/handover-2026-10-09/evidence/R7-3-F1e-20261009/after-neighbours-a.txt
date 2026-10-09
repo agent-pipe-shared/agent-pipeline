@@ -1,0 +1,402 @@
+command: node --test plugins/pipeline-core/lib/architecture-design.test.mjs plugins/pipeline-core/lib/design-approval-route.test.mjs plugins/pipeline-core/lib/design-workflow-package-route.test.mjs plugins/pipeline-core/lib/design-workflow-package.test.mjs plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs
+label: after-neighbours-a
+exitCode: 1
+head: 8328f56bb437549da2a8f2caededf8219b99f4b8
+tree: 226dc80fa0fed6972ca9efea198e46f36d19b651
+dirty: true
+--- stdout ---
+✔ architecture package explicitly carries bounded modules and renders only design artifacts (13.525623ms)
+✔ closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input (4.652788ms)
+✔ compact greenfield package derives redundant fitness rows and zero baseline (0.452749ms)
+ℹ architecture design authoring bytes: 1149 -> 766
+✔ field-local diagnostics identify the single invalid architecture input (0.365157ms)
+✔ brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval (1.609189ms)
+✔ materialization transaction restores exact scaffold after a partial staged write (1.675222ms)
+✔ materialization transaction preserves a target raced by another writer and restores earlier outputs (1.215893ms)
+✔ authority CAS change after first publication rolls back and a changed lock refuses all writes (1.233423ms)
+✔ hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry (24.249643ms)
+✔ hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check (1.986107ms)
+✔ hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted (3.463794ms)
+✔ hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed) (2.16182ms)
+✔ hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository (1.06434ms)
+✖ R1 re-read: design-workflow-package.mjs exports the re-read function (441.495741ms)
+✖ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (0.179113ms)
+✖ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (0.225044ms)
+✖ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (0.269555ms)
+✖ R5 re-read: package bytes changed after the approval are refused (item 1) (0.274485ms)
+✖ R6 re-read: a missing package file is a typed refusal (0.147613ms)
+✖ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (0.136562ms)
+✖ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (0.172983ms)
+✖ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (0.235395ms)
+✖ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (0.198754ms)
+✖ R11 re-read: a package of another feature is refused (0.171293ms)
+✖ R12 re-read: malformed approval inputs are a typed input refusal (0.124982ms)
+✔ V0 v8: pipeline.plan-approval.v8 is the current approval schema (44.757107ms)
+✔ V1 v8: a signature-mode record with a proof is valid (0.657422ms)
+✔ V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid (0.255134ms)
+✔ V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid) (0.280715ms)
+✔ V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid) (0.251465ms)
+✔ V5 v8: the mode must be exactly signature or chat (0.260775ms)
+✔ V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid) (0.219114ms)
+✔ V7 v8: the plan approval carries designApproval and none of the four retired v7 fields (0.187054ms)
+✔ V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1 (0.225044ms)
+✔ V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO) (0.332916ms)
+✔ V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval (0.316146ms)
+✔ V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable) (0.238295ms)
+✔ L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception (33.7085ms)
+✔ L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid (0.231564ms)
+✔ L3 classification: other or malformed records are unknown (0.201244ms)
+✔ L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent (0.915877ms)
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (19.699209ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (18.396574ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (14.625343ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (14.787677ms)
+✔ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (40.854974ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (13.882989ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (4.583315ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (15.706664ms)
+✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (14.965026ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (15.257499ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (14.964149ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (14.557702ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (12.822299ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (13.880979ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (14.522491ms)
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (19.23028ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (55.255981ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (28.791099ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (16.681161ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (16.171754ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (27.605745ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (57.532475ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (28.31663ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (4.979754ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (26.470659ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (40.536202ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (176.210042ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (6.91362ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (15.709974ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (30.120503ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (12.664997ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (12.965002ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (12.619767ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (62.57993ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (147.72171ms)
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (82.241126ms)
+✔ Codex readiness bootstrap dispatches exact committed sources and publishes one exclusive receipt (16.258134ms)
+✔ the bootstrap receipt is consumable by the physical final-package reader without changing its host binding (32.203242ms)
+✔ Codex readiness bootstrap refuses a physical source change before model execution (5.171657ms)
+✔ Codex readiness bootstrap discards output when the candidate changes during review (5.942752ms)
+✔ Codex readiness bootstrap rejects duplicate source roles and flags before resolving a model (4.249978ms)
+✔ Codex readiness bootstrap honors an explicitly declined advisor export before resolving or invoking a provider (4.920503ms)
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (2456.886138ms)
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (2470.457012ms)
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (2498.309982ms)
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (2457.312906ms)
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (2550.506328ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 70
+ℹ fail 18
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15105.004914
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:260:1
+✖ R1 re-read: design-workflow-package.mjs exports the re-read function (441.495741ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:261:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:264:1
+✖ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (0.179113ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:265:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:275:1
+✖ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (0.225044ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:276:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:294:1
+✖ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (0.269555ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:295:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:304:1
+✖ R5 re-read: package bytes changed after the approval are refused (item 1) (0.274485ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:305:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:312:1
+✖ R6 re-read: a missing package file is a typed refusal (0.147613ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:313:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:320:1
+✖ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (0.136562ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:321:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:327:1
+✖ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (0.172983ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:328:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:335:1
+✖ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (0.235395ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:336:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:347:1
+✖ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (0.198754ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:348:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:357:1
+✖ R11 re-read: a package of another feature is refused (0.171293ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:358:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:364:1
+✖ R12 re-read: malformed approval inputs are a typed input refusal (0.124982ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:365:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (82.241126ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-package.test.mjs:936:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (2456.886138ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:67:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (2470.457012ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:75:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (2498.309982ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:84:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (2457.312906ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:97:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (2550.506328ms)
+  Error: DRHS-UNSAFE-DIRECTORY
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:20:40)
+      at checkedDirectory (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:65:84)
+      at ensurePrivatePath (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:75:3)
+      at createDesignReadinessRunnerHostStore (file://<repo-root>/plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs:108:21)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:53:14)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'DRHS-UNSAFE-DIRECTORY'
+  }
+
+--- stderr ---

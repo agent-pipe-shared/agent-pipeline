@@ -1,0 +1,117 @@
+// DRAFT, UNMEASURED (ONB-T2-20261009 hand-back). Target path once measured:
+// plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (NEW file, Ruling 163).
+// Pattern copied from onboarding-first-restart-intake.test.mjs (lines 1-24 and 197-202): local
+// two-argument test() collector + registerTestCaseCompletion, fixtures IMPORTED from
+// ./project-onboarding-v3.test.mjs (that file exports root, dispose, fakeDeps, fakeGit,
+// clearRuntimeBarrier and registers zero cases when imported, lines 149-162 of it).
+// DEVIATION to rule on: the briefing says "copy the minimal fixture helpers"; fakeDeps alone is ~250
+// lines (v3 test 484-738), so this draft imports them exactly like onboarding-first-restart-intake.test.mjs.
+// SPDX-License-Identifier: SUL-1.0
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { openSync as openCompletionDescriptor } from "node:fs";
+import { devNull } from "node:os";
+
+const completionCases = [];
+function test(name, run) {
+  if (arguments.length !== 2 || typeof run !== "function") throw new TypeError("Required completion expects the preserved two-argument test registration");
+  completionCases.push({ id: "GFW" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+}
+import assert from "node:assert/strict";
+import { root, dispose, fakeDeps, fakeGit, clearRuntimeBarrier } from "./project-onboarding-v3.test.mjs";
+import {
+  inspectProjectOnboardingV3, planProjectOnboardingV3, applyProjectOnboardingV3,
+  planProjectOnboardingLifecycleV4, applyProjectOnboardingLifecycleV4,
+} from "./project-onboarding-v3.mjs";
+import { readRestartBarrier } from "./codex-onboarding-runtime.mjs";
+import { planOnboardingIntakeGenerate } from "./onboarding-continuity.mjs";
+import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+
+// F3 (argv half ONLY; the language half is ruled out, Ruling 163). Owner:
+// intakeConsentAction, plugins/pipeline-core/lib/project-onboarding-v3.mjs 2755-2759:
+// `argv.indexOf("--text-file")` is -1 for runner claude (line 2743 only pushes --text-file for
+// non-claude), so `argv.slice(0, -1)` drops the RUNNER VALUE and the tail appends a second
+// `--activate --runner claude`. Expected RED today: "--runner" count 2, "--activate" count 2, and the
+// first "--runner" is followed by "--text-file" (value lost).
+// Open ruling (do not guess): whether the claude consent existingFileApplyAction may carry
+// `--text-file <path> --text-file-sha256 <sha>` at all. CONT36 said "no --text-file", Ruling 163 narrowed
+// F3 to the doubled/dropped tokens only. This pin forbids the doubling and the lost value, and allows
+// at most ONE --text-file, so it holds under either answer.
+test("greenfield walk F3: the claude consent existingFileApplyAction has one --runner with its value and one --activate", () => {
+  const path = root();
+  try {
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "claude" });
+    const runtimeSha = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "claude", planSha256: runtimeSha, activate: true }).status, "intake-required");
+    const observed = inspectProjectOnboardingV3({ rootDir: path, runner: "claude", deps: fakeDeps });
+    assert.equal(observed.status, "intake-required");
+    const argv = observed.nextAction.existingFileApplyAction.argv;
+    const count = (flag) => argv.filter((value) => value === flag).length;
+    const shown = JSON.stringify(argv);
+    assert.equal(argv[1], "intake-consent-apply", shown);
+    assert.equal(count("--runner"), 1, `doubled --runner: ${shown}`);
+    assert.equal(argv[argv.indexOf("--runner") + 1], "claude", `--runner lost its value: ${shown}`);
+    assert.equal(count("--activate"), 1, `doubled --activate: ${shown}`);
+    assert.ok(count("--text-file") <= 1, `more than one --text-file: ${shown}`);
+    assert.equal(argv.includes("--text"), false, shown);
+  } finally { dispose(path); }
+});
+
+// F4. Owners: the CLI result assembly in plugins/pipeline-core/scripts/project-onboarding-v3.mjs, branches
+// at 904-952 (intake-consent-apply), 953-955 (intake-capture-apply), 956-964 (design-questions),
+// 971-973 (intake-generate-apply): none attaches `nextAction`. The `inspect` nextAction is the value the
+// apply must return. Plus: the nextAction of the intake-generate-plan summary (script line 773,
+// `plan.nextAction` from planOnboardingIntakeGenerate in lib/onboarding-continuity.mjs; locate the argv
+// builder with `rg -n "intake-generate-apply" plugins/pipeline-core/lib/onboarding-continuity.mjs`)
+// must carry `--runner <runner>` like its neighbours. Expected RED today: mismatches lists all four
+// applies; the generate-plan nextAction lacks --runner.
+// UNMEASURED RISK: the CLI route for intake-generate-plan/apply under fakeGit. The v3 test (9239-9258)
+// calls planOnboardingIntakeGenerate/applyOnboardingIntakeGenerate DIRECTLY because the CLI wrapper
+// does not thread an injected spawn. If the CLI generate-apply cannot run on fakeGit, measure it with a
+// real-git root (see project-onboarding-v3-argv-closure.test.mjs) in a second case, and keep this case
+// to the three applies that do run, naming the generate-apply as the remainder.
+test("greenfield walk F4: every intake apply returns the nextAction a following inspect returns, and generate-plan carries --runner", () => {
+  const path = root();
+  const deps = { ...fakeDeps, spawn: fakeGit, prepareBoundDesignLineEndings: () => ({ ok: true, code: "FIXTURE-LINE-ENDINGS-READY" }) };
+  const invoke = (args) => {
+    let out = ""; let err = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { out += chunk; }, writeError: (chunk) => { err += chunk; } });
+    assert.equal(code, 0, err);
+    return JSON.parse(out);
+  };
+  const inspect = () => inspectProjectOnboardingV3({ rootDir: path, runner: "codex", deps: fakeDeps });
+  const mismatches = [];
+  const compare = (step, applied) => {
+    const returned = JSON.stringify(applied.nextAction ?? null);
+    const following = JSON.stringify(inspect().nextAction ?? null);
+    if (returned !== following) mismatches.push(step);
+  };
+  try {
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "codex" });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    compare("intake-consent-apply", invoke(["intake-consent-apply", "--root", path, "--granted", "--language", "en", "--profile", "feature", "--activate", "--runner", "codex"]));
+    compare("intake-capture-apply", invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]));
+    // Same runtime barrier crossing as v3 test 9207-9210.
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex" });
+    const runtimeSha = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", runner: "codex", planSha256: runtimeSha, activate: true }).status, "restart-required");
+    clearRuntimeBarrier(path, readRestartBarrier({ rootDir: path, spawn: fakeGit }));
+    const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
+    compare("intake-design-questions-apply", invoke(["intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex"]));
+    const generatePlan = invoke(["intake-generate-plan", "--root", path, "--summary", "--runner", "codex"]);
+    const planArgv = generatePlan.nextAction.argv;
+    assert.notEqual(planArgv.indexOf("--runner"), -1, `intake-generate-plan nextAction has no --runner: ${JSON.stringify(planArgv)}`);
+    assert.equal(planArgv[planArgv.indexOf("--runner") + 1], "codex");
+    const fullPlan = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    compare("intake-generate-apply", invoke(["intake-generate-apply", "--root", path, "--plan-sha256", fullPlan.planSha256, "--activate", "--runner", "codex"]));
+    assert.deepEqual(mismatches, [], "these applies return a nextAction that differs from the following inspect");
+  } finally { dispose(path); }
+});
+
+if (completionCases.length !== 2) throw new Error("Required completion declared case count drift");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openCompletionDescriptor(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: completionCases, fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

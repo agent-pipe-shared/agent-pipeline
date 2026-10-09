@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R7-3-F1b2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["77bd8dad894d353db3a991261c56d76d6b69ce57"],
+  "resultSha256": null,
+  "report": {
+    "text": "Status: implementation complete (gate committed 77bd8dad8); independent review: pending (criticRequired T3, Opus Critic follows after R7-3-F1d); PO acceptance pending. Route pre-check: requested goldfish-deep claude-sonnet-5-5/xhigh, observed model claude-sonnet-5-5 (runtime prompt), effort not directly observable (disclosed, not a contradiction).\n\n6-FIRST. BRIEFING DEFECT / OPEN ITEM: the briefing says R7-3-T2c/T2d (92a0f98d7) committed the package in every fixture. False for one of the 8 Ruling 88 cases: 92a0f98d7 touched only 4 test files (design-workflow-evidence-descendant, design-workflow-package-v2, po-gate-authority, pipeline-state-rebind-runner); project-onboarding-e2e.test.mjs was NOT touched, and no later commit touched it. In freshDriver (:1017-1036) the fixture still materializes the package and calls present-plan with no git add/commit. The case 'in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary' is red in BEFORE and in AFTER, so by-name comparison does not flag it, but the failure MOVED: BEFORE at project-onboarding-e2e.test.mjs:1607 (DAA-PUBLIC-UNAVAILABLE, a third red the briefing did not list, same code as DWP21, possibly one root cause) ; AFTER at :1036 via freshDriver :1453 (present-plan refused DWP-BOUND-PATH-UNTRACKED). The AFTER run therefore no longer exercises the approval path between :1036 and :1607. Required follow-up: a test-only slice that commits the package between materializeTestDesignWorkflowPackage and present-plan in freshDriver (about :1033), plus resolution of the DAA-PUBLIC-UNAVAILABLE root cause (DWP21 and the e2e :1607 red). Elephant decision: commit 77bd8dad8 is local and unpushed; revert it if the gate must not land before that slice.\n\n1. DoD: (1) BEFORE capture under WSL: passed, 89 tests / 82 pass / 6 fail / 1 skipped, wrapped exit 1. (2) edit + node --check: passed, exit 0. (3) AFTER capture: passed, 89 / 85 / 3 / 1, wrapped exit 1; the three R7-3a pins (IGNORED, UNTRACKED, MODIFIED) turned green; no case green in BEFORE is red in AFTER by test name. (4) harness/scripts/check-consumer-safe-paths.test.mjs: passed, 9/9, exit 0 (WSL). (5) one-file commit 77bd8dad8, exact trailers Dispatch: R7-3-F1b2-20261009 (goldfish) and AI-Assisted: true: passed (36 insertions, git add then git commit -F separately, no guard refusal). (6) terminal record: written after the commit.\n\nReds BEFORE (6): EVDESC-h (DAC-FINAL-ENDPOINT, owned by F1d); DWP21 (DAA-PUBLIC-UNAVAILABLE, design-workflow-package.test.mjs:936 in AFTER); e2e in-process driver (:1607 DAA-PUBLIC-UNAVAILABLE); R7-3a IGNORED pin; R7-3a UNTRACKED pin; R7-3a MODIFIED pin. Reds AFTER (3): EVDESC-h (evidence-descendant.test.mjs:391, refused:DAC-FINAL-ENDPOINT where DWP2-CURRENT-CANDIDATE is pinned, unchanged cause); DWP21 (unchanged); e2e in-process driver (:1036 DWP-BOUND-PATH-UNTRACKED, see item 6-FIRST).\n\n2. Evidence: evidence/R7-3-F1b2-20261009/before.txt and after.txt (written by capture-evidence.mjs; command: wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/R7-3-F1b2-20261009/{before,after}.txt --label {before,after} -- node --test <the 8 suites of the briefing>'; wrapped exit 1 both). Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0. Syntax: node --check plugins/pipeline-core/lib/design-workflow-approval.mjs, exit 0. Platform scope: the runs were WSL/Linux only; Windows-native, macOS and non-Claude runners were not run (the gate shells out to git with cwd=repoRoot, no platform-specific code).\n\n3. Changed files: plugins/pipeline-core/lib/design-workflow-approval.mjs (execFileSync import, gitStatus + refuseUnsoundBoundPath, two call lines in createDesignWorkflowPackageApprovalRequest; R4-S3c forwarding lines untouched). Non-repo-tracked outputs: evidence/R7-3-F1b2-20261009/{before,after}.txt, evidence/dispatch-record-R7-3-F1b2-20261009.json, scratch/commit-msg/R7-3-F1b2.txt.\n\n4. Deliberately not changed: every test file (including project-onboarding-e2e.test.mjs, see 6-FIRST); po-human-approval.mjs and the other foreign uncommitted edits; foreign staged files (exact pathspec only); design-workflow-package.mjs, -v2.mjs; hooks/, lib/guard/, harness/.\n\n5. Deviations from spec: none. Gate applied by hand (no git apply) per the rebased recipe.\n\n6. Open items: independent review pending (Opus Critic after R7-3-F1d); the e2e fixture fault and the DAA-PUBLIC-UNAVAILABLE root cause above; the DUTY-NOT-RUNTIME-LIVE preflight diagnostic listed 5 differing plugin files (agents/critic.md, two references, two templates), not mine and not touched. No stop condition fired.",
+    "changedFiles": ["plugins/pipeline-core/lib/design-workflow-approval.mjs"]
+  },
+  "log": [
+    {
+      "phase": "opening-record-written",
+      "toolUses": 6,
+      "note": "route pre-check: requested goldfish-deep claude-sonnet-5-5/xhigh; observed model claude-sonnet-5-5 from runtime prompt; effort not directly observable (disclosed, not a contradiction); preflight ran ready after GUARD-BOOTSTRAP-RECEIPT-MISSING"
+    },
+    {
+      "phase": "BEFORE capture done (WSL 8 suites)",
+      "toolUses": 22,
+      "evidence": "evidence/R7-3-F1b2-20261009/before.txt (wrapped exit 1)",
+      "note": "89 tests / 82 pass / 6 fail / 1 skipped. Reds: EVDESC-h (foreign, F1d), DWP21 (foreign), e2e 'in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary' (red BEFORE the edit), 3 R7-3a pins (IGNORED, UNTRACKED, MODIFIED)"
+    },
+    {
+      "phase": "gate applied by hand (hunk 1 import, hunk 2 gitStatus+refuseUnsoundBoundPath, hunk 3 two lines after DWP-APPROVAL-BINDING return); node --check ok; AFTER capture done",
+      "toolUses": 41,
+      "evidence": "evidence/R7-3-F1b2-20261009/after.txt (wrapped exit 1)",
+      "note": "89 tests / 85 pass / 3 fail / 1 skipped. 3 R7-3a pins GREEN. Reds in AFTER: EVDESC-h (DAC-FINAL-ENDPOINT, F1d), DWP21 (DAA-PUBLIC-UNAVAILABLE), e2e in-process driver. Every AFTER red is also red in BEFORE: no green-to-red by test name. check-consumer-safe-paths.test.mjs 9/9 exit 0. FINDING: e2e in-process driver failure MOVED from :1607 DAA-PUBLIC-UNAVAILABLE (BEFORE) to :1036 DWP-BOUND-PATH-UNTRACKED via freshDriver :1453 (AFTER): that fixture still never commits its package; 92a0f98d7 did not touch project-onboarding-e2e.test.mjs and no later commit has"
+    }
+  ]
+}

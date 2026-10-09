@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-J-D-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["45f8c3649"],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["45f8c3649: partial diagnosis note (3 of 5 reds traced)"],
+    "verifiedGreen": [{ "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exitCode": 0 }],
+    "remainsUndone": ["cases :1852 and :1905 not diagnosed", "exact win32/Linux production divergence line in lib/project-onboarding-v3.mjs near :5425 not read"],
+    "nextBriefingAdjustments": ["budget 35 was too small: ~10 calls lost to guard refusals (parallel preflight race, inline node -e, directory-wide Grep, host-path in evidence write)", "scope next dispatch to :1852/:1905 plus the project-onboarding-v3.mjs runtime-readback branch only", "use exact file paths for Grep"]
+  },
+  "log": [
+    { "phase": "opening", "toolUses": 8 },
+    { "phase": "diagnosis of :1544/:1572/:1720", "toolUses": 28 },
+    { "phase": "note written and committed 45f8c3649", "toolUses": 35 }
+  ],
+  "report": {
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md"],
+    "text": "Closing-allowance handover, PARTIAL. Committed 45f8c3649 (note only). Three onboarding-gate reds (:1544, :1572, :1720): test defect, fixture leaks the live repo; preflight() helper passes no cwd/requireProjectOnboardingReadyFn so the real gate runs on process.cwd() (pipeline-start-preflight.mjs:1035,1043,1439-1447,1609-1630); live gate reports runtime-attestation-required for runner codex (lib/project-onboarding-v3.mjs:5425). Proposed test-only slice: default a hermetic ready requireProjectOnboardingReadyFn in the preflight() helper. :1852 and :1905 not reached. consumer-safe check exit 0. independent review: pending."
+  }
+}

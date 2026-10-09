@@ -1,0 +1,164 @@
+command: node --test plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs plugins/pipeline-core/scripts/capture-evidence.test.mjs plugins/pipeline-core/lib/model-family-route-source.test.mjs
+label: TR-I-T-red
+exitCode: 1
+head: 56ec8c380185712f5b7c09fae6c5c615c5e5ff1c
+tree: de0e8794329fb9707538155c841eb5f6f168889f
+dirty: true
+--- stdout ---
+file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79:21)
+    at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+    ... 5 lines matching cause stack trace ...
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:71:23)
+      at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+      at buildRecorder (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:149:3)
+      at registerTestCaseCompletion (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:215:20)
+      at file://<repo-root>/plugins/pipeline-core/lib/model-family-route-source.test.mjs:70:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+      at async node:internal/modules/esm/loader:639:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/lib/model-family-route-source.test.mjs (144.216773ms)
+✔ redactText strips a plain-path occurrence and a file:// occurrence of the repo root, and a separate home-dir occurrence (1.08624ms)
+✔ formatArtifact matches the de facto backlog/evidence/ shape (0.193954ms)
+✔ formatJsonArtifact produces candidate-bound machine-readable focused evidence (0.582921ms)
+✔ parseArgs accepts the explicit JSON evidence format and rejects lookalikes (0.421968ms)
+✔ captureEvidence: a failing command with the repo root in both plain and file:// form is fully redacted, and the exit code is recorded and preserved (67979.44107ms)
+✔ captureEvidence: a passing command is captured with exit code 0 (63468.148542ms)
+✔ captureEvidence: a command that writes nothing still produces a well-formed artifact with the recorded exit code (53658.843934ms)
+✔ captureEvidence: a spawn failure (command not found) throws and writes no artifact -- never collapsed into a fabricated exit code (46826.937627ms)
+✔ captureEvidence: a maxBuffer overflow throws (fails loudly) instead of writing a silently truncated artifact (42572.696363ms)
+✔ findResidualHostPath: returns null when no covered shape is present (0.209334ms)
+✔ findResidualHostPath: catches a POSIX user-home path (0.179084ms)
+✔ findResidualHostPath: catches a macOS user-home path (0.117542ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, backslash spelling (0.060731ms)
+✔ findResidualHostPath: catches a Windows drive-letter path, forward-slash spelling (0.085802ms)
+✔ findResidualHostPath: does NOT false-positive on an ordinary URL scheme like file:// or https:// (0.091682ms)
+✔ findResidualHostPath: catches a percent-encoded POSIX user-home path (AC-3, the mandatory half) when the literal /home/ separator never appears (0.069841ms)
+✔ captureEvidence: redacts a residual /home/ path and writes complete evidence (48754.022218ms)
+✔ captureEvidence: redacts a residual Windows drive-letter path without losing the command result (6173.339117ms)
+✔ redactResidualHostPaths removes multiple literal and encoded shapes in one pass (0.134523ms)
+✔ redactResidualHostPaths removes complete WSL mount and UNC paths without leaving host prefixes (0.207214ms)
+✔ captureEvidence accepts a reporter line containing the Greenfield Windows fixture literal (6061.508581ms)
+✔ findResidualHostPath: catches a percent-encoded Windows drive-letter path immediately after an encoded path separator (F4 false-negative repro) (0.135443ms)
+✔ findResidualHostPath: catches a percent-encoded macOS user-home path (AC-3, previously untested) (0.078532ms)
+✔ findResidualHostPath: the F4 fix does not reopen a false positive on a fully percent-encoded URL scheme (0.055641ms)
+✔ findRepoRoot: resolves the actual repository root for a cwd inside this checkout (31.267985ms)
+✔ findRepoRoot: throws a hard stop (never guesses) for a cwd outside any Git working tree (2.327894ms)
+✔ parseArgs: throws when the -- separator is absent (0.102572ms)
+✔ parseArgs: throws when no command follows -- (0.061941ms)
+✔ parseArgs: throws when --out is missing (0.116782ms)
+✔ parseArgs: throws when --label is missing (0.087982ms)
+✔ parseArgs: throws on an unrecognized flag (0.121083ms)
+✔ parseArgs: parses a valid invocation, and everything after -- is the command verbatim (including tokens that look like flags) (0.222284ms)
+✔ runCli (CLI process): the success line names the artifact path with the repo root redacted, never the absolute host path (F2) (84.017686ms)
+✔ runCli (CLI process): an fs error on the write path is redacted on stderr too, never the absolute host path (F2) (81.67622ms)
+✔ runCli (CLI process): an unrecognized-flag error carrying a covered-shape absolute path is never printed raw on stderr (F-A) (48.993136ms)
+✔ runCli (CLI process): an ordinary unrecognized-flag error with no embedded host path still surfaces its usual diagnostic detail (F-A, no-overreach guard) (51.538963ms)
+✔ runCli (CLI process): a generic UNC share root in an argument error is refused on stderr (61.54795ms)
+✔ runCli (CLI process): the success line refuses to print an --out path that resolves outside repoRoot/homeDir and matches a covered shape, but preserves the wrapped exit code (F-B) (89.44564ms)
+✔ runCli (CLI process): a filesystem error naming an out-of-root path matching a covered shape is never printed raw on stderr (F-B, error-channel backstop) (83.166325ms)
+✔ captureEvidence: a relative `out` resolves against the given `cwd`, not the implicit process.cwd() (F-E) (32.782933ms)
+✔ EVID-T: header carries head equal to git rev-parse HEAD (100.326064ms)
+✔ EVID-T: header carries tree equal to git rev-parse HEAD^{tree} (98.923808ms)
+✔ EVID-T: dirty is false on a clean repository (100.741257ms)
+✔ EVID-T: dirty is true after a tracked file is modified (103.973558ms)
+✔ EVID-T: outside a Git repository the three identity lines read unavailable (30.323568ms)
+✔ EVID-T: a child exiting 3 still records exitCode 3 and the CLI exits 3 (106.413458ms)
+✔ EVID-T / T60 characterisation pin (TR-I-T, GREEN today): one artifact header carries head, tree and dirty together, in order (110.473395ms)
+✔ control: clean tree, default mode scans HEAD and passes (fixture validity, GREEN today) (137.711891ms)
+✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (77.367075ms)
+✖ T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (73.082234ms)
+✔ T32 pin 2 (GREEN today, guards the kept behaviour): shared-tree mode still refuses a dirty tree (69.08415ms)
+ℹ tests 52
+ℹ suites 0
+ℹ pass 49
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 336867.462327
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/model-family-route-source.test.mjs:1:1
+✖ plugins/pipeline-core/lib/model-family-route-source.test.mjs (144.216773ms)
+  'test failed'
+
+test at plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:144:1
+✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (77.367075ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      commit: '8afbf01d59d85d467b455d02b2c8a2a87be92521',
+  +   exitCode: 2,
+  -   exitCode: 0,
+      scanners: [
+        {
+          findingCount: 0,
+  +       status: 'ERROR',
+  -       status: 'PASS',
+          tool: 'license-check'
+        }
+      ],
+      tree: '52199202f481506dfc1bee9971b0a7f1f842dfdd'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:151:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { exitCode: 2, scanners: [ [Object] ], commit: '8afbf01d59d85d467b455d02b2c8a2a87be92521', tree: '52199202f481506dfc1bee9971b0a7f1f842dfdd' },
+    expected: { exitCode: 0, scanners: [ [Object] ], commit: '8afbf01d59d85d467b455d02b2c8a2a87be92521', tree: '52199202f481506dfc1bee9971b0a7f1f842dfdd' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:163:1
+✖ T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (73.082234ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      commit: '7c75e2090313fc80f2f0ef7c2ca262d4531c2d33',
+      exitCode: 2,
+      scanners: [
+        {
+  +       findingCount: 0,
+  +       status: 'ERROR',
+  -       findingCount: 1,
+  -       status: 'FINDINGS',
+          tool: 'license-check'
+        }
+      ],
+      tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:169:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { exitCode: 2, scanners: [ [Object] ], commit: '7c75e2090313fc80f2f0ef7c2ca262d4531c2d33', tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f' },
+    expected: { exitCode: 2, scanners: [ [Object] ], commit: '7c75e2090313fc80f2f0ef7c2ca262d4531c2d33', tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

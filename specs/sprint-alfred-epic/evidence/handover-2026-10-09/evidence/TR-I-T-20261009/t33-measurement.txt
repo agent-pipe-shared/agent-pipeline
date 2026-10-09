@@ -1,0 +1,48 @@
+command: node --test plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs
+label: TR-I-T-t33-measurement
+exitCode: 1
+head: ecf4bad9317acdccf6b887b11b8ee96fe69fc0d4
+tree: 8b447f6d653985b880b14568b8b7e455c1f5fa9a
+dirty: true
+--- stdout ---
+file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79:21)
+    at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs:171:1 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:71:23)
+      at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+      at buildRecorder (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:149:3)
+      at registerTestCaseCompletion (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:215:20)
+      at file://<repo-root>/plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs:171:1 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs (4757.738734ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4769.067265
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs (4757.738734ms)
+  'test failed'
+
+--- stderr ---

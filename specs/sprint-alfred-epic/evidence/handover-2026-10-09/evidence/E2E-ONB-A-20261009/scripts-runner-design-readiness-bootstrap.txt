@@ -1,0 +1,25 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs
+label: scripts-runner-design-readiness-bootstrap
+exitCode: 0
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ Claude and Antigravity invocations keep source content out of stdin and disable or bound tool access (2.058674ms)
+✔ Antigravity stream rejects tool-bearing and incomplete executions (0.480368ms)
+✔ Claude and Antigravity bootstraps publish host-observed receipts bound to committed sources (3758.56972ms)
+✔ declined export stops before route, executable resolution, or runner launch (29.631954ms)
+✔ source drift during the child run prevents publishing a readiness receipt (191.50143ms)
+✔ hotfix 7: claude --json-schema parses to the input schema minus the top-level $schema/$id, and the input schema is not mutated (0.703691ms)
+✔ hotfix 7: claude argv differs from the antigravity/plain shape only in the --json-schema value, and a schema without the metadata is passed through byte for byte (0.329705ms)
+✔ hotfix 7: antigravity still carries the full schema and the argument validation is unchanged (0.388216ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5820.915032
+
+--- stderr ---

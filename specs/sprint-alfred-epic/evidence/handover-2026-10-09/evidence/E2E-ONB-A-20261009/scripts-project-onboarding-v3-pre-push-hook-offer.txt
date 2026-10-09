@@ -1,0 +1,24 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/project-onboarding-v3-pre-push-hook-offer.test.mjs
+label: scripts-project-onboarding-v3-pre-push-hook-offer
+exitCode: 0
+head: 3211c15eafe9d042e29ced644e0581853907a0c6
+tree: cae39dbc20f88836d4da65f38315c975eb5ba108
+dirty: true
+--- stdout ---
+✔ buildPrePushHookOfferAction: hook absent + gates.push blocking -> unbackedGate true, gap text present (27.61056ms)
+✔ buildPrePushHookOfferAction: hook absent + no manifest at all -> unbackedGate false, no gap field (18.497062ms)
+✔ buildPrePushHookOfferAction: hook absent + gates.push warn (not blocking) -> unbackedGate false (24.589041ms)
+✔ buildPrePushHookOfferAction: hook absent + gates.push off -> unbackedGate false (24.289446ms)
+✔ buildPrePushHookOfferAction: declined + gates.push blocking -> reported as unbacked gate, not merely 'declined' (27.215613ms)
+✔ buildPrePushHookOfferAction: declined + no manifest -> unbackedGate false, no gap field (23.236479ms)
+✔ buildPrePushHookOfferAction: hook installed + gates.push blocking -> null (backed, nothing to offer or flag) (18526.620583ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20390.956779
+
+--- stderr ---

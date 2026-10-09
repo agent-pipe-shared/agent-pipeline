@@ -1,0 +1,25 @@
+{
+  "taskId": "KERNEL-DOCS-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "commits": ["ad96ef730"],
+  "log": [
+    {"phase": "opening; preflight run; GMWKC03 is SUPERSET", "toolUses": 4},
+    {"phase": "(a) doc edited and committed ad96ef730; closure capture done", "toolUses": 33}
+  ],
+  "report": {
+    "done": [
+      "(a) GMWKC03 is doc SUPERSET list. Added the 15 paths to Protected assets prose; committed ad96ef730 (docs/guard-maintenance-window-threat-model.md only).",
+      "Native capture evidence/KERNEL-DOCS-20261009/closure.txt (git-ignored dir, not committed): GMWKC03 PASS, GMWKC03a PASS, GMWKC01 FAIL (26 violations, expected), 9 passed 1 failed.",
+      "Other docs: docs/adr/0058-guard-maintenance-window.md, docs/doc-reconciliation.md mention NEVER_LIFTABLE_KERNEL_PATHS only; docs/human-authorization-inventory.md and docs/product-capability-inventory.json have no match. None enumerate the list entry by entry, none changed."
+    ],
+    "remaining": [
+      "(b) guard-split-map entry for lib/guard/env-dump-lane.mjs: NOT started beyond orientation. evaluate.mjs imports env-dump-lane (line 33) next to dispatch-record-lane, gate-strength-lane, devplan-shell-lane, rebase-lane, etc. The layer of those siblings in harness/guard-split-map.json was not yet read (the rg call was refused for the multi-file/-B flags; use Read on the file).",
+      "split.txt capture, Edit attempt on harness/guard-split-map.json (or post-image + sha256 README line), consumer-safe check, terminal record."
+    ],
+    "nextStep": "Read harness/guard-split-map.json, pick sibling layer, try Edit, then run capture-evidence on guard-split-contract.test.mjs to evidence/KERNEL-DOCS-20261009/split.txt.",
+    "notVerified": "node --test harness/scripts/check-consumer-safe-paths.test.mjs not run. Prose in the new doc paragraph describing module functions is inferred from module names, not from reading each module."
+  }
+}

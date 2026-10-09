@@ -1,0 +1,81 @@
+command: node --test plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+label: cmi-native-after
+exitCode: 1
+head: 193c405117e4d7f56f6db0c8b9cc3d8413a3cd6e
+tree: 1ec30532ac91452b808e499c63e7e66542c9121e
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: commit-msg-hook-plugin-UJRw9I
+✔ CMI001 installed hook allows a valid contiguous Pipeline provenance block (10722.2648ms)
+✖ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (0.4474ms)
+✔ CMI003 installed hook blocks provenance split by a blank line (10183.8944ms)
+✔ CMI004 installed hook blocks marker-only provenance (10617.0122ms)
+✔ CMI005 installed hook blocks dispatch-only provenance (10452.8954ms)
+✔ CMI006 installed hook blocks provider and session correlation (10687.9321ms)
+✔ CMI007 installed hook blocks an unprovenanced commit in a Pipeline-managed repository (11092.6298ms)
+✔ CMI008 installed hook blocks a shell-script-wrapped commit without Pipeline provenance (10791.5202ms)
+✔ CMI009 absent policy defaults to blocking incomplete signaled provenance (10508.5157ms)
+✔ CMI010 warn policy reports incomplete signaled provenance but allows the commit (10712.0556ms)
+✔ CMI011 off policy does not produce provenance findings (11236.2224ms)
+✔ CMI012 off policy still blocks provider and session correlation (10982.9061ms)
+✔ CMI013 applyInstall refuses a foreign commit-msg hook without changing it (2266.6734ms)
+✔ CMI014 install, managed upgrade and removal preserve ownership checks (12624.1554ms)
+✔ CMI015 commit hook blocks unapproved staged implementation paths but still permits documentation (16221.1276ms)
+✔ CMI016 upgrade and removal refuse a modified managed hook (7432.3283ms)
+✔ CMI017 upgrade and removal refuse a modified managed implementation (7300.5039ms)
+✖ CMI018 generated hook fails closed when Git's message file is unreadable (7606.0712ms)
+✔ CMI019 generated hook fails closed when its install-bound policy module is unavailable (11304.7281ms)
+✔ CMI020 decline marker has the same reversible, non-overwriting contract as the other hook installers (10069.8079ms)
+✔ CMI021 installed hook permits first permissions settings but rejects new hook authority (14238.8643ms)
+✔ CMI022 installed hook compares settings hooks against Git base and exact staged deletions (17360.7533ms)
+✔ CMI023 --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (161.5729ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 21
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 226086.0207
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (0.4474ms)
+  Error: ENOENT: no such file or directory, mkdtemp '<home-path> path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line
+  next-XXXXXX'
+      at mkdtempSync (node:fs:3111:18)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs:105:15)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'mkdtemp',
+    path: "<host-path> path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line\nnext-XXXXXX"
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ CMI018 generated hook fails closed when Git's message file is unreadable (7606.0712ms)
+  AssertionError [ERR_ASSERTION]: The "string" argument must be of type string. Received type undefined (undefined)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs:308:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /could not be read/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+--- stderr ---

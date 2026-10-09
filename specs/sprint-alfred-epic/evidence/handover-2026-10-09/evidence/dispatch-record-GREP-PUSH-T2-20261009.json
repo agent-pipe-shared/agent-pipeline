@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "GREP-PUSH-T2-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "sonnet",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3211c15eafe9d042e29ced644e0581853907a0c6",
+  "resultSha256": null,
+  "outcome": "completed",
+  "commits": ["f06b434a2"],
+  "log": [
+    { "phase": "orientation-complete-record-opened", "toolUseCount": 8 },
+    { "phase": "manifest written, consumer-safe-paths exit 0", "toolUseCount": 29 },
+    { "phase": "committed f06b434a2, terminal record", "toolUseCount": 32 }
+  ],
+  "report": {
+    "text": "Implementation complete, independent review: pending. DoD: GREP-PUSH-MANIFEST.md written (passed); node harness/scripts/check-consumer-safe-paths.mjs exit 0 (passed, stdout: 1769 tracked files, 152 allowlist entries); one commit f06b434a2 of the test post-image (sha256 68def38e..., unchanged, re-measured) and the manifest (passed). Deviations: commit message trailer changed to Dispatch: GREP-PUSH-T2-20261009 (goldfish) because the T-20261009b record is stopped-without-commit; the count in the message already said 22 refused. commits holds the short SHA f06b434a2 (budget exhausted before rev-parse; the dispatcher should resolve it to 40-hex). No suite re-run, no checkpoint write between commit and this record. Red.txt measurement is the Elephant's.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/GREP-PUSH-MANIFEST.md"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "runner": "claude"
+}

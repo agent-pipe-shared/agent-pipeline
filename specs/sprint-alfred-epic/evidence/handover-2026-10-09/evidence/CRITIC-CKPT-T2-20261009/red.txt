@@ -1,0 +1,383 @@
+command: node --test --test-reporter=spec scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.test.mjs
+label: CRITIC-CKPT-T2-red
+exitCode: 1
+head: b0d1ff11d5758914260f2d2784112cf72e5f9600
+tree: 0c2ee651cac3f12651be9c54c0c25fbe061b14a8
+dirty: true
+--- stdout ---
+✔ subagentIdentity: transcript_path under a subagents/ directory with valid meta.json resolves as a dispatched subagent (2619.286681ms)
+✔ subagentIdentity: transcript_path NOT under a subagents/ directory resolves as the orchestrator (2614.541967ms)
+✔ subagentIdentity: missing transcript_path is unresolved (ambiguous), not orchestrator (2812.466983ms)
+✔ subagentIdentity: a present but relative transcript_path is a distinct kind, never merged into 'unresolved' (2681.944931ms)
+✔ subagentIdentity: a present but non-string, non-null transcript_path is invalid-identity, not unresolved (2720.952744ms)
+✔ subagentIdentity: a null transcript_path is unresolved (treated as absent), not invalid-identity (2700.46166ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id is the orchestrator to this guard regardless of its transcript_path shape -- exit 0 (2914.577592ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id writes no counter and no unresolved.jsonl -- it is the orchestrator to this guard, full stop, whatever its transcript_path looks like (2915.030648ms)
+✔ subagentIdentity: missing sibling meta.json is unresolved (2682.893243ms)
+✔ subagentIdentity: spawnDepth that is not a number >= 1 is unresolved, never force-fit (2648.019447ms)
+✔ resolveMaxTurns: reads the live maxTurns value out of a real agent definition's frontmatter (no mocking) (2676.936541ms)
+✔ resolveMaxTurns: unknown agent name resolves null rather than throwing (2648.891944ms)
+✔ resolveGitCommonDir: resolves a real .git directory in this checkout (no mocking) (2585.100933ms)
+✔ evaluateDispatchBudgetGuard: counts across calls, allowing every call up to the working cap (3738.071017ms)
+✔ evaluateDispatchBudgetGuard: refuses a non-closing working call once the cap is crossed (4022.295266ms)
+✔ evaluateDispatchBudgetGuard: malformed persisted counts fail closed without being reset or overwritten (11155.082745ms)
+✔ evaluateDispatchBudgetGuard: each permitted closing act still passes after the cap (4696.55154ms)
+✔ evaluateDispatchBudgetGuard: exactly five post-cap closing calls pass and the sixth is denied (5585.318445ms)
+✔ evaluateDispatchBudgetGuard: a denied work attempt consuming the final slot reports closing exhaustion (5036.117827ms)
+✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10015.717879ms)
+✔ evaluateDispatchBudgetGuard: the orchestrator branch records exactly one bounded observation for its session (NVA-BUDGETROOT-1) (2908.168301ms)
+✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10015.163912ms)
+✔ evaluateDispatchBudgetGuard: rootDir precedence -- assert the actual resolveGitCommonDirFn argument in all three precedence cases (8498.078795ms)
+✔ evaluateDispatchBudgetGuard: a null git common dir is observed on stderr, and the allow verdict is unchanged (2926.776094ms)
+✔ evaluateDispatchBudgetGuard: orchestrator with an unresolvable common dir is still allowed, observed via stderr only, and persists nothing (2959.366455ms)
+✔ evaluateDispatchBudgetGuard: a write failure in the new orchestrator observation sink never changes the allow verdict (2992.500715ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped transcript_path with no agent_id is still the orchestrator to this guard -- transcript_path shape is no longer read at all for this guard's own identity step (2918.906771ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): an unresolvable maxTurns (unknown agent_type carried directly on the payload) still allows and records (2911.670406ms)
+✔ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (7945.946468ms)
+✔ an altered pending record cannot overwrite an already-bound child counter (2991.839023ms)
+✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10015.111665ms)
+✔ a budget-bearing child with an attested parent tool id but no pending binding fails closed (2931.873743ms)
+✔ a live counter owner blocks a second acquisition and releases its exact inode (2721.438998ms)
+✔ a complete lock in its two-link publication interval is retryable contention (2707.789068ms)
+✔ a binding lock left by a dead process is identity-checked and recovered (5465.010404ms)
+✔ concurrent authenticated child calls serialize counter RMW without lost increments (3152.082088ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the two measured live PreToolUse payload key sets are pinned as fixtures (0.158362ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured subagent-shaped fixture is counted -- a counter file is written carrying its agentId and agentType (2837.943829ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured orchestrator-shaped fixture is never counted -- no per-agent counter file is ever written for it (2830.798207ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying agent_type without agent_id is recorded as unattributable, not silently absorbed into the orchestrator marker (2833.638644ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a blank agent_id is recorded as unattributable, not the orchestrator (2831.231414ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a non-string agent_id is recorded as unattributable with its raw value preserved (2918.144686ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes land in three disjoint sinks -- counted, marker-only, and unresolved-only (3369.530571ms)
+✔ evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve (16257.378368ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): repeated unresolved identity observations are bounded once per session and reason (3609.843348ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): unresolved observation keys separate session, reason, and fallback session buckets (3800.039092ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): max-turns-unresolvable is deduplicated and sink failures remain fail-open (3481.03051ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): malformed and absent session identities share the explicit fallback bucket, retain legacy JSONL, and clean partial writes (4177.559264ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-filesystem callers claim one complete same-key observation (2113.675394ms)
+✖ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (4667.054421ms)
+✔ R7-11b: the wait variant recovers a lock left by a provably dead holder at once, without waiting out the bound (7862.665816ms)
+✔ R7-11b: the wait variant keeps a malformed lock fail-closed under its existing code and never waits for it (2665.445415ms)
+✔ R7-11b: the hook admits and counts exactly once a call whose lock was left by a provably dead holder (5658.447999ms)
+✔ R7-11c: a lock held for agent A leaves agent B's call admitted with no wait; the counters stay independent (5620.954372ms)
+✔ R7-11c: two agents each making concurrent calls are all admitted and keep separate counters, with agent A's lock held throughout the first contention (4593.497371ms)
+✔ R7-11d: COUNTER_LOCK_WAIT_BOUND_MS is exported as a positive integer ceiling of a few seconds (0.116211ms)
+✔ R7-11d: a live holder beyond the bound yields counter-lock-timeout naming the holder age, and the holder is left intact (3111.431775ms)
+✔ R7-11d: a holder that releases within the bound lets the call through as soon as the lock is free (2678.430053ms)
+✔ R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing (3719.343582ms)
+✔ R7-11d: at hook level a holder that releases within the bound lets the call through, counted exactly once (3052.087387ms)
+✔ R7-11d-T3: COUNTER_LOCK_WAIT_BOUND_MS is exactly 3000 ms (0.217333ms)
+✔ R7-11d-T3: counter-lock-busy is retried inside the bound and the call is admitted as soon as the lock is free (2609.217354ms)
+✔ R7-11d-T3: counter-lock-changed is retried inside the bound and the call is admitted as soon as the lock is free (2662.563447ms)
+✔ R7-11d-T3: counter-lock-recovery-busy is retried inside the bound and the call is admitted as soon as the lock is free (2612.739771ms)
+✔ R7-11d-T3: counter-lock-recovery-changed is never retried: one attempt, no sleep, refused with its own code (2605.69179ms)
+✔ R7-11d-T3: counter-lock-recovery-malformed is never retried: one attempt, no sleep, refused with its own code (2619.779259ms)
+✔ R7-11d-T3: counter-lock-malformed is never retried: one attempt, no sleep, refused with its own code (2607.726645ms)
+✔ R7-11d-T3: counter-lock-recovery-failed (a genuine dead-owner recovery failure) fails closed at once: one attempt, no sleep (2666.101968ms)
+✔ R7-11d-T5: counter-lock-recovery-raced is a retried benign race (2785.629691ms)
+✔ R7-11d-T3: only counter-lock-changed until the bound times out with counter-lock-timeout and no holderAgeMs (2724.211709ms)
+✔ R7-11d-T3: only counter-lock-recovery-busy until the bound times out with counter-lock-timeout and no holderAgeMs (2588.44757ms)
+✔ R7-11d-T3: a timeout without a holder age never says 'live holder' in the refusal text (2855.294793ms)
+✔ R7-11d-T3: the hook refuses a timeout (with-age) under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT with a retry-the-same-call repair (2840.413825ms)
+✔ R7-11d-T3: the hook refuses a timeout (no-age) under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT with a retry-the-same-call repair (2932.61512ms)
+✔ R7-11d-T3: with no injected clock the wait is monotonic: Date.now jumping back 60000 ms mid-wait ends the call within the bound plus 500 ms of real time (5830.511729ms)
+✔ R7-11d-T4: a recovery lock that vanishes between the EEXIST link attempt and the existence check is not a refusal: the call waits for the winner's live main lock, then is admitted and counted once (5849.372294ms)
+✔ R7-11d-T4: a stale-recovery-lock takeover that hits ENOENT because a parallel caller took it first is retried, admitted and counted once (5977.489194ms)
+✔ R7-11d-T4: a stale-recovery-lock takeover whose republish hits EEXIST because a parallel caller published first is retried, admitted and counted once (6008.191444ms)
+✔ R7-11d-T4: a main-lock republish that hits ENOENT after the dead-owner rename is retried, admitted and counted once (5954.513074ms)
+✔ R7-11d-T4: a genuine I/O failure (EACCES from the rename of the dead main lock into quarantine) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (5801.889984ms)
+✔ R7-11d-T4: a genuine I/O failure (EIO from the link that publishes the recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (5878.222325ms)
+✔ R7-11d-T4: a genuine I/O failure (EPERM from the rename of a stale recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (5863.019675ms)
+✔ R7-11d-T4: a genuine I/O failure (EIO from the unlink of a stale recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (5991.939695ms)
+✔ R7-11d-T4: a genuine I/O failure (EACCES from the link that republishes the main lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (5941.243124ms)
+✔ R7-11d-T4: a main-lock republish that hits EEXIST because a fresh caller published first is retried, admitted and counted once (6129.867131ms)
+✔ TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted (4550.759027ms)
+✔ TR-G T49 (b): after the working cap nothing but the named closing acts is admitted (control, green today) (5402.515062ms)
+✔ TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused (5784.861426ms)
+✔ TR-G T49 (d): after the working cap, a quoted producer path with a backslash before the script name is refused on a POSIX host (4398.031444ms)
+✔ TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host (4286.828456ms)
+✔ TR-G T49 (f): after the working cap, `git add <x> && <other>` is refused -- only one simple git command is a closing act (4361.014876ms)
+✔ TR-G T49 (g): after the working cap, `git add <x>; <other>` is refused (4275.956078ms)
+✔ TR-G T49 (h): after the working cap, `git commit -F <f> | <other>` is refused (4384.341407ms)
+✔ TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control, green today) (4613.892598ms)
+✔ TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today) (4708.148654ms)
+✔ TR-G T49 (k): after the working cap, a relative spelling of the producer script stays refused (control, green today) (4313.063216ms)
+✔ TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path (4258.990985ms)
+✔ TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb (4245.735076ms)
+✔ TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike (4251.448813ms)
+✔ TR-G T49 (o): after the working cap, the exact admitted producer command (quoted, and bare with forward slashes) and `git commit -F <f> -- <p>` stay admitted (control, green today) (4690.310294ms)
+﹣ TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused (0.056661ms) # TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)
+﹣ TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused (0.048251ms) # TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)
+✔ TR-G T37 (a): a second same-role child under one parent tool id is bound per dispatch, or its refusal names the re-dispatch action (3374.331343ms)
+✔ TR-G T37 (b): concurrent launches under DISTINCT parent tool ids each resolve their own binding (control, green today) (3327.926475ms)
+✔ TR-G T57 (Ruling 115, TR-K4 clause 2): this guard's own denial shows the budget charge -- counted attempts, working cap and remaining closing slots (green today) (5228.733707ms)
+✔ TR-G T34: a governance state change between two guard calls takes effect on the second call -- the scope observation recomputes (invariant for a future cache, green today) (11371.839463ms)
+✖ CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED (10019.373586ms)
+✖ CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39 (10015.203792ms)
+✖ CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance (10009.11033ms)
+✖ CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today) (10010.792651ms)
+✖ CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today) (10016.276486ms)
+✖ CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today) (10017.829769ms)
+✖ CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed (10018.633861ms)
+✔ CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md path stays refused after its own cap (green today) (4059.057433ms)
+CKPT2-REDIRECT-FIRED guard-dispatch-budget.mjs (144 runner-child loads served from the tranche-2 guard post-image)
+ℹ tests 114
+ℹ suites 0
+ℹ pass 101
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 530165.055742
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:433:1
+✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10015.717879ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:437:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:460:1
+✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10015.163912ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:466:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:606:1
+✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10015.111665ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:609:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:1225:1
+✖ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (4667.054421ms)
+  AssertionError [ERR_ASSERTION]: the holder released its exact lock inode
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:1236:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2204:1
+✖ CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED (10019.373586ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2205:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2212:1
+✖ CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39 (10015.203792ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2213:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2220:1
+✖ CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance (10009.11033ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2221:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2231:1
+✖ CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today) (10010.792651ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at ckptCap (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2196:25)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2232:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2238:1
+✖ CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today) (10016.276486ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at ckptCap (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2196:25)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2239:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2245:1
+✖ CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today) (10017.829769ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at ckptCap (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2196:25)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2246:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2251:1
+✖ CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed (10018.633861ms)
+  AssertionError [ERR_ASSERTION]: critic runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at ckptRun (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2182:10)
+      at ckptCap (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2196:25)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/CRITIC-CKPT-T2/guard-dispatch-budget.ckpt2.body.mjs:2252:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

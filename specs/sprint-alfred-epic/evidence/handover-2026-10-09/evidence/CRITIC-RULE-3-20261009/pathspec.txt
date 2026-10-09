@@ -1,0 +1,12 @@
+harness/review-protocol.md
+roles/critic.md
+plugins/pipeline-core/skills/critic-review/SKILL.md
+docs/adr/0003-role-implementation-subagents.md
+docs/adr/0014-critic-contract.md
+policies/model-policy.md
+templates/prompts/critic-review.md
+backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md
+plugins/pipeline-core/docs/adr/0003-role-implementation-subagents.md
+plugins/pipeline-core/docs/adr/0014-critic-contract.md
+plugins/pipeline-core/roles/critic.md
+plugins/pipeline-core/templates/prompts/critic-review.md

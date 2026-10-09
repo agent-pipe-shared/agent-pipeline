@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "T90-F4-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "6305f867f",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "f0d1fbde1"
+  ],
+  "resultSha256": "67e63fb351a4210c2ed619a6d7d1cd6feb225747d61669a173818662673889ca",
+  "report": {
+    "text": "1 DoD: T90 native green.txt (24 tests/23 pass/0 fail/1 skip, exit 0): passed. WSL wsl.txt (200 tests/199 pass/0 fail/1 skip, exit 0): passed; the T90-F3 baseline file was not compared (counts show no red). check-consumer-safe-paths.test.mjs exit 0: passed. Commit f0d1fbde1 of the production file with the exact subject: passed.\n2 Evidence: evidence/T90-F4-20261009/green.txt, evidence/T90-F4-20261009/wsl.txt (written by node scripts, exit= appended).\n3 Changed: plugins/pipeline-core/lib/human-guard-override.mjs (one Array.from copy of recovery.files, cap/validate/render on the copy); scratch/t90f4-wsl.mjs and scratch/commit-msg/T90-F4.txt untracked helpers.\n4 Not changed: tests, hooks, other files; recovery.files is read twice (Array.isArray then Array.from) which the briefed fix shape implies.\n5 Deviations: none.\n6 Open: independent review: pending. Proxy variant not individually run beyond the pin passing.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/human-guard-override.mjs"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 3
+    },
+    {
+      "phase": "verified-green, committing",
+      "toolUses": 18
+    },
+    {
+      "phase": "closed",
+      "toolUses": 27
+    }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

@@ -1,0 +1,30 @@
+command: node scratch/dispatch/win-harden-f-a1/probe.mjs real
+label: native
+exitCode: 0
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+{"ev":"env","platform":"win32","node":"v24.20.0","powershellFound":true}
+{"ev":"real-spawn","call":1,"withChild":false,"n":1,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":1,"withChild":false,"n":2,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":1,"withChild":false,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":2,"withChild":false,"n":3,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":2,"withChild":false,"n":4,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":2,"withChild":false,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":3,"withChild":false,"n":5,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":3,"withChild":false,"n":6,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":3,"withChild":false,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":1,"withChild":true,"n":7,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":1,"withChild":true,"n":8,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":1,"withChild":true,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":2,"withChild":true,"n":9,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":2,"withChild":true,"n":10,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":2,"withChild":true,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-spawn","call":3,"withChild":true,"n":11,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-spawn","call":3,"withChild":true,"n":12,"status":0,"errorCode":null,"fqErrorId":null,"stderrTagLines":[]}
+{"ev":"real-result","call":3,"withChild":true,"status":"secure","reason":"Windows owner, DACL, and reparse-point checks are private","spawnsInCall":2}
+{"ev":"real-result","call":"missing-path","status":"unavailable","reason":"native Windows DACL hardening failed (exit 1, DirectoryNotFoundException)","spawnsInCall":1}
+{"ev":"done","totalSpawns":13}
+
+--- stderr ---

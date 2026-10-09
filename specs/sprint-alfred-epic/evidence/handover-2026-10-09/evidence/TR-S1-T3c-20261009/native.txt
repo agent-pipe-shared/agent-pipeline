@@ -1,0 +1,128 @@
+command: node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: native
+exitCode: 1
+head: 77bd8dad894d353db3a991261c56d76d6b69ce57
+tree: 9b9619fd5b2b43bec44808642c4f0535343091fc
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8e772dbb78d69dbba94afad351a94f9427d73e8e344f0d3f5a49cb6bec89827b
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T02:16:19.882Z
+  candidate commit: fde1dd08a7a8fca6d474f7bee94c8d6710ac5720
+  candidate tree: 9c9551ee91e20bb978dec6b81536169b24a9b684
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: cd62041eed2c0881536763b9bb5c75fcfe07d5b2d76a58e62b967bdc528b20aa
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T02:16:23.120Z
+  candidate commit: 282cc2d002702902443d38fb9ee2ac83bb69b0e7
+  candidate tree: 1092da830033a3a030d07360805fbd35f7957a0b
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from <home-path>
+DC5B0000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../openssl-3.5.7/providers/implementations/ciphers/ciphercommon_block.c:107:
+DC5B0000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../openssl-3.5.7/crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'unrelated.txt', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 38569ce6dbd25dbb44274fac346cb3b1fff2944b030ef88f394d8a6fed9402e4
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T02:16:25.834Z
+  candidate commit: b092ab63e5b00c35a6d042cf30be78bf6f83c912
+  candidate tree: c9f46910996c3c71e9413d536cf996f6c55c1c10
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✖ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (3283.4182ms)
+✖ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (2729.3575ms)
+✖ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (3206.0173ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.398ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.1705ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9573.9096
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\signing-ceremony.test.mjs:221:1
+✖ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (3283.4182ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\scripts\signing-ceremony.test.mjs:286:1
+✖ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (2729.3575ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/signing-ceremony.test.mjs:323:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\signing-ceremony.test.mjs:327:1
+✖ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (3206.0173ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'GES-LOCKED'
+  - 'GMW-CANDIDATE-COMMIT-MISMATCH'
+  
+      at Object.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/signing-ceremony.test.mjs:368:14)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/signing-ceremony.test.mjs:348:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'GES-LOCKED',
+    expected: 'GMW-CANDIDATE-COMMIT-MISMATCH',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

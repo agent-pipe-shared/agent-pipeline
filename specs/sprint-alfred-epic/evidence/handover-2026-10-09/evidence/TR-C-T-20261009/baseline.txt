@@ -1,0 +1,470 @@
+command: node --test plugins/pipeline-core/hooks/guard-push.test.mjs plugins/pipeline-core/hooks/guard-git.test.mjs
+label: baseline
+exitCode: 1
+head: 58a30b844c7721130c3483a5cc28a16ad4cc1710
+tree: 439592fbcd84d8e1a13861e80b5b30601d361f65
+dirty: true
+--- stdout ---
+PASS  R01 block  --force
+PASS  R01 block  -f
+PASS  R01 block  --force-with-lease
+PASS  R01 allow  plain push
+PASS  R01 allow  push -u feature
+PASS  R02 block  +refspec
+PASS  R02 allow  same refspec without +
+PASS  R03 block  --delete main
+PASS  R03 block  -d master
+PASS  R03 block  :main refspec
+PASS  R03 block  dev:main overwrite
+PASS  R03 allow  --delete feature branch
+PASS  R03 allow  dev:staging refspec
+PASS  R04 block  --delete archive tag
+PASS  R04 block  bare :archive refspec
+PASS  R04 allow  pushing an archive tag
+PASS  R05 block  tag -d archive/
+PASS  R05 allow  tag -d other tag
+PASS  R06 block  branch -D main
+PASS  R06 block  branch --delete master
+PASS  R06 allow  branch -d feature
+PASS  R06 block  branch -delete main (inert word form, GG-06)
+PASS  R06 allow  branch -delete feature
+PASS  R07 block  reset --hard
+PASS  R07 block  reset -q --hard (hardened)
+PASS  R07 allow  reset --soft
+PASS  R07 allow  unstage file
+PASS  R08 block  clean -fd
+PASS  R08 block  clean --force (long flag)
+PASS  R08 allow  clean dry-run
+PASS  R09 block  checkout -- .
+PASS  R09 block  restore -- *
+PASS  R09 allow  checkout -- single file
+PASS  R10 block  bare checkout .
+PASS  R10 block  bare restore .
+PASS  R10 allow  checkout branch
+PASS  R10 allow  restore single file
+PASS  R10 allow  checkout ./subpath (anchor)
+PASS  R21 block  checkout --force branch
+PASS  R21 block  switch -f branch
+PASS  R21 allow  ordinary fetch
+PASS  R11 block  add .env
+PASS  R11 block  add .env.production
+PASS  R11 block  add secrets.yaml
+PASS  R11 allow  add fakesecrets.yaml (unrelated file matched only by substring before the GG-11 fix)
+PASS  R11 allow  add .storage (project-specific entry removed from the generic denylist)
+PASS  R11 allow  add app-state.db (project-specific entry removed from the generic denylist)
+PASS  R11 block  add id_rsa
+PASS  R11 block  add id_ed25519
+PASS  R11 block  add .pem
+PASS  R11 block  add .key
+PASS  R11 allow  add normal files
+PASS  R11 block  add .env.example (documented errs-safe overblock)
+PASS  R12 block  rm -rf .git
+PASS  R12 block  rm .git -rf (flag after path)
+PASS  R12 block  rm -rf /config
+PASS  R12 allow  rm -rf build/config (path-start anchor)
+PASS  R12 allow  rm -rf node_modules
+PASS  R12 allow  rm -rf .github (word boundary)
+PASS  R12 block  rm --recursive .git (long form)
+PASS  R12 block  rm --recursive --force app/.git (long forms combined)
+PASS  R12 block  rm /config --recursive (target-first, long form)
+PASS  R12 allow  rm --recursive node_modules (long form, harmless target)
+PASS  R13 block  Remove-Item -Recurse .git
+PASS  R13 block  Remove-Item target-first -r
+PASS  R13 block  Remove-Item secrets.yaml -Recurse
+PASS  R13 allow  Remove-Item -Recurse other dir
+PASS  R13 block  Remove-Item .storage -recu -Force (abbreviation)
+PASS  R13 allow  Remove-Item -recu temp (abbreviation, harmless target)
+PASS  R13 block  Remove-Item -rec abbreviation now covered (AP-P1-G1 rework R1)
+PASS  GAP allow  non-recursive secret deletion (parity gap)
+PASS  QS  allow  commit message mentions git push --force
+PASS  QS  allow  single-quoted mention of reset --hard
+PASS  QS  block  force flag OUTSIDE quotes still fires
+PASS  SEG allow  flag in later segment does not bleed back
+PASS  SEG allow  chained with && (no cross-segment match)
+PASS  SEG block  deny still fires inside a later segment
+PASS  CFG block  extraDenyPattern fires with origin line
+PASS  CFG allow  harmless command with valid config
+PASS  CFG warn   broken JSON surfaces as exit 1 WARN
+PASS  CFG block  union still active despite broken config
+PASS  CFG allow  missing config is silent (no warning)
+PASS  CFG block  union active without any config
+PASS  OV-AC1 warn   valid inline override for the matching rule (GG-07 reset --hard) allows (exit 1)
+PASS  OV-AC1 warn   valid env-fallback override for the matching rule (fresh token) allows (exit 1)
+PASS  OV-AC2 block  reusing an already-consumed rule|token pair
+PASS  OV-AC3 block  malformed override (empty reason) — matching rule still blocks
+PASS  OV-AC3 warn   malformed override (unknown rule id), no rule matches -> exit-1 warning only
+PASS  OV-AC4 block  override armed for GG-07 does not cover an additional matching rule (GG-01)
+PASS  OV-AC4 warn   same rule|token still fresh afterward (AC-4 attempt consumed nothing), allows (exit 1)
+PASS  OV-AC5 block  ledger not appendable (.claude missing) -> override not applied, fail-closed
+PASS  OV-AC6 block  no arming present -> unchanged block behavior
+PASS  OV-AC6 allow  no arming present -> unchanged allow behavior
+PASS  OV-AC7 block  union rule prints its stable id
+PASS  OV-AC7 block  project guard-config rule prints its PX id
+PASS  OV-bonus warn   PowerShell arming form parses and applies, allows (exit 1)
+PASS  OV-bonus warn   inline prefix wins over a conflicting env arming (env ignored, noted), allows (exit 1)
+PASS  GO-GG01 block  -C interposed force-push
+PASS  GO-GG02 block  -C interposed +refspec
+PASS  GO-GG03 block  -C interposed remote main delete
+PASS  GO-GG04 block  -C interposed remote archive tag delete
+PASS  GO-GG05 block  -C interposed local archive tag delete
+PASS  GO-GG06 block  -C interposed local main branch delete
+PASS  GO-GG07 block  -C interposed reset --hard
+PASS  GO-GG08 block  -C interposed clean -fd
+PASS  GO-GG09 block  -C interposed blanket discard --
+PASS  GO-GG10 block  -C interposed bare checkout .
+PASS  GO-GG11 block  -C interposed secret staging
+PASS  GO-push -c   -c interposed force-push
+PASS  GO-push --git-dir  --git-dir= interposed force-push
+PASS  GO-reset -c   -c interposed reset --hard
+PASS  GO-reset --git-dir  --git-dir <arg> (space form) interposed reset --hard
+PASS  GO-add -c   -c interposed secret staging
+PASS  GO-add --git-dir  --git-dir= interposed secret staging
+PASS  GO-multi block  -C + -c combined before push --force
+PASS  GO-quote block  -c with quoted value before push --force (quote-stripping interaction)
+PASS  GO-allow  -C interposed harmless status
+PASS  GO-allow  -c interposed harmless commit
+PASS  GO-CFG block  extraDenyPattern normalizes -C before matching (AR-2)
+PASS  GO-CFG allow  -C interposed harmless command with the same config loaded
+PASS  GO-OV block  override armed for GG-07 rejects a cross-target -C command
+PASS  GO-OV warn   override accepts an explicit same-root relative -C target
+PASS  GO-OV ledger target binding stores only an opaque physical-target digest
+PASS  GO-OV block  override rejects a relative cross-target -C target
+PASS  GO-OV block  override rejects an absolute cross-target -C target
+PASS  GO-OV block  override rejects a cross-target --git-dir= selector
+PASS  GO-OV ledger --git-dir= rejection records no coordinator token
+PASS  GO-OV warn   --git-dir= rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --git-dir space selector
+PASS  GO-OV ledger --git-dir space rejection records no coordinator token
+PASS  GO-OV warn   --git-dir space rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --work-tree= selector
+PASS  GO-OV ledger --work-tree= rejection records no coordinator token
+PASS  GO-OV warn   --work-tree= rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target --work-tree space selector
+PASS  GO-OV ledger --work-tree space rejection records no coordinator token
+PASS  GO-OV warn   --work-tree space rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target GIT_DIR environment selector
+PASS  GO-OV ledger GIT_DIR environment rejection records no coordinator token
+PASS  GO-OV warn   GIT_DIR environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target GIT_WORK_TREE environment selector
+PASS  GO-OV ledger GIT_WORK_TREE environment rejection records no coordinator token
+PASS  GO-OV warn   GIT_WORK_TREE environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target PowerShell GIT_DIR environment selector
+PASS  GO-OV ledger PowerShell GIT_DIR environment rejection records no coordinator token
+PASS  GO-OV warn   PowerShell GIT_DIR environment rejection leaves token unconsumed
+PASS  GO-OV block  override rejects a cross-target PowerShell GIT_WORK_TREE environment selector
+PASS  GO-OV ledger PowerShell GIT_WORK_TREE environment rejection records no coordinator token
+PASS  GO-OV warn   PowerShell GIT_WORK_TREE environment rejection leaves token unconsumed
+PASS  R14 block  ssh with quoted rm -rf /config
+PASS  R14 block  bash -c with quoted git reset --hard
+PASS  R14 block  pwsh -Command with quoted git push --force
+PASS  R14 allow  commit message mentions bash -c (prose, no wrapper)
+PASS  R14 allow  echo mentions rm -rf /config (no wrapper)
+PASS  R14 allow  ssh with quoted harmless command
+PASS  R15 block  git add quoted secrets.yaml
+PASS  R15 block  git add single-quoted .env
+PASS  R15 allow  commit message mentions git add secrets.yaml (prose, no inner quotes)
+PASS  R16 block  rm -rf quoted .git
+PASS  R16 block  Remove-Item -Recurse quoted .storage
+PASS  R16 allow  rm -rf quoted harmless target
+PASS  RAW-OV warn   valid inline override for a raw-string rule (GG-15 quoted git add) allows (exit 1)
+PASS  RAW-OV allow  arming reason mentioning `rm -rf /config` does not trip GG-14/16 on a harmless command
+PASS  R17 block  commit --no-verify
+PASS  R17 block  push --no-verify
+PASS  R17 block  merge --no-verify
+PASS  R17 allow  merge --no-verify-signatures (real flag, NOT a hook-skip)
+PASS  R17 allow  commit message quotes --no-verify (prose, no actual flag)
+PASS  R18 block  commit -n
+PASS  R18 block  commit -nm (bundled)
+PASS  R18 block  commit -an (bundled, n at end)
+PASS  R18 allow  push -n origin main (=--dry-run, not a hook-skip)
+PASS  R18 allow  push --dry-run
+PASS  R18 allow  merge -n (=--no-stat, not a hook-skip)
+PASS  R18 allow  commit --no-edit (long flag, double-dash excluded)
+PASS  R18 allow  commit -m normal message
+PASS  R19 block  -c core.hooksPath=/dev/null commit
+PASS  R19 block  -c core.hooksPath commit (no value, boolean true)
+PASS  R19 block  --config-env=core.hooksPath=X commit
+PASS  R19 allow  commit message quotes core.hooksPath (prose, no actual -c)
+PASS  R19 allow  -c with quoted value (documented quote-stripping trade-off, NOT a regression)
+PASS  R19 block  --config-env core.hooksPath=X commit (space form, critic L1)
+PASS  R19 allow  grep -c core.hooksPath (non-git command, git-anchored, critic L1)
+PASS  R20 block  config core.hooksPath /tmp/x
+PASS  R20 block  config set core.hooksPath /tmp/x (git >= 2.46 form)
+PASS  R20 allow  commit message quotes git config core.hooksPath (prose, no actual git config)
+PASS  R20+ non-overridable GG-17 ignores a correctly shaped arming
+PASS  R20+ non-overridable GG-18 ignores a correctly shaped arming
+PASS  R20+ non-overridable GG-19 ignores a correctly shaped arming
+PASS  R20+ non-overridable GG-20 ignores a correctly shaped arming
+PASS  GIT03-1 block  provider co-author and session URL via -F
+PASS  GIT03-2 allow  a clean message via -F
+PASS  GIT03-3 block  an inline session trailer
+PASS  GIT03-4 allow  a human co-author
+PASS  GIT03-5 block  an armed override does not open the correlation rule
+PASS  GIT03-6 block  a missing marker is enforced by default
+PASS  GIT03-7 block  a -F file outside the project root, even with clean content
+PASS  GIT03-8 allow  blocking policy accepts one structurally valid provenance block
+PASS  GIT03-9 block  blocking policy refuses a missing Dispatch binding
+PASS  GIT03-10 block  body lines cannot pose as the final provenance block
+PASS  GIT03-11 warn  provenance conventions stay non-blocking in warn mode
+PASS  GIT01-1 block  inadmissible type
+PASS  GIT01-2 allow  admitted type
+PASS  GIT01-3 allow  editor commit (no -m/-F) is never false-blocked by GIT-01
+PASS  GIT01-4 allow  a non-commit git command is untouched by GIT-01
+PASS  SIG-1 allow   GG-03 push with a verifying push approval and no arming at all
+PASS  SIG-1 ledger  the admission records the authorization it relied on (key, forCommit, destination) and no token
+PASS  SIG-2 block   a valid signature from a key the committed anchor does not name
+PASS  SIG-3 block   a push whose destination differs from the approved one
+PASS  SIG-4 block   a push at a commit that is not the approval's forCommit
+PASS  SIG-5 block   --force carrying a VALID approval still blocks on GG-01 (single-match invariant)
+PASS  SIG-5 ledger  the refused force-push wrote no authorization record
+PASS  SIG-6 block   a GG-03 push with no approval and no arming blocks with today's message
+PASS  SIG-7 block   `push origin --delete main` under a valid approval is never attested
+PASS  SIG-7 ledger  the refused deletion wrote no authorization record
+PASS  SIG-8 block   a verified approval is NOT applied when the audit ledger cannot be written
+PASS  SIG-9 block   a cross-target -C push under a valid approval is refused before any attestation
+PASS  SIG-10 warn   an armed GG-03 override still takes the unchanged token route
+PASS  SIG-11 block  a project with no committed trust anchor cannot attest anything
+PASS  SIG-12 block  a threat model edited after the approval revokes it
+PASS  SIG-13 block  a record whose stated binding contradicts the signed subject
+PASS  RTY-1 warn    first admission of an armed token allows and ledgers it
+PASS  RTY-1 ledger  the entry binds command + candidate and carries a 3600s default lifetime
+PASS  RTY-2 warn    the SAME token, byte-identical command, same HEAD, inside the TTL is admitted again
+PASS  RTY-2 ledger  the re-presentation is appended as a retry and does NOT extend the lifetime
+PASS  RTY-3 block   the same token against a DIFFERENT command is consumed exactly as before
+PASS  RTY-4 block   a cross-target -C re-presentation of an admitted arming is refused (target binding)
+PASS  RTY-5 block   the identical command after HEAD moved is a different act and stays consumed
+PASS  RTY-6 warn    first admission under a configured lifetime allows
+PASS  RTY-6 ledger  overrideArmingTtlSeconds from the guard-config is what bounds the arming
+PASS  RTY-7 block   the identical command after the arming expired stays consumed
+PASS  RTY-8 block   an OLD-shape ledger entry (no commandSha256) stays fully consumed
+PASS  GG22-1 allow  bootstrap: backlog/transitions.ndjson never existed in history
+PASS  GG22-2 allow  clean: status flip reconciled by a later ledger touch, nothing outstanding
+PASS  GG22-3 block  debt: status flip after the last ledger touch, disallowed path staged
+PASS  GG22-4 allow  reconciliation commit: staged commit touches only backlog/items+ledger paths
+PASS  GG22-5 allow  non-status edit: item touched since reconcile but its status: line did not change
+PASS  GG22-6 allow  fail-open: a spawnSync git failure never blocks (same debt state as GG22-3)
+PASS  GG22-7 allow  fixed order: item edits committed first, reconciler run once, ledger commit last -- no debt
+PASS  GG22-8 block  remediation text states the corrected reconcile-last order, not reconcile-first
+PASS  GG22-9 allow  pathspec ledger commit ignores unrelated staged source file
+PASS  GG22-10 block  pathspec source commit remains blocked while GG22 debt exists
+PASS  GG22-11 block  bare staged-index commit remains blocked with unrelated source staged
+PASS  GG22-12 block  -i widens a pathspec commit to the staged index
+PASS  GG22-13 block  --include widens a pathspec commit to the staged index
+PASS  GG22-14 block  ../ traversal escaping backlog/items is disallowed
+PASS  GG22-15 allow  trailing-slash backlog/items directory pathspec is admitted
+
+247/247 cases passed.
+✔ plugins/pipeline-core/hooks/guard-git.test.mjs (431708.423726ms)
+PASS  PG01 allow  no manifest at all
+PASS  PG02 allow  non-push command -> fast path
+PASS  PG03 allow  push gate mode off
+PASS  PG03a block  documented inline override cannot authorize main publication
+PASS  PG03a block  dynamic inline override prefix stays inside the strict shell grammar
+PASS  PG03a block  unquoted override pipeline delimiter stays inside the strict shell grammar
+PASS  PG03b allow  structural policy remains opt-in without a manifest
+PASS  PG03c allow  structural policy remains off when push gate is off
+PASS  PG03d block  raw publication push cannot consume typed authority
+PASS  PG03e block  GG-03 cannot widen the executor-only publication boundary
+PASS  PG04 block  blocking + missing verify evidence
+PASS  PG05 block  blocking + stale commit in verify evidence
+PASS  PG06 block  blocking + red exitCode in verify evidence
+PASS  PG06a block  impacted Verify base is unrelated to pushed source
+PASS  PG07 warn  warn mode + missing verify evidence -> exit 1
+PASS  PG08 block  security evidence enforced when gates.security mode=blocking
+PASS  PG09 allow  security evidence skipped when gates.security mode=off
+PASS  PG08b warn  security mode=warn never hard-blocks even though push.mode=blocking
+PASS  PG08c block  security mode=blocking still hard-blocks even though push.mode=warn
+PASS  PG10 allow  standing-approved passes without any state file
+PASS  PG11a block  required approval, no state file at all
+PASS  PG11b block  required approval, state present but stale forCommit
+PASS  PG11c block required approval, state lacks lastApproved
+PASS  PG11d block required approval with malformed state
+PASS  PG11e block  required approval, state has no pushApproval key at all (== PG11c)
+PASS  PG-HD1 allow a commit whose heredoc body mentions the phrase
+PASS  PG-HD2 allow a commit whose quoted message mentions the phrase
+PASS  PG-HD3 block a --git-dir override push
+PASS  PG-HD4 block an env-prefixed push
+PASS  PG-HD5 block a real push AFTER a heredoc terminator
+PASS  PG-HD6 block a real push chained after a heredoc
+PASS  PG-HD7 block a real push after a tab-indented <<- heredoc
+PASS  PG-HD8 block a real push after two heredocs
+PASS  PG-HD9 block a real push separated from the terminator by a blank line
+PASS  PG-HD10 block a real push after a quoted-tag heredoc
+PASS  PG-HD11 block a push that itself carries an unterminated heredoc
+PASS  PG-HD12 block a push after an arithmetic left shift
+PASS  PG-HD13 block a push after a shift in an assignment
+PASS  PG-HD14 block a push after a shift inside a command substitution
+PASS  PG12 block required approval without critical proof
+PASS  PG12w allow required approval when the proof is explicitly waived
+PASS  PG12w2 block a waived push whose approval is bound to another commit
+PASS  PG12w3 block a waived push whose recorded approval does not name the waiver
+PASS  PG12w4 block a claimed waiver that no policy file backs
+PASS  PG12x allow a bare branch-name push resolved to refs/heads/<branch>
+PASS  PG12x2 allow a colon-less full-ref source resolved as identity
+PASS  PG12y block a bare branch push when remote.<name>.push is configured -- unresolved as before
+PASS  PG12z block a bare `HEAD` push -- not resolved as refs/heads/HEAD
+PASS  PG12c allow a chat-mode push configured in pipeline.user.yaml
+PASS  PG12c3 block a chat mode that exists only in the working tree
+PASS  PG12c2 block a claimed chat waiver while the source demands a signature
+PASS  PG12c-main allow a chat-mode push to main -- the boundary that used to refuse it regardless
+PASS  PG12c-main-mismatch block a chat-mode approval for another destination does not cover main
+PASS  PG12s1 allow a signature-mode push the key holder attested for this exact action
+PASS  PG12s2 allow an attested push to main -- the ref is signed, not special-cased
+PASS  PG12s3 block an attested push redirected to another remote
+PASS  PG12s4 block an attested push redirected to another ref
+PASS  PG12s5 block an approval bound to another commit
+PASS  PG12s6 block a state record signed by a key the project never anchored
+PASS  PG12s7 block a signature-mode push when no trust anchor is committed
+PASS  PG12s8 block a legacy approval that records no proof object
+PASS  PG12s9 block an attested push whose proof has expired
+PASS  PG12s10 block when the bound threat model changed after approval
+PASS  PG12s11 block a record whose stated binding contradicts the signed subject
+PASS  PG12s12 block an approval whose proof was never consumed
+PASS  PG12u1 block an attested push while specs/ carries uncommitted work
+PASS  PG12u1 block an attested push while docs/ carries uncommitted work
+PASS  PG12u1 block an attested push while backlog/ carries uncommitted work
+PASS  PG12u2 allow an attested push while an unrelated path carries uncommitted work
+PASS  PG12s13 block a main push attested only by an anchor inside the pushed repository
+PASS  PG12s14 block a branch push attested only by an anchor inside the pushed repository
+PASS  PG12s15 the attestation refusal never echoes a credential-bearing remote
+PASS  PG12s16 allow a bare `git push origin main` attested for the ref it resolves to
+PASS  PG12s17 block a bare push whose source is ambiguous with a same-named tag
+PASS  PG12s18 block a bare push when no local branch by that name exists
+PASS  PG12s19 block a bare push under a configured remote.origin.push refspec
+PASS  PG12s20 block a bare push whose resolved ref no attestation covers
+PASS  PG12w5 block when the proof policy cannot be read
+PASS  PG12b block a raw push carrying a proof-shaped record with nothing behind it
+PASS  PG13 allow  all-green (verify + security fresh, standing-approved)
+PASS  PG13a block  unverified immutable snapshot and stale payload digest are rejected
+PASS  PG14 warn  malformed manifest YAML -> exit 1 warn, not block
+PASS  PG15 block  push detected inside second segment (git add . && git push)
+PASS  PG17a block  git -C target never borrows green evidence from session repo
+PASS  PG17b allow  git -C target uses target evidence despite red session repo
+PASS  PG17bb allow  explicit attached source branch resolves evidence from its target worktree
+PASS  PG17c allow  attached short source binds its worktree evidence, not checkout HEAD
+PASS  PG17d block  checkout-HEAD evidence cannot authorize another source
+PASS  PG17e block  unresolvable source fails closed
+PASS  PG17f block  quoted git executable is gated
+PASS  PG17g block  git.exe cannot bypass detection
+PASS  PG17h block  shell wrapper cannot bypass detection
+PASS  PG17h2 block  cmd wrapper cannot bypass detection
+PASS  PG17h3 block  ssh wrapper cannot bypass detection
+PASS  PG17i diagnostics redact raw credential-shaped remote and absolute path
+PASS  PG17i2 unsupported option diagnostics redact credential-shaped values
+PASS  PG17j multiple refspecs is structurally blocked
+PASS  PG17k bulk all is structurally blocked
+PASS  PG17l pipe is structurally blocked
+PASS  PG17m redirect is structurally blocked
+PASS  PG17n substitution is structurally blocked
+PASS  PG17o option operand is structurally blocked
+PASS  PG17o2 git-dir override is structurally blocked
+PASS  PG17o3 multiple git-C overrides is structurally blocked
+PASS  PG17p incomplete quoting is structurally blocked
+PASS  PG17r variable source expansion is structurally blocked
+PASS  PG17s double-quoted source expansion is structurally blocked
+PASS  PG17q allow  safe set-upstream flag preserves one-source binding
+PASS  PG17t block  bundled git -C push loads the target gate, not an ungated session repo
+PASS  PG17u block  unresolved variable git -C target fails closed
+PASS  PG17v block  literal dynamic-path decoy cannot hide the expanded gated target
+PASS  PG17w block  inline environment assignment cannot hide dynamic cross-repo expansion
+PASS  PG17x block  env wrapper options cannot hide dynamic cross-repo expansion
+PASS  PG16 allow  quoted prose mentioning push is NOT detected as a push command
+PASS  PG16b allow  an unquoted commit-message token named push is not a push subcommand
+PASS  PGD22 block  a tuple-matching deployApproval with no attestation behind it
+PASS  PGD23 allow  a deployApproval the key holder attested for this exact candidate
+PASS  PGD01 block  bare-name deploy-trigger to human-gate env without a deployApproval
+PASS  PGD02 allow  bare-name deploy-trigger with a matching unconsumed deployApproval
+PASS  PGD03 block  src:dst deploy-trigger (destination-keyed) without a deployApproval
+PASS  PGD04 allow  src:dst deploy-trigger with a matching unconsumed deployApproval (bare dest artifact identity)
+PASS  PGD05 block  --tags cannot bind evidence to one source commit
+PASS  PGD06 block  --tags remains ambiguous without a tag trigger
+PASS  PGD07 block  --delete cannot bind evidence to a source commit
+PASS  PGD08 block  a multi-push chain in one command is unparseable in a release-declaring repo -- conservative block
+PASS  PGD09 block  an unparseable refspec form (empty destination after the colon) -- conservative block
+PASS  PGD10 block  bare git push cannot identify one source
+PASS  PGD11 block  bare git push remains ambiguous with a branch trigger
+PASS  PGD12 allow  deploy-trigger to a non-human-gated env (automated) never demands a deployApproval
+PASS  PGD13 block  standing push approval does NOT satisfy a deployApproval -- the composition bypass closed
+PASS  PGD14 block  case A: semantic-invalid manifest + release present + deploy-triggering push -- unconditional block
+PASS  PGD15 block  case B: semantic-invalid manifest + release present + NON-deploy-triggering push -- falls through, blocked by the normal evidence-freshness gate (WARN prepended, not fail-open)
+PASS  PGD16 warn  case C: semantic-invalid manifest, no release section -- unchanged WARN
+PASS  PGD17 warn  case D: parse-level invalid manifest (malformed YAML) -- unchanged WARN
+PASS  PGD18 block  a declared-but-malformed central deploy-policy fail-closes a deploy-triggering push, unconditional
+PASS  PGD18a block  a fixed mandate lock with unverified source blocks a deploy trigger without governance discovery
+PASS  PGD18b allow  an advisory unverified lock warns at validation but does not close an otherwise approved deploy trigger
+PASS  PGD19 block  leading-plus force refspec is source-ambiguous
+PASS  PGD20 block  fully-qualified leading-plus force refspec is source-ambiguous
+PASS  PGD21 warn  case B: semantic-invalid manifest + release present + NON-deploy-triggering push + NO active push gate -- invalidity WARN still surfaces, does not silently exit 0
+PASS  PG26a allow  calibrated anonymous feature-branch range
+PASS  PG26aa block malformed SSH host alias before shell fixture resolution
+PASS  PG26b block  personal Author or Committer in the newly reachable range
+PASS  PG26c block  personal/provider trailers and mail in the new range
+PASS  PG26d block  private-account trailer in the new range
+PASS  PG26e block  a generic or wrong SSH identity path
+PASS  PG26f block  signing-enabled local configuration
+PASS  PG26g block  missing fetched destination range evidence
+PASS  PG26h block  SSH account evidence from a different account
+PASS  PG26i block  pushurl cannot bypass the calibrated public remote
+PASS  PG26j block  main is never an anonymous-public delivery destination
+PASS  PG26k block  provider/model/session correlation metadata
+PASS  PG26l block  private URLs and machine paths in the complete range
+PASS  PG26m block  credential-shaped metadata in the complete range
+PASS  PG26n block  global pushurl cannot bypass the calibrated public remote
+PASS  PG26o block  pushInsteadOf cannot rewrite the calibrated public endpoint
+PASS  PG26p block  free-text session and account correlation
+PASS  PG26q block  SSH URLs, UNC paths and root paths
+PASS  PG26r block  field-separator metadata cannot escape range privacy
+PASS  PG26s block  GIT_SSH_COMMAND cannot diverge from the account probe
+PASS  PG26t block  core.sshCommand cannot diverge from the account probe
+PASS  PG26u block  embedded file URI, root path and general SCP coordinate
+PASS  PG27 block  a published commit cannot retain a machine-local cleanup binding
+PASS  PG28 block  an injected fault inside the blocking evaluation fails closed
+PASS  PG29 warn  an injected fault under mode warn stays non-blocking (AC4 unchanged)
+PASS  PG30 allow  the fault sentinel env var alone (wrong value) never fires
+PASS  D4a allow  absolute declaredCwd is used as-is (bare candidate)
+PASS  D4b allow  relative declaredCwd resolves against process.cwd() (bare candidate)
+PASS  D4c allow  -C <relative> branch honors declaredCwd, not raw process.cwd() (D1 regression)
+FAIL  PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature -- exit 2 (expected 0) -- stderr: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).
+Run: push-init.mjs --checkpoint prin; stderr not empty: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state re
+PASS  PG-CHECKPOINT block main never receives checkpoint relaxation
+PASS  PG-CHECKPOINT block release/stable destination remains on strict evidence lane
+PASS  PG-CHECKPOINT block tags remain on strict evidence lane
+PASS  PG-CHECKPOINT block force refspec before any checkpoint classification
+PASS  PG-CHECKPOINT block malformed policy cannot select the relaxed lane
+FAIL  PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary -- exit 2 (expected 0) -- stderr: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).
+Run: push-init.mjs --checkpoint prin; stderr not empty: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state re
+PASS  PG-CHECKPOINT-WORKTREE block detached -C source falls back to dirty attached branch worktree
+PASS  PG-CHECKPOINT-WORKTREE block attached -C worktree on a different branch falls back
+PASS  PG-CHECKPOINT-WORKTREE block source branch with no attached worktree
+
+177/179 cases passed.
+Failures:
+  - PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature: exit 2 (expected 0) -- stderr: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).
+Run: push-init.mjs --checkpoint prin; stderr not empty: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state re
+  - PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary: exit 2 (expected 0) -- stderr: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).
+Run: push-init.mjs --checkpoint prin; stderr not empty: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state re
+✖ plugins/pipeline-core/hooks/guard-push.test.mjs (525204.709012ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 525217.354297
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-push.test.mjs:1:1
+✖ plugins/pipeline-core/hooks/guard-push.test.mjs (525204.709012ms)
+  'test failed'
+
+--- stderr ---

@@ -1,0 +1,29 @@
+command: node --test scratch/dispatch-wip/t0c-run/b.test.mjs
+label: red
+exitCode: 1
+head: 5031d4dc474cdeab4f533d14b8bd0f5292d44352
+tree: 801823c0ddb41a10182bd6caf5838bc057af038c
+dirty: true
+--- stdout ---
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (3036.40837ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5049.129628
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/t0c-run/b.test.mjs:248:1
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (3036.40837ms)
+  Error: fixture enrollment did not become active
+      at enrollFixture (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:85:79)
+      at buildLiveShapedV7Fixture (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:237:3)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:253:14)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+
+--- stderr ---

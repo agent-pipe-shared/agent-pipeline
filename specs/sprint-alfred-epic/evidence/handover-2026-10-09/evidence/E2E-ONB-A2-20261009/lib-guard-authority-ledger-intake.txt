@@ -1,0 +1,36 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs
+label: lib-guard-authority-ledger-intake
+exitCode: 0
+head: 143dab8dee3e219de4b5773e8d5644d9a7e69703
+tree: 90e4e734889be2253c75a20802c33c1f275a0e71
+dirty: true
+--- stdout ---
+✔ U-1 every builder output validates, and one extra key fails HGL-SHAPE (4.221272ms)
+✔ U-2 granted without links.requestDecisionId fails HGL-LIFECYCLE; each disposition needs exactly its own link (0.661801ms)
+✔ U-3 reason codes are pinned; free text never appears in and is never hashed into any output (2.975991ms)
+✔ U-4 identifiers are deterministic; g moves only the disposition ids; installedAtMs moves no id at all (0.801794ms)
+✔ U-5 identityAssurance is locally-attributed and timeAssurance locally-observed in every record (0.822704ms)
+✔ U-6 validity is min(signed, installedAtMs + MAX_WINDOW_TTL_MS); the catalogue pin agrees with isLiftableRuleId (0.300595ms)
+✔ U-7 policyDigest is verified constructively; the trust anchor is absent at every depth (0.944146ms)
+✔ U-8 no builder can emit corrected or superseded (0.776853ms)
+✔ U-9 the HGO denial builder produces requested + denied with GUARD.OVERRIDE.DENIED and requestDecisionId (0.568629ms)
+✔ U-10 HGO representability follows §7.5's order: layer 0 first, then layers 1-3 (2.227518ms)
+✔ U-1/U-5 support: buildAppendIntent yields exactly §7.2's 24 keys and a store-valid envelope (2.048405ms)
+✔ §7.4 support: an artifact digest that disagrees with the signed intent fails closed (0.155733ms)
+✔ §7.3 support: a disposition must belong to the request digest and generation it names (0.168633ms)
+✔ D-1: buildWindowAttributionEvent produces a shape-valid restricted draft (0.55656ms)
+✔ D-1: sealGovernanceEvent turns the draft into a fully valid envelope (0.60635ms)
+✔ D-1 R-2: no record-level correlator crosses -- correlation/candidate/artifacts are all typed states (0.326026ms)
+✔ D-1: eventId/idempotencyKey are fresh random values, never derived from a portable decisionId (0.395887ms)
+✔ D-1: occurredAtEpochMs is bucketed to day granularity, never left exact (0.200024ms)
+✔ D-1: an invalid rationale/packageId fails closed through the payload validator (0.170483ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 270.683209
+
+--- stderr ---

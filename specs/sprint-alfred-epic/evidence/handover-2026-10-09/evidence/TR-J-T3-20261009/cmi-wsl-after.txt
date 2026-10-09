@@ -1,0 +1,41 @@
+command: node --test plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+label: cmi-wsl-after
+exitCode: 0
+head: 8328f56bb437549da2a8f2caededf8219b99f4b8
+tree: 226dc80fa0fed6972ca9efea198e46f36d19b651
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: commit-msg-hook-plugin-NcunWu
+✔ CMI001 installed hook allows a valid contiguous Pipeline provenance block (4085.928602ms)
+✔ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (367.533652ms)
+✔ CMI003 installed hook blocks provenance split by a blank line (4318.13971ms)
+✔ CMI004 installed hook blocks marker-only provenance (4137.080264ms)
+✔ CMI005 installed hook blocks dispatch-only provenance (4066.16291ms)
+✔ CMI006 installed hook blocks provider and session correlation (4328.041179ms)
+✔ CMI007 installed hook blocks an unprovenanced commit in a Pipeline-managed repository (4313.632491ms)
+✔ CMI008 installed hook blocks a shell-script-wrapped commit without Pipeline provenance (4015.994601ms)
+✔ CMI009 absent policy defaults to blocking incomplete signaled provenance (4262.736162ms)
+✔ CMI010 warn policy reports incomplete signaled provenance but allows the commit (3989.777886ms)
+✔ CMI011 off policy does not produce provenance findings (3497.804544ms)
+✔ CMI012 off policy still blocks provider and session correlation (3820.884233ms)
+✔ CMI013 applyInstall refuses a foreign commit-msg hook without changing it (2799.46276ms)
+✔ CMI014 install, managed upgrade and removal preserve ownership checks (3495.72935ms)
+✔ CMI015 commit hook blocks unapproved staged implementation paths but still permits documentation (5441.311503ms)
+✔ CMI016 upgrade and removal refuse a modified managed hook (3171.292429ms)
+✔ CMI017 upgrade and removal refuse a modified managed implementation (3197.377258ms)
+✔ CMI018 generated hook fails closed when Git's message file is unreadable (4285.926124ms)
+✔ CMI019 generated hook fails closed when its install-bound policy module is unavailable (3825.028415ms)
+✔ CMI020 decline marker has the same reversible, non-overwriting contract as the other hook installers (3564.809268ms)
+✔ CMI021 installed hook permits first permissions settings but rejects new hook authority (4823.7817ms)
+✔ CMI022 installed hook compares settings hooks against Git base and exact staged deletions (5438.99099ms)
+✔ CMI023 --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (209.423645ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 97110.135934
+
+--- stderr ---

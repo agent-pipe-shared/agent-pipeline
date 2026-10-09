@@ -1,0 +1,304 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
+label: HOOKREFRESH-F1b-before
+exitCode: 1
+head: 410d0addf8da0a970d6a6d3c8e0f7b2031ba04b2
+tree: 9ebd0bc69f7c5b8ce9bfc7a961330d13852a7def
+dirty: true
+--- stdout ---
+✖ ENFORCEMENT: Elephant, all three hooks stale -> non-ready, ONE action refreshes all of them (15.895408ms)
+✖ ENFORCEMENT: Elephant, one mandatory hook stale next to a current one -> action covers exactly the stale one (10.18289ms)
+✖ ENFORCEMENT: Elephant, a stale hook next to a MISSING one is not a dead end (a typed action, not null) (10.247393ms)
+✖ ENFORCEMENT: an absent role is the Elephant (strict default) -> stale mandatory hook is non-ready (9.918756ms)
+✔ CONTROL: goldfish readback is unaffected by stale hooks (they never install) (9.976877ms)
+✔ CONTROL: critic readback is unaffected by stale hooks (they never install) (10.739512ms)
+✔ CONTROL: Elephant, only the ADVISORY pre-push hook stale -> still ready (assumption: pre-push is not mandatory) (11.076319ms)
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: absent) (5.031124ms)
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: elephant) (5.067715ms)
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: goldfish) (5.659706ms)
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: critic) (5.390591ms)
+✖ ENFORCEMENT: a ready model-role bootstrap is passed through as its own status and code (5.512594ms)
+✖ ENFORCEMENT: `unavailable` with its code is a legal value and does not downgrade the envelope (5.928861ms)
+✖ ENFORCEMENT: a bootstrap that throws is still a present field (`unavailable`), never an absent one (5.059954ms)
+✔ TODO: plugin update under an onboarded project -> one typed refresh nextAction, not a two-step repair (0.112442ms) # not expressible at the preflight seam: the preflight only distinguishes ProjectOnboardingReadyError code PORG-NOT-READY (never onboarded, projection drift and cleanup residue all fold into it) and answers with the guided-driver / inspect action; projection drift after a plugin update is classified inside project-onboarding-v3, and no 'refresh' action or command exists in any contract yet (backlog item pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair: 'Not designed here'; pipeline.typed-plugin-update-next-action has no design). Pin it in the project-onboarding-v3 suite once the refresh action's identity is decided.
+✔ preflight declares what its status ranges over, in every status (10.12553ms)
+✔ preflight gates mandatory local hooks and keeps pre-push advisory (15043.432997ms)
+✔ all three runner bootstraps expose the same nonblocking decision digest (16.125542ms)
+✔ AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations (60.629036ms)
+✖ preflight reports exact identity and no-handoff without secret fields (4.629577ms)
+✔ normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness (3.905794ms)
+✔ a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal (3.861933ms)
+✔ a durable decision with a present physical map does not repeatedly propose adoption (3.593027ms)
+✔ normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted (3.660668ms)
+✔ Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity (30.917289ms)
+✔ all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume (29.33106ms)
+✔ NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape (3.971035ms)
+✔ a soft plugin refresh still exposes the not-ready project's onboarding action (4.514904ms)
+✔ NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged (4.458734ms)
+✔ NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string (122.492095ms)
+✔ preflight declares the Claude runner when CLAUDECODE marks the session (3.823952ms)
+✔ preflight keeps the Codex runner default for any non-Claude-Code session (12.525226ms)
+✔ resolveActiveRunner: a genuine Codex session resolves codex even in a claude-default repository (0.158953ms)
+✔ resolveActiveRunner: a signal-less shell in a claude-default repository resolves claude (0.579001ms)
+✔ resolveActiveRunner: a signal-less shell in a repository declaring nothing resolves codex (0.124803ms)
+✔ resolveActiveRunner: an actual CLAUDECODE/Antigravity signal is never overridden by a declared default (0.053791ms)
+✔ a rendered PO-facing re-run command always carries --runner explicitly (0.178313ms)
+✔ normal bootstrap receipt retains exact envelope measurement and over-budget state (0.226284ms)
+✔ preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0 (11.526936ms)
+✔ PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary (7.718994ms)
+✔ preflight distinguishes complete and malformed handoff by presence only (18997.713301ms)
+✔ preflight turns a loaded/installed mismatch into a typed refresh handoff (4826.390382ms)
+✔ an exact registered local marketplace is a visible development source (4799.968709ms)
+✔ an attested local-development entry wins over a coexisting official entry (Codex, D5) (4821.581731ms)
+✔ the isolated development id is accepted only from its exact local marketplace root (0.197974ms)
+✔ unavailable registry remains non-blocking when the loaded identity is coherent (14111.958388ms)
+✔ installed version accepts only one exact enabled Agent-Pipeline entry (0.252385ms)
+✔ missing or malformed manifest fails identity closed (2927.984514ms)
+✔ a Claude session reads the Claude source manifest, never the Codex one (4.379572ms)
+✔ a non-Claude-Code session still reads the Codex source manifest, never the Claude one (4.055696ms)
+✔ Antigravity reads its own plugin manifest, never the Codex-shaped manifest (0.149483ms)
+✔ a Claude bare-array registry resolves an attested local-development installation (3.909053ms)
+✔ an attested local-development entry wins over a coexisting official entry (D1) (4395.244964ms)
+✔ an unattested local-development entry does not win over a coexisting official entry (0.328916ms)
+✔ two eligible Claude local-development entries still collide as ambiguous (0.151773ms)
+✔ a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity (4.061046ms)
+✔ a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry (3.922843ms)
+✔ two eligible Claude project-scope entries for the same id and cwd still collide as ambiguous (3.961263ms)
+✔ a malformed, non-array, or empty Claude registry yields no identity without crashing (18545.590808ms)
+✔ a Claude version mismatch between loaded and installed identity requires refresh (4617.341449ms)
+✔ the Claude local-development id is accepted only from an attested directory-source marketplace (0.285376ms)
+✔ Codex registry binding rejects equal manifest versions with stale cached installer bytes (4.521805ms)
+✔ Codex direct local registry binding supplies its verified content identity (4.77248ms)
+✔ a Gitless Codex local-development install is ready only with its installer-owned receipt (9654.174207ms)
+✔ Agy managed copy missing a receipt has an exact host recovery action from a Git source (2313.226215ms)
+✔ Codex attestation source selection binds only a verified checkout and retains sanitized observation codes (0.428978ms)
+✔ a non-local Claude installation id reports unknown source without touching the host marketplace registry (0.091672ms)
+✔ preflight calls observe self-referentially with the loaded plugin root on both sides (5275.32629ms)
+✔ an unattested origin keeps plugin refresh required and returns a non-executable advisory (5316.809438ms)
+✔ the second reviewed origin (SSH form) also attests as ready (5418.411483ms)
+✔ a rejected observation keeps plugin refresh required and returns a non-executable advisory (5596.438606ms)
+✔ a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation (1315.940061ms)
+✔ plugin-identity-unavailable keeps nextAction null even under a failing attestation (1187.270848ms)
+✔ F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout (5751.413618ms)
+✔ F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all (22589.00697ms)
+✔ F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub (21665.914938ms)
+✔ F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub (21800.825259ms)
+✔ F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub (26967.256623ms)
+✔ PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity (5354.252567ms)
+✔ PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate (22096.976609ms)
+✔ PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value (10080.173428ms)
+✔ PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change (44660.657211ms)
+✔ PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning (19643.520885ms)
+✔ PHX-WP-AAC01-MULTISESSION: a repository root with no registered descriptors at all never warns and never throws (18929.832737ms)
+✔ PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws (10.004097ms)
+✔ observeDutyNotRuntimeLive reports in-force when roots are identical or match (0.52288ms)
+✔ observeDutyNotRuntimeLive recognizes two paths to one physical plugin root (0.389437ms)
+✔ observeDutyNotRuntimeLive reports differing and lists differing files when modified (0.411018ms)
+✔ observeDutyNotRuntimeLive reports not-applicable when roots are missing or null (0.122393ms)
+✔ NVA-B8-11: gitless Claude recovery references survive a skill-only installation (74.018103ms)
+✔ AM-W-T2: pipeline-start-preflight.mjs imports observeAgyStartHint and calls it (structural stand-in) (5.448391ms)
+✔ AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output (0.088921ms) # missing seam: observePipelineStartPreflight() must accept an injectable observeAgyStartHint (or the workspace root, config root and loaded plugin root it reads) before this can be pinned against a fixture governed workspace whose loaded agy plugin root differs from the managed copy, without touching the real home or resolving the real agy CLI. The wiring slice must provide that seam; the case then asserts that the agy hint appears in the preflight output. The output field name is the wiring slice's to choose and is deliberately not pinned here.
+✔ AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output (0.047831ms) # missing seam: same injectable seam as the case above. The wiring slice must provide it; the case then asserts, for a governed workspace whose loaded agy plugin root is the managed copy and for an ungoverned workspace, that the preflight output carries no agy hint and is otherwise byte-identical to the output of a run without the agy observation.
+ℹ tests 93
+ℹ suites 0
+ℹ pass 78
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 3
+ℹ duration_ms 351228.622504
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:190:1
+✖ ENFORCEMENT: Elephant, all three hooks stale -> non-ready, ONE action refreshes all of them (15.895408ms)
+  AssertionError [ERR_ASSERTION]: a stale mandatory hook must make the Elephant's preflight non-ready (it let the bootstrap confirmation through)
+      at assertElephantMustRefresh (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:170:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:196:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'ready',
+    expected: 'ready',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:199:1
+✖ ENFORCEMENT: Elephant, one mandatory hook stale next to a current one -> action covers exactly the stale one (10.18289ms)
+  AssertionError [ERR_ASSERTION]: a stale mandatory hook must make the Elephant's preflight non-ready (it let the bootstrap confirmation through)
+      at assertElephantMustRefresh (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:170:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:203:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'ready',
+    expected: 'ready',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:206:1
+✖ ENFORCEMENT: Elephant, a stale hook next to a MISSING one is not a dead end (a typed action, not null) (10.247393ms)
+  AssertionError [ERR_ASSERTION]: a stale + missing mix must not collapse to a dead end (blocked, nextAction null); it must offer one typed action, got null
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:213:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:220:1
+✖ ENFORCEMENT: an absent role is the Elephant (strict default) -> stale mandatory hook is non-ready (9.918756ms)
+  AssertionError [ERR_ASSERTION]: a stale mandatory hook must make the Elephant's preflight non-ready (it let the bootstrap confirmation through)
+      at assertElephantMustRefresh (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:170:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:224:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'ready',
+    expected: 'ready',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: absent) (5.031124ms)
+  AssertionError [ERR_ASSERTION]: a ready envelope without modelRoleBootstrap lets the bootstrap skip the model-role step silently
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:260:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: elephant) (5.067715ms)
+  AssertionError [ERR_ASSERTION]: a ready envelope without modelRoleBootstrap lets the bootstrap skip the model-role step silently
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:260:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: goldfish) (5.659706ms)
+  AssertionError [ERR_ASSERTION]: a ready envelope without modelRoleBootstrap lets the bootstrap skip the model-role step silently
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:260:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: critic) (5.390591ms)
+  AssertionError [ERR_ASSERTION]: a ready envelope without modelRoleBootstrap lets the bootstrap skip the model-role step silently
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:260:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:269:1
+✖ ENFORCEMENT: a ready model-role bootstrap is passed through as its own status and code (5.512594ms)
+  AssertionError [ERR_ASSERTION]: modelRoleBootstrap must be present
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:272:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:277:1
+✖ ENFORCEMENT: `unavailable` with its code is a legal value and does not downgrade the envelope (5.928861ms)
+  AssertionError [ERR_ASSERTION]: modelRoleBootstrap must be present even when unavailable
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:280:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:285:1
+✖ ENFORCEMENT: a bootstrap that throws is still a present field (`unavailable`), never an absent one (5.059954ms)
+  AssertionError [ERR_ASSERTION]: an exception must be folded into the field, not swallowed into absence
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:288:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:273:1
+✖ preflight reports exact identity and no-handoff without secret fields (4.629577ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      'architectureOrientation',
+      'bootstrapPayload',
+      'cloneProvisioning',
+      'concurrentSessionWarning',
+  ...
+      'installedVersion',
+  +   'mandatoryHookReadiness',
+      'nextAction',
+      'pluginRoot',
+      'rulesetSource',
+      'schema',
+      'status',
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:281:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'architectureOrientation', 'bootstrapPayload', 'cloneProvisioning', 'concurrentSessionWarning', 'effectiveDecisions', 'executionBoundary', 'handoff', 'installedPluginAttestation', 'installedSource', 'installedVersion', 'mandatoryHookReadiness', 'nextAction', 'pluginRoot', 'rulesetSource', 'schema', 'status', 'statusScope', 'version' ],
+    expected: [ 'architectureOrientation', 'bootstrapPayload', 'cloneProvisioning', 'concurrentSessionWarning', 'effectiveDecisions', 'executionBoundary', 'handoff', 'installedPluginAttestation', 'installedSource', 'installedVersion', 'nextAction', 'pluginRoot', 'rulesetSource', 'schema', 'status', 'statusScope', 'version' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

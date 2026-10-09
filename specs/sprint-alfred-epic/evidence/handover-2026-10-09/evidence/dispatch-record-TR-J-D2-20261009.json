@@ -1,0 +1,27 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-J-D2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "commits": ["997356d7e"],
+  "resultSha256": null,
+  "report": {
+    "text": "Both owner-runtime reds share one cause: plugins/pipeline-core/lib/worktree-lifecycle.mjs:559 (localProcessStartIdentity returns null unless process.platform === linux) -> :567-574 localProcessOwnerRuntime null -> :642 descriptor ownerRuntime null -> :715 inspectSessionOwnerRuntime status unavailable -> pipeline-start-preflight.mjs:868 warns only on live. Case 1 gets null warning; case 2 TypeErrors at test :1954 (was :1933 in the capture; file shifted +21). Classification: host limitation surfacing as test defect, no product defect (worktree-lifecycle.test.mjs:818 already asserts unavailable off-Linux). Slice: test-only skip on non-Linux for the two tests in pipeline-start-preflight.test.mjs plus optional positive null-ownerRuntime case. Consumer-safe check 9/9 pass. Commit 997356d7e. independent review: pending.",
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md"]
+  },
+  "log": [
+    { "phase": "opening", "toolUses": 6 },
+    { "phase": "diagnosis complete", "toolUses": 14 },
+    { "phase": "committed note; consumer-safe check 9/9 pass; final record", "toolUses": 20 }
+  ]
+}

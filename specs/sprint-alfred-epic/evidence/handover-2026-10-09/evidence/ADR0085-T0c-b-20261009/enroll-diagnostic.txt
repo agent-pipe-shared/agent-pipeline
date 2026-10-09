@@ -1,0 +1,29 @@
+command: node --test scratch/dispatch-wip/t0c-run/b.test.mjs
+label: enroll-diagnostic
+exitCode: 1
+head: 5031d4dc474cdeab4f533d14b8bd0f5292d44352
+tree: 801823c0ddb41a10182bd6caf5838bc057af038c
+dirty: true
+--- stdout ---
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (2824.901315ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4808.832758
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/t0c-run/b.test.mjs:248:1
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (2824.901315ms)
+  Error: fixture enrollment did not become active: {"plan":{"schema":"pipeline.governance-decision-plan.v1","root":"/tmp/codex-composition-fixture-300XUT","scopeKey":"05bfa386f50c2e7a77d9d08bc2a04aa85184884a003d4cf206c9ae2a596d6276","repositoryKind":"git","rootIdentity":{"dev":"72","ino":"24153"},"commonIdentity":{"dev":"72","ino":"24155"},"decision":"enroll","by":"disposable-guard-fixture","preimageSha256":"68c62f12ad2cc5ced527e3fd9848d70cc3887f53cd3608c18611e28764dc5d3e","planSha256":"70dd92296400b73b28d004689bccb54aea0e885dc069b4491c94daab3c86e4d8"},"active":{"schema":"pipeline.governance-scope.v1","state":"declined","root":"/tmp/codex-composition-fixture-300XUT","scopeKey":"05bfa386f50c2e7a77d9d08bc2a04aa85184884a003d4cf206c9ae2a596d6276","repositoryKind":"git","provenance":{"kind":"explicit-local-decision","refs":[{"path":"git-common-config","sha256":"32e7bcdd424b7b23b302ba550fed7c748dd027061d2a8504d0a59ec90ed56496"}]},"diagnostics":[],"requiresEnforcement":false,"hintAllowed":false}}
+      at enrollFixture (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:85:79)
+      at buildLiveShapedV7Fixture (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:237:3)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/b.test.mjs:253:14)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+
+--- stderr ---

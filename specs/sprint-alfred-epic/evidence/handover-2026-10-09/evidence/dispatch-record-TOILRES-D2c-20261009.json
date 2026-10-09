@@ -1,0 +1,61 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TOILRES-D2c-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-opus-5-5",
+  "effort": "xhigh",
+  "modelOverride": {
+    "model": "claude-opus-5-5",
+    "effort": "xhigh",
+    "rationale": "MP-07 design tier: SECURITY/GUARDRAIL design note feeding BK gating slices (briefing field 6); agent definition pins sonnet/xhigh"
+  },
+  "routeObservation": {
+    "requested": "claude-opus-5-5 / xhigh",
+    "observedModel": "claude-opus-5-5 (dispatch runtime prompt states the exact model ID)",
+    "observedEffort": "unknown (no direct same-dispatch evidence)"
+  },
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "12426da30bf6dd2c5c75d275d0e43bbcda0a619f",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "70b03bfaeae7f25012ba1319af10975746400f98"
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "TOILRES-D2c completion report. Implementation complete; independent review: pending; PO acceptance: open.\n\n1. DoD results\n- F-1: passed. Section 3.2a measures, with file:line, what the ready-state grammar admits. The tokenizer (hooks/guard-command-grammar.mjs:15, :69-75, :79-81) has no executable allowlist. In evaluate.mjs, the read fast path :345-363 covers only the read family of shell-grammar.mjs:890-983, and the parse branch :377-474 lets any single simple command reach :482. devplan-shell-lane.mjs:127/:135/:139 are its only executable branches; :144 returns null for the rest. Four live probes executed in a ready lifecycle: openssl version, wsl.exe -e true, cp --version, powershell.exe -NoProfile -Command Get-Date. TR-S2 now covers every Bash and PowerShell-tool command, with nested carriers (wsl.exe/bash -lc, powershell -Command, cmd /c), /mnt/<drive>/ and MSYS normalisation, raw openssl corpus entries and the WSL suite route as a negative pin. The wiring moves to the env-dump position evaluate.mjs:81-94 [C]. The remaining non-literal lanes are registered as RS-1K/C/M with owner and expiry. The section 3.5 closure claim is corrected.\n- F-3: passed. RS-1 is split into RS-1K (signing key: TR-S1 plus attended terminal plus I2a), RS-1C (credential stores: OS permissions only, same OS account [C]) and RS-1M (machine plane: OS permissions only). PO decision 5 is updated.\n- T87/T88: passed. T87 is assigned to TR-D, T88 to TR-F. Count: 88 rows, L7-L94; 20 Owned + 11 Tracked + 1 Note + 56 slices (TR-D 4, TR-F 7) = 88. T81 moved to L93 and T28 to L94, and those references are fixed. Self-checked arithmetic; there is no machine check.\n- Every changed claim cites file:line or is marked [C]: passed by self-review. a3 claims carry the 'a3' marker; a2's 'verified' marker is redefined to mean TOILRES-D2b, not reassigned. Not machine-verifiable.\n- English only: passed (self-review).\n- One docs(toilres) commit of the one file: passed. 70b03bfaeae7f25012ba1319af10975746400f98; git log --name-only lists only the note.\n- Terminal record with commits and changedFiles: passed (this record).\n- The briefing defines no verify suite. No capture-evidence run applies (docs only, no plugins/ file, so no consumer-safe check).\n\n2. Evidence\n- Command: git log -3 --format=\"%H %P %s\" --name-only. Exit 0. Shows 70b03bfae (parent 12426da30) touching only specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md.\n- The probe outputs are in this record's log (phase measure-F1-probes).\n\n3. Changed files\n- specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md: revision a3 (F-1, F-3, T87/T88, count check, revision log).\n- evidence/dispatch-record-TOILRES-D2c-20261009.json (ignored root): this record.\n- scratch/commit-msg/TOILRES-D2c-20261009.txt (ignored): commit message.\n\n4. Deliberately not changed\n- Rows T1-T86, apart from the T28/T81 line references and the 'this dispatch' wording in T20/T86, which now names D2b.\n- Section 3.3 and section 4.\n- powerShellScopeVerdict (evaluate.mjs:230): not read; listed as open item 8.\n- The staged foreign files (sanctioned-args-onboarding.mjs, the pipeline-state.mjs import, rebind-approval.mjs): untouched. The pathspec commit excluded them.\n- No toil row was added for refusals hit in this run; backlog and toil files are out of scope.\n\n5. Deviations from spec\n- The briefing names plugins/pipeline-core/lib/guard/guard-command-grammar.mjs. That path is absent (Grep refused GUARD-READ-TARGET). The grammar was measured in hooks/guard-command-grammar.mjs, lib/guard/shell-grammar.mjs and lib/guard/evaluate.mjs:340-484, beyond the named ranges, because the measurement required them.\n- Record ordering: the record was set terminal (committed-pending-report, changedFiles) BEFORE the commit, to honour family section 6 ('never commit while non-terminal'), then finalised with the SHA. The template orders commit, then checkpoint.\n- candidateCommit holds the commit's real parent, 12426da30 (parallel commits landed). HEAD at dispatch start was 870fb81ed; the opening record carried the briefing's minimum, 07935b23c.\n- The record carries modelOverride because agents/goldfish-deep.md pins sonnet/xhigh.\n- No closing advisor call, because of the budget checkpoint.\n\n6. Open items\n- Independent review: pending (Opus Critic re-review of a3). PO decisions 1-9 in note section 6, including the new 9 (TR-S2 scope versus an executable allowlist).\n- Refusals hit in this run, for the dispatcher's toil judgement:\n  - GUARD-BOOTSTRAP-RECEIPT-MISSING on the first Write (T20 recurrence);\n  - GUARD-PARSE-UNSUPPORTED on a compound cd command;\n  - GUARD-READ-TARGET on a Grep of a missing file (reads as a policy refusal, not 'missing');\n  - GUARD-TESTPATH-SHELL/PB-GUARD-HOOKS on a read-only rg -n whose pattern contained writer words (cp/copy) and named a hooks/ file (conservative unparsed-command lane, T80/T85 family);\n  - GUARD-READ-COMMAND-UNSUPPORTED on stat -c %n with three operands.\n- The budget hook counted call 36 of 45 at the pre-commit record write.\n- Note open items 8-10 (PowerShell scope verdict, cmd.exe /c type not probed, commit-msg hook source).",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md"
+    ]
+  },
+  "log": [
+    { "phase": "bootstrap", "toolUses": 11, "note": "subagent preflight ran (status ready) after GUARD-BOOTSTRAP-RECEIPT-MISSING on the first record Write" },
+    { "phase": "orientation", "toolUses": 15, "note": "read findings file, note, devplan-shell-lane.mjs:115-154, po-decisions:66-71, toil log L83-L94 (T87 L91, T88 L92, T81 L93, T28 L94)" },
+    { "phase": "measure-F1", "toolUses": 20, "note": "hooks/guard-command-grammar.mjs has no executable allowlist (:15, :69-75, :79-81); briefed path lib/guard/guard-command-grammar.mjs does not exist (GUARD-READ-TARGET / stat refused); evaluate.mjs:345-363 read family only (shell-grammar.mjs:890-983), :377-474 parse branch, :482 lifecycle tail" },
+    { "phase": "measure-F1-probes", "toolUses": 27, "note": "live probes in a ready lifecycle, Bash tool, all executed: 'openssl version' -> OpenSSL 3.5.7; 'wsl.exe -e true' -> no output, completed; 'cp --version' -> GNU coreutils 8.32; 'powershell.exe -NoProfile -Command Get-Date' -> date printed" },
+    { "phase": "write-note", "toolUses": 29, "note": "note written in one Write (revision a3); guard-devplan admitted it" },
+    { "phase": "pre-commit-record", "toolUses": 31, "note": "record set terminal (committed-pending-report) with changedFiles before the commit" },
+    { "phase": "commit", "toolUses": 33, "note": "git commit -F by exact pathspec -> 70b03bfaeae7f25012ba1319af10975746400f98 (1 file, +200/-42)" },
+    { "phase": "final-record", "toolUses": 35, "note": "outcome completed; commits and report written; independent review pending" }
+  ]
+}

@@ -1,0 +1,7 @@
+# compare before=evidence/WIN-AP-F3-20261009/wsl-before.txt after=evidence/WIN-AP-F3-20261009/wsl-after.txt
+CHANGED: F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven win32): fail -> pass
+CHANGED: F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven POSIX): fail -> pass
+CHANGED: F2: a PRIVATE root owned by someone else is refused with PB-ROOT-INSECURE under either posture, untouched and never chmodded (seam-driven POSIX over a real directory): fail -> pass
+CHANGED: D1: an existing 0o777 root of the current user whose chmod takes no effect is accepted with PB-ROOT-MODE-UNRECORDED, neither repaired nor refused (seam-driven POSIX): fail -> pass
+CHANGED: D1: a fresh root this call created that reads 0o777 only because the filesystem records no mode bits is accepted with PB-ROOT-MODE-UNRECORDED and kept (seam-driven POSIX): fail -> pass
+# unchanged: 114

@@ -1,0 +1,18 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs
+label: WINACL-T-wsl
+exitCode: 0
+head: df5d562d1adb9b9e6017c648ab1775d14ecacc35
+tree: 14223fb57a477f096a6a542bc46f76e4ac7e814f
+dirty: true
+--- stdout ---
+﹣ WINACL001 win32: a record whose ACL is widened to Everyone is not secure and the controller fails closed (0.731924ms) # host limitation: the ACL pin needs native win32 (platform is linux)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 1642.37161
+
+--- stderr ---

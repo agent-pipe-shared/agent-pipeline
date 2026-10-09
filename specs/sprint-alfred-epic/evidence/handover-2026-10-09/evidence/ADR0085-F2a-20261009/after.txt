@@ -1,0 +1,45 @@
+command: node --test plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: target-after
+exitCode: 0
+head: ae14b4c43738996ccec90e4ea12f32c061c19160
+tree: 40324f113d50f4412964da279d3e2e0ac2fa1a21
+dirty: true
+--- stdout ---
+✔ R1 re-read: design-workflow-package.mjs exports the re-read function (449.571465ms)
+✔ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (8.256045ms)
+✔ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (5.416952ms)
+✔ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (5.123746ms)
+✔ R5 re-read: package bytes changed after the approval are refused (item 1) (1.709172ms)
+✔ R6 re-read: a missing package file is a typed refusal (0.908907ms)
+✔ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (1.0431ms)
+✔ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (7.574962ms)
+✔ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (10.386605ms)
+✔ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (8.274325ms)
+✔ R11 re-read: a package of another feature is refused (4.503874ms)
+✔ R12 re-read: malformed approval inputs are a typed input refusal (0.836036ms)
+✔ V0 v8: pipeline.plan-approval.v8 is the current approval schema (29.164845ms)
+✔ V1 v8: a signature-mode record with a proof is valid (0.779095ms)
+✔ V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid (0.275205ms)
+✔ V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid) (0.297635ms)
+✔ V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid) (0.425608ms)
+✔ V5 v8: the mode must be exactly signature or chat (0.349706ms)
+✔ V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid) (0.396997ms)
+✔ V7 v8: the plan approval carries designApproval and none of the four retired v7 fields (0.307395ms)
+✔ V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1 (0.254554ms)
+✔ V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO) (0.532881ms)
+✔ V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval (0.335176ms)
+✔ V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable) (0.202393ms)
+✔ L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception (29.515602ms)
+✔ L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid (0.144213ms)
+✔ L3 classification: other or malformed records are unknown (0.084971ms)
+✔ L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent (1.988077ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 635.081094
+
+--- stderr ---

@@ -1,0 +1,32 @@
+command: node --test plugins/pipeline-core/lib/test-private-tmp.test.mjs
+label: before
+exitCode: 0
+head: 314359cf6ca584ae8c3781e2ad9ae12a5b633b67
+tree: 86d576a78133e10af0585592f31bbbb8a24381c6
+dirty: true
+--- stdout ---
+✔ privateTempRoot returns an absolute directory that exists (794.5705ms)
+✔ privateTempRoot is memoized: two calls in one process return the same path (0.1258ms)
+✔ privateTempRoot has no ancestor .git directory (0.4878ms)
+✔ privateMkdtemp returns a fresh directory inside the root whose basename starts with the prefix (0.7289ms)
+✔ privateMkdtemp honours a different prefix (0.4899ms)
+✔ privateMkdtemp returns a different directory on every call (1.1039ms)
+✔ win32: a privateMkdtemp child passes the existing private-state assurance (296.7373ms)
+✔ win32: the root carries no access entry for a principal other than the current user (629.1862ms)
+﹣ POSIX: the root's mode is 0o700 (0.1231ms) # POSIX mode bits only; win32 is covered by the DACL tests
+✔ the module does not import or change the assurance's evaluation function (0.3225ms)
+✔ B-S1-T2: the private temp root and its children are removed when a process that used them exits normally (1003.7994ms)
+✔ B-S1-T2: PRIVATE_TMP_ROOT_INSIDE_REPOSITORY is refused and leaves no root behind (.git directory in an ancestor of the temp directory) (1739.3989ms)
+✔ B-S1-T2: PRIVATE_TMP_ROOT_INSIDE_REPOSITORY is refused and leaves no root behind (.git file in an ancestor of the temp directory) (1818.1761ms)
+✔ B-S1-T2: PRIVATE_TMP_PREFIX_INVALID refuses an empty or non-string prefix and creates nothing (0.5028ms)
+✔ B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves outside the root and creates nothing (5.5064ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 6358.0418
+
+--- stderr ---

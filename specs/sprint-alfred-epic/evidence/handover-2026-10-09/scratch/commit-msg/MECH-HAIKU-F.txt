@@ -1,0 +1,8 @@
+feat(routing): route the mechanic on Haiku at effort medium
+
+Mechanic capability moves from sonnet/low to haiku/medium in the claude
+runner mapping, the routing authority and the goldfish-mechanic agent
+definition (Rulings 158/161). The research-fetcher exception is unchanged.
+
+AI-Assisted: true
+Dispatch: MECH-HAIKU-F-20261009 (goldfish)

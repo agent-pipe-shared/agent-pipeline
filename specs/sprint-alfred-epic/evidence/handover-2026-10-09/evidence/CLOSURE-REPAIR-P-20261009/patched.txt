@@ -1,0 +1,152 @@
+command: node scratch/closure-repair-p/tool.mjs run patched
+label: CLOSURE-REPAIR-P-patched-SCRATCH-ONLY
+exitCode: 1
+head: 4137c9bd5f388aa1eba4a96547a27b4754b4d37e
+tree: bb109461a7d84ca130d0d6548c9d46a487d70c16
+dirty: true
+--- stdout ---
+STATE: patched
+=== closure (SCRATCH-ONLY): node scratch/closure-repair-p/closure.scratch.test.mjs
+PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+
+guard-maintenance-window-kernel-closure: 9 passed, 1 failed
+FAIL GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry: AssertionError [ERR_ASSERTION]: 15 NEVER_LIFTABLE_KERNEL_PATHS entries are not mentioned in docs/guard-maintenance-window-threat-model.md's "Protected assets" section:
+plugins/pipeline-core/lib/agy-central-refresh.mjs
+plugins/pipeline-core/lib/agy-central-snapshot.mjs
+plugins/pipeline-core/lib/agy-start-hint.mjs
+plugins/pipeline-core/lib/checkpoint-push-approval.mjs
+plugins/pipeline-core/lib/continuity-authority-drift.mjs
+plugins/pipeline-core/lib/critical-action-authorization.mjs
+plugins/pipeline-core/lib/fs-durability.mjs
+plugins/pipeline-core/lib/git-null-device.mjs
+plugins/pipeline-core/lib/guard/env-dump-lane.mjs
+plugins/pipeline-core/lib/hardened-private-directory.mjs
+plugins/pipeline-core/lib/hook-currentness.mjs
+plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs
+plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs
+plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs
+plugins/pipeline-core/scripts/toolchain-preflight.mjs
+
+15 !== 0
+
+    at file:///<repo-root>/scratch/closure-repair-p/closure.scratch.test.mjs:767:10
+    at check (file:///<repo-root>/scratch/closure-repair-p/closure.scratch.test.mjs:482:5)
+    at file:///<repo-root>/scratch/closure-repair-p/closure.scratch.test.mjs:750:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+--- exit 1
+ANALYSIS cases: PASS=[GMWKC01,GMWKC08,GMWKC09,GMWKC02,GMWKC03a,GMWKC04,GMWKC06,GMWKC05,GMWKC07] FAIL=[GMWKC03]
+ANALYSIS GMWKC01 violations: edgeLines=0 distinctTargets=0 targetSetEqualsThe15=false missingFromTargets=[plugins/pipeline-core/lib/agy-central-refresh.mjs,plugins/pipeline-core/lib/agy-central-snapshot.mjs,plugins/pipeline-core/lib/agy-start-hint.mjs,plugins/pipeline-core/lib/checkpoint-push-approval.mjs,plugins/pipeline-core/lib/continuity-authority-drift.mjs,plugins/pipeline-core/lib/critical-action-authorization.mjs,plugins/pipeline-core/lib/fs-durability.mjs,plugins/pipeline-core/lib/git-null-device.mjs,plugins/pipeline-core/lib/guard/env-dump-lane.mjs,plugins/pipeline-core/lib/hardened-private-directory.mjs,plugins/pipeline-core/lib/hook-currentness.mjs,plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs,plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs,plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs,plugins/pipeline-core/scripts/toolchain-preflight.mjs] extraTargets=[] nonEdgeViolationLines=0
+=== split-contract (SCRATCH-ONLY): node --test scratch/closure-repair-p/split.scratch.test.mjs
+✖ GSC01 the module files of lib/guard are exactly the modules of the split map (2.0565ms)
+✖ GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle (4.7043ms)
+✔ GSC03 the facade's export surface is exactly the pinned 40-name table (name and typeof) (244.8697ms)
+✔ GSC04 once the facade is wired to lib/guard it is a thin facade of at most 500 lines (0.5786ms)
+✔ GSC05 every lib/guard module is a never-liftable kernel path (0.3392ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 3
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 323.0169
+
+✖ failing tests:
+
+test at scratch\closure-repair-p\split.scratch.test.mjs:141:1
+✖ GSC01 the module files of lib/guard are exactly the modules of the split map (2.0565ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      'bootstrap-receipt',
+      'command-catalogue',
+      'constants',
+      'denial-route',
+  ...
+      'entry-gates',
+  +   'env-dump-lane',
+      'evaluate',
+      'gate-strength-lane',
+      'grammar-denials',
+      'lifecycle-gate',
+      'path-containment',
+  
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/closure-repair-p/split.scratch.test.mjs:144:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [
+      'bootstrap-receipt',          'command-catalogue',
+      'constants',                  'denial-route',
+      'denial-telemetry',           'devplan-shell-lane',
+      'dispatch-record-lane',       'entry-gates',
+      'env-dump-lane',              'evaluate',
+      'gate-strength-lane',         'grammar-denials',
+      'lifecycle-gate',             'path-containment',
+      'po-commands',                'powershell-dialect',
+      'read-scope',                 'rebase-lane',
+      'sanctioned-args-onboarding', 'sanctioned-args-scripts',
+      'shell-grammar',              'verdict',
+      'write-scope'
+    ],
+    expected: [
+      'bootstrap-receipt',       'command-catalogue',
+      'constants',               'denial-route',
+      'denial-telemetry',        'devplan-shell-lane',
+      'dispatch-record-lane',    'entry-gates',
+      'evaluate',                'gate-strength-lane',
+      'grammar-denials',         'lifecycle-gate',
+      'path-containment',        'po-commands',
+      'powershell-dialect',      'read-scope',
+      'rebase-lane',             'sanctioned-args-onboarding',
+      'sanctioned-args-scripts', 'shell-grammar',
+      'verdict',                 'write-scope'
+    ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scratch\closure-repair-p\split.scratch.test.mjs:147:1
+✖ GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle (4.7043ms)
+  AssertionError [ERR_ASSERTION]: layer violations:
+  evaluate imports ./env-dump-lane.mjs, which is not a module of the map
+  + actual - expected
+  
+  + [
+  +   'evaluate imports ./env-dump-lane.mjs, which is not a module of the map'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/closure-repair-p/split.scratch.test.mjs:164:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'evaluate imports ./env-dump-lane.mjs, which is not a module of the map' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+--- exit 1
+ANALYSIS split cases: exit=1
+
+--- stderr ---

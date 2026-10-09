@@ -1,0 +1,16 @@
+command: node plugins/pipeline-core/scripts/architecture-adoption.mjs check --json --scope specs/sprint-alfred-epic/
+label: adopt-d-check
+exitCode: 0
+head: fa4365b7d04644928b6a325ce4d1fc2a64088d3d
+tree: 159199c534e2856c2d95fa3143ef2eeb12c0e7b3
+dirty: true
+--- stdout ---
+{
+  "ok": true,
+  "disposition": "deferred",
+  "scope": [
+    "specs/sprint-alfred-epic/"
+  ]
+}
+
+--- stderr ---

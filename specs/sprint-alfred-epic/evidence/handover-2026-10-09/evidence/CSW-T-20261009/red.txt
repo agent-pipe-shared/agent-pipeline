@@ -1,0 +1,82 @@
+command: node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs
+label: native
+exitCode: 1
+head: b9040293813b18d9a7f3a3d42d824f34c26494e6
+tree: b323a16fdf203222637b1848ea226d0af14c6e1c
+dirty: true
+--- stdout ---
+PASS D0-01 branch mapping is canonical and traversal is rejected
+PASS D0-02 detached mapping binds purpose and full OID
+PASS D0-03 symlink parents and case-fold aliases fail before creation
+PASS D0-04 branch creation records exact canonical state and one /branch/ exclusion
+PASS D0-05 protected or sole-copy content cannot enter a cleanup manifest
+PASS D0-06 changed canary and same-prefix decoy remain untouched and block cleanup
+PASS D0-06 sealed coordinator scratch may refresh its tree after an allowed child write
+PASS D0-06 a registered but unmaterialized scratch intent drains after creator crash
+PASS D0-06 dirty detached worktree blocks, then exact cleanup drains its manifest
+PASS D0-06 interrupted cleanup recovers from cleanup-intent without a second target
+PASS D0-10 stale same-session writer lock recovers while a foreign lock blocks
+PASS D0 Verify cleanup registration accepts only the private Git-common run root
+PASS D0 Verify cleanup removes one exact closed run and preserves an unregistered sibling
+PASS D0 Verify cleanup blocks a live writer but retires its exact stale creating run
+PASS D0 Verify cleanup fails closed for missing or malformed run ownership locks
+PASS D0-07 hygiene reports only redacted classifications and rejects noncanonical registration
+PASS D0-07 missing Git registration preserves session counts and independent noncanonical findings
+PASS D0-07 hygiene still throws an unsafe canonical-path error
+PASS D0-07 hygiene ignores dirty state made only of onboarding-generated paths
+PASS D0-07 hygiene still flags current-worktree-dirty when a genuinely foreign path is dirty
+PASS D0-09 post-commit cleanliness: cleanup drains session scratch after a real deliverable commit, leaving committed content untouched
+PASS D0-08 clean migration creates/verifies canonical copy before removing old registration
+PASS D0-08 injected migration failure at target-created retains an exact recoverable copy
+PASS D0-08 injected migration failure at target-verified retains an exact recoverable copy
+PASS D0-08 injected migration failure at source-removed retains an exact recoverable copy
+PASS D0-08 injected migration failure at branch-attached retains an exact recoverable copy
+PASS D0 worktree CLI denies unmanaged dispatch before creation while cleanup still drains owned scratch
+PASS D0 worktree CLI honors an explicit --runner over the CLAUDECODE-derived boundary default
+PASS D0 worktree CLI derives the boundary runner from an absent CLAUDECODE and fails closed on an invalid explicit --runner
+PASS D0 session descriptor is private, bound to one common dir and retires only after cleanup
+PASS D0 session owner runtime status is sanitized, detects PID reuse, and preserves legacy descriptors
+PASS CSW-T control: a second session whose owner pid does not exist never fires the concurrent-session warning
+PASS D0 session-cleanup CLI accepts descriptor ownership without receiving the nonce
+PASS D0 descriptor-only session closes cleanly without inventing a temporary manifest
+PASS D0 descriptor digest drift blocks CLI cleanup before any registered resource is removed
+PASS D0 CLI reports a blocked cleanup with exit 2
+PASS D0 parser accepts NUL porcelain without path guessing
+PASS Git worktree porcelain paths are native and physical at discovery
+PASS WT-LOCAL-WINDOWS-ASSURANCE auto-remediates a pre-existing insecure directory instead of only failing closed
+PASS WT-LOCAL-WINDOWS-ASSURANCE still fails closed when a pre-existing directory cannot be remediated
+PASS WT-LOCAL-WINDOWS-ASSURANCE closes the ancestor-skip gap: an insecure existing ancestor is remediated even when directories were created below it
+PASS WT-LOCAL-WINDOWS-ASSURANCE does not re-harden an already-secure existing ancestor
+PASS WT-LOCAL-WINDOWS-ASSURANCE still hardens every newly-created component outright, without assessing them first
+PASS D0-TO01 runGit forwards an explicit timeout to the underlying spawn call
+PASS D0-WSPAWN runGit accepts WSL EPERM only after status zero and keeps non-zero or missing status closed
+PASS D0-TO02 runGit omits timeout entirely (stays undefined, not 0/null) when the caller passes none
+PASS D0-TO03 discoverRepository forwards its options.timeout down to every git spawn it makes
+PASS D0-TMP-IGN listActiveSessionDescriptors ignores abandoned atomic write temporary files
+PASS RF2A archive moves a V2 null-owner descriptor byte-exactly to archived/<id>.<sha>.json with one audit record, deletes nothing, and a second run is a no-op
+PASS RF2A archive moves a V1 field-absent descriptor byte-exactly to archived/<id>.<sha>.json with one audit record, deletes nothing, and a second run is a no-op
+PASS RV-1: V2 null-owner descriptor is unavailable, never not-live, and the orphan-archive gate accepts it without inferring a dead owner
+PASS RV-1: V1 field-absent descriptor is unobserved, never not-live, and the orphan-archive gate accepts it without inferring a dead owner
+PASS RF2A archive refuses a manifest, the requester's own session, digest drift, hardlink, symlink, an existing target, a placeholder operator and an observable owner, and never deletes
+PASS FLAPW list-all skips a descriptor retired between listing and its load and still returns the survivors
+PASS FLAPW list-all treats a descriptor that vanishes at before-check as absent, never as malformed or non-private
+PASS FLAPW a required load of a descriptor that vanishes at before-check is still WT-SESSION-MISSING, never an absent result
+PASS FLAPW list-all treats a descriptor that vanishes at before-read as absent, never as malformed or non-private
+PASS FLAPW a required load of a descriptor that vanishes at before-read is still WT-SESSION-MISSING, never an absent result
+PASS FLAPW classifyActiveSessionDescriptors skips a descriptor retired between its listing pass and its classification load
+PASS FLAPW a published descriptor that is still present fails closed when malformed, in the loader and in list-all
+PASS FLAPW a published descriptor that is still present fails closed when multi-linked, in the loader and in list-all
+PASS FLAPW an in-flight atomic-write temporary file holding partial bytes is never listed or loaded
+PASS R7-1a behavioural (RED on win32 today; may PASS on POSIX, which already uses /dev/null): runGit succeeds against a git that rejects NUL-like null devices
+PASS R7-1a ratchet detector self-check: flags a win32 NUL ternary and an inline /dev/null for a git value, ignores look-alikes and the shared GIT_NULL_DEVICE constant
+PASS R7-1a ratchet: no production module (lib, scripts, hooks) assigns a "NUL" literal to a git environment or -c value
+PASS R7-1a ratchet: no *.test.mjs fixture (lib, scripts, hooks) assigns a "NUL" literal to a git environment or -c value (fixtures may keep /dev/null)
+PASS R7-1a single-source ratchet (RED until every site is converted): no production module (lib, scripts, hooks) spells an inline /dev/null git value; each takes GIT_NULL_DEVICE
+
+67/68 checks passed.
+
+--- stderr ---
+FAIL CSW-T a live second session in the same repository fires the concurrent-session warning on this host platform: AssertionError [ERR_ASSERTION]: no concurrent-session warning on platform win32: the live second session's owner reads "unavailable", and the warning fires only for a live owner
+    at file:///<repo-root>/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs:866:10
+    at check (file:///<repo-root>/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs:77:5)
+    at file:///<repo-root>/plugins/pipeline-core/lib/worktree-lifecycle.test.mjs:854:1

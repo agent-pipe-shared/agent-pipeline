@@ -1,0 +1,146 @@
+command: node --test --test-reporter=spec "--test-name-pattern=TR-G T49" scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.test.mjs
+label: TR-G-T4-red-native
+exitCode: 1
+head: f0697512665dd6fd0fbff24a183955a98ca0e1b0
+tree: 283a27f8ec9a2d867e3669ce56b7505bbd577a4a
+dirty: true
+--- stdout ---
+✔ TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted (724.8338ms)
+✔ TR-G T49 (b): after the working cap nothing but the named closing acts is admitted (control, green today) (876.2626ms)
+✔ TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused (1013.2391ms)
+﹣ TR-G T49 (d): after the working cap, a quoted producer path with a backslash before the script name is refused on a POSIX host (0.0967ms) # POSIX-host pin: on a win32 host the backslash is a path separator and that spelling stays admitted (the guard reads process.platform directly; no platform seam to inject)
+﹣ TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host (0.0618ms) # POSIX-host pin: on a win32 host the backslash is a path separator and that spelling stays admitted (the guard reads process.platform directly; no platform seam to inject)
+✔ TR-G T49 (f): after the working cap, `git add <x> && <other>` is refused -- only one simple git command is a closing act (674.0114ms)
+✔ TR-G T49 (g): after the working cap, `git add <x>; <other>` is refused (651.9772ms)
+✔ TR-G T49 (h): after the working cap, `git commit -F <f> | <other>` is refused (675.0534ms)
+✔ TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control, green today) (733.7873ms)
+✔ TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today) (710.4454ms)
+✔ TR-G T49 (k): after the working cap, a relative spelling of the producer script stays refused (control, green today) (692.9276ms)
+✖ TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path (720.732ms)
+✖ TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb (671.3987ms)
+✖ TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike (665.0645ms)
+✔ TR-G T49 (o): after the working cap, the exact admitted producer command (quoted, and bare with forward slashes) and `git commit -F <f> -- <p>` stay admitted (control, green today) (785.3415ms)
+✖ TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused (650.1186ms)
+✖ TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused (654.173ms)
+TRG4-REDIRECT-FIRED guard-dispatch-budget.mjs (15 runner-child loads served from the tranche-2 guard post-image)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 10
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 15706.2231
+
+✖ failing tests:
+
+test at scratch\dispatch-wip\TR-G-T4\guard-dispatch-budget.trg4.body.mjs:1981:1
+✖ TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path (720.732ms)
+  AssertionError [ERR_ASSERTION]: the refusal must name the admitted absolute path <host-path> -- got: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-EXHAUSTED: this dispatch (pipeline-core:goldfish-deep, agent abc123) has counted 6 tool-call attempts against a working cap of 5 (effective cap min(baseCalls=5, maxTurns=20 minus the fixed 5-closing + 10-safety reserve)).
+  The working budget is exhausted; 4 closing-call slots remain.
+  Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths, plus the read-only commit-flow producer `goldfish-commit-command-flow.mjs` from the plugin scripts directory (it is counted like any closing call).
+  Stop working and emi
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1985:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scratch\dispatch-wip\TR-G-T4\guard-dispatch-budget.trg4.body.mjs:1991:1
+✖ TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb (671.3987ms)
+  AssertionError [ERR_ASSERTION]: must stay refused after the cap, but it was admitted: git commit-graph write
+  
+  0 !== 2
+  
+      at trgAssertRefusedAfterCap (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1893:10)
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1994:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch\dispatch-wip\TR-G-T4\guard-dispatch-budget.trg4.body.mjs:1997:1
+✖ TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike (665.0645ms)
+  AssertionError [ERR_ASSERTION]: must stay refused after the cap, but it was admitted: git commit-tree HEAD
+  
+  0 !== 2
+  
+      at trgAssertRefusedAfterCap (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1893:10)
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:2000:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch\dispatch-wip\TR-G-T4\guard-dispatch-budget.trg4.body.mjs:2013:1
+✖ TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused (650.1186ms)
+  AssertionError [ERR_ASSERTION]: must stay refused after the cap, but it was admitted: node <host-path> --task TR-G-T4-20261009 -- evidence/x.json
+  
+  0 !== 2
+  
+      at trgAssertRefusedAfterCap (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1893:10)
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:2018:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch\dispatch-wip\TR-G-T4\guard-dispatch-budget.trg4.body.mjs:2021:1
+✖ TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused (654.173ms)
+  AssertionError [ERR_ASSERTION]: must stay refused after the cap, but it was admitted: node <repo-root>/scratch/guard-budget-active-guard-45ZjNi/plugins/pipeline-core/scripts\goldfish-commit-command-flow.mjs --task TR-G-T4-20261009 -- evidence/x.json
+  
+  0 !== 2
+  
+      at trgAssertRefusedAfterCap (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:1893:10)
+      at TestContext.<anonymous> (file:///<repo-root>/scratch/dispatch-wip/TR-G-T4/guard-dispatch-budget.trg4.body.mjs:2025:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

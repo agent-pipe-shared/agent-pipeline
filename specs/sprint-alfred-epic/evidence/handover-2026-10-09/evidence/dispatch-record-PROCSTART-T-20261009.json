@@ -1,0 +1,24 @@
+{
+  "taskId": "PROCSTART-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "complete",
+  "commits": ["7082974eabe56f18709d158175297e27bee3b785"],
+  "log": [
+    {"phase": "opening: bootstrap + preflight, orientation", "toolUses": 6},
+    {"phase": "design: exported callers identified (startSessionDescriptor/loadSessionDescriptor/inspectSessionOwnerRuntime for the :561 route, cleanupSession over an active verify-run lock for the :1652 route)", "toolUses": 20},
+    {"phase": "implemented new test file and commit message", "toolUses": 24},
+    {"phase": "WSL capture green (2 pass, 0 fail), consumer-safe exit 0, committed", "toolUses": 34}
+  ],
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/lib/worktree-process-start.test.mjs"],
+    "dod": {
+      "wslCapture": "passed: evidence/PROCSTART-T-20261009/after.txt, wrapped exit code 0, 2 tests pass",
+      "consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, 9 tests pass",
+      "commit": "passed: 7082974eabe56f18709d158175297e27bee3b785 via git commit -F scratch/commit-msg/PROCSTART-T.txt, one file"
+    },
+    "notRun": "mutation check of the pre-fix parser (production files are forbidden; the in-test naive-split assertion is the discriminator)",
+    "deviations": "Opening dispatch record replaced by scratch/dispatch-progress/PROCSTART-T-20261009.json because the briefing header requires the repo-root record to be written once, after the commit (T88)."
+  }
+}

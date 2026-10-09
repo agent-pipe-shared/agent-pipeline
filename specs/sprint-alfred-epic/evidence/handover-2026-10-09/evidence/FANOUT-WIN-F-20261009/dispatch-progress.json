@@ -1,0 +1,25 @@
+{
+  "taskId": "FANOUT-WIN-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing FANOUT-WIN-F-20261009)",
+  "outcome": "in-progress (leaning: stop, briefing-vs-repo contradiction; no production file touched)",
+  "note": "Interim progress file. The terminal record evidence/dispatch-record-FANOUT-WIN-F-20261009.json is written once, after the commit (or after the stop), per briefing field 3.",
+  "log": [
+    { "phase": "opening: bootstrap line printed, route pre-check matched (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5), briefing + CONT17/CONT18 headers read, preflight run", "toolUses": 7 },
+    {
+      "phase": "orientation findings",
+      "toolUses": 33,
+      "findings": [
+        "Both pin commits (2a51a0356, de4d37afa) touch ONLY plugins/pipeline-core/hooks/stop-fanout.test.mjs (SF22). There are no lib-level pins: fanout-ledger.test.mjs and governance-scope.test.mjs contain no spawn/cache pin.",
+        "SF22 is GREEN today: it asserts an exact equality of 4 win32 ledger-side powershell.exe spawns (LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 = 4) and its own text says it turns RED on purpose when the backlog item is fixed (constant must become 0). Changing it needs a hooks/ test edit, forbidden by field 4 and deferred to the signed tranche by CONT18.",
+        "Baseline (this dispatch, native Windows): node --test plugins/pipeline-core/hooks/stop-fanout.test.mjs -> 23 pass / 0 fail, SF22 observed 4 spawns (windows-private-state > private-boundary > fanout-ledger > stop-fanout).",
+        "fanout-ledger.mjs:185 is ensurePrivateDirectory on CREATION only; an existing ledger dir already takes the cheap lstat branch (:178-183). The 4 spawns are the one-time creation hardening, measured by SF22 in a fresh commonDir.",
+        "governance-scope.mjs:256-258 is the whole observe() function; it has no input to make explicit. requiresEnforcement there is an OUTPUT field of observation(). The explicit boolean already exists on the hook side (stop-fanout.mjs:153-155, config.requiresEnforcement), which is hooks/ and forbidden.",
+        "A Stop hook is a fresh process per event: an in-process cache cannot reduce its spawns; a cross-process cache would be a persisted enforcement-decision cache (security-relevant design, not in the briefing)."
+      ]
+    }
+  ]
+}

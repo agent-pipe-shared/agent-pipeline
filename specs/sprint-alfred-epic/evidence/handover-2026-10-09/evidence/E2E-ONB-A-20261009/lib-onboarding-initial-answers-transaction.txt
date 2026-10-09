@@ -1,0 +1,29 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/onboarding-initial-answers-transaction.test.mjs
+label: lib-onboarding-initial-answers-transaction
+exitCode: 0
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ a journal binds exact bytes, then a matching completion is replay-safe (4.10048ms)
+✔ an interruption after each publication resumes only exact bound postimages (3.611691ms)
+✔ a changed answer or foreign target byte stops before any further publication (0.774363ms)
+✔ a validated preimage that changes before journal admission cannot authorize a stale postimage (0.337126ms)
+✔ an unchanged validated preimage admits and completes the exact projection (0.831454ms)
+✔ a later-language journal binds its purpose and repository capability (0.991487ms)
+✔ a three-target marker from the prior plugin is completed only with an explicit manifest migration (1.502406ms)
+✔ a malformed or target-swapped journal never authorizes publication (0.704572ms)
+✔ a broken target alias and a changed file mode are not accepted as absent or exact (0.964256ms)
+✔ recovery can project the exact machine plane through its sole sanctioned writer (1.892082ms)
+✔ a crash between exclusive marker link and temporary cleanup is recoverable (0.699002ms)
+✔ an orphaned partial temporary without a marker never blocks a new journal (0.500819ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 82.241998
+
+--- stderr ---

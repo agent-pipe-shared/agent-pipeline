@@ -1,0 +1,35 @@
+command: git diff -- plugins/pipeline-core/lib/governance-event-store.mjs
+label: WIN-GES-F-uncommitted-diff
+exitCode: 0
+head: 0dfe853cc01f6ad3478766f922168814fbebadc2
+tree: 6076bf9069384b1863fcff08433d478c301721b6
+dirty: true
+--- stdout ---
+diff --git a/plugins/pipeline-core/lib/governance-event-store.mjs b/plugins/pipeline-core/lib/governance-event-store.mjs
+index 86693a65c..a0acab600 100644
+--- a/plugins/pipeline-core/lib/governance-event-store.mjs
++++ b/plugins/pipeline-core/lib/governance-event-store.mjs
+@@ -31,6 +31,7 @@ import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.
+ import { GOVERNANCE_ACTION_EVENT_SCHEMA, validateGovernanceActionEvent } from "./governance-action-events.mjs";
+ import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
+ import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
++import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+ 
+ const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
+ const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
+@@ -152,7 +153,12 @@ async function bindLocalRepositoryFingerprint(gitCommonDir, root) {
+   if (!existing) {
+     const legacyAliases = await discoverLegacyRepositoryFingerprints(root);
+     const generated = randomBytes(32).toString("hex");
+-    await mkdir(directory, { recursive: true, mode: 0o755 });
++    // `<git-common-dir>/agent-pipeline` is repository-private state shared with the hook
++    // installer, which later calls `ensureHardenedPrivateDirectory` on the same anchor and refuses
++    // (PB-WINDOWS-ASSURANCE) a segment that already exists with an inherited DACL. A plain recursive
++    // mkdir would introduce exactly that segment, so create each one hardened (win32) and owner-only
++    // (0o700) instead of 0o755: the binding holds a random local identity no other user needs to read.
++    ensureHardenedPrivateDirectory(gitCommonDir, directory);
+     await assertNoSymlink(directory, { directory: true });
+     await writeAtomic(target, `${canonicalizeJson({ schema: LOCAL_REPOSITORY_BINDING_SCHEMA, repositoryFingerprint: generated, legacyAliases, boundAtEpochMs: Date.now() })}\n`);
+     return { fingerprint: generated, legacyAliases };
+
+--- stderr ---

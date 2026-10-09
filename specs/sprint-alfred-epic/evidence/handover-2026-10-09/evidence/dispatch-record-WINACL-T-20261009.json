@@ -1,0 +1,48 @@
+{
+  "taskId": "WINACL-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-green",
+  "commits": ["dbbb75b56"],
+  "log": [
+    {"phase": "opening: record created before substantive work (preflight from loaded plugin root ran first, hook-required, status ready); route pre-check passed (requested claude-sonnet-5-5/xhigh, observed model id claude-sonnet-5-5 from runtime prompt, effort unobservable)", "toolUses": 7},
+    {"phase": "coverage check done: windows-private-state.test.mjs has no real ACL widening; adjacent coverage named in report; advisor consulted once; commit message + test file written", "toolUses": 33},
+    {"phase": "native capture GREEN (ran, not skipped); WSL capture skipped with host limitation; consumer-safe check exit 0; committed dbbb75b56 by exact pathspec", "toolUses": 41}
+  ],
+  "report": {
+    "status": "Implementation complete and committed; independent Critic review and PO acceptance pending.",
+    "dod": [
+      "coverage check (read-only): done; no existing test of the module widens a real ACL and asserts non-secure for the singular assessWindowsPrivatePath at the governance-scope seam (adjacent coverage named in the report): passed",
+      "native capture evidence/WINACL-T-20261009/native.txt: passed (pin RAN, 1 pass, 0 skipped, exit 0)",
+      "WSL capture evidence/WINACL-T-20261009/wsl.txt: passed (1 skipped with 'host limitation: the ACL pin needs native win32 (platform is linux)', exit 0)",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed (9/9, exit 0)",
+      "one commit by exact pathspec: passed (dbbb75b56)"
+    ],
+    "evidence": [
+      "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WINACL-T-20261009/native.txt --label WINACL-T-native -- node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs ; wrapped exit 0",
+      "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WINACL-T-20261009/wsl.txt --label WINACL-T-wsl -- node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs\" ; wrapped exit 0",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 0"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs (NEW, committed dbbb75b56): win32-only pin with baseline control, icacls Everyone:R grant, assessWindowsPrivatePath and observe() assertions",
+      "scratch/commit-msg/WINACL-T.txt (untracked commit message input)",
+      "evidence/WINACL-T-20261009/native.txt and wsl.txt (untracked captures)",
+      "evidence/dispatch-record-WINACL-T-20261009.json (this record)"
+    ],
+    "notChanged": [
+      "production files, governance-scope.test.mjs, windows-private-state.test.mjs, other tests: untouched",
+      "foreign staged/dirty files in the shared tree: untouched, commit was by exact pathspec"
+    ],
+    "deviations": [
+      "Added two assertions beyond the brief: a pre-widen baseline control (record assesses secure and observes active) and a post-widen observed.diagnostics.includes('GS-PRIVATE-MODE') check, so a red or green cannot be a fixture or unrelated-state artifact.",
+      "Added a third skip: if the native DACL observer itself reports 'unavailable' on the temp dir, the pin skips with 'host limitation:' (a missing observer is not a fail-open).",
+      "The two captures record different HEAD shas (8bb83c3c vs df5d562d) because parallel dispatches moved HEAD between runs; the test file is unchanged between them."
+    ],
+    "openItems": [
+      "Result is GREEN on native win32: no fail-open was observed. Observed assessment before widening: secure; after Everyone:R: non-secure (observe() state unverifiable-active with GS-PRIVATE-MODE). The exact post-widen assessment object is not printed on a green run; the captured native.txt only records the pass.",
+      "Not done (budget): no mutation check proving the pin goes red when privatePath's win32 branch is removed.",
+      "Adjacent existing coverage, not triggering the briefed STOP (different function or consumer): git-hook-runtime-snapshot-fast-verify.test.mjs:289-306 (GHRSF19, widens Everyone:R, asserts insecure, but via the BATCH assessWindowsPrivatePaths, a different native script); po-gate-authority.test.mjs:287-301 plus helper :100-109 (widens receipt ACL, reaches the singular assessor via po-gate-authority.mjs:660, but asserts a receipt error code, either INVALID or STALE, not the assess status and not governance-scope observe()). The Elephant may judge this as sufficient reason to treat the new file as redundant; I judged the governance-scope seam (governance-scope.mjs:394) uncovered per the Goal sentence."
+    ]
+  }
+}

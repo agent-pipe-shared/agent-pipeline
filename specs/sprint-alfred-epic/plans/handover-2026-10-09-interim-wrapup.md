@@ -11,6 +11,21 @@ the "Ruling" list) → `po-list-2026-10-08.md` (decisions, signatures) → `toil
 (`handover-2026-10-08-machine-switch.md` §0: signed tranche `da20519dd`, stamp; `next-actions-2026-10-08.md` §0) stays as
 history.
 
+## Where the intermediate results are (fresh clone!)
+
+The WSL sessions work in a **different git checkout**; `evidence/` and `scratch/` are git-ignored and therefore absent
+there. Every intermediate result of 2026-10-09 (dispatch records `dispatch-record-*-20261009.json`, all captures
+`evidence/<SLICE>-20261009/…`, walk runners and `git-step.sh`, ONB drafts, the briefings CONT17/18/35/36, the Elephant
+scripts — `push-currency.mjs`, the E2E-ONB-A2 matrix driver, `mech-haiku-after.sh`, `persist-handover.mjs` — the canon
+check `CRITIC-RULE-2b/apply.mjs`, the stamp-gate probe `f3a-m2.mjs`, the WIN-AP-S5-D probes, the MECH-HAIKU commit
+message) is copied, host paths redacted, to the tracked folder:
+
+**`specs/sprint-alfred-epic/evidence/handover-2026-10-09/`** — mirror of the original repo-relative paths; the full list
+with original path and size is **`specs/sprint-alfred-epic/evidence/handover-2026-10-09/INDEX.md`**. A path written
+in this handover as `evidence/X` or `scratch/Y` is found there as `…/handover-2026-10-09/evidence/X` or
+`…/handover-2026-10-09/scratch/Y`. To run a copied script, copy it back to its original path first (scripts resolve
+siblings relatively). Re-run `node scratch/dispatch/elephant/persist-handover.mjs` (from the mirror) to refresh it.
+
 ## 0. Entry under WSL (both runners)
 
 ```bash

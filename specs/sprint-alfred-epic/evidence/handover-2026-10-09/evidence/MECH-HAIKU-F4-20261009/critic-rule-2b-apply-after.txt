@@ -1,0 +1,30 @@
+command: node scratch/dispatch-wip/CRITIC-RULE-2b/apply.mjs after
+label: critic-rule-2b-after
+exitCode: 0
+head: 2e875d0218b2b6aec32fbd59996284c3d5525d2e
+tree: d466d5fc6a9e37481f7fee6a8de8487508056bf6
+dirty: true
+--- stdout ---
+{
+ "sweepAfter": {
+  "label": "after",
+  "lines": 37,
+  "oldQuote": 0
+ },
+ "checksAfter": [
+  "check-adr-consistency.mjs: exit 0",
+  "check-critic-contract-citations.mjs: exit 0",
+  "check-critic-contract-citations.test.mjs: exit 0",
+  "check-critic-fail-closed.mjs: exit 0",
+  "check-doc-contracts.mjs: exit 0",
+  "check-language-canon.mjs: exit 0",
+  "check-reference-paths.mjs: exit 0",
+  "check-section-citations.mjs: exit 0",
+  "check-vendored-template-sync.mjs: exit 0",
+  "check-vendored-template-sync.test.mjs: exit 0",
+  "generate-elephant-role-prohibitions.test.mjs: exit 0",
+  "generate-vendored-canon.test.mjs: exit 0"
+ ]
+}
+
+--- stderr ---

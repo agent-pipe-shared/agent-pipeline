@@ -1,0 +1,36 @@
+command: node --test --test-name-pattern "declines the passphrase" plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: native-decline
+exitCode: 0
+head: 5e19c84c58dd3232851fba721098b98c2389b5ab
+tree: 15ce5c46f17105d376cf51142543a72d47a1b1c7
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: b02ffaea947cb14f05732f726397625b7f0b828ec9ed842ee3e1ce99bfaf79f9
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T02:44:28.670Z
+  candidate commit: c611b97468a888ab6c3e04cc6d9045358ac88fd4
+  candidate tree: e7cb0f2e869dc0b75d34a5a016c1b2fdf919d89d
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from <home-path>
+EC7D0000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../openssl-3.5.7/providers/implementations/ciphers/ciphercommon_block.c:112:
+EC7D0000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../openssl-3.5.7/crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (3640.7997ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4031.113
+
+--- stderr ---

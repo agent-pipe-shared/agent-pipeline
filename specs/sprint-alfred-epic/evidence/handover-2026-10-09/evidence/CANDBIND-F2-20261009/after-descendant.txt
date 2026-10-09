@@ -1,0 +1,24 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs"
+label: CANDBIND-F2-after-descendant
+exitCode: 0
+head: 575726bbf5151fc6dd61749820b91f1c037609c5
+tree: 068977ab9f9bbc653877d77811a1d50b99f9d554
+dirty: true
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (659.899991ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (678.312156ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (476.880131ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (357.287184ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (329.788747ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (338.096893ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (339.797635ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5600.24508
+
+--- stderr ---

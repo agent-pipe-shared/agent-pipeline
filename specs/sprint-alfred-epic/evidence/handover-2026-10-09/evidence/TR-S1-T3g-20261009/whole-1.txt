@@ -1,0 +1,41 @@
+command: node --test --test-name-pattern=driveOnboardingInit plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: whole-1
+exitCode: 0
+head: 6f9aba5a0c7f26b42ea1ffc3a7e5c895dca9df0c
+tree: 52cb5cf64586607eaa40314bfd981dd7f2d5ca06
+dirty: true
+--- stdout ---
+✔ driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks (98883.615996ms)
+✔ driveOnboardingInit: stops at the first published ask (pendingAsks or collect-input) without inventing any of its values (42051.837304ms)
+✔ driveOnboardingInit: executes a run of consecutive command actions before it has to stop (38703.756975ms)
+✔ driveOnboardingInit: is re-entrant -- a second run never repeats the already-executed command that published the ask (47774.947577ms)
+✔ driveOnboardingInit: the step cap fires on a chain that never converges (0.465518ms)
+✔ driveOnboardingInit: failed portable seed stops at its first unexpected mutation outcome (0.276659ms)
+✔ driveOnboardingInit: re-anchors after an executed step settles with no nextAction, and completes (0.302196ms)
+✔ driveOnboardingInit: re-anchors after a published command succeeds with plain human-facing output (0.335532ms)
+✔ driveOnboardingInit: binds a returned root-less project action to the Driver root (0.468627ms)
+✔ driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status (0.61761ms)
+✔ driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results remain closed (0.563877ms)
+✔ driveOnboardingInit: a blocked published runner-permission repair retains its exact diagnostic action (0.306066ms)
+✔ driveOnboardingInit: plain or malformed anchor output, JSON-shaped malformed command output, and nonzero command output remain errors (0.716299ms)
+✔ driveOnboardingInit: a nextAction-less result from the anchoring inspect itself does not re-anchor again (0.149793ms)
+✔ driveOnboardingInit: a genuinely non-converging chain stops with its own outcome, not the step cap (0.330913ms)
+✔ driveOnboardingInit: collect-input, external-operator, ready, unsupported-next-action and error outcomes reached directly are typed (0.766754ms)
+✔ driveOnboardingInit: a command nextAction carrying pendingAsks stops and surfaces them instead of executing straight past them (2.403969ms)
+✔ driveOnboardingInit: a command nextAction with no pendingAsks (absent or empty) is unaffected (2.299262ms)
+✔ driveOnboardingInit: a collect-input nextAction that also carries pendingAsks surfaces both, neither lost (1.805937ms)
+✔ driveOnboardingInit: malformed pendingAsks does not crash the driver and is not silently swallowed (4.276879ms)
+✔ driveOnboardingInit: walks migration plan -> apply --activate -> re-anchor inspect -> ready without premature termination (0.310635ms)
+✔ driveOnboardingInit: a migration-ready V4 response keeps required asks while optional handover commands remain terminal (2.378212ms)
+✔ driveOnboardingInit: a greenfield V4-ready command nextAction executes before reaching PO input (0.248792ms)
+✔ driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready (0.172161ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 230369.784577
+
+--- stderr ---

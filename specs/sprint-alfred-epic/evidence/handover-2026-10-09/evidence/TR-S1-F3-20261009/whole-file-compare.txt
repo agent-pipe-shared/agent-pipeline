@@ -1,0 +1,10 @@
+== whole-1: T3g exit 0 {"tests":24,"pass":24,"fail":0,"skipped":0} -> F3 exit 0 {"tests":24,"pass":24,"fail":0,"skipped":0}
+== whole-2: T3g exit 1 {"tests":23,"pass":22,"fail":1,"skipped":0} -> F3 exit 1 {"tests":23,"pass":22,"fail":1,"skipped":0}
+still fail: host-managed consent CLI routes its later explicit language into private intake state
+== whole-3: T3g exit 1 {"tests":10,"pass":7,"fail":3,"skipped":0} -> F3 exit 1 {"tests":10,"pass":8,"fail":2,"skipped":0}
+CHANGED pass -> fail: first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary
+CHANGED fail -> pass: public onboarding driver keeps chat keyless and reaches a separate signature-anchor action
+CHANGED fail -> pass: signature anchor reuses a key already at the canonical directory path without importing or replacing it
+still fail: setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory
+still fail: first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary
+TOTAL CHANGED CASES: 3

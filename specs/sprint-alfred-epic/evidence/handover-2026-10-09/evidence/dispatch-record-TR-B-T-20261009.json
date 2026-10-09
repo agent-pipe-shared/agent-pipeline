@@ -1,0 +1,73 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-B-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17/CONT15 headers, goldfish-task field 6, repo-copy preflight (advisory only), loaded-root preflight (ready), design rows T74/T77 + 3.2/3.2a, toil rows read; opening record written and read back", "toolUses": 24 },
+    { "phase": "orientation: located owner (hooks/guard-lifecycle-ready.test.mjs, 370 tests), read guard-command-grammar.mjs rg validator, passive-read-policy SECRET_BASENAME, QP4 helpers; WSL baseline captured GREEN", "toolUses": 46 },
+    { "phase": "advisor consulted once; wrote ONE draft file scratch/dispatch-wip/TR-B-T/build.mjs (build script + 21-case block as its tail); 80 % checkpoint notice fired at call 48; build script NEVER RUN, nothing verified for the new cases; interim hand-back", "toolUses": 49 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "baseline of the unmodified owning file (WSL)",
+        "command": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-B-T-20261009/baseline.txt --label TR-B-T-baseline -- node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs\"",
+        "exitCode": 0,
+        "artifact": "evidence/TR-B-T-20261009/baseline.txt",
+        "result": "370 tests, 367 pass, 0 fail, 3 skipped, 0 cancelled, 0 todo (summary lines 382-388)"
+      }
+    ],
+    "remainsUndone": [
+      "Run the build script (never run; syntax and block behaviour unverified).",
+      "red.txt capture of the pinned version (pre-existing 370 cases must keep their results; 21 new cases expected).",
+      "tranche-2 post-image bytes: not yet written (build.mjs writes them).",
+      "TR-B-MANIFEST.md: not written.",
+      "Consumer-safe check: not run.",
+      "Commit: not made (no commit message file exists either).",
+      "Terminal dispatch record: not written."
+    ],
+    "nextBriefingAdjustments": [
+      "Base cap: orientation alone cost 46 of 60 calls in this dispatch (guard refusals of directory Grep, one unfiltered rg that returned about 500 lines, reading 11k lines of test file in chunks). The next briefing must say: the draft exists, do not re-orient, run the 11-call sequence below.",
+      "Point the continuation at scratch/dispatch-wip/TR-B-T/build.mjs and at this record; forbid re-reading the design, the toil log, the grammar module or the rulings.",
+      "Persist the draft to a tracked path if scratch/ is swept (scratch/ is git-ignored here): the only copy of the draft is build.mjs.",
+      "The T77 refused rg -g spelling is not preserved in the toil log; CANDBIND-T-20261008's record was not read. The Elephant should decide whether TR-B-F admits any -g shape beyond one basename-extension filter; the draft only characterises today's lane."
+    ]
+  },
+  "report": {
+    "text": "INTERIM (closing-allowance hand-back at the 80 % checkpoint, call 48 of 60). independent review: pending. Implementation NOT complete; nothing committed; the new pins have never been run.\n\n1. DoD results: baseline of the unmodified owning file: passed (370 tests, 367 pass, 0 fail, 3 skipped). Pins in the owning file: not verifiable (draft written, build never run). red.txt: not run. Consumer-safe check: not run. Commit: not made.\n\n2. Evidence: evidence/TR-B-T-20261009/baseline.txt, written by capture-evidence.mjs, exit 0, command in closingAllowance.verifiedGreen.\n\n3. Changed files: scratch/dispatch-wip/TR-B-T/build.mjs (new, git-ignored scratch, UNCOMMITTED: build script plus the 21-case test block as its raw tail after the marker line); evidence/TR-B-T-20261009/baseline.txt (new, machine-written); evidence/dispatch-record-TR-B-T-20261009.json (this record). Owner: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (protected, PB-GUARD-HOOKS) was NOT touched.\n\n4. Deliberately not changed: every production file; the owning test file and every existing case; the tranche README; no other tranche-2 post-image (hooks/ holds only guard-devplan-design-approval(-v7).test.mjs and stop-fanout.test.mjs, none for this file).\n\n5. Deviations: (a) Stopped at the checkpoint with the work un-run, as the notice requires. (b) Route fact: the owning file is plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs (the rg for GUARD-READ-COMMAND-UNSUPPORTED returns lib/guard/grammar-denials.mjs as the code module and this test; the rg flag validator is hooks/guard-command-grammar.mjs validateRg, the grep validator isSafeExactGrepArgs in lib/guard/shell-grammar.mjs, unread). (c) Interim outcome stays in-progress because the briefing allows no other interim string without a commit.\n\n6. Open items. DESIGN OF THE DRAFT: 9 spellings x (admit pin + key-operand refuse pin) = 18 cases, plus a control case, a T77 rg -g lane characterisation and a directory-Grep case = 21 new test() calls, all titled 'TR-B <row> <spelling>: ...'. Spellings: rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching, rg quoted alternation, grep quoted alternation, rg -g, rg --glob. The refuse pin is non-vacuous by construction: the primary refusal code of the spelling plus a corpus key must equal the code the already-admitted spelling gives the identical operand and must not be GUARD-READ-COMMAND-UNSUPPORTED, so a spelling still refused for its own sake is RED, not vacuously green. Operand shapes: first positional, -e pattern + positional, -f value, second positional, and a directory holding keys (rg). Corpus: vault/po-private.pem, vault/id_ed25519, vault/id_rsa, vault/server.key, vault/client.pem (path names only, content x). Predicted states (predictions only): -o, --only-matching and --max-columns admit and refuse pins RED; the rest GREEN. NEXT STEPS (about 11 calls): (1) node scratch/dispatch-wip/TR-B-T/build.mjs  [writes specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-lifecycle-ready.test.mjs = HEAD file + block at EOF, and the runnable copy scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs with relative specifiers and import.meta.url rebased via TRB_META_URL; prints sha256s]. If a PB-* refusal hits the post-image path or the shell lane refuses the script: stop and report. (2) wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-B-T-20261009/red.txt --label TR-B-T-red -- node --test scratch/dispatch-wip/TR-B-T/guard-lifecycle-ready.trb.test.mjs\" (Bash timeout 600000, foreground). Expect 391 tests; the 370 old ones must equal baseline (367 pass, 3 skipped); any extra red among old cases is relocation noise to be named, not repaired. (3) Grep red.txt for 'TR-B ' to read each pin's state; a misfiring pin is reported with its state, not iterated on more than once. (4) Write specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md: target path plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs, post-image sha256, command, per-pin state, and say that the old-case claim rests on baseline.txt plus the post-image being HEAD plus an appended block. (5) node --test harness/scripts/check-consumer-safe-paths.test.mjs (exit 0). (6) Write scratch/commit-msg/TR-B-T.txt: subject 'test(read-grammar): pin TR-B spellings with a key-operand corpus', trailers exactly 'Dispatch: TR-B-T-20261009 (goldfish)' and 'AI-Assisted: true' (no Co-Authored-By, no Claude-Session). (7) git add -- <post-image> <manifest> evidence/TR-B-T-20261009/baseline.txt evidence/TR-B-T-20261009/red.txt ; (8) git commit -F scratch/commit-msg/TR-B-T.txt -- <same paths> ; (9) checkpoint this record (commits, outcome committed-pending-report, report.changedFiles from git show --name-only); (10) final record overwrite and report. BRIEFING NOTES: the T77 refused rg -g spelling is not in the toil log and evidence/dispatch-record-CANDBIND-T-20261008.json was not read; the draft therefore characterises today's lane (one basename-extension filter admitted; *.test.mjs, **/*.md, !*.md, scratch/*.md refused; repeated -g already pinned by QP4-1) and does not decide whether TR-B admits more. Quoted alternation is in the T74 row but its git grep half is TR-C; the rg and grep variants were included as cheap pins. grep -o admission was not analysed (isSafeExactGrepArgs unread). The build script keeps the block as the raw tail of build.mjs after the process.exit(0); syntax is unchecked.",
+    "changedFiles": [
+      "scratch/dispatch-wip/TR-B-T/build.mjs",
+      "evidence/TR-B-T-20261009/baseline.txt",
+      "evidence/dispatch-record-TR-B-T-20261009.json"
+    ]
+  }
+}

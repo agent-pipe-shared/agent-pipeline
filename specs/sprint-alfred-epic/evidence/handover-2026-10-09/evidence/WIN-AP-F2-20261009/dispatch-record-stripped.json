@@ -1,0 +1,12 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "e51844ab8"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+      "plugins/pipeline-core/lib/guard-maintenance-window.mjs"
+    ]
+  }
+}

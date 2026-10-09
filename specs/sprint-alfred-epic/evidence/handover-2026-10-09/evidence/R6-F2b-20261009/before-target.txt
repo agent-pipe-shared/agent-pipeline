@@ -1,0 +1,197 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+label: before-target
+exitCode: 1
+head: 870fb81edb727e37e1297e2df51a19667dca7606
+tree: c3b06610338c74db1ccc5c948e8b87e9c69dacd7
+dirty: true
+--- stdout ---
+✔ R6-2 precondition: a continuity-bearing in-sync fixture inspects cleanly (passes today) (7.436199ms)
+ℹ baseline nextAction kind: command; lifecycle: {"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing"}
+✖ R6-2 case 7: State without continuity -> continuityAuthorityDrift is an explicit null, every other key intact (2.019357ms)
+✖ R6-2 case 8: PRD bytes differ in a temp repo -> inspect reports drift with recorded and observed digests (4.825989ms)
+✖ R6-2 case 8b: a missing PRD file is unobservable and fails closed as drift (7.765254ms)
+✖ R6-2 case 8c: an in-sync continuity State is reported current with no recovery (1.327054ms)
+✖ R6-2 case 9: inspect is read-only -- State bytes and the whole tree are identical afterwards (4.041541ms)
+✖ R6-2 case 10: precedence -- the existing nextAction wins; a would-be-null one becomes the recovery; one action (2.441016ms)
+✖ R6-2 case 11: drift is not a blocker -- status, lifecycle, planApproved and dispatch permission are unchanged (2.906259ms)
+✖ R6-2 case 12 (registry half): recovery.route is a registered State verb and the guidance names --proposal-file (4.767898ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 1
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2719.2998
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:176:1
+✖ R6-2 case 7: State without continuity -> continuityAuthorityDrift is an explicit null, every other key intact (2.019357ms)
+  AssertionError [ERR_ASSERTION]: the new key is present
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:181:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:195:1
+✖ R6-2 case 8: PRD bytes differ in a temp repo -> inspect reports drift with recorded and observed digests (4.825989ms)
+  AssertionError [ERR_ASSERTION]: continuityAuthorityDrift is present for a State that carries continuity
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:201:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: null,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:217:1
+✖ R6-2 case 8b: a missing PRD file is unobservable and fails closed as drift (7.765254ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'drift'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:222:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'drift',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:228:1
+✖ R6-2 case 8c: an in-sync continuity State is reported current with no recovery (1.327054ms)
+  AssertionError [ERR_ASSERTION]: continuityAuthorityDrift is present for a State that carries continuity
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:233:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: null,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:239:1
+✖ R6-2 case 9: inspect is read-only -- State bytes and the whole tree are identical afterwards (4.041541ms)
+  AssertionError [ERR_ASSERTION]: precondition: the drift path was exercised
+  + actual - expected
+  
+  + undefined
+  - 'drift'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:245:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'drift',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:250:1
+✖ R6-2 case 10: precedence -- the existing nextAction wins; a would-be-null one becomes the recovery; one action (2.441016ms)
+  AssertionError [ERR_ASSERTION]: continuity-only drift: precondition: the drift projection exists
+  + actual - expected
+  
+  + undefined
+  - 'drift'
+  
+      at assertPrecedence (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:154:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:256:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'drift',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:266:1
+✖ R6-2 case 11: drift is not a blocker -- status, lifecycle, planApproved and dispatch permission are unchanged (2.906259ms)
+  AssertionError [ERR_ASSERTION]: precondition: drift is reported
+  + actual - expected
+  
+  + undefined
+  - 'drift'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:273:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'drift',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:284:1
+✖ R6-2 case 12 (registry half): recovery.route is a registered State verb and the guidance names --proposal-file (4.767898ms)
+  AssertionError [ERR_ASSERTION]: a drift projection with a recovery is present
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs:297:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: null,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

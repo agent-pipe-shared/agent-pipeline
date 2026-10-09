@@ -1,0 +1,41 @@
+{
+  "taskId": "R7-3-T2c-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (R7-3 family)",
+  "outcome": "stopped-at-budget-checkpoint (orientation only; one case flagged as stop-condition-1 shape)",
+  "commits": [],
+  "log": [
+    { "phase": "bootstrap, briefing read, route pre-check (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5: match); orientation (CONT15/CONT17 header, F1b record); preflight ready", "toolUses": 6 },
+    { "phase": "orientation: evidence-descendant test, v2 reader (:52-69, :135), held patch (Ruling 61 path), five target suites, shared fixture module, v1 reader", "toolUses": 43 },
+    { "phase": "finding: onboarding-e2e uses a v1 package with a live candidate; committing the package moves HEAD and the v1 reader requires strict equality. Coordinator mid-task note received, verified, treated as information only", "toolUses": 44 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT at call 44 of 55; no fixture edits made; interim report written; hand back", "toolUses": 46 }
+  ],
+  "report": {
+    "dod": {
+      "withGateRun": "not verifiable (not reached)",
+      "withoutGateRun": "not verifiable (not reached)",
+      "gateFileCleanBeforeCommit": "passed trivially: design-workflow-approval.mjs was never touched (git status --short for it printed nothing at orientation)",
+      "consumerSafeCheck": "not verifiable (not reached)",
+      "commit": "none made",
+      "terminalRecord": "this is an interim/stop record, not a terminal success record"
+    },
+    "changedFiles": [],
+    "changedFilesNote": "No repo file was edited. The only file this dispatch wrote is this record (untracked, repo-root evidence/).",
+    "findings": [
+      "Held gate patch location: not named by the F1b record; Ruling 61 names it: specs/sprint-alfred-epic/evidence/held-patches/R7-3-F1-gate.patch. Hunk 3 does not apply verbatim (approval.mjs:57-58 now forwards roleRoutePreflight, evidenceBindings); use rebasedHunk3 from the F1b record.",
+      "Stale briefing premise: design-workflow-package-v2.test.mjs has NO uncommitted modification (git diff --stat empty, absent from git status). Stop condition 3 does not apply. approval.mjs is clean.",
+      "Coordinator mid-task note (bound set = package, readiness, initialContext, failureEvidence, receipt, report minus sources; A/M only; v2 reader ignores readCandidate) verified against design-workflow-package-v2.mjs:52-55/59-69 and design-workflow-package.mjs:544-546. It matches. Treated as information, not a briefing change; it did not alter scope.",
+      "BLOCKER CANDIDATE, onboarding-e2e (scripts/project-onboarding-e2e.test.mjs): the fixture package is v1 (lib/test-design-workflow-fixture.mjs:80). The v1 reader (lib/design-workflow-package.mjs:502-503, called via :591) demands JSON-equal candidate between the live reader and workflowPackage.candidate. Only the v2 dispatch (:544-545) reaches Ruling 65's evidence-only-descendant branch (v2.mjs:135). The e2e binds candidate: candidateAtHead(cwd) (:1020), bindFixtureReadiness asserts live HEAD == package.candidate (:816), and gitCandidate is live (:1025). The bound-path gate needs the package committed and clean at HEAD; committing moves HEAD; v1 then fails with DWP-CANDIDATE-DRIFT unless the candidate is pinned to the pre-commit HEAD, which is the forbidden freeze. This is the stop-condition-1 shape (or a briefing-vs-repo contradiction: the briefing's admission premise cites the v2-only rule for a v1 fixture). NOT confirmed empirically (budget); confirmed by source reading only. Recommend a dispatcher/PO ruling before anyone edits that file.",
+      "po-gate-authority (lib/po-gate-authority.test.mjs submitFixturePlan :692) and rebind-runner (scripts/pipeline-state-rebind-runner.test.mjs :281) also use the v1 fixture, but deps.gitCandidate returns the fixture's constant fake candidate, so committing the package (commitPackage: true, already shipped by T2b 659fc9b53, no consumers yet) should satisfy both the gate and the candidate check. First check for the follow-up: that primary / f.dir are git work trees (F1b showed the gate firing there, so almost certainly yes). Also: bindFixtureReadiness-style post-materialize rewrites must not happen after the commit.",
+      "EVDESC-a cannot keep 'HEAD == candidate' for the approval half: committing the package makes HEAD an evidence-only descendant, so the case collapses into EVDESC-b. Options for the dispatcher: keep the reader half at HEAD == candidate before the commit and run the approval half after it, or accept the redundancy. Not listed among the subject-preserving cases.",
+      "EVDESC-c1: package commit, then the unrelated commit; precondition rev-parse HEAD^ becomes HEAD~2. Refusal stays DWP2-CURRENT-CANDIDATE.",
+      "EVDESC-d ordering trap: amend FIRST (assert same tree and non-ancestry on the sibling), then commit the bound set, then attempt. Package-commit-then-amend gives a descendant with an evidence-only diff, which is admitted and would weaken the control.",
+      "EVDESC-h ordering trap: rewrite candidate.tree FIRST, then commit. Commit-then-rewrite becomes a DWP-BOUND-PATH-MODIFIED gate case (subject change). Preconditions at :327 (HEAD unchanged) and :332 (empty diff) need rewording. The v2 descendant check uses only pkg.candidate.commit (v2.mjs:59-70), so the wrong tree is still admitted at the candidate rule and caught downstream; the exact downstream code moves off DAC-FINAL-ENDPOINT (F1b after.txt:252 shows reader DAC-FINAL-ENDPOINT without the commit) and must be measured.",
+      "RC12C001 (lib/design-workflow-package-v2.test.mjs): insert between :133 (save(unavailable)) and :134 using the in-scope runGit (:112). Stage exactly packagePath, readinessRef.path, artifacts.initial.path, artifacts.failure.path and artifacts.receipt.path only when present; never evidence/preparation.json and never git add evidence. Lines :147-151 mutate the package for reader-only calls and should still hit their asserted codes (to verify)."
+    ],
+    "doNotRepeat": "Guard grammar here is one simple command per Bash call; Grep on a directory and rg over directories are refused; the first Write needs the preflight from the loaded plugin root (done). Evidence directory is the repo-root evidence/, not specs/.../evidence/."
+  }
+}

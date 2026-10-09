@@ -1,0 +1,55 @@
+{
+  "taskId": "TR-S1-T5-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "outcome": "complete-committed-red-by-design",
+  "commits": ["546e8c513 test(po-approval): carry the encrypted-key lever and re-point retired-subject cases (TR-S1)"],
+  "log": [
+    { "phase": "opening: bootstrap + route pre-check (requested claude-sonnet-5-5 == observed claude-sonnet-5-5), CONT17 header and T4 record read, preflight ready, opening in-progress record", "toolUses": 9 },
+    { "phase": "orientation: lever, pin header, four (b) cases, Rulings 78/83/91; advisor consulted once", "toolUses": 31 },
+    { "phase": "edits: 3 re-points + NVA-W5-TTYSIGN re-point + pin header (lists, A4, literal-word, acceptance shape) + trim of the T4 block above the adapter", "toolUses": 37 },
+    { "phase": "acceptance: node --check; SIM-GATE added; WSL simulated.txt; SIM-GATE reverted (grep -c = 0); WSL after.txt; consumer-safe check; commit 546e8c513", "toolUses": 51 },
+    { "phase": "post-commit: git grep of HEAD for SIM-GATE (no match); terminal record written", "toolUses": 53 }
+  ],
+  "report": {
+    "dodResults": {
+      "simulatedTxt": "passed: 170 tests, 169 pass, 1 fail; the single red is NVA-SWEEP-F2f-REWORK (the symlink-at-derived-sibling-path case). Pins 1,3,4,5, the five (b) cases and the 16 channel cases are green under the typed gate.",
+      "afterTxt": "passed: 170 tests, 160 pass, 10 fail; reds are NVA-SWEEP-F2f-REWORK, pins 1,3,4,5, and the five (b) cases (mismatched confirmation, NVA-W5-TTYSIGN, NVA-SIGNONCE-1, empty answer, NVA-BL-74 German). No other case is red; the 16 channel cases are green.",
+      "consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9, exit 0",
+      "commit": "passed: 546e8c513, one file, exact pathspec, two trailers only; git grep -c SIM-GATE at HEAD finds nothing",
+      "terminalRecord": "this file, written after the commit"
+    },
+    "evidence": [
+      "evidence/TR-S1-T5-20261009/simulated.txt  (wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T5-20261009/simulated.txt --label simulated -- node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs\"; wrapped exit 1 = the one F2f red)",
+      "evidence/TR-S1-T5-20261009/after.txt  (same command, --label after, no gate; wrapped exit 1 = the ten designed reds)",
+      "grep -c SIM-GATE plugins/pipeline-core/scripts/po-human-approval.test.mjs  -> 0 before the after.txt capture",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs -> exit 0"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs (committed 546e8c513): four (b) re-points; pin header carries the retired-subject list, the 16 channel cases, the literal-word measurement, the amended A4 and the acceptance shape; the T4 block above the adapter is trimmed to a pointer"
+    ],
+    "deliberatelyNotChanged": [
+      "production files, other tests, hooks/, lib/guard/, harness/",
+      "test titles",
+      "the 16 channel cases and their markers (all green in both captures; no 91(b) fix was needed)",
+      "the T3 lever and T4 adapter bodies"
+    ],
+    "deviations": [
+      "Record: an opening in-progress record was written at the same path first (role contract GF-09-D), then overwritten here once after the commit; the briefing says the terminal record is written once.",
+      "NVA-W5-TTYSIGN: the old result.ok assertion cannot coexist with the typed refusal and was replaced by it. A pin-4-style no-artifact assertion was ADDED (the case had none); nothing else dropped.",
+      "A4 wording is mine, not the T4 record's suggested sentence: it points at the lever and at the lists in the same header, because the 'block above' no longer holds the lists.",
+      "The T4 doc block above the adapter was reduced to a four-line pointer (the lists moved into the pin header).",
+      "tr1ReadDirectory (an import at the pin header) is now used in NVA-W5-TTYSIGN, which precedes that import in file order; hoisting makes it correct (the case ran green in the simulated capture).",
+      "Edit-cap interpretation: 6 from T4 + 6 here (3 re-points, TTYSIGN, header, block trim) = 12 substantive edits; the SIM-GATE add and revert are not case edits (14 if they are counted); the cap of 15 was not exceeded. No Ruling 91(b) channel fix was needed.",
+      "Tool budget: 53 of 65 used; one advisor consultation. Two early calls were refused for guard grammar (compound command, directory-glob Grep), and the preflight cured GUARD-BOOTSTRAP-RECEIPT-MISSING."
+    ],
+    "openItems": [
+      "The five retired-subject cases and pins 1,3,4,5 stay RED until TR-S1-F lands the production gate; the tree is red by design (same pattern as 0388fd0fe).",
+      "NVA-SWEEP-F2f-REWORK ('symlink planted at the derived scratch proof/signer sibling path') is red in both captures with SIGN-READINESS-FAILED key-anchor-mismatch before the expected message; pre-existing, unrelated to this slice, not touched.",
+      "Matrix: WSL only (the file is OpenSSL/POSIX-bound); no Windows or macOS run of the full file, per the no-full-verify-on-Windows rule."
+    ]
+  }
+}

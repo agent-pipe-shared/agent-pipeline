@@ -1,0 +1,329 @@
+command: node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs
+label: T90-T3-red
+exitCode: 1
+head: a662f4dc6e8e118531451d4d876278503a44ded4
+tree: 7c1afd68d9d92fdfe7f9959e9eaa38a01b22b608
+dirty: true
+--- stdout ---
+[AGY-MKTATTEST-1] WARN: this machine's external local-marketplace copy does not match this checkout (external local marketplace plugin entry content does not match this checkout). Expected during active development on plugins/pipeline-core/** -- the underlying security property is now enforced hard at push time instead (guard-push.mjs); Verify stays informative here, not blocking.
+✔ shared command disclosure is Bash-only, secret-safe, and copy-bounded (23.555431ms)
+✔ lifecycle-not-ready denial sets never create or consume a human-override route (15.585582ms)
+✔ lifecycle co-denial diagnostics remain bounded (0.546501ms)
+✔ M6 plan result adds a mode-specific nextAction without changing the persisted plan (347.533098ms)
+✔ ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identical v2 capability, consumable exactly like the chat path (378.386519ms)
+✔ an exact retry ignores only regenerated human-override handoff text in a nested denial (342.219218ms)
+✔ NVA-SIGENTRY-1: buildHumanGuardOverrideSignatureIntent() produces the same digest an existing signed-authorization test already expects (255.966362ms)
+✔ NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact matching stored request, never the wrong one among several (435.277395ms)
+✔ NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() stays unresolved for a digest that matches no stored request (207.656101ms)
+✔ ADR-0059 Decision 1: re-authorizing with an identical proof is an idempotent no-op (mutated: false), a genuinely different re-arming is HGO-REPLAY (475.503485ms)
+✔ NVA-G-EXPIREDARM: authorize-by-signature refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan (308.448957ms)
+✔ ADR-0059 Decision 1: an invalid, wrong-key or mismatched proof is refused with HGO-PROOF-INVALID (348.696374ms)
+✔ ADR-0059 Decision 1: the global-plugin-install denial class is refused for the signed path with HGO-SIGNATURE-UNSUPPORTED-MODE (176.577449ms)
+✔ Part C: prepareHumanGuardOverrideForSignature() fails closed on the global-plugin-install denial class with HGO-SIGNATURE-INTENT-INVALID (not a silent pass-through) (148.886943ms)
+✔ ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no committed anchor) is refused with HGO-TRUST-ANCHOR-MISSING (198.07418ms)
+✔ NVA-HGOFIX-1: a v3-only trustAnchors array (no legacy singular trustAnchor) is honored -- previously failed with HGO-TRUST-ANCHOR-MISSING (331.304722ms)
+✔ WP-B2-4: an EMPTY v3 trustAnchors array with an unrecognized well-formed key requires TOFU confirmation (HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED) (191.705355ms)
+✔ WP-B2-4: an unrecognized well-formed key emits HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED, and succeeds after TOFU confirmation (289.405704ms)
+✔ WP-B2-4: a malformed public key fails with HGO-PROOF-INVALID rather than TOFU confirmation (197.154353ms)
+✔ WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligibility (310.803031ms)
+✔ WP-B2-1: a signature-mode repository cannot mint an admitted chat test-change grant (83.106811ms)
+✔ WP-B2-1: a prior chat grant cannot survive a committed switch to signature mode (98.699568ms)
+✔ WP-B2-1: a chat writer does not claim a granted record its reader would reject (60.96866ms)
+✔ WP-B2-1: a recognized signed grant is admitted and an altered stored proof is not (125.085678ms)
+✔ WP-B2-1: retained chat grants must preserve their exact record identity and expiry (103.257064ms)
+✔ WP-B2-1 physical target: missing leaf beneath an external symlink is rejected (17.132577ms)
+✔ WP-B2-1 physical target: an in-root symlink grant is void after retargeting outside (69.920456ms)
+✔ NVA-HGOFIX-1: the pre-existing legacy-singular-only trustAnchor case is unaffected by the v3 resolution fix (no regression) (332.132055ms)
+✔ one exact attended capability is audited, consumed once and cannot be replayed (346.778756ms)
+✔ an armed capability remains armed when a later lifecycle-not-ready co-denial takes precedence (322.186992ms)
+✔ committed global chat arms HGO without a terminal or signature material and marks its capability/audit (237.701765ms)
+✔ signature, invalid, and uncommitted global human approval all fail closed before HGO can arm (71.548576ms)
+✔ PO chat may arm an exact external read scope while mutation approval remains signature-bound (348.211934ms)
+✔ a host-Git-unavailable hook can consume only the exact audited local plugin installation (303.532835ms)
+✔ local plugin installation capability rejects a changed candidate source (314.946097ms)
+✔ commit and exact in-root patch admission never execute the effect or claim success (695.453958ms)
+✔ drift, expiry and concurrent consumption fail closed (422.173134ms)
+✔ NVA-G-EXPIREDARM: authorizeHumanGuardOverride (chat mode) refuses to arm once the plan window has closed, writes no capability, and still arms an unexpired plan (348.331934ms)
+✔ NVA-G-EXPIREDARM: a consumption denial that rejected an existing (but now-expired) armed capability is distinguishable from a first denial (386.354451ms)
+✔ NVA-W3-16: a rejected drift audit entry names exactly which checks diverged (359.223946ms)
+✔ security and authority boundaries return typed recovery without an ambient bypass (1267.086552ms)
+✔ NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command (59.990062ms)
+✔ every push-guard denial routes to an exact publication preflight even through an alias (35.421437ms)
+✔ GF-098: a denied push destined for main keeps the exact publication-executor route (174.536885ms)
+✔ GF-098: a denied push destined for a non-main branch names THAT branch's approve-push ceremony (105.204539ms)
+✔ GF-098: a denied push whose destination cannot be read is told so, never routed at main (157.367196ms)
+✔ a non-push git apply --check command whose patch path says push never selects push recovery (37.164179ms)
+✔ pipeline author repair binds one exact source root and action without State readiness (452.984371ms)
+✔ tampered audit fails verification (99.75078ms)
+✔ an authenticated killed genesis writer can finish the first audit entry (1504.718909ms)
+✔ SIGKILL during ordinary lock publication never exposes an empty canonical lock and reacquisition succeeds (1596.180846ms)
+✔ SIGKILL after create-only publication finalizes the authenticated ordinary lock before reclamation (1345.73074ms)
+✔ SIGKILL during recovery-guard publication leaves no canonical recovery lock and reclamation retries safely (2830.44649ms)
+✔ SIGKILL after recovery-guard publication finalizes its authenticated twin and safely retries reclamation (2562.313279ms)
+✔ a real killed audit writer is reclaimed by the next ordinary append without rewriting prior bytes (1734.443503ms)
+✔ repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes (1935.77151ms)
+✔ a writer recovers when the prior dead-owner reclaimer was itself killed (3009.37196ms)
+✔ legacy, malformed, unauthenticated and cross-host audit locks remain typed fail-closed (3856.528487ms)
+✔ a recovery guard excludes a second reclaimer and a raced replacement is never unlinked (2993.765153ms)
+✔ an authenticated empty head and a multi-entry tail recover without dropping prefix bytes (149.105052ms)
+✔ a valid authenticated empty ledger remains valid and ordinary appends preserve authenticated JSON bytes (226.316778ms)
+✔ audit head-mac is terminal-invalid and never repairable (174.638708ms)
+✔ audit head-prefix-digest is terminal-invalid and never repairable (173.187169ms)
+✔ audit prefix-bytes is terminal-invalid and never repairable (199.610162ms)
+✔ audit head-ahead is terminal-invalid and never repairable (188.269792ms)
+✔ audit tail-sequence is terminal-invalid and never repairable (188.795911ms)
+✔ audit tail-link is terminal-invalid and never repairable (210.291452ms)
+✔ audit tail-mac is terminal-invalid and never repairable (194.315776ms)
+✔ audit missing-newline is terminal-invalid and never repairable (186.893505ms)
+✔ audit blank-line is terminal-invalid and never repairable (199.43515ms)
+✔ audit invalid-utf8 is terminal-invalid and never repairable (194.329659ms)
+✔ a valid authenticated head prefix plus contiguous authenticated tail is classified and repaired once (200.115627ms)
+✔ a completed repair remains idempotent after a later ordinary authenticated append (255.527736ms)
+✔ repair rechecks the attended preimage under lock before it mutates (182.606506ms)
+✔ a failed repair or ordinary append never removes the active repair writer's lock (227.934161ms)
+✔ repair completes idempotently after interruption between ledger and head without a second audit-repaired event (161.986501ms)
+✔ prepare-for-signature authenticates audit first and only recoverable state names repair-audit (160.80251ms)
+✔ deleted ledger, authenticated head, or their pair fails verification (493.545215ms)
+✔ an armed capability is unusable when its authorization audit disappeared (290.754762ms)
+✔ policy-library and override-CLI drift invalidate the loaded plugin identity (396.77894ms)
+✔ Antigravity HGO binds its own manifest through planning, arming, and consumption (362.302337ms)
+✔ missing or replaced audit keys fail closed without silent regeneration (190.863069ms)
+✔ a tampered one-action capability cannot be consumed (335.482507ms)
+✔ NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poisons the others -- the valid, armed one still consumes (628.831188ms)
+✔ NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimate non-match (wrong tool input) is still refused exactly as before -- no security regression (267.177853ms)
+✔ authorization audit failure rolls back its newly created capability (298.266513ms)
+✔ native Windows private-state assurance is injected and fail-closed (0.446689ms)
+✔ secureDirectory hardens EVERY newly-created path component, not only the leaf (NVA-PAWINACL-2) (0.203724ms)
+✔ secureDirectory only ASSESSES an already-secure existing parent, never re-hardens it, when adding a new child (NVA-PAWINACL-2) (0.188494ms)
+✔ F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succeeds against THIS repository's own, real marketplace manifest and plugin source tree (21020.882587ms)
+✔ NVA-BL-20: this suite's junction-capability gate is the shared typed probe, not a blanket catch (0.317696ms)
+✔ NVA-BL-20: a correctly linked external agent-pipeline-local root is verified and folded into statusSha256 (1.274154ms)
+✔ NVA-BL-20: a link-shaped external agent-pipeline-local root that points elsewhere, or nowhere, fails closed (1.0975ms)
+✔ NVA-BL-20: a repointed or mutated external agent-pipeline-local root fails closed (1.212542ms)
+✔ NVA-BL-20: an unobservable or unregistered marketplace registry is a typed, distinctly hashed state (0.681453ms)
+✔ NVA-BL-20: the attestation exposes the external-marketplace state it hashed, without changing the hash (1.191682ms)
+✔ NVA-MKTHASH-1: a real, content-identical directory copy at the external entry is verified via hash equality (1.146032ms)
+✔ NVA-MKTHASH-1: a real directory copy whose content diverges from this checkout fails closed with a distinct message (0.811786ms)
+✔ NVA-MKTHASH-1/NVA-MKTHASH-2: an internal symlink planted inside the real directory copy still hard-fails, now reported as a distinct external-marketplace failure naming the external tree (0.734314ms)
+✔ NVA-MKTHASH-2 (F3): a real directory copy whose entry count exceeds the bounded walk fails closed with a distinct message, before completing the hash (157.4892ms)
+✔ NVA-MKTHASH-1: a real directory copy is folded into statusSha256, and a subsequent content mutation moves OUT of the verified state (1.237873ms)
+✔ NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all three production entry points (451.906726ms)
+✔ a route-less denial reports the status the planner actually returned, with its typed code (0.346467ms)
+✔ a failed route plan is reported as a failure, distinguishably from a planner answer (0.104392ms)
+✔ the rendered reason is bounded to typed tokens against any outcome shape (0.241225ms)
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (0.389457ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.104202ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.662173ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.089102ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.410827ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.134902ms)
+✖ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.397238ms)
+✔ HGO multi-file apply binds one complete external-repository path set and fails closed across authority planes (434.494923ms)
+✔ NOVA-HGOELIG-1: an out-of-root target reaches the identical plan/prepare/authorize-by-signature/consume/ledger route, honestly scoped (319.135497ms)
+✔ NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the same reach as signature mode (ADR-0059 Decision 3/6 parity, no special-casing) (329.458248ms)
+✔ NOVA-HGOELIG-3: an out-of-root capability binds one exact command -- a different command is refused, and consumption is single-use (326.477853ms)
+✔ NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target (14.157714ms)
+✔ NVA-HGOFIX-1: safePath() reads an in-root component literally named `..\x` as in-root, not as an escape (13.831977ms)
+✔ NVA-HGOFIX-1: crossBoundaryTarget() never rescues an in-root `..\x` symlink attack into the cross-repository-target class (14.012821ms)
+✔ NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable platform seam, provable from a POSIX host (13.947019ms)
+✔ NVA-HGOFIX-2: crossBoundaryTarget()'s :792 hardBoundaryPath() check is intentionally unnormalized on POSIX, and its platform seam reaches the win32 branch (13.823588ms)
+✔ NVA-HGOFIX-2: eligibility()'s Bash argv-token normalization (:1385) is win32-only; POSIX behavior is unchanged (14.324506ms)
+✔ repository identity failures name the sanitized Git operation (14.118003ms)
+✔ NVA-HGOHEAD-1: a fresh repository with no commits (unborn HEAD) does not crash recordHumanGuardDenial()/planHumanGuardOverride() (145.365354ms)
+✔ Part A (a): a benign statusSha256/head/tree-only repository change between plan and arm does not block (proves the narrowing) (307.99626ms)
+✔ NVA-HGOHEAD-1: two unborn-HEAD observations of the same otherwise-unchanged repository compare equal (no spurious HGO-DRIFT) (145.525107ms)
+✔ NVA-HGOHEAD-1: a repository that gains its first commit between record and plan is reported as drift, never as a silent match against the unborn observation (146.789731ms)
+✔ Part A (b): a policyIdentity change between plan and arm still blocks with HGO-DRIFT (narrowing did not become no-check) (263.133746ms)
+✔ NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shape still throws HGO-GIT unchanged (the special case stays narrowly scoped) (157.117942ms)
+✔ Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between plan and arm trips HGO-PLUGIN-DRIFT (946.62383ms)
+✔ Part A (d): a benign repository-only change between plan and arm does not trip HGO-PLUGIN-DRIFT (3c stayed narrow) (277.868148ms)
+✔ Part A (e): a commit landing on HEAD between signing and arming trips HGO-CANDIDATE-DRIFT on the signature path only (296.146967ms)
+✔ Part A (e): the chat path has no signedCandidate concept and cannot trip HGO-CANDIDATE-DRIFT even when HEAD moves before arming (276.267586ms)
+✔ Part A (f): refreeze-plan succeeds on a benign drift, produces a new planSha256, and never arms or writes to the capabilities store (242.14571ms)
+✔ Part A (f): refreeze-plan still blocks with HGO-DRIFT when the project's guard/policy configuration changed (the gate is not relaxed for recovery) (171.922166ms)
+✔ Part A (f): refreeze-plan gives an expired exact request a fresh bounded plan but never reuses its old signature binding (271.846734ms)
+✔ Part A (f): refreeze-plan fails HGO-PLAN-ABSENT when no persisted plan exists yet for the pair (80.322913ms)
+✔ NVA-CROSSREPOLEDGER-1a: an ordinary in-root command still binds its ledger to the coordinator's own root, unchanged (82.473623ms)
+✔ Part A step 6: after HGO-CANDIDATE-DRIFT, refreeze-plan plus a fresh signature recovers without a full ceremony restart (489.513428ms)
+✔ Finding 1: a plugin-code tamper between plan and refreeze fails HGO-DRIFT and never poisons the persisted plan (746.753542ms)
+✔ Finding 3: two different non-null authorSourceRoot values for the same requestSha256 persist as independent, non-colliding plans (125.984393ms)
+✔ NVA-CROSSREPOLEDGER-1b: a cross-repository `git -C` command binds command evaluation, token consumption and ledger append to the TARGET repository, not the coordinator's (367.004323ms)
+✔ NVA-CROSSREPOLEDGER-1c: a cross-repository target capability still requires explicit double-confirmed activation -- no implicit override (193.843553ms)
+✔ NVA-CROSSREPOLEDGER-1d: a cross-repository target whose ledger root cannot be written fails closed before the guarded command runs, never falling back to the coordinator's ledger (52.25283ms)
+✔ NVA-CROSSREPOLEDGER-2a: a symlinked cross-repository target resolves the ledger binding through its REAL target, not the repository containing the symlink (393.971525ms)
+✔ NVA-CROSSREPOLEDGER-2b: a symlinked cross-repository target pointing at a nonexistent path is handled safely, never binding to the repository containing the symlink (98.473601ms)
+✔ NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinator's own root, and the ceremony runs against exactly that root (156.093252ms)
+✔ AGY-MKTATTEST-1: guard-push permits an otherwise-green push when the registered local marketplace copy is stale (1539.64591ms)
+✔ AGY-MKTATTEST-1: a matching local marketplace copy remains irrelevant to an otherwise-green push (1675.939374ms)
+✔ AGY-MKTATTEST-1: stale local marketplace state cannot bypass invalid Verify evidence (3116.069791ms)
+✔ NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET root, which is the only root its ceremony can be run against (176.478323ms)
+✔ governance/events/ status lines are excluded from statusSha256 drift check (0.099401ms)
+✔ concurrentWorktreeAdvisory() reports zero other worktrees for an ordinary single-checkout repository (16.596317ms)
+✔ concurrentWorktreeAdvisory() counts an additional git worktree (27.336888ms)
+✔ concurrentWorktreeAdvisory() never throws: a failing spawn reports checked:false rather than propagating (14.006811ms)
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (1.144051ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (0.420448ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (0.737133ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (0.627091ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (0.437198ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (0.342356ms)
+✔ T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead (1.724432ms)
+✔ T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched (0.618091ms)
+✔ T90-T2 (seam): an injected host decides the owner the lock records (0.377947ms)
+﹣ T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous (0.03204ms) # real-host variant: it runs the default host with no injected seam, so it needs a native win32 machine; the seam-injected cases (a)-(d2) pin the same rules on every host
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (17.435864ms)
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1.216633ms)
+✖ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (0.678633ms)
+✖ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (0.873907ms)
+✖ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (0.598631ms)
+✔ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (18.027485ms)
+✔ publish-consumption-action exposes only the minimal digest-bound HGO fact after source readback (2.784392ms)
+✔ publish-consumption-action rejects caller-supplied feature or session correlation (0.246434ms)
+✔ publish-consumption-action refuses before readback on bad output and returns an event-only retry after a write failure (0.501319ms)
+✔ authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() and prints its JSON result on stdout (281.004761ms)
+✔ plan prints a candidate-drift advisory on stderr without altering the plan JSON on stdout (160.41364ms)
+✔ plan's advisory escalates when another git worktree is present (184.800276ms)
+✔ render-copy-safe keeps its backward-compatible entry point on the shared bounded renderer (signature mode) (185.001511ms)
+✔ render-copy-safe selects the chat-mode ceremony steps (plan/prepare-authorization/authorize, never the signature-only steps) (179.545988ms)
+✔ render-copy-safe refuses a request-sha256 that was never recorded, with the same HGO-* error other subcommands give (18.810744ms)
+✔ render-copy-safe validates its flag set like the sibling plan subcommand (84.141107ms)
+✔ emit-signature-digest prints the exact digest authorizeHumanGuardOverrideBySignature() gates arming on (288.744057ms)
+✔ emit-signature-digest validates its flag set like the sibling subcommands (0.252375ms)
+✔ emit-signature-digest no longer accepts a --reason flag; a non-canonical value never prints a digest and exits non-zero (171.293353ms)
+✔ authorize-by-signature refuses a caller-supplied trust anchor; the committed anchor is the only trust source (217.49314ms)
+✔ the external-path check uses the platform's own separator, so an in-repository win32 path is refused (0.743144ms)
+✔ NVA-HGOFIX-2: the external-path check does not misread a POSIX in-repository file whose name merely contains a backslash as external (0.197204ms)
+✔ authorize-by-signature refuses an invalid proof with HGO-PROOF-INVALID on stderr and exit 2 (207.039245ms)
+✔ authorize-by-signature rejects a --proof file supplied inside the repository (181.462293ms)
+✔ authorize-by-signature validates its flag set like the sibling subcommands (0.140933ms)
+✔ prepare-for-signature emits the exact §3.3 output shape, with real resolved script paths and a reproducible intentSha256 (231.16887ms)
+✔ prepare-for-signature resolves the configured machine key directory without printing its private path (177.221642ms)
+✔ prepare-for-signature validates its flag set like the sibling plan/prepare-authorization subcommands (0.125152ms)
+✔ prepare-for-signature emits no ceremony material for a recoverable torn audit and repair-audit requires typed attended readback (187.645975ms)
+✔ repair-audit requires the exact flag set and explicit activation (0.215664ms)
+✔ repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin) (172.725888ms)
+✔ refreeze-plan CLI wiring: a benign drift refreezes successfully and prints the exact §3.6 output shape (264.297002ms)
+✔ refreeze-plan CLI wiring: HGO-PLAN-ABSENT surfaces through the ordinary exit-code-2 + stderr-code convention (88.937066ms)
+✔ refreeze-plan validates its flag set like the sibling plan subcommand (0.150023ms)
+ℹ tests 199
+ℹ suites 0
+ℹ pass 193
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 79879.34793
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:4425:3
+✖ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.397238ms)
+  AssertionError [ERR_ASSERTION]: (w) .git/agent-pipeline/human-guard-overrides/audit.lock (host default): the line must say "run from the main checkout root (the directory that holds .git)": "Recovery (attended, run from the repository root, only after confirming that no other Pipeline session is running an override ceremony): rm -- '.git/agent-pipeline/human-guard-overrides/audit.lock'"
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:4431:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:6532:3
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1.216633ms)
+  AssertionError [ERR_ASSERTION]: (f) ordinary lock: recovery.files must be exactly the main-checkout-relative POSIX form .git/agent-pipeline/human-guard-overrides/audit.lock, not an absolute path (got ["/tmp/hgo-t90t3-r9pZnE/.git/agent-pipeline/human-guard-overrides/audit.lock"])
+  + actual - expected
+  
+    [
+  +   '/tmp/hgo-t90t3-r9pZnE/.git/agent-pipeline/human-guard-overrides/audit.lock'
+  -   '.git/agent-pipeline/human-guard-overrides/audit.lock'
+    ]
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6553:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '/tmp/hgo-t90t3-r9pZnE/.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    expected: [ '.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:6565:3
+✖ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (0.678633ms)
+  AssertionError [ERR_ASSERTION]: (g) a separate git dir, ordinary lock: a common dir not named .git must yield NO recovery property, but error.recovery is {"files":["/tmp/hgo-t90t3-SHNd2H/separate-gitdir/agent-pipeline/human-guard-overrides/audit.lock"],"command":"rm -- '/tmp/hgo-t90t3-SHNd2H/separate-gitdir/agent-pipeline/human-guard-overrides/audit.lock'"}
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6579:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:6600:3
+✖ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (0.873907ms)
+  AssertionError [ERR_ASSERTION]: (h) linked worktree, ordinary lock: recovery.files must be relative to the main checkout root (.git/agent-pipeline/human-guard-overrides/audit.lock), got ["/tmp/hgo-t90t3-KU7ng8/main/.git/agent-pipeline/human-guard-overrides/audit.lock"]
+  + actual - expected
+  
+    [
+  +   '/tmp/hgo-t90t3-KU7ng8/main/.git/agent-pipeline/human-guard-overrides/audit.lock'
+  -   '.git/agent-pipeline/human-guard-overrides/audit.lock'
+    ]
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6618:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '/tmp/hgo-t90t3-KU7ng8/main/.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    expected: [ '.git/agent-pipeline/human-guard-overrides/audit.lock' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:6631:3
+✖ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (0.598631ms)
+  AssertionError [ERR_ASSERTION]: (j) ordinary lock (host default): a real HGO-AUDIT-LOCK-AMBIGUOUS refusal must render the recovery as a third line, but the route text is "No human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=HGO-AUDIT-LOCK-AMBIGUOUS."
+  
+  2 !== 3
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6644:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

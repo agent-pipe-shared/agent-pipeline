@@ -1,0 +1,18 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs
+label: lib-project-onboarding-foreign-residue
+exitCode: 0
+head: 2e875d0218b2b6aec32fbd59996284c3d5525d2e
+tree: d466d5fc6a9e37481f7fee6a8de8487508056bf6
+dirty: true
+--- stdout ---
+✔ PFR01 foreign session descriptors never lock session readiness; the requester's own descriptor still does (44717.71707ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47057.871404
+
+--- stderr ---

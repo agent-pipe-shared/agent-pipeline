@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WINPRIV-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "77bd8dad894d353db3a991261c56d76d6b69ce57",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "d1f31f4d2"
+  ],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "diagnosis done: outcome (a). governance-scope.mjs ensureHostRoot hardens the host-store dir to an owner-only inheriting DACL (hardenWindowsPrivateDirectory), the witness inherits it, privatePath() requires assessWindowsPrivatePath(...).status === 'secure' on win32. Mechanism the ACL suite uses: assessWindowsPrivatePath from windows-private-state.mjs.",
+      "toolUses": 29
+    },
+    {
+      "phase": "edit done: freshRepo records the witness path on win32 (POSIX keeps the exact 0o600 mode check); one root after() hook assesses all recorded witnesses via assessWindowsPrivatePaths in one batch (no new test case). Smoke run of one case: green, 1 witness assessed secure.",
+      "toolUses": 31
+    },
+    {
+      "phase": "native capture landed: evidence/WINPRIV-T-20261009/native.txt exit 1, 59 pass / 4 fail, 50 witnesses assessed secure in one batch, freshRepo privacy red class gone; 4 remaining reds are other causes (3 signed-GMW PB-WINDOWS-ASSURANCE, 1 EPERM symlink).",
+      "toolUses": 34
+    },
+    {
+      "phase": "WSL capture landed: evidence/WINPRIV-T-20261009/wsl.txt exit 0, 63/63. check-consumer-safe-paths test exit 0, 9/9. Committed d1f31f4d2 (short SHA kept: the shared-tree HEAD has since moved on).",
+      "toolUses": 40
+    },
+    {
+      "phase": "closing: git rev-parse HEAD showed the shared tree moved past the commit; final record written. The budget hook fired at call 40 after the commit and checkpoint; no work remained, so this is a completed run, not a closing-allowance handover.",
+      "toolUses": 42
+    }
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs"
+    ],
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded, Project agent-pipeline-share, Calibration not supplied by the briefing, State briefing WINPRIV-T-20261009, Role Goldfish. Route: requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed claude-sonnet-5-5 from this dispatch's own runtime prompt; match (class is test authorship, not a declared A/G/S class). This is a COMPLETED run, not a closing-allowance handover (the budget hook fired at call 40, after the commit and checkpoint; no work remained). independent review: pending.\n\n1. DoD results. (1) Native capture: PARTIAL. The freshRepo privacy red class (the 438 !== 384 assertion) is gone: 47 of the 51 baseline reds now pass, 59 pass / 4 fail of 63, 50 witnesses assessed secure in one DACL batch. 4 native reds remain with other causes (section 6), so the run exits 1. (2) WSL capture: passed, 63/63, exit 0. (3) node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9. (4) One commit d1f31f4d2 of the test file only: passed; trailers exactly 'Dispatch: WINPRIV-T-20261009 (goldfish)' and 'AI-Assisted: true'; stage and commit as two separate calls with the exact pathspec.\n\n2. Evidence. evidence/WINPRIV-T-20261009/native.txt (node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WINPRIV-T-20261009/native.txt --label native -- node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs; wrapped exit 1; its machine-written header shows HEAD 77bd8dad894d353db3a991261c56d76d6b69ce57, the candidate actually built on, above the briefed floor 03cd3eede). evidence/WINPRIV-T-20261009/wsl.txt (same command through wsl.exe -e bash -lc, label wsl; wrapped exit 0; ℹ tests 63, pass 63, fail 0). check-consumer-safe-paths: exit 0, stdout only. Commit: d1f31f4d2 (short SHA kept; git rev-parse HEAD later showed the shared tree had moved past it).\n\n3. Changed files. plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs (+26/-1): imports assessWindowsPrivatePaths; adds a comment naming the mechanism, a WIN32_WITNESS_PATHS array and one root after() hook; replaces the :174 mode assertion with 'record the path on win32, exact 0o600 mode check on POSIX'. Uncommitted by design: evidence/dispatch-record-WINPRIV-T-20261009.json, evidence/WINPRIV-T-20261009/native.txt, evidence/WINPRIV-T-20261009/wsl.txt, scratch/commit-msg/WINPRIV-T.txt.\n\n4. Deliberately not changed. The 4 remaining native reds. Fixture temp directories are still not cleaned up (pre-existing, and the after() hook depends on them still existing). The trust-anchor-bootstrap suite. All production files, hooks/, lib/guard/, harness/. The POSIX assertion is byte-identical.\n\n5. Deviations and design disclosure. Diagnosis outcome (a): ensureHostRoot (governance-scope.mjs) hardens the host-store directory to an owner-only inheriting DACL via hardenWindowsPrivateDirectory, the witness created inside inherits it, and privatePath() requires assessWindowsPrivatePath(...).status === 'secure' on win32; governance-scope-win32-acl.test.mjs asserts exactly that mechanism. Neither briefed option fit: applyDecision's return carries no privacy field, and no witness exists at module load to probe. Chosen: freshRepo records the witness path on win32 and ONE root after() hook calls assessWindowsPrivatePaths (one fixed PowerShell process per 64 paths, same owner/DACL/reparse policy) with timeout: 120000 passed explicitly (the default is 7000 ms). It is a hook, not a test case, so the case count is unchanged (63 on WSL). A privacy failure surfaces as a root-hook failure naming the witness path and status, NOT as a per-case red; a non-secure or unavailable result fails, and there is no t.skip. Outcome: the record uses committed-pending-report as the terminal value, as field 6 pins, rather than overwriting with 'completed', because independent review is pending. resultSha256 is null (authored-commit kind). Counting disclosure: 50 witnesses were recorded against the briefing's 51 baseline reds, so at least one baseline red probably had a different first cause that the :174 assertion masked (plausibly the symlink roundtrip); not investigated, so I cannot confirm from the baseline that the EPERM red is pre-existing. Wasted calls: two directory-scoped Glob/Grep calls were refused with GUARD-READ-TARGET before the first write; the first write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING and cured by running the preflight alone from the plugin root path the guard printed.\n\n6. Open items. Four remaining native reds, none the briefed class. (a) Three signed-GMW cases ('matching signed GMW permits a non-kernel TP rewrite', 'wrong-scope signed GMW does not permit a TP rewrite', 'matching signed GMW never permits hooks.json kernel rewrite') fail with PB-WINDOWS-ASSURANCE thrown by ensureHardenedPrivateDirectory via applyInstall (pre-commit-hook-install.mjs:932): 'private path DACL grants a non-owner principal. The directory already existed and was left untouched.' Hypothesis, unverified: every other installHook case passes, and these three differ by the guard-maintenance-window setup before install, so that path may create the private agent-pipeline directory without win32 hardening; the dispatcher should check that in a separate dispatch (production is out of this briefing's scope). (b) 'applyInstall then applyRemoval: removes exactly what was installed' fails with EPERM on symlinkSync in the test (the Windows symlink privilege is missing on this host); a host limitation of the fixture, not a privacy defect. Independent review: pending. Native acceptance still needs those four resolved in follow-up dispatches."
+  }
+}

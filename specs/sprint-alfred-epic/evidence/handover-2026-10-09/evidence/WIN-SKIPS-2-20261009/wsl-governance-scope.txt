@@ -1,0 +1,41 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope.test.mjs
+label: WIN-SKIPS-2-wsl-gs
+exitCode: 0
+head: 8bb83c3c18dd06851cccfcd4ec6d6b02ed84e0d1
+tree: 86bfd88ac0320ed4b3f560e43c8e705ab71224f0
+dirty: true
+--- stdout ---
+✔ RC14C001 documents, entry pointers and malformed arbitrary source never enroll; observation writes nothing (16.672932ms)
+✔ RC14C002 actual Git config stores a parseable root-bound decision and preserves unrelated bytes and mode (7334.184884ms)
+✔ RC14C003 actual linked worktrees enroll independently; linked decline does not deactivate primary (3444.981966ms)
+✔ RC14C004 non-Git decline persists only in sealed fixture host store and restores explicit enrollment (39.00163ms)
+✔ RC14C005 existing exact onboarding consent qualifies partial enrollment; corrupt marker alone cannot activate (33.167059ms)
+✔ RC14C006 canonical V3 owned projection qualifies existing enrollment without invented receipt; drift fails closed (1916.447646ms)
+✔ RC14C007 paired canonical legacy authority qualifies; malformed source paired with valid authority stays governed (23.063106ms)
+✔ RC14C008 fabricated/cloned/stale plans cannot mutate storage; consumed plan cannot replay (118.49064ms)
+✔ RC14C009 dedicated malformed record/mode/alias refuse authority; aliases do not cause outside content reads (22.715445ms)
+✔ RC14C010 root inode reuse invalidates bound record, oversized sparse record and hardlinks reject without adoption (22.741285ms)
+✔ RC14C011 authenticated onboarding projection reuses enrollment and explicit activation reverses decline (12891.980875ms)
+✔ RC14C012 actual observations and absence errors satisfy closed published schema (28.30915ms)
+✔ RC14C013 neutral V3 authority has precedence over retained runtime and no invented receipt is required (70.966695ms)
+✔ RC14C014 broken physical Git control cannot be recast as non-Git enrollment (167.899101ms)
+✔ RC14C015 enrolled current Git root survives an unrelated removed registered worktree and can plan decline (2100.608995ms)
+✔ RC14C016 declined current Git root survives an unrelated removed worktree without hints or enforcement and can re-enroll (1971.445737ms)
+✔ RC14C017 closest containing nested linked worktree keeps its own decision despite a stale sibling (1435.930319ms)
+✔ RC14C018 path-component containment does not select a prefix sibling and selected alias paths cannot authorize decisions (3736.689451ms)
+✔ RC14C019 removed relevant linked directory remains unavailable and cannot be used to plan a decision (1648.264349ms)
+✔ RC14C020 current Git root inode replacement retains record binding refusal rather than inactive admission (2053.519284ms)
+✔ RC14C021 owned Git config alias and hardlink refuse active authority and cannot become inactive admission (6871.603667ms)
+✔ RC14C022 broken relevant linked Git control and unreadable owned config remain fail-closed (3837.889153ms)
+ℹ chmod(000) actual EACCES: true
+✔ RC14C023 Git common-directory inode replacement invalidates enrollment without changing its record bytes (2092.182099ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53482.756615
+
+--- stderr ---

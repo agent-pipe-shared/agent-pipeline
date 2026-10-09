@@ -1,0 +1,1168 @@
+command: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs
+label: native-before
+exitCode: 1
+head: 58a30b844c7721130c3483a5cc28a16ad4cc1710
+tree: 439592fbcd84d8e1a13861e80b5b30601d361f65
+dirty: true
+--- stdout ---
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (153.7712ms)
+✔ installed pre-commit hook rejects a staged local private pattern before Git commits (11149.6414ms)
+✖ stagedPaths: lists a newly staged file relative to HEAD (2478.1854ms)
+✖ stagedPaths: falls back to the empty-tree comparison before any commit exists (2435.5139ms)
+✖ stagedPaths: nothing staged yields an empty array, not null (2488.7597ms)
+✖ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (2480.6904ms)
+✖ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (2396.7574ms)
+✖ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (2350.7223ms)
+✖ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (2586.8367ms)
+✔ installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK (72.9734ms)
+✖ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (2297.3344ms)
+✖ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2330.7765ms)
+✖ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (2400.6725ms)
+✖ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2448.3084ms)
+✖ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (2584.2877ms)
+✖ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (2537.3291ms)
+✖ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (2387.4181ms)
+✖ installed hook: refuses a late verify rewrite when it also stages lifecycle state (2620.1929ms)
+✖ installed hook: refuses late verify recovery when committed plan approval is stale (2568.2815ms)
+✖ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (2559.2969ms)
+✖ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (2379.6829ms)
+✖ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (2392.8072ms)
+✖ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (2547.8945ms)
+✖ installed hook: admits one complete proof-bound quality package, never a widened index (2396.904ms)
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (2646.1257ms)
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (2514.3685ms)
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (2322.5203ms)
+✖ installed hook: staged NON-protected path is unaffected -> commit succeeds (2479.8835ms)
+✖ installed hook: nothing staged (--allow-empty) -> commit succeeds (2490.3692ms)
+✖ applyInstall: refuses to overwrite a pre-existing foreign hook (2514.5092ms)
+✖ applyInstall then applyRemoval: removes exactly what was installed (10177.9782ms)
+✖ applyRemoval: refuses when the installed hook was modified after install (2250.8461ms)
+✖ applyRemoval: nothing-to-remove when never installed (2272.9268ms)
+✖ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (2239.5748ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.2119ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.3285ms)
+✖ applyDecline: records a decline marker with a timestamp, no name/credential (2375.7286ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (15.6383ms)
+✖ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (2144.7698ms)
+✖ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (2154.3763ms)
+✖ planInstall: a decline marker never suppresses an already-installed hook (2364.2502ms)
+✖ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (2239.2512ms)
+✖ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (2284.7952ms)
+✖ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (2221.5084ms)
+✖ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (2236.7508ms)
+✖ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (2327.9089ms)
+✖ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (2228.6853ms)
+✖ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (2233.3638ms)
+✖ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (2232.735ms)
+✖ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (2196.4949ms)
+✖ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (2399.9304ms)
+✖ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (2495.1556ms)
+✖ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (2324.5874ms)
+✖ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (2342.8713ms)
+✖ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (2481.2828ms)
+✖ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (2661.1579ms)
+✖ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (2409.8399ms)
+✔ trust-anchor bootstrap exemption: (a) REPLACING an existing single anchor with a different one stays BLOCKED (10887.275ms)
+✔ trust-anchor bootstrap exemption: (b) ADDING a second anchor to a policy that already has one stays BLOCKED (11149.1925ms)
+✔ trust-anchor bootstrap exemption: (c) an UNRELATED field change (requiredKinds) bundled alongside the first anchor addition stays BLOCKED (10656.3754ms)
+✔ trust-anchor bootstrap exemption: (d) a policy whose trustAnchors set is ALREADY non-empty gaining one more entry stays BLOCKED, regardless of current set size (11188.2466ms)
+✖ trust-anchor bootstrap exemption: a genuine v1(no-anchor) -> v3(one-anchor) upgrade, unrelated fields unchanged, commits ALLOWED (12137.4917ms)
+✖ trust-anchor bootstrap exemption: v1(no-anchor) -> v3(no-anchor, empty trustAnchors) is NOT the anchor upgrade -- still blocked (no anchor actually added) (12271.9499ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 10
+ℹ fail 53
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141635.4768
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:320:1
+✖ stagedPaths: lists a newly staged file relative to HEAD (2478.1854ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:322:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:329:1
+✖ stagedPaths: falls back to the empty-tree comparison before any commit exists (2435.5139ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:331:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:338:1
+✖ stagedPaths: nothing staged yields an empty array, not null (2488.7597ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:340:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:346:1
+✖ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (2480.6904ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:348:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:352:1
+✖ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (2396.7574ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:354:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:358:1
+✖ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (2350.7223ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:360:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:367:1
+✖ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (2586.8367ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:369:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:402:1
+✖ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (2297.3344ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:403:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:420:1
+✖ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2330.7765ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:421:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:429:1
+✖ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (2400.6725ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:430:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:445:1
+✖ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2448.3084ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:446:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:457:1
+✖ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (2584.2877ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:462:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:477:1
+✖ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (2537.3291ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:478:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:491:1
+✖ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (2387.4181ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:492:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:504:1
+✖ installed hook: refuses a late verify rewrite when it also stages lifecycle state (2620.1929ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:505:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:520:1
+✖ installed hook: refuses late verify recovery when committed plan approval is stale (2568.2815ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:521:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:541:1
+✖ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (2559.2969ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:542:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:559:1
+✖ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (2379.6829ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:560:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:572:1
+✖ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (2392.8072ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:578:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:589:1
+✖ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (2547.8945ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:590:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:599:1
+✖ installed hook: admits one complete proof-bound quality package, never a widened index (2396.904ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:600:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:633:1
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (2646.1257ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:634:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:647:1
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (2514.3685ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:648:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:662:1
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (2322.5203ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:663:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:678:1
+✖ installed hook: staged NON-protected path is unaffected -> commit succeeds (2479.8835ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:679:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:687:1
+✖ installed hook: nothing staged (--allow-empty) -> commit succeeds (2490.3692ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:688:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:696:1
+✖ applyInstall: refuses to overwrite a pre-existing foreign hook (2514.5092ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:697:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:709:1
+✖ applyInstall then applyRemoval: removes exactly what was installed (10177.9782ms)
+  Error: EPERM: operation not permitted, symlink '<host-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:740:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:767:1
+✖ applyRemoval: refuses when the installed hook was modified after install (2250.8461ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:768:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:779:1
+✖ applyRemoval: nothing-to-remove when never installed (2272.9268ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:780:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:785:1
+✖ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (2239.5748ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:786:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:816:1
+✖ applyDecline: records a decline marker with a timestamp, no name/credential (2375.7286ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:817:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:835:1
+✖ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (2144.7698ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:836:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:846:1
+✖ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (2154.3763ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:847:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:855:1
+✖ planInstall: a decline marker never suppresses an already-installed hook (2364.2502ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:856:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:878:1
+✖ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (2239.2512ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:880:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:885:1
+✖ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (2284.7952ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:887:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:898:1
+✖ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (2221.5084ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:900:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:911:1
+✖ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (2236.7508ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:913:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:928:1
+✖ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (2327.9089ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:930:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:943:1
+✖ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (2228.6853ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:946:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:965:1
+✖ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (2233.3638ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:968:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:982:1
+✖ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (2232.735ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:983:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:994:1
+✖ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (2196.4949ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:997:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1013:1
+✖ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (2399.9304ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1024:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1038:1
+✖ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (2495.1556ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1046:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1076:1
+✖ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (2324.5874ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1078:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1104:1
+✖ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (2342.8713ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1106:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1127:1
+✖ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (2481.2828ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1134:24)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1169:1
+✖ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (2661.1579ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1176:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:1201:1
+✖ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (2409.8399ms)
+  AssertionError [ERR_ASSERTION]: diagnostic witness remains private
+  
+  438 !== 384
+  
+      at freshRepo (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:160:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:1208:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 438,
+    expected: 384,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:149:1
+✖ trust-anchor bootstrap exemption: a genuine v1(no-anchor) -> v3(one-anchor) upgrade, unrelated fields unchanged, commits ALLOWED (12137.4917ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:933:27)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:52:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:152:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:162:1
+✖ trust-anchor bootstrap exemption: v1(no-anchor) -> v3(no-anchor, empty trustAnchors) is NOT the anchor upgrade -- still blocked (no anchor actually added) (12271.9499ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:933:27)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:52:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs:165:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+--- stderr ---

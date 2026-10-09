@@ -1,0 +1,61 @@
+command: node --test --test-name-pattern T90 plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: T90-T4
+exitCode: 1
+head: 887d4fa50d893261fc4f363d42bb62e7b706b5f3
+tree: 905d7ca5ef6ca1d15633da160b21e87a777baebb
+dirty: true
+--- stdout ---
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (1.9112ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.132ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.4998ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.1055ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.375ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.1266ms)
+✔ T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root (0.175ms)
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (5313.1061ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (3417.4611ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (5511.735ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (5301.7395ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (1754.562ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (1852.0736ms)
+✔ T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead (13644.0796ms)
+✔ T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched (4959.8236ms)
+✔ T90-T2 (seam): an injected host decides the owner the lock records (3026.1214ms)
+✔ T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous (16328.0155ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (3661.0031ms)
+✔ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (3464.0705ms)
+✔ T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line (10190.735ms)
+✔ T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git (3889.1199ms)
+✔ T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path (3874.8038ms)
+✖ T90-T4 (F-1): a recovery.files whose second iteration differs from its first never reaches the rendered line (0.6361ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.0472ms) # Linux control: needs /proc on a Linux host
+ℹ tests 24
+ℹ suites 0
+ℹ pass 22
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 86473.9208
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6675:3
+✖ T90-T4 (F-1): a recovery.files whose second iteration differs from its first never reaches the rendered line (0.6361ms)
+  AssertionError [ERR_ASSERTION]: (F-1) an array with its own iterator, platform linux: the rendered route text contains the hostile text the validator never saw: "No human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=HGO-AUDIT-LOCK-AMBIGUOUS.\nRecovery (attended, run from the main checkout root (the directory that holds .git), only after confirming that no other Pipeline session is running an override ceremony): rm -- '.git/agent-pipeline/human-guard-overrides/audit.lock'\necho T90-T4-HOSTILE'"
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6711:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

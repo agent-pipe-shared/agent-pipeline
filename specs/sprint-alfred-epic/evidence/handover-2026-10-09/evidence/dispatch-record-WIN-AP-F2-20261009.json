@@ -1,0 +1,71 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "e51844ab8"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created; preflight run once; route pre-check requested claude-sonnet-5-5/xhigh == observed claude-sonnet-5-5",
+      "toolUses": 7
+    },
+    {
+      "phase": "baselines native: root-before (a,b,c,e red; premise green), hpd-before exit 0, closure-before 26 violations (3 name hardened-private-directory.mjs)",
+      "toolUses": 23
+    },
+    {
+      "phase": "edits: hardened-private-directory.mjs (ensureAgentPipelineRoot + D0 constant) and one kernel-list line; no guard refusal",
+      "toolUses": 36
+    },
+    {
+      "phase": "after: native root-after (e green; a,b,c red), hpd-after exit 0, closure-after 23 violations none naming the module; WSL (e green, a red, b/c green, hpd unchanged); consumer-safe-paths 9/9 exit 0",
+      "toolUses": 44
+    },
+    {
+      "phase": "ad-hoc probe of refusal branches (scratch, injected seams): 25/25 ok",
+      "toolUses": 50
+    },
+    {
+      "phase": "committed e51844ab8 (two production files by exact pathspec)",
+      "toolUses": 52
+    },
+    {
+      "phase": "final record: report text and resultSha256 written in one write",
+      "toolUses": 55
+    }
+  ],
+  "report": {
+    "text": "WIN-AP-F2-20261009 completion report (goldfish-deep, claude-sonnet-5-5 / xhigh). Committed e51844ab8. independent review: pending. Implementation complete; Critic review (class S) and PO acceptance outstanding.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6, from the agent definition); observed from this dispatch's own runtime prompt: model claude-sonnet-5-5. No contradiction.\n\n1. DoD results\n- Native root-creation pins (root-before / root-after): passed. Pin (e) red -> green; pins (a), (b), (c) still red as required (inherited foreign ACE, status=insecure); premise self-check green before and after.\n- Native hardened-private-directory.test.mjs (hpd-before / hpd-after): passed, no new red (exit 0 both).\n- Native GMWKC01 closure (closure-before / closure-after): passed, no new violation. Violations 26 -> 23. The three removed are exactly the three that named hardened-private-directory.mjs (the pre-push, pre-commit and commit-msg installers); after the edit no violation names it. 26-3=23 is arithmetic plus a grep for the module name; the remaining list was not line-diffed. The briefing's baseline of 23 equals the post-add count; at this HEAD the pre-add count was 26. GMWKC03 (doc enumeration) still passes: the threat model already lists the module inside Protected assets.\n- WSL after: passed. Pin (e) green, (a) red (mode=0o755, creator still unhardened, slice S3), (b) and (c) green, hpd cases all green (20 tests: 18 pass, 1 fail = pin (a), 1 skipped = the native-Windows-only hpd case).\n- check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9 (run directly, not through capture-evidence, so no machine-written artifact; the exit code and TAP are from this run's tool result only).\n- One commit of the two production files, subject verbatim, trailers AI-Assisted: true and Dispatch: WIN-AP-F2-20261009 (goldfish) only (no Co-Authored-By / Claude-Session: the briefing and GIT-03 override the harness attribution reminder): done, e51844ab8.\n\n2. Evidence (repo-root evidence/WIN-AP-F2-20261009/, written by capture-evidence.mjs; commands exactly as briefed, wrapped exit code in each file header)\n- root-before.txt exit 1, root-after.txt exit 1 (pins a-c red by design), hpd-before.txt exit 0, hpd-after.txt exit 0, closure-before.txt exit 1 (26 violations), closure-after.txt exit 1 (23 pre-existing violations), wsl-after.txt exit 1 (pin a red by design).\n- The artifacts and this record are NOT in the commit (briefing: production files only).\n\n3. Changed files (commit e51844ab8)\n- plugins/pipeline-core/lib/hardened-private-directory.mjs: new export ensureAgentPipelineRoot(common, options) returning { path, created, repaired, advisory, detail }; D0 posture constant AGENT_PIPELINE_ROOT_INSECURE_OWNED_POSTURE = \"repair\" (the single switch; options.posture overrides per call; any value but \"repair\" is read as refuse); advisory constant AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY = \"PB-ROOT-REPAIRED\". Existing ensureHardenedPrivateDirectory and its callers are unchanged. New imports are only node:fs members and two members of the already-imported windows-private-state.mjs (no new module edge).\n- plugins/pipeline-core/lib/guard-maintenance-window.mjs: the single NEVER_LIFTABLE_KERNEL_PATHS entry for hardened-private-directory.mjs (plus a 2-line comment). No guard refusal at either Edit or the commit.\n\nBehaviour. Absent: created through the existing machinery. Present and secure: returned. Present and insecure and owned by the current user: win32 observes once with observeWindowsPrivatePath, requires a non-reparse path whose owner is the current principal (judged by the module's own evaluator on the observation with a clean DACL, BEFORE any hardening, because the hardening script takes ownership), then hardenWindowsPrivateDirectory, then an explicit assess; anything but secure throws PB-WINDOWS-ASSURANCE and is never reported as repaired. POSIX: the existing helper does not assess an existing segment's mode, so the entry point does (mode & 0o077, owner uid vs getuid()), then chmods 0o700 through an O_NOFOLLOW|O_DIRECTORY descriptor bound to the assessed dev/inode, then re-lstat; not private afterwards throws PB-ROOT-INSECURE. Foreign owner, reparse point, non-directory, unobservable assurance, or posture refuse: refused with the family's typed errors and left untouched (PB-WINDOWS-ASSURANCE on win32, PB-ROOT-INSECURE elsewhere, PB-DIRECTORY, PB-ANCHOR). PB-ROOT-INSECURE and PB-ROOT-REPAIRED are new codes in the PB-* family.\n\n4. Deliberately not changed\n- Foreign staged and dirty files, all test files, windows-private-state.mjs, private-boundary.mjs, docs, hooks, lib/guard, harness, and this repository's live .git/agent-pipeline tree.\n- Untracked scratch files (scratch/win-ap-f2-probe.mjs, scratch/win-ap-f2-finalize.mjs, the commit message) are ignored scratch, not committed.\n- The record and evidence artifacts stay uncommitted for the dispatcher.\n\n5. Deviations from spec\n- None in design. Measured baseline 26 violations vs the briefing's 23 (explained above). I did not read the CONT15 header the CONT17 header points to, because the dispatch said to read nothing else from the briefing folder; no effect on the work. Final outcome is committed-pending-report as the briefing says, with the report and resultSha256 (sha256 of the UTF-8 bytes of this text) written in one write.\n\n6. Open items\n- independent review: pending (Elephant dispatches the Opus Critic for the S-chain).\n- Not exercised against real hosts: the foreign-owner, refuse-posture, unobservable, reparse-point and chmod-did-not-take refusals ran only through injected seams in an ad-hoc untracked probe (25 checks, all ok; scratch/win-ap-f2-probe.mjs); no test file was added (forbidden here). A test-only follow-up should pin them (QG-04), including PB-ROOT-INSECURE and the PB-ROOT-REPAIRED advisory shape.\n- Predicted from reading, not run: on a win32 host whose temp dir hands down no foreign ACE, the pin (e) premise is built with an explicit icacls grant on the directory itself; the module's hardening script resets only the current user's entries and inherited entries, so an explicit foreign entry survives, the entry point then refuses (it never reports repaired) and pin (e) would stay red there for a windows-private-state.mjs reason outside this slice. On this host the premise is inherited and pin (e) is green natively.\n- Not measured: whether children created earlier under a repaired win32 root (e.g. governance-events) have their inherited entries recomputed by Windows after the root DACL reset.\n- D0 stays on the PO list; flipping to refuse is the one constant.\n- Next slice S3 (governance-event-store.mjs:155, kernel, signed-package route) can now call ensureAgentPipelineRoot; pin (a) stays red until then.\n- Budget: reached the 55 base cap at this final record write; no stop condition triggered.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+      "plugins/pipeline-core/lib/guard-maintenance-window.mjs"
+    ]
+  },
+  "resultSha256": "8355d4708bc11fcba5e689c79f4e7abb461f09a9a41c74599cebe12ef6759592"
+}

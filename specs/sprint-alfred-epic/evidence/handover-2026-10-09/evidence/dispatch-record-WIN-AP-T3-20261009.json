@@ -1,0 +1,79 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-T3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f0697512665dd6fd0fbff24a183955a98ca0e1b0",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "237ab69f97d2953dea78a1f1efaa53192ad99ca5"
+  ],
+  "resultSha256": "0d63ac74a0df19b7d8bee0a53a1223b44c4792f9d44e22f34a9886b0a80cbf17",
+  "report": {
+    "text": "WIN-AP-T3-20261009: closing report (implementation complete; independent review: pending). Not a closing-allowance handover: all DoD work finished and was committed after the 80 % notice (counted call 44 of 55).\n\nBootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded; Project agent-pipeline-share; Role Goldfish.\nRoute pre-check: class test-only (QG-04), no A/G/S class declared in field 6. Requested: goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed from this dispatch's runtime prompt: \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- New pins red for the stated reason, nothing else changes state: passed. `compare.txt` / `wsl-compare.txt`: 44 pre-existing entries unchanged on each host, no REMOVED. The only CHANGED line is the parent `describe` pass -> fail, the expected effect of red subtests. Red reasons (grep of the captures' `error:` lines): F1 \"expected exactly one PB-ROOT-REPAIRED warning through the emitWarning seam\" (0 calls); default-seam pin \"saw 0 warning(s)\"; F2 \"expected a PrivateBoundaryError, got no throw\"; D1 \"did not end private after an in-place repair (mode 0o777)\" thrown where the advisory is expected.\n- Per-host matrix. Native Windows: F1-win32 RED, F1-default-seam RED, F1-POSIX skip (no-posix-owner-ids), F2 skip (same), F2-control skip (same), D1-existing skip and D1-fresh skip (open-mode-not-buildable, native reads 0o666), D1-real skip (no-posix-owner-ids). WSL (tmp on ext4): F1-win32, F1-POSIX, F1-default-seam, F2, D1-existing, D1-fresh RED; F2-control green (control); D1-real skip (host-records-mode-bits).\n- Controls that stay green: every existing case; F2-control (WSL) is green by design. No pin was green today apart from that control.\n- consumer-safe-paths exits 0: passed, read as `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (the checker's own suite, 9/9, same reading as WIN-AP-T2). A run of the checker over the committed tree was NOT run; every capture is scrubbed of host paths by the tooling.\n- One commit of the test file: passed.\n\n2. Evidence (machine-written by scratch/WIN-AP-T3/tools.mjs capture/compare; each capture carries its command and `# exit code:` footer)\n- evidence/WIN-AP-T3-20261009/before.txt (native, exit 0), red.txt (native, exit 1), wsl-before.txt (WSL, exit 0), wsl-red.txt (WSL, exit 1), compare.txt, wsl-compare.txt, consumer-safe-paths.txt (exit 0).\n- Commands: `node scratch/WIN-AP-T3/tools.mjs capture evidence/WIN-AP-T3-20261009/<name>.txt`; WSL: `wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node scratch/WIN-AP-T3/tools.mjs capture evidence/WIN-AP-T3-20261009/wsl-<name>.txt\"`; each runs `node --test --test-reporter=tap plugins/pipeline-core/lib/hardened-private-directory.test.mjs`.\n\n3. Changed files\n- plugins/pipeline-core/lib/hardened-private-directory.test.mjs: +188 lines, 0 deleted; new cases inside the existing `ensureAgentPipelineRoot` describe (commit 237ab69f97d2953dea78a1f1efaa53192ad99ca5, subject as briefed, trailers Dispatch: WIN-AP-T3-20261009 (goldfish) and AI-Assisted: true only).\n\n4. Deliberately not changed\n- Any production file, every other test, the two foreign staged files (pipeline-state.test.mjs, sanctioned-args-onboarding.mjs; still staged), live hooks, no push. No new import: the new codes are string literals and `emitWarning` is a plain option, so the file loads and existing cases keep their state before F3.\n\n5. Deviations from spec\n- Mechanics: `git diff --stat` instead of `git diff -- <file>`. Safe because the file was unmodified in the opening status and the stat and commit both show exactly 188 insertions, 0 deletions, one path.\n- Extra pin beyond the briefed shapes: the default `emitWarning` is `process.emitWarning` (observed via a `process` \"warning\" listener); it uses no seam other than `emitWarning`. Without it a no-op default would satisfy every other pin and F1 (surfacing for every caller) would stay open.\n- Added the F2 control and two probed host gates (`OPEN_MODE_HOST_SKIP`, `HOST_RECORDS_MODE_BITS_SKIP`) because native Windows reads 0o666 and has no getuid. The real-host D1 case therefore skips natively with `no-posix-owner-ids` rather than `host-records-mode-bits`, and it ran on NEITHER DoD host (WSL tmp is ext4). To make it run: WSL with TMPDIR pointed at a scratch directory on the DrvFs mount.\n- Pinned message content beyond the code: the warning is a string that names the segment and no host path; the F2 refusal says \"not owned by the current user\" and \"left untouched\". Result `detail` is left free (string or null).\n- Tooling slip: one accidental background capture of the target test file under the consumer-safe output name (overwritten by the real run; its record log entry is relabelled). WSL red capture and the compares were not logged individually.\n\n6. Open items\n- independent review: pending (only the Elephant dispatches the Critic).\n- REQUIRED RULING FOR THE F3 BRIEFING: existing case \"a chmod that does not take is refused\" (repair posture, 0o755, no-op chmod seam -> PB-ROOT-INSECURE) and the new D1-existing pin (repair posture, 0o777, no-op chmod seam -> advisory) differ only in starting mode, and Ruling 156's D1 criterion (\"a successful chmod leaves the mode unchanged\") describes both. F3 must define \"records no mode bits\" more narrowly than \"chmod had no effect\" (e.g. a sibling-directory probe, or the 0o777-read signature), or the existing case has to be re-scoped in a test slice. T3's DoD holds today.\n- Next briefing should also say: native cannot exercise the POSIX-seam pins; WIN-AP-F3 verification must be read on WSL.\n- Untracked for the Elephant to integrate: evidence/WIN-AP-T3-20261009/*.txt, evidence/dispatch-record-WIN-AP-T3-20261009.json; throwaway scratch/WIN-AP-T3/, scratch/commit-msg/WIN-AP-T3-20261009.txt.\n- Closing statements: Committed: 237ab69f97d2953dea78a1f1efaa53192ad99ca5 (the test file). Verified green: baseline captures and consumer-safe check with exit codes above. Remains undone: none beyond the Critic. Next-briefing adjustments: the ruling and TMPDIR recipe above.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 11
+    },
+    {
+      "phase": "native before capture (HEAD test file, unedited)",
+      "toolUses": 26
+    },
+    {
+      "phase": "wsl-before-capture-unedited",
+      "toolUses": 27
+    },
+    {
+      "phase": "native red capture (new pins added)",
+      "toolUses": 29
+    },
+    {
+      "phase": "native red capture (final test file)",
+      "toolUses": 36
+    },
+    {
+      "phase": "tooling slip: an accidental capture of the target test file was started under the consumer-safe output name (its output was overwritten by the real check below)",
+      "toolUses": 0
+    },
+    {
+      "phase": "consumer-safe-paths check (harness/scripts/check-consumer-safe-paths.test.mjs)",
+      "toolUses": 42
+    },
+    {
+      "phase": "committed 237ab69f9 (test file only); record checkpointed",
+      "toolUses": 47
+    },
+    {
+      "phase": "terminal: wsl red capture (exit 1) and both compares clean (44 unchanged each); outcome completed, report bound, resultSha256 written",
+      "toolUses": 50
+    }
+  ]
+}

@@ -1,0 +1,459 @@
+command: node --test plugins/pipeline-core/lib/git-cmd.test.mjs
+label: git-cmd-after
+exitCode: 0
+head: ea5401ec69812e0f9b40627d6ca1bddddf4e12eb
+tree: a2ad9f6ef1fc7d104e2f12b20a5c083a03446983
+dirty: true
+--- stdout ---
+PASS  STRIP double-quote  a double-quoted commit message is emptied out
+PASS  STRIP single-quote  a single-quoted commit message is emptied out
+PASS  STRIP no-quotes  an unquoted destructive command passes through unchanged
+PASS  STRIP quoted-evasion  quoted destructive-looking prose is blanked, trailing unquoted command intact
+PASS  STRIP quoted-target  a quoted protected target is blanked (matches guard-git's accepted trade-off)
+PASS  NORM -c  a -c key=value global option between git and push collapses away
+PASS  NORM -C push-variant  -C <path> before a push --force collapses away (git push variant)
+PASS  NORM --git-dir=  an =-form global option collapses away
+PASS  NORM multi-option  a whole run of recognized global options collapses in one pass
+PASS  NORM unknown  an unrecognized global option stops the repetition and is left in place (tripwire honesty)
+PASS  NORM no-options  a plain command without global options is unchanged
+PASS  COMBINED pipeline  strip -> lowercase -> normalize matches guard-git.mjs's own composition order
+PASS  TOKENIZE double-quote  a double-quoted ref is preserved verbatim, not destroyed
+PASS  TOKENIZE single-quote  a single-quoted ref is preserved verbatim, not destroyed
+PASS  TOKENIZE bare-ref  an unquoted ref is unchanged
+PASS  TOKENIZE option-tokens  option tokens (-C, sub, --force) are present in the returned list unchanged
+PASS  TOKENIZE mixed-whitespace  multiple spaces/tabs between tokens collapse to one split each
+PASS  TOKENIZE interior-quote  a quote pair inside one token collapses to its content (a"b"c -> abc)
+PASS  TOKENIZE ANSI-C quote  Bash $'...' escapes become the argv bytes Git receives
+PASS  GLOB star-crosses-slash  refs/tags/v* matches refs/tags/v1.0.0
+PASS  GLOB star-crosses-slash-2  refs/tags/v* matches refs/tags/v1/beta (* crosses /)
+PASS  GLOB no-cross-type  refs/tags/v* does NOT match refs/heads/v1
+PASS  GLOB case-sensitive  refs/tags/V* does NOT match refs/tags/v1.0.0 (git refs are case-sensitive)
+PASS  GLOB literal-question-mark  a `?` in a pattern is a literal character, not a wildcard
+PASS  GLOB exact-match-only  a wildcard-free pattern matches only itself
+PASS  PUSH-EVIDENCE "git --git-dir=.git --work-tree=. push origin main"  whole-string branch: --git-dir=/--work-tree= global options
+PASS  PUSH-EVIDENCE "git -C repo -C nested push origin main"  whole-string branch: repeated -C overrides
+PASS  PUSH-EVIDENCE "git.exe -C repo push origin main"  directPush branch: git.exe -C <dir> push
+PASS  PUSH-EVIDENCE "sh -c \"git push origin main\""  shellWrapperPush branch: sh -c "git push ..."
+PASS  PUSH-EVIDENCE "bash -c 'git push'"  shellWrapperPush branch: bash -c 'git push'
+PASS  PUSH-EVIDENCE "ssh host \"git push\""  shellWrapperPush branch: ssh host "git push"
+PASS  PUSH-NEGATIVE "git commit -m \"push later\""  a commit message merely mentioning "push" must not trigger
+PASS  PUSH-NEGATIVE "git log --grep=push"  a --grep=push search must not trigger
+PASS  PUSH-EMPTY  an empty command string is not a push (defensive, matches guard-push.mjs's own early exit)
+PASS  PUSHCLASS-REPRO "git push -u origin Rune_Test1_Codex_060_58"
+PASS  PUSHCLASS-REPRO "git -c core.sshCommand=ssh\\ -i\\ <host-path> -o\\ IdentitiesOnly=yes push -u origin branch"
+PASS  PUSHCLASS-REPRO "git -c core.sshCommand='ssh -i <host-path>' push -u origin branch"
+PASS  PUSHCLASS-REPRO "git -C /some/repo push origin HEAD"
+PASS  PUSHCLASS-REPRO "git --git-dir=/some/.git push origin HEAD"
+PASS  PUSHCLASS-REPRO "git --no-pager push origin HEAD"
+PASS  PUSHCLASS-REPRO "git.exe push origin HEAD"
+PASS  PUSHCLASS-REPRO "git -c a=b -c c=d push origin HEAD"
+PASS  PUSHCLASS-REPRO "git --config-env=core.sshCommand=VAR push origin HEAD"
+PASS  PUSHCLASS-REPRO "git status"
+PASS  PUSHCLASS "git -c core.sshCommand=ssh\\ -i\\ <host-path> -o\\ IdentitiesOnly=yes push -u origin branch"  backslash-escaped whitespace inside a -c value is consumed as one shell word, not several
+PASS  PUSHCLASS "git --config-env=core.sshCommand=VAR push origin HEAD"  --config-env is an unrecognized global option before the subcommand: fail-closed
+PASS  PUSHCLASS "git -c a=b -c 'c=d' -c \"e=f\" push origin main"  repeated -c options with mixed quoting styles (bare/single/double) all collapse away
+PASS  PUSHCLASS "git --totally-unknown-flag status"  an unknown option before the subcommand fails closed even though the real subcommand (status) is not a push -- the intended over-approximation
+PASS  PUSHCLASS "git -c core.sshCommand=\"unterminated status"  an unterminated double quote is an unparseable quoting state: fail-closed
+PASS  PUSHCLASS "git -c core.sshCommand='unterminated status"  an unterminated single quote is an unparseable quoting state: fail-closed
+PASS  PUSHCLASS-NEGATIVE "git status"  a plain read command with no pre-subcommand option stays not-a-push
+PASS  PUSHCLASS-NEGATIVE "git log"  a plain read command with no pre-subcommand option stays not-a-push
+PASS  PUSHCLASS-NEGATIVE "git diff"  a plain read command with no pre-subcommand option stays not-a-push
+PASS  PUSHCLASS-NEGATIVE "npm run build"  a non-git command stays not-a-push
+PASS  PUSHCLASS-NEGATIVE "echo hello"  a non-git command stays not-a-push
+PASS  PUSHCLASS-NEGATIVE "echo \"it's fine\""  a non-git command with a legitimately nested quote stays not-a-push (no false unterminated-quote trip)
+PASS  PUSHCLASS-NEGATIVE nested-quote  a single quote nested inside a balanced double-quoted message is not an unterminated quote
+PASS  GPGL2-NOT-GIT "gitleaks detect --no-git --redact"  the observed trigger: `git` inside --no-git is an option, not an executable
+PASS  GPGL2-NOT-GIT "tool --no-git -v --source ."  --no-git followed by a verbose flag and a source path
+PASS  GPGL2-NOT-GIT "tool --git-dir=x --redact"  --git-dir=x is an option of another tool, not a git invocation
+PASS  GPGL2-NOT-GIT "tool --exclude=git --flag"  a `git` after `=` is a value, not an executable
+PASS  GPGL2-NOT-GIT "echo origin.git --flag"  a `git` after `.` is a name suffix, not an executable
+PASS  GPGL2-NOT-GIT "xgit push origin main"  a `git` after a word character is part of a longer word
+PASS  GPGL2-NOT-GIT "xgit --unknown-opt status"  a longer word ending in git followed by an option is not git
+PASS  GPGL2-GIT-WORD "/usr/bin/git push origin main"  an absolute POSIX path ending in git
+PASS  GPGL2-GIT-WORD "<host-path> push origin main"  a Windows path ending in git.exe
+PASS  GPGL2-GIT-WORD "\"git\" push origin main"  a quoted executable name
+PASS  GPGL2-GIT-WORD "a;git push origin main"  after a `;` operator
+PASS  GPGL2-GIT-WORD "$(git push origin main)"  inside a command substitution
+PASS  GPGL2-GIT-WORD "/usr/bin/git --unknown-opt status"  check #2 after a POSIX path separator (unknown option, no push word)
+PASS  GPGL2-GIT-WORD "<host-path> --unknown-opt status"  check #2 after a Windows path separator and git.exe
+PASS  GPGL2-GIT-WORD "a;git --unknown-opt status"  check #2 after `;`
+PASS  GPGL2-GIT-WORD "a&&git --unknown-opt status"  check #2 after `&&`
+PASS  GPGL2-GIT-WORD "a|git --unknown-opt status"  check #2 after `|`
+PASS  GPGL2-GIT-WORD "$(git --unknown-opt status)"  check #2 inside `$(`
+PASS  GPGL2-GIT-WORD "(git --unknown-opt status)"  check #2 inside a subshell parenthesis
+PASS  GPGL2-GIT-WORD "echo `git --unknown-opt status`"  check #2 inside a backtick substitution
+PASS  GPGL2-GIT-WORD "a git --unknown-opt status"  check #2 after whitespace
+PASS  GPGL2-GIT-WORD "git --unknown-opt status"  check #2 at the start of the command
+PASS  GPGL2-GIT-WORD "FOO=bar git --unknown-opt status"  check #2 after a leading NAME=value assignment
+PASS  GPGL2-GIT-WORD "gitleaks git --redact"  fail-closed: a whitespace-separated literal git argument is indistinguishable from the executable
+PASS  GPGL2-GIT-WORD "gitleaks git --redact --log-opts \"origin/main..HEAD --not push\""  fail-closed: the same literal git word with a quoted argument
+PASS  GPGL3-FAIL-CLOSED "echo \\'; git push origin main; echo \\'"  the minimal shape: escaped single quotes fake a quoted span around a real push
+PASS  GPGL3-FAIL-CLOSED "gitleaks detect --no-git --x \\'; git push origin HEAD:refs/heads/feat/x; echo \\'"  the GL-B13 shape: the same fake span behind a gitleaks call
+PASS  GPGL3-FAIL-CLOSED "echo \\\"; git push; echo \\\""  escaped double quotes fake the span just the same
+PASS  GPGL3-FAIL-CLOSED "echo \"a \\\" b\" ; git push origin main ; echo \"c \\\" d\""  an escaped quote INSIDE a double-quoted span desynchronises the quote stripper the same way
+PASS  GPGL3-FAIL-CLOSED "echo $'it\\'s' ; git push origin main ; echo $'a\\'b'"  an escaped quote inside an ANSI-C $'...' string (the quote count stays even, so the unterminated-quote check cannot catch it)
+PASS  GPGL3-FAIL-CLOSED "echo \\'; git  PUSH origin main; echo \\'"  uppercase push word and a double space still classify as a push
+PASS  GPGL3-FAIL-CLOSED "\"git\" --unknown-opt push origin main"  quoted executable name, unknown option, then push
+PASS  GPGL3-FAIL-CLOSED "'git' -c core.sshCommand=x push origin main"  single-quoted executable name, a recognised -c option, then push
+PASS  GPGL3-FAIL-CLOSED "\"/usr/bin/git\" -c a=b push origin main"  quoted POSIX path ending in git, then push
+PASS  GPGL3-FAIL-CLOSED "\"<host-path> Tools\\cmd\\git.exe\" -c a=b push origin main"  quoted Windows path ending in git.exe, then push
+PASS  GPGL3-FAIL-CLOSED "\"GIT.EXE\" --unknown-opt push origin main"  the quoted executable name is matched case-insensitively
+PASS  GPGL3-FAIL-CLOSED "echo x;\"git\" -c a=b push origin main"  quoted executable name glued to a preceding shell operator
+PASS  GPGL3-FAIL-CLOSED "\"git\" -c a=b \"push\" origin main"  the push word itself quoted
+PASS  GPGL3-FAIL-CLOSED "git log --grep='a\\'"  decision S: a backslash before the closing quote of a single-quoted argument, with a git word: a push candidate
+PASS  GPGL3-FAIL-CLOSED "git commit -m \"say \\\"hi\\\"\""  decision S: an escaped quote in a double-quoted commit message, no push word: a push candidate
+PASS  GPGL3-FAIL-CLOSED "git log --grep \"a \\\"b\\\"\""  decision S: an escaped quote in a double-quoted grep pattern, no push word: a push candidate
+PASS  GPGL3-FAIL-CLOSED "git tag -m \"x \\\"y\\\"\""  decision S: an escaped quote in a double-quoted tag message, no push word: a push candidate
+PASS  GPGL3-NEGATIVE "echo \\'hello\\'"  escaped quotes with no git word anywhere
+PASS  GPGL3-NEGATIVE "gitleaks detect --no-git --redact"  no git executable (GPGL-2 stays closed)
+PASS  GPGL3-NEGATIVE "git log --format='%s'"  a single-quoted argument with no escape is not a push
+PASS  GPGL3-NEGATIVE "git status"  a plain read command
+PASS  GPGL3-NEGATIVE "echo \\\"hello\\\" gitleaks detect --no-banner"  escaped quotes plus a word that merely STARTS with git: no executable boundary
+PASS  GPGL3-NEGATIVE "\"git\" status"  a quoted executable name with no push word
+PASS  GPGL3-NEGATIVE "\"git\" -c a=b status"  a quoted executable name, a recognised option, no push word
+PASS  GPGL3-NEGATIVE "\"git\" commit -m \"push later\""  a push word that only occurs inside one quoted message token
+PASS  GPGL3-NEGATIVE "\"<host-path> Tools\\cmd\\git.exe\" log --oneline"  a quoted Windows path ending in git.exe, no push word
+PASS  GPGL3-NEGATIVE "git log -- \"<host-path>""  a Windows path ending in a backslash before the closing quote, no push word
+PASS  GPGL5-STRIP escaped quotes inside a double-quoted span stay inside it
+PASS  GPGL5-STRIP an escaped quote outside quotes is a literal, never a delimiter (the text stays visible)
+PASS  GPGL5-STRIP an escaped quote inside an ANSI-C string does not end it
+PASS  GPGL5-TOKENIZE escaped quotes inside double quotes become literal characters of one token
+PASS  GPGL5-TOKENIZE an escaped quote outside quotes is a literal character, not a span opener
+PASS  GPGL5-TOKENIZE (re-specified by GPGL-6) an unquoted backslash before an ordinary character stays literal while adjacent quoted parts still concatenate
+PASS  GPGL6-TOKENIZE an unquoted native Windows path after -C survives with every backslash intact
+PASS  GPGL6-TOKENIZE a double-quoted span keeps POSIX rules: \" is a literal quote, a backslash before an ordinary character stays literal
+PASS  GPGL6-TOKENIZE POSIX quoting is unchanged: \" inside double quotes is one literal quote, inside single quotes both characters stay
+PASS  GPGL5-TOKENIZE a backslash before an ordinary character stays literal inside double quotes and single quotes
+PASS  GPGL5-FAIL-CLOSED "echo \\'; git pu\"sh\" origin main; echo \\'"  F1 attack: escaped quotes outside quotes, push word split by interior quotes
+PASS  GPGL5-FAIL-CLOSED "echo \\'; \"git\" pu\"sh\" origin main; echo \\'"  F1 attack variant: the executable name is quoted as well
+PASS  GPGL5-FAIL-CLOSED "git pu\"sh\" origin main"  push word split by interior double quotes
+PASS  GPGL5-FAIL-CLOSED "git 'push' origin main"  push word wrapped in single quotes
+PASS  GPGL5-FAIL-CLOSED "g\"it\" push origin main"  git word split by interior quotes
+PASS  GPGL5-FAIL-CLOSED "git p\\ush origin main"  a backslash inside the push word
+PASS  GPGL5-FAIL-CLOSED "echo hi; git pu\"sh\" origin main"  split push word behind another command
+PASS  GPGL5-FAIL-CLOSED "echo hi; g\"it\" push origin main"  split git word behind another command
+PASS  GPGL5-FAIL-CLOSED "git p''ush origin main"  an empty quote pair inside the push word
+PASS  GPGL5-FAIL-CLOSED "echo hi; git p''ush origin main"  an empty quote pair inside the push word behind another command
+PASS  GPGL5-FAIL-CLOSED "git $'pu\\163h' origin main"  an ANSI-C octal escape spells the push word
+PASS  GPGL5-FAIL-CLOSED "git \\\npush origin main"  a backslash-newline continuation between git and push
+PASS  GPGL5-FAIL-CLOSED "git pu\\\nsh origin main"  a backslash-newline continuation inside the push word
+PASS  GPGL5-FAIL-CLOSED "echo \\'; g\"it\" pu\"sh\" origin main; echo \\'"  both words split behind an escaped-quote span
+PASS  GPGL5-FAIL-CLOSED "echo \\'; git status; echo \\'"  backstop: an escaped quote outside quotes plus a git word needs no push word (GPGL-3 rule)
+PASS  GPGL5-FAIL-CLOSED "echo \"a \\\\\" ; git push origin main ; echo \"b \\\\\""  an escaped backslash does not escape the closing quote, so the push after it is executed
+PASS  GPGL5-FAIL-CLOSED "git status \\"  a trailing lone backslash cannot be parsed with certainty: fail closed
+PASS  GPGL5-FAIL-CLOSED "git commit -m \"say \\\"hi\\\"\""  decision S: an escaped quote inside a double-quoted message is a push candidate
+PASS  GPGL5-FAIL-CLOSED "git commit -m \"say \\\"push\\\"\""  decision S: the same, with a push word inside the message: a push candidate
+PASS  GPGL5-FAIL-CLOSED "git log --grep \"a \\\"push\\\" word\""  decision S: push inside an escaped-quote span of a non-push subcommand argument: a push candidate
+PASS  GPGL5-NEGATIVE "gitleaks detect --no-git --redact"  the GPGL-2 trigger stays fixed
+PASS  GPGL5-NEGATIVE "echo \"git push\""  quoted text that is not executed
+PASS  GPGL5-NEGATIVE "git commit -m 'say \"hi\" push'"  double quotes inside a single-quoted message
+PASS  GPGL5-NEGATIVE "git log --format=\"%h %s\" -n 3"  an ordinary double-quoted argument
+PASS  GPGL6-CLASSIFIER "git -C <host-path> push origin main"  a native Windows -C path classifies as a push
+PASS  GPGL6-CLASSIFIER "git -C <host-path> status"  the same path with a read-only subcommand is not a push
+PASS  GPGL6-CLASSIFIER "git p\\ush origin main"  POSIX reading of an escaped push word still classifies, although tokenizeArgv keeps it literal
+PASS  GPGL6-CLASSIFIER "git -C <host-path> p\\ush origin main"  a Windows path and an escaped push word together
+PASS  GPGL6-CLASSIFIER "echo \\'; git pu\"sh\" origin main; echo \\'"  the Critic F1 attack stays closed
+PASS  GPGL6-SPLIT the exported tokenizer reads `p\ush` literally while the classifier still fails closed on it
+PASS  GPGL7-POWERSHELL-PUSH "git -C <host-path> push origin main"  F1 (a): a drive path ending in a backslash and a space; PowerShell reads the space as a separator
+PASS  GPGL7-POWERSHELL-PUSH "echo \"x\\\"; git push origin main; echo \\\"y\""  F1 (b): `"x\"` closes the span in PowerShell, so the push after it is executed
+PASS  GPGL7-POWERSHELL-PUSH "git -C '<host-path>' push origin main"  the drive path quoted in single quotes (backslash literal in every shell), then push
+PASS  GPGL7-POWERSHELL-PUSH "echo \"a\\\"; git push origin HEAD:refs/heads/feat/x; echo \\\"b\""  the escaped-quote shape again, the middle segment a push with a remote and a refspec
+PASS  GPGL7-POWERSHELL-PUSH "git -c a=b -C <host-path> push origin main"  a recognised -c option before the drive path: the `\<space>` token must not swallow the push word
+PASS  GPGL7-POWERSHELL-PUSH "git -C <host-path> -C <host-path> push origin main"  repeated -C drive paths, each ending in a backslash and a space
+PASS  GPGL7-POWERSHELL-PUSH "& git -C <host-path> push origin main"  PowerShell call operator in front of git, then a drive path ending in a backslash
+PASS  GPGL7-POWERSHELL-PUSH "cd <host-path> ; git -C <host-path> push origin main"  a drive path ending in a backslash on a preceding command, then the push
+PASS  GPGL7-POWERSHELL-PUSH "echo \"x\\\"; git -c a=b -C <host-path> push origin main; echo \\\"y\""  the span-closing shape and the swallowing path together
+PASS  GPGL7-POWERSHELL-PUSH "echo \"x\\\"; git push --force origin main; echo \\\"y\""  the span-closing shape around a force push with a flag
+PASS  GPGL7-POWERSHELL-PUSH "echo \"x\\\"; git status; echo \\\"y\""  decision S: the span-closing shape around a read-only git command: a push candidate
+PASS  GPGL7-POWERSHELL-PUSH "git log --grep \"a \\\"push\\\" word\""  decision S: the GPGL-5 escaped-quote grep shape is a push candidate under the third reading too
+PASS  GPGL7-NEGATIVE "git -C <host-path> status"  a drive path ending in a backslash and a space, read-only subcommand
+PASS  GPGL7-NEGATIVE "git -c a=b -C <host-path> status"  a recognised -c option, a drive path ending in a backslash, read-only subcommand
+PASS  GPGL7-NEGATIVE "git -C '<host-path>' log --oneline"  the single-quoted drive path with a read-only subcommand
+PASS  GPGL7-NEGATIVE "git commit -m \"see <host-path> for details\""  a drive path with a backslash and a space inside a double-quoted message
+PASS  GPGL7-NEGATIVE "echo \"<host-path> push\""  a drive path and the word push inside one double-quoted argument, no git word
+PASS  GPGL8-FAIL-CLOSED "git $(echo push) origin main"  (a) command substitution spells the push word
+PASS  GPGL8-FAIL-CLOSED "git $(printf push) origin main"  (a) a different substituting command
+PASS  GPGL8-FAIL-CLOSED "echo hi; git $(echo push) origin HEAD:refs/heads/feat/x"  (a) behind another command, with a remote and a refspec
+PASS  GPGL8-FAIL-CLOSED "git -C repo $(echo push) origin main"  (a) after a recognised -C option
+PASS  GPGL8-FAIL-CLOSED "git `echo push` origin main"  (b) backtick substitution spells the push word
+PASS  GPGL8-FAIL-CLOSED "git `printf push` --force origin main"  (b) a different substituting command, with a flag
+PASS  GPGL8-FAIL-CLOSED "echo hi; git `echo push` origin main"  (b) behind another command
+PASS  GPGL8-FAIL-CLOSED "git ${X:-push} origin main"  (c) a default-value expansion spells the push word
+PASS  GPGL8-FAIL-CLOSED "P=push; git ${P} origin main"  (c) a plain braced expansion of a variable assigned just before
+PASS  GPGL8-FAIL-CLOSED "git ${PUSH_CMD:-push} --force origin main"  (c) a default-value expansion, with a flag
+PASS  GPGL8-FAIL-CLOSED "echo \"$(git push origin main)\""  (d) the push is the whole double-quoted substitution
+PASS  GPGL8-FAIL-CLOSED "git commit -m \"$(git push origin main)\""  (d) a git command whose message argument executes a push
+PASS  GPGL8-FAIL-CLOSED "echo \"result: $(git push --force origin main) done\""  (d) the push sits between prose inside the double-quoted argument
+PASS  GPGL8-FAIL-CLOSED "printf \"%s\" \"$(git -C repo push origin main)\""  (d) a recognised -C option inside the double-quoted substitution
+PASS  GPGL8-FAIL-CLOSED "echo \"x”; git push origin main; echo “y\""  (e) closed by U+201D, then a push statement and a string reopened by U+201C
+PASS  GPGL8-FAIL-CLOSED "echo \"x“; git push origin main; echo ”y\""  (e) closed by U+201C, reopened by U+201D
+PASS  GPGL8-FAIL-CLOSED "git log \"x”; git push --force origin main; echo “y\""  (e) the same behind a git command, the middle statement a force push
+PASS  GPGL8-FAIL-CLOSED "echo “x\"; git push origin main; echo \"y”"  (e) mirror: opened by a typographic quote, closed by the ASCII quote
+PASS  GPGL8-FAIL-CLOSED "echo 'x’; git push origin main; echo ‘y'"  (f) closed by U+2019, then a push statement and a string reopened by U+2018
+PASS  GPGL8-FAIL-CLOSED "echo 'x‘; git push origin main; echo ’y'"  (f) closed by U+2018, reopened by U+2019
+PASS  GPGL8-FAIL-CLOSED "git log 'x’; git push --force origin main; echo ‘y'"  (f) the same behind a git command, the middle statement a force push
+PASS  GPGL8-FAIL-CLOSED "echo ‘x'; git push origin main; echo 'y’"  (f) mirror: opened by a typographic quote, closed by the ASCII quote
+PASS  GPGL8-NEGATIVE "git status"  a read-only git command
+PASS  GPGL8-NEGATIVE "git log --oneline"  a read-only git command with a flag
+PASS  GPGL8-NEGATIVE "git commit -m \"plain message\""  an ordinary double-quoted commit message
+PASS  GPGL8-NEGATIVE "echo “hello”"  a typographic-quoted word with no git word anywhere
+PASS  GPGL8-NEGATIVE "echo $(date)"  a non-git command using command substitution
+PASS  GPGL8-NEGATIVE "echo `date`"  a non-git command using backtick substitution
+PASS  GPGL8-NEGATIVE "echo ${HOME}"  a non-git command using parameter expansion
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\;b $(echo push) origin main"  F1 (a): an escaped `;` in a -c value, then a command substitution spelling the push word
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\|b $(echo push) origin main"  F1 (a): the same with an escaped `|`
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\&b $(echo push) origin main"  F1 (a): the same with an escaped `&`
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\)b $(echo push) origin main"  F1 (a): the same with an escaped `)`
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\;b `echo push` origin main"  F1 (a): an escaped `;`, then a backtick substitution spelling the push word
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\|b `echo push` origin main"  F1 (a): an escaped `|`, then a backtick substitution
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\&b `echo push` origin main"  F1 (a): an escaped `&`, then a backtick substitution
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\)b `echo push` origin main"  F1 (a): an escaped `)`, then a backtick substitution
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\;b ${X:-push} origin main"  F1 (a): an escaped `;`, then a default-value expansion spelling the push word
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\|b ${X:-push} origin main"  F1 (a): an escaped `|`, then a default-value expansion
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\&b ${X:-push} origin main"  F1 (a): an escaped `&`, then a default-value expansion
+PASS  GPGL9-FAIL-CLOSED "git -c x.y=a\\)b ${X:-push} origin main"  F1 (a): an escaped `)`, then a default-value expansion
+PASS  GPGL9-FAIL-CLOSED "echo \\`; git `echo push; true` origin main"  F1 (b): an escaped backtick before git makes the parity odd and the `;` inside the substitution leaves one backtick after git
+PASS  GPGL9-FAIL-CLOSED "echo \\`; git `echo push; true` --force origin main"  F1 (b): the same parity shape with a flag after the substitution
+PASS  GPGL9-FAIL-CLOSED "echo \\`; git `echo push` origin main"  F1 (b): an escaped backtick before git, then a plain backtick substitution spelling the push word
+PASS  GPGL9-FAIL-CLOSED "P=push; git $P origin main"  F2 (c): a bare $NAME expansion of a variable assigned just before
+PASS  GPGL9-FAIL-CLOSED "P=push; git $P --force origin main"  F2 (c): a bare $NAME expansion, with a flag
+PASS  GPGL9-FAIL-CLOSED "P=push; git -C repo $P origin main"  F2 (c): a bare $NAME expansion after a recognised -C option
+PASS  GPGL9-FAIL-CLOSED "set -- push; git $1 origin main"  F2 (c): a positional parameter set by `set --`
+PASS  GPGL9-FAIL-CLOSED "set -- push origin main; git $@"  F2 (c): `$@` expands to the whole push argument list
+PASS  GPGL9-FAIL-CLOSED "$p='push'; git $p origin main"  F2 (d): a PowerShell variable assigned just before spells the push word
+PASS  GPGL9-FAIL-CLOSED "$p = 'push'; git $p origin main"  F2 (d): the same with spaces around the assignment
+PASS  GPGL9-FAIL-CLOSED "$p='push'; git -C repo $p origin main"  F2 (d): a PowerShell variable after a recognised -C option
+PASS  GPGL9-FAIL-CLOSED "$env:SUB='push'; git $env:SUB origin main"  F2 (d): a PowerShell environment-drive variable spells the push word
+PASS  GPGL9-FAIL-CLOSED "git $\"push\" origin main"  F2 (e): bash locale quoting spells the push word
+PASS  GPGL9-FAIL-CLOSED "git $\"push\" --force origin main"  F2 (e): bash locale quoting, with a flag
+PASS  GPGL9-FAIL-CLOSED "git -C repo $\"push\" origin main"  F2 (e): bash locale quoting after a recognised -C option
+PASS  GPGL9-FAIL-CLOSED "git (\"push\") origin main"  F2 (f): PowerShell grouping around a double-quoted push word
+PASS  GPGL9-FAIL-CLOSED "git ('push') origin main"  F2 (f): PowerShell grouping around a single-quoted push word
+PASS  GPGL9-FAIL-CLOSED "git (\"push\") --force origin main"  F2 (f): PowerShell grouping, with a flag
+PASS  GPGL9-FAIL-CLOSED "git -C repo (\"push\") origin main"  F2 (f): PowerShell grouping after a recognised -C option
+PASS  GPGL9-FAIL-CLOSED "cat <<EOF\n$(git push origin main)\nEOF"  F3 (g): an unquoted-delimiter here-document whose body line is a command substitution running a push
+PASS  GPGL9-FAIL-CLOSED "cat <<EOF\n$(git push origin main)\nEOF\n"  F3 (g): the same with a trailing newline after the delimiter
+PASS  GPGL9-FAIL-CLOSED "cat <<EOF\nsome prose\n$(git push --force origin main)\nmore prose\nEOF"  F3 (g): the substitution line sits among prose lines, a force push
+PASS  GPGL9-FAIL-CLOSED "cat <<EOF\n`git push origin main`\nEOF"  F3 (g): a backtick substitution in the unquoted body
+PASS  GPGL9-FAIL-CLOSED "cat <<-EOF\n$(git push origin main)\nEOF"  F3 (g): the tab-stripping <<- form of the unquoted delimiter
+PASS  GPGL9-FAIL-CLOSED "cat > notes.txt <<EOF\n$(git push origin main)\nEOF"  F3 (g): the here-document feeds a redirected cat
+PASS  GPGL9T2-BRACE-EXPANSION "git {push,origin} main"  brace list yields the push word and the remote; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {push,origin,main}"  one brace list yields push, remote and ref; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {push,--force} origin main"  brace list yields the push word and a flag; bash runs: git push --force origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {push,origin} {main,dev}"  two brace lists, the first yields push and the remote; bash runs: git push origin main dev
+PASS  GPGL9T2-BRACE-EXPANSION "git {push,-u,origin,main}"  one brace list yields push, a flag, remote and ref; bash runs: git push -u origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {p..p}ush origin main"  sequence group at the start of the push word; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git pu{s..s}h origin main"  sequence group in the middle of the push word; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git pus{h..h} origin main"  sequence group at the end of the push word; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git pu{sh,sh} origin main"  comma list in the middle of the push word doubles the tail; bash runs: git push push origin main (the push subcommand, remote named push)
+PASS  GPGL9T2-BRACE-EXPANSION "git push{,} origin main"  ALREADY CAUGHT: the push word is literal, only a brace group trails it; bash runs: git push push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "{git,push,origin,main}"  the whole command is one brace list, git included; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "{git,push} origin main"  a brace list yields git and the push word; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "g{i..i}t push origin main"  sequence group in the middle of the git word, push literal; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "{git,-C,repo,push} origin main"  brace list yields git, -C, its directory and the push word; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "echo ok; git {push,origin} main"  after a semicolon; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "cd repo && git {push,origin} main"  after an AND-list operator; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "false || git {push,origin} main"  after an OR-list operator; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git status\ngit {push,origin} main"  on the line after a newline; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "(git {push,origin} main)"  inside a subshell group; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "true & git {push,origin} main"  after a lone background operator; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git -C repo {push,origin} main"  after a recognised -C option; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git -C {repo,push} origin main"  brace list yields the -C directory and the push word; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {-C,repo,push,origin,main}"  one brace list yields -C, its directory, push, remote and ref; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "cd x; git -C repo {push,origin} main"  after a semicolon and behind -C; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git --no-pager {push,origin} main"  after a recognised flag option; bash runs: git --no-pager push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git -c color.ui=never {push,origin} main"  after a recognised -c option; bash runs: git -c color.ui=never push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git {-C,repo} push origin main"  brace list yields -C and its directory, push word literal; bash runs: git -C repo push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "bash -c 'git {push,origin} main'"  inside a bash -c string, which the inner bash brace-expands; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "GIT_TERMINAL_PROMPT=0 git {push,origin} main"  behind a NAME=value assignment; bash runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "env GIT_TERMINAL_PROMPT=0 git {push,origin} main"  behind env and a NAME=value assignment; env runs: git push origin main
+PASS  GPGL9T2-BRACE-EXPANSION "git.exe {push,origin} main"  git.exe as the executable name; bash runs: git.exe push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c 'git {push,origin} main'"  zsh -c brace-expands the single-quoted string; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c \"git {push,origin,main}\""  zsh -c with a double-quoted string holding no substitution; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c 'git -C repo {push,origin} main'"  zsh -c, brace list behind -C <dir>; zsh runs: git -C repo push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c '{git,push,origin,main}'"  zsh -c, the whole inner command is one brace list, git included; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c 'echo ok; git {push,origin} main'"  zsh -c, brace list after an inner semicolon; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh.exe -c 'git {push,origin} main'"  zsh.exe spelling, the wrapper regex admits an optional .exe; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "/bin/zsh -c 'git {push,origin} main'"  path-qualified zsh, the executable name is the last path segment; zsh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "zsh -c 'git push{,} origin main'"  ALREADY CAUGHT: the push word is literal inside the wrapper string, only a brace group trails it; zsh runs: git push push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "sh -c 'git {push,origin} main'"  sh -c brace-expands where sh is bash; sh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "sh -c \"git {push,--force} origin main\""  sh -c with a double-quoted string, brace list yields push and a flag; sh runs: git push --force origin main
+PASS  GPGL9T3-BRACE-WRAPPER "sh -c '{git,-C,repo,push} origin main'"  sh -c, brace list yields git, -C, its directory and the push word; sh runs: git -C repo push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "sh -c 'cd repo && git {push,origin} main'"  sh -c, brace list after an inner AND-list operator; sh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "sh.exe -c 'git {push,origin} main'"  sh.exe spelling, the wrapper regex admits an optional .exe; sh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "/bin/sh -c 'git {push,origin} main'"  path-qualified sh, the executable name is the last path segment; sh runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "bash.exe -c 'git {push,origin} main'"  bash.exe spelling, the wrapper regex admits an optional .exe; bash runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "/usr/bin/bash -c 'git {push,origin} main'"  path-qualified bash, the executable name is the last path segment; bash runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "bash -lc 'git {push,origin} main'"  bash with the combined -lc flag word; bash runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "bash -c \"git {push,origin} main\""  bash -c with a double-quoted string holding no substitution; bash runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh host \"git {push,origin} main\""  ssh with a double-quoted remote command, expanded by the remote login shell; the remote shell runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh user@host 'git {push,origin} main'"  ssh user@host with a single-quoted remote command; the remote shell runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh host 'cd repo && git {push,origin} main'"  ssh with a remote AND-list; the remote shell runs: cd repo && git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh -p 2222 host \"git {push,origin} main\""  ssh with an option before the host; the remote shell runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh.exe host \"git {push,origin} main\""  ssh.exe spelling, the wrapper regex admits an optional .exe; the remote shell runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh host git {push,origin} main"  ssh with an UNQUOTED remote command: the LOCAL shell brace-expands, ssh then sends: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "ssh host \"git push{,} origin main\""  ALREADY CAUGHT: the push word is literal inside the wrapper string, only a brace group trails it; the remote shell runs: git push push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "env GIT_TERMINAL_PROMPT=0 zsh -c 'git {push,origin} main'"  behind env and a NAME=value assignment; env runs zsh, which runs: git push origin main
+PASS  GPGL9T3-BRACE-WRAPPER "GIT_TERMINAL_PROMPT=0 sh -c 'git {push,origin} main'"  behind a NAME=value assignment; sh runs: git push origin main
+PASS  Q12J-PATH-NOT-MARKER "git grep -n status -- <host-path>"  a drive path after a pathspec separator; the backslashes only separate segments
+PASS  Q12J-PATH-NOT-MARKER "git -C <host-path> status"  a drive path as the -C directory, read-only subcommand after it
+PASS  Q12J-PATH-NOT-MARKER "git log --oneline -- plugins\\pipeline-core\\lib\\git-cmd.mjs"  a relative path with backslash separators after a pathspec separator
+PASS  Q12J-PATH-NOT-MARKER "git show HEAD:plugins/x.mjs"  no backslash at all: a plain revision:path argument stays out of the gate
+PASS  Q12J-PATH-NOT-MARKER "git diff --stat -- \"<host-path> b\\c.mjs\""  a double-quoted drive path holding a space; the backslashes only separate segments
+PASS  Q12J-BACKSLASH-MARKER "git pu\\sh origin main"  a backslash escaping a letter inside the push word spells push in a POSIX shell
+PASS  Q12J-BACKSLASH-MARKER "git push\\ origin"  a backslash-escaped space right after the push word
+PASS  Q12J-BACKSLASH-MARKER "git \"pu\"\\sh"  a quoted fragment followed by a backslash-escaped letter splices the push word
+PASS  Q12J-BACKSLASH-MARKER "git \\push"  a backslash escaping the first letter of the push word
+PASS  Q12J-BACKSLASH-MARKER "git \\\"push\\\" origin"  backslash-escaped quote characters around the push word
+PASS  Q12J-BACKSLASH-MARKER "git \\\npush"  a line continuation joins the push word to the git word
+PASS  Q12J-BACKSLASH-MARKER "git -C <host-path> pu\\sh"  a drive path is present, but a backslash elsewhere escapes a letter of the push word
+PASS  Q12-PLAIN "git status"  a plain read-only command
+PASS  Q12-PLAIN "git commit -m 'fix: x' -- a.mjs"  a plain commit with a single-quoted message and a pathspec
+PASS  Q12-PLAIN "git add -- a.mjs b.mjs"  a plain add with a pathspec separator and two paths
+PASS  Q12-PLAIN "git log --oneline -5"  a plain log with flags
+PASS  Q12-ACCEPTED-FP "git commit -m \"$(date)\""  ACCEPTED false positive: command substitution inside a double-quoted commit message
+PASS  Q12-ACCEPTED-FP "git diff $(git merge-base HEAD main)"  ACCEPTED false positive: command substitution as a revision argument
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "git commit -q -F - <<EOF\nfix: a raw git push cannot consume it\nEOF"  the exact text of PG-HD1: a commit message here-document whose body mentions the push phrase
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "git commit -q -F - <<EOF\nfix: explain why a push is refused\nEOF"  an unquoted delimiter, the body line mentions push
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "git commit -q -F - <<'EOF'\nfix: explain why a push is refused\nEOF"  a single-quoted delimiter (no expansion in the body), the body line mentions push
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "git commit -q -F - <<-EOF\n\tfix: explain why a push is refused\n\tEOF"  the tab-stripping <<- form with a tab-indented body and terminator
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "cat <<EOF > notes.txt\ngit push origin main\nEOF"  cat is not a shell: the body, even a full push phrase, is written to a file and never run
+PASS  Q12-X: DATA-HEREDOC-NOT-CANDIDATE "git commit -q -F - <<<\"fix: push docs\""  a here-string feeding git commit: data, not a command
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "bash <<EOF\ngit push origin main\nEOF"  bash runs the here-document body
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "sh <<'EOF'\ngit push origin main\nEOF"  sh with a single-quoted delimiter: the shell still runs the body
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "node <<EOF\n// git push origin main\nEOF"  node runs the here-document body as a program
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "pwsh <<EOF\ngit push origin main\nEOF"  pwsh runs the here-document body
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "bash <<<\"git push\""  a here-string fed to bash: the string is the command line it runs
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "ssh host <<EOF\ngit push\nEOF"  ssh sends the here-document body to a remote shell
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "cat <<EOF | sh\ngit push\nEOF"  cat only forwards the body; the shell after the pipe runs it
+PASS  Q12-X: SHELL-RECEIVER-CANDIDATE "python3 - <<EOF\n# git push origin main\nEOF"  python3 reads its program from the here-document
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "zsh <<EOF\ngit push origin main\nEOF"  zsh
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "ksh <<EOF\ngit push origin main\nEOF"  ksh
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "dash <<EOF\ngit push origin main\nEOF"  dash
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "ash <<EOF\ngit push origin main\nEOF"  ash
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "fish <<EOF\ngit push origin main\nEOF"  fish
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "csh <<EOF\ngit push origin main\nEOF"  csh
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "tcsh <<EOF\ngit push origin main\nEOF"  tcsh
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "powershell <<EOF\ngit push origin main\nEOF"  powershell
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "cmd <<EOF\ngit push origin main\nEOF"  cmd
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "eval <<EOF\ngit push origin main\nEOF"  eval
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "perl <<EOF\n# git push origin main\nEOF"  perl
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "ruby <<EOF\n# git push origin main\nEOF"  ruby
+PASS  Q12-X: NAMED-RECEIVER-CANDIDATE "python <<EOF\n# git push origin main\nEOF"  python (python3 is pinned above)
+PASS  Q12-X: OTHER-MARKER-STAYS-CANDIDATE "git -C \"$(git rev-parse --show-toplevel)\" commit -q -F - <<EOF\nfix: docs\nEOF"  a data here-document whose command line carries a $( ) command substitution outside the body
+PASS  Q12-X: OTHER-MARKER-STAYS-CANDIDATE "git -C `git rev-parse --show-toplevel` commit -q -F - <<EOF\nfix: docs\nEOF"  a data here-document whose command line carries a backtick substitution outside the body
+PASS  Q12-X: OTHER-MARKER-STAYS-CANDIDATE "git commit -q -F - <<EOF\nfix: docs\nEOF\necho \"$(git rev-parse HEAD)\""  a data here-document followed, after its terminator, by a command with a $( ) substitution
+PASS  Q12-X: PUSH-NEXT-TO-HEREDOC-CANDIDATE "git commit -q -F - <<EOF\nmsg\nEOF\ngit push origin main"  a real push on the line after the terminator
+PASS  Q12-X: PUSH-NEXT-TO-HEREDOC-CANDIDATE "git commit -q -F - <<EOF\nmsg\nEOF\n && git push origin main"  a real push chained after the terminator
+PASS  Q12-X: PUSH-NEXT-TO-HEREDOC-CANDIDATE "git push origin main <<EOF\nnote\nEOF"  the push itself carries a data here-document
+PASS  Q12-C: F1-QUOTED-GIT-WORD-EXPANSION-CANDIDATE "g\"i\"t $(echo push) origin main"  bash removes the quotes so the command word is git; the $( ) substitution then yields the word push
+PASS  Q12-C: F1-QUOTED-GIT-WORD-EXPANSION-CANDIDATE "g\"i\"t `echo push` origin main"  bash removes the quotes so the command word is git; the backtick substitution then yields the word push
+PASS  Q12-C: F1-QUOTED-GIT-WORD-EXPANSION-CANDIDATE "g\"i\"t ${X:-push} origin main"  bash removes the quotes so the command word is git; the parameter expansion falls back to the word push
+PASS  Q12-C: F1-QUOTED-GIT-WORD-EXPANSION-CANDIDATE "g''it $(echo push) origin main"  an empty quote pair inside the word is removed by bash, so the command word is git; the substitution yields push
+PASS  Q12-C: F2-BRACE-QUOTED-ALTERNATIVE-CANDIDATE "{g\"i\"t,push} origin main"  brace expansion yields the words g"i"t and push; quote removal turns the first into git
+PASS  Q12-C: F2-BRACE-QUOTED-ALTERNATIVE-CANDIDATE "{g''it,push} origin main"  brace expansion yields the words g''it and push; quote removal turns the first into git
+PASS  Q12-C: F2-BRACE-QUOTED-ALTERNATIVE-CANDIDATE "{\"g\"it,push} origin main"  brace expansion yields the words "g"it and push; quote removal turns the first into git
+PASS  Q12-C: F2-BRACE-QUOTED-ALTERNATIVE-CANDIDATE "{g\\it,push} origin main"  brace expansion yields the words g<backslash>it and push; the backslash escapes a plain letter, so the first word is git
+PASS  Q12-C: F3-PIPELINE-ACROSS-LINE-BREAK-CANDIDATE "cat <<EOF |\ngit push origin main\nEOF\nsh"  cat forwards the body through the line-continued pipe into sh, which runs the body as commands
+PASS  Q12-C: F4-QUOTED-PATH-RECEIVER-CANDIDATE "\"/c/Program Files/git/bin/bash\" <<EOF\ngit push origin main\nEOF"  the double-quoted word is one path naming bash, which runs the here-document body
+PASS  Q12-C: F4-QUOTED-PATH-RECEIVER-CANDIDATE "'/c/Program Files/Git/bin/sh' <<EOF\ngit push origin main\nEOF"  the single-quoted word is one path naming sh, which runs the here-document body
+PASS  Q12-C: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "git commit -F - <<'EOF'\nfix: push docs\nEOF"  git commit reads its message from the here-document: the body is data, a single-quoted delimiter so nothing in it is expanded
+PASS  Q12-C: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "cat <<EOF |\ntr a-z A-Z\nEOF"  cat only forwards the here-document body as data; no shell or interpreter receives it, the only command named after the pipe is tr
+PASS  Q12-AF: ARGV-JOINED-RUNNER-CANDIDATE "xargs git <<EOF\npush origin main\nEOF"  xargs reads the words push origin main from the here-document and runs git push origin main
+PASS  Q12-AF: ARGV-JOINED-RUNNER-CANDIDATE "xargs -n3 git <<EOF\npush origin main\nEOF"  xargs -n3 passes at most three words per run: it runs git push origin main with the three body words
+PASS  Q12-AF: ARGV-JOINED-RUNNER-CANDIDATE "xargs git <<< \"push origin main\""  the here-string supplies the same words on xargs standard input: xargs runs git push origin main
+PASS  Q12-AF: SCHEDULER-CANDIDATE "at now <<EOF\ngit push origin main\nEOF"  at reads the here-document as a job script and runs it with sh at the given time (now): it runs git push origin main
+PASS  Q12-AF: SCHEDULER-CANDIDATE "batch <<EOF\ngit push origin main\nEOF"  batch reads the here-document as a job script and runs it with sh when the load permits: it runs git push origin main
+PASS  Q12-AF: LINE-EDITOR-CANDIDATE "ed -s <<EOF\n!git push origin main\nq\nEOF"  ed reads editor commands from the here-document; the ! command runs git push origin main in a shell, then q quits
+PASS  Q12-AF: LINE-EDITOR-CANDIDATE "ex -s <<EOF\n!git push origin main\nEOF"  ex reads editor commands from the here-document; the ! command runs git push origin main in a shell
+PASS  Q12-AF: SQLITE3-CANDIDATE "sqlite3 <<EOF\n.shell git push origin main\nEOF"  the sqlite3 shell reads dot-commands from the here-document; .shell runs git push origin main
+PASS  Q12-AF: SCRIPT-LANGUAGE-CANDIDATE "php <<EOF\n<?php system(\"git push origin main\");\nEOF"  php reads its program from standard input; system() runs git push origin main
+PASS  Q12-AF: SCRIPT-LANGUAGE-CANDIDATE "lua <<EOF\nos.execute(\"git push origin main\")\nEOF"  lua reads its program from standard input; os.execute runs git push origin main
+PASS  Q12-AF: SCRIPT-LANGUAGE-CANDIDATE "awk -f - <<EOF\nBEGIN { system(\"git push origin main\") }\nEOF"  awk -f - reads the program from standard input; the BEGIN block calls system(), which runs git push origin main
+PASS  Q12-AF: SCRIPT-LANGUAGE-CANDIDATE "awk -f /dev/stdin <<EOF\nBEGIN { system(\"git push origin main\") }\nEOF"  awk -f /dev/stdin reads the program from standard input; the BEGIN block calls system(), which runs git push origin main
+PASS  Q12-AF: INTERPRETER-STDIN-CANDIDATE "perl - <<EOF\nsystem(\"git push origin main\")\nEOF"  perl - reads the program from standard input; system() runs git push origin main
+PASS  Q12-AF: INTERPRETER-STDIN-CANDIDATE "python - <<EOF\nimport os; os.system(\"git push origin main\")\nEOF"  python - reads the program from standard input; os.system runs git push origin main
+PASS  Q12-AF: INTERPRETER-STDIN-CANDIDATE "ruby - <<EOF\n`git push origin main`\nEOF"  ruby - reads the program from standard input; the backtick literal runs git push origin main
+PASS  Q12-AF: INTERPRETER-STDIN-CANDIDATE "node - <<EOF\nrequire(\"child_process\").execSync(\"git push origin main\")\nEOF"  node - reads the program from standard input; execSync runs git push origin main
+PASS  Q12-AF: MARKER-FREE-BODY-CANDIDATE "lua <<EOF\nos.execute \"git push origin main\"\nEOF"  marker-free body: lua reads its program from standard input; os.execute runs git push origin main
+PASS  Q12-AF: MARKER-FREE-BODY-CANDIDATE "perl - <<EOF\nsystem \"git push origin main\"\nEOF"  marker-free body: perl - reads the program from standard input; system runs git push origin main
+PASS  Q12-AF: MARKER-FREE-BODY-CANDIDATE "ruby - <<EOF\nsystem \"git push origin main\"\nEOF"  marker-free body: ruby - reads the program from standard input; system runs git push origin main
+PASS  Q12-AF: MARKER-FREE-BODY-CANDIDATE "perl <<EOF\nsystem \"git push origin main\"\nEOF"  marker-free body: perl with no - and no file argument reads its program from standard input; system runs git push origin main
+PASS  Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "xargs echo <<EOF\nhello\nEOF"  xargs runs echo with the word hello: nothing git-related is run, the body is only an argument
+PASS  Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "sqlite3 db.sqlite <<EOF\nselect 1;\nEOF"  sqlite3 runs the SQL statement select 1; against db.sqlite: plain SQL, no .shell dot-command
+PASS  Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "awk NF <<EOF\ngit push origin main\nEOF"  the awk program NF is on argv; the here-document is only its input data, which awk filters and never runs
+PASS  Q12-AF: CONTROL-DATA-HEREDOC-NOT-CANDIDATE "git commit -F - <<'EOF'\nfix: push docs\nEOF"  git commit reads its message from the here-document: the body is data, a single-quoted delimiter so nothing in it is expanded
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "vim -es <<EOF\n!git push origin main\nEOF"  vim -es runs in ex mode reading commands from the here-document; the ! command runs git push origin main in a shell
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "vi -e <<EOF\n!git push origin main\nEOF"  vi -e runs in ex mode reading commands from the here-document; the ! command runs git push origin main in a shell
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "ex -s <<EOF\n!git push origin main\nEOF"  ex -s reads editor commands from the here-document; the ! command runs git push origin main in a shell
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "vim -E -s <<EOF\n!git push origin main\nEOF"  vim -E -s runs in ex mode silently reading commands from the here-document; the ! command runs git push origin main
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "busybox sh <<EOF\ngit push origin main\nEOF"  busybox sh is the shell applet reading the here-document as commands: it runs git push origin main
+PASS  Q12-VB: VIM-BUSYBOX-CANDIDATE "busybox ash <<'EOF'\ngit push origin main\nEOF"  busybox ash is a shell applet reading the here-document as commands: it runs git push origin main
+PASS  Q12-VB: CONTROL-NOT-CANDIDATE "vim -es <<EOF\n:wq\nEOF"  vim -es reads ex commands from the here-document; :wq only writes and quits, nothing runs git
+PASS  Q12-VB: CONTROL-NOT-CANDIDATE "busybox ls <<EOF\ngit push origin main\nEOF"  busybox ls is not a shell applet: the here-document is only unused standard input, nothing runs git push
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<EOF && git push origin main\nbody\nEOF"  the heredoc only feeds cat; && then runs git push origin main as its own command
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<EOF; git push origin main\nbody\nEOF"  the heredoc only feeds cat; the semicolon then runs git push origin main as its own command
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<'EOF' || git push origin main\nbody\nEOF"  the heredoc only feeds cat; || runs git push origin main as its own command when cat fails
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "git commit -F - <<EOF && git push origin main\nmsg\nEOF"  the heredoc only feeds git commit; && then runs git push origin main as its own command
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<-EOF & git push origin main\n\tbody\n\tEOF"  the tab-stripping heredoc only feeds cat; & backgrounds cat and runs git push origin main as its own command
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<< \"x\" && git push origin main"  the here-string only feeds cat; && then runs git push origin main as its own command
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "git push origin main <<EOF\nbody\nEOF"  the push itself carries the heredoc; git push origin main runs and merely has an unused standard input
+PASS  Q12-HD: PUSH-AFTER-HEREDOC-OPENER "cat <<EOF\nbody\nEOF\ngit push origin main"  the heredoc ends at the terminator; the next line runs git push origin main as its own command
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok && git.exe push origin main"  echo succeeds; && then runs git.exe push origin main as its own command
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok; git.exe push origin main"  the semicolon ends echo; git.exe push origin main then runs as its own command
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "true || git.exe push origin main"  true succeeds so || would skip it, but git.exe push origin main is still a command the shell may run
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok | git.exe push origin main"  each pipeline stage is its own command; git.exe push origin main runs as the second stage with echo output on its standard input
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "cat <<EOF && git.exe push origin main\nbody\nEOF"  the heredoc only feeds cat; && then runs git.exe push origin main as its own command
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok && GIT.EXE push origin main"  on a case-insensitive file system (Windows) GIT.EXE resolves to git.exe; the second command then pushes
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok && \"<host-path> Files/Git/cmd/git.exe\" push origin main"  the double-quoted word is one path naming git.exe; the second command pushes
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok && /usr/bin/git push origin main"  an absolute POSIX path ending in git is the executable of the second command, which pushes
+PASS  Q12-EXE: NON-LEADING-GIT-EXE-PUSH "echo ok && git.exe -C . push origin main"  git.exe with a -C option before the subcommand; the second command still runs push origin main
+PASS  Q12-EXE: NON-GIT-LOOKALIKE "echo ok && xgit.exe push origin main"  xgit.exe is a different program; no git command runs
+PASS  Q12-EXE: NON-GIT-LOOKALIKE "echo ok && git.exe.bak push origin main"  git.exe.bak is a different program; no git command runs
+PASS  Q12-EXE: NON-GIT-LOOKALIKE "echo ok && gitk push origin main"  gitk is a different program; no git command runs
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "cat <<EOF | # c\ngit push origin main\nEOF\nsh"  the heredoc body feeds cat, whose output pipes into sh after the terminator; sh runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "cat <<EOF |\ngit push origin main\nEOF\n# c\nsh"  the pipe continues past the heredoc and the comment line; sh receives the body and runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "cat <<EOF |   # trailing comment\n\ngit push origin main\nEOF\nbash"  a trailing comment after the pipe and a blank line; bash receives the body and runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "xargs git <<EOF | # c\npush origin main\nEOF"  the heredoc body becomes xargs arguments for git, so git push origin main runs; the comment does not change that
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "cat <<EOF\ndon't\nEOF\ng\"i\"t $(echo push) origin main"  the apostrophe is heredoc data; after the terminator g"i"t is git and the substitution yields push
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "cat <<EOF\ndon't\nEOF\n{g\"i\"t,push} origin main"  the apostrophe is heredoc data; after the terminator brace expansion yields git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "# don't\ng\"i\"t $(echo push) origin main"  the first line is a comment, so its apostrophe opens no quote; line two runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "true # don't\ng\"i\"t $(echo push) origin main"  the comment starts at the word-initial # so its apostrophe opens no quote; line two runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "# x\"\ng\"i\"t $(echo push) origin main"  the double quote sits inside a comment and opens no quote; line two runs git push origin main
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "echo \"it's\" # it's\ng''it push origin main"  the apostrophe in the double quotes and in the comment open no quote; g''it is git on line two and pushes
+PASS  Q12-CQ: COMMENTS-AND-QUOTE-CHARS "echo '# don't' && git status"  the quote is unterminated so bash refuses the line and the classifier fails closed
+PASS  Q12-CQ: CONTROL-NOT-CANDIDATE "# git push origin main"  a comment only; no command runs
+PASS  GITCLS-T: "env -S 'git push origin main'" is a push  env -S splits its single-quoted string into a command; git push runs
+PASS  GITCLS-T: "env -S \"git push origin main\"" is a push  env -S splits its double-quoted string into a command; git push runs
+PASS  GITCLS-T: "env -S'git push origin main'" is a push  attached form of env -S; git push runs
+PASS  GITCLS-T: "vim -c '!git push origin main'" is a push  vim -c with an ex bang runs git push through the shell
+PASS  GITCLS-T: "vi -c '!git push origin main'" is a push  vi -c with an ex bang runs git push through the shell
+PASS  GITCLS-T: "nvim -c ':!git push origin main'" is a push  nvim -c with a colon-prefixed ex bang runs git push through the shell
+PASS  GITCLS-T: "vim +'!git push origin main'" is a push  vim +cmd with an ex bang runs git push through the shell
+PASS  GITCLS-T: "env -S 'git status'" is not a push  env -S running git status is not a push
+PASS  GITCLS-T: "vim -c ':wq' notes.txt" is not a push  an ex write-quit command is not a push
+PASS  GITCLS-T2: "env --split-string='git push origin main'" is a push  long attached form of env -S; git push runs
+PASS  GITCLS-T2: "env --split-string 'git push origin main'" is a push  long separate form of env -S; git push runs
+PASS  GITCLS-T2: "env -iS 'git push origin main'" is a push  clustered -iS short flags end in -S; git push runs
+PASS  GITCLS-T2: "view -c '!git push origin main'" is a push  view -c with an ex bang runs git push through the shell
+PASS  GITCLS-T2: "ex -c '!git push origin main'" is a push  ex -c with a bang runs git push through the shell
+PASS  GITCLS-T2: "vim --cmd '!git push origin main'" is a push  vim --cmd with an ex bang runs git push through the shell
+PASS  GITCLS-T2: "vim -c'!git push origin main'" is a push  attached form of vim -c; git push runs
+PASS  GITCLS-T2: "env -S 'git push \"unterminated'" is a push  unparseable env -S payload fails closed
+PASS  GITCLS-T2: "env -Sgit push origin main" is a push  ruling 48: the -S string joins the trailing operands, so git push runs
+PASS  GITCLS-T2: "env --split-string='git status'" is not a push  long env -S form running git status is not a push
+PASS  GITCLS-T2: "view -c ':q'" is not a push  an ex quit command is not a push
+PASS  GITCLS-T2: "env -S 'git log' --oneline" is not a push  env -S git log with a trailing operand is not a push
+
+439/439 cases passed.
+✔ plugins\pipeline-core\lib\git-cmd.test.mjs (55.3308ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60.6542
+
+--- stderr ---

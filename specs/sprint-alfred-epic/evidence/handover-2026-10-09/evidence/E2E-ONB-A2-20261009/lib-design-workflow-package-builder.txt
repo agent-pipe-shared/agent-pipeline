@@ -1,0 +1,20 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs
+label: lib-design-workflow-package-builder
+exitCode: 0
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ DWPB001 builder publishes one canonical v2 package under the tracked specs/<feature-id>/evidence home and refuses overwrite (55820.328866ms)
+✔ DWPB002 builder rejects stale candidate bindings, ignored outputs and unsafe destinations without publishing (27023.510372ms)
+✔ DWPB003 builder retains a canonical no-child Advisor exception as pending PO approval (4429.040671ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 90760.389944
+
+--- stderr ---

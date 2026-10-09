@@ -1,0 +1,45 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "HOOKREFRESH-T8-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "candidateCommit": "8328f56bb437549da2a8f2caededf8219b99f4b8",
+  "commits": ["6bdf4cca6c54f9c085b5635c760804b2d9b4cd02"],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {"phase": "opening: obligations, CONT17 and CONT15 headers read; repo-copy preflight (plugin-refresh-required, advisory) then loaded-root preflight (ready) run; first Write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING until the loaded-root preflight ran", "toolUses": 11},
+    {"phase": "orientation done (bootstrap, store, runtime host, v3-baseline recipe); advisor consulted once before building", "toolUses": 29},
+    {"phase": "built 7 new cases (T8 a, b1, b2, c, d, e, control) in the one test file; native run 8 pass / 5 skipped / 0 fail; WSL run 13 pass / 0 fail", "toolUses": 38},
+    {"phase": "comment-only edit to the b2 case; final native and WSL captures and the consumer-safe check re-run at the final file state, all exit 0", "toolUses": 42},
+    {"phase": "committed 6bdf4cca6 by exact pathspec; record checkpointed; writing the final report", "toolUses": 49}
+  ],
+  "report": {
+    "text": "HOOKREFRESH-T8-20261009 report. Implementation complete; independent review: pending.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (goldfish-deep, no A/G/S justification); observed model identity from the runtime prompt: Sonnet 5.5, exact ID claude-sonnet-5-5 (match). Effort xhigh has no direct same-dispatch evidence, so it is unverified and disclosed. Not a contradiction.\n\n1. DoD results\n- Ruling 84 F2 last bullet / Ruling 113 HR-D1: passed on WSL (POSIX). Seven new cases drive runModelRoleBootstrap with the preflight's readOnly bag against a real temp git repo and the real store, and snapshot the whole temp root and the store dir (path, size, sha256 per file) before/after.\n- New case states, all GREEN on WSL: T8 (a) no prior state (confirmation-required, .git/agent-pipeline never created); T8 (b1) model-family active branch via synthetic activation over the real runtime host (ok=false, MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED, fallbackForbidden); T8 (b2) real activation marker over the real host (ok=false, uncertain: MODEL-FAMILY-STATE-UNCERTAIN natively, MODEL-FAMILY-ACTIVATION-UNCERTAIN on WSL); T8 (c) populated store, changed mapping (confirmation-required); T8 (d) unchanged mapping (admission-pending, store identical); T8 (e) recorded session (REUSED); T8 control (without readOnly the same path writes one new store file, and the snapshot comparison flags it). No case is RED, so the Ruling 113 conditional HOOKREFRESH-F3 is not triggered by this pin.\n- Native: passed, exit 0. 8 pass, 5 skipped, 0 fail (T8 (b1) and (b2) run; the 4 store cases and (a) skip on win32 with a stated reason, because the real store accepts only a POSIX '/'-rooted common dir and answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE natively). Counts read from the native capture taken before a comment-only edit; the final native capture's wrapped exit code is 0 but its counts were not re-read.\n- WSL: passed, exit 0, final capture 13 pass / 0 fail / 0 skipped.\n- Existing six cases: unchanged text, unchanged result (pass on both).\n- Fixtures: absolute, realpath'd mkdtemp roots. Passed.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9.\n- Commit 6bdf4cca6c54f9c085b5635c760804b2d9b4cd02, subject as briefed, exactly the two briefed trailers, git commit -F by exact pathspec: passed.\n\n2. Evidence\n- evidence/HOOKREFRESH-T8-20261009/native.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/HOOKREFRESH-T8-20261009/native.txt --label native -- node --test plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs; wrapped exit 0.\n- evidence/HOOKREFRESH-T8-20261009/wsl.txt: the same via wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; ...\"; exit 0. Capture head differs between runs (parallel commits moved HEAD); dirty: true (foreign dirty files).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0.\n\n3. Changed files\n- plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs: header pointer, extended imports, 7 appended T8 cases plus helpers (+209/-1, the -1 is the replaced import line).\n- Uncommitted by design: evidence/HOOKREFRESH-T8-20261009/{native,wsl}.txt and this record; scratch/commit-msg/HOOKREFRESH-T8-20261009.txt (ignored scratch).\n\n4. Deliberately not changed\n- All production files, other tests, hooks/, lib/guard/, harness/. The six existing cases (their T6 header text is untouched apart from one pointer line). Foreign staged and dirty files were not touched.\n- Not written as backlog: the Windows fact that the real model-role store is unreachable natively (commonDir must start with '/'). A candidate backlog item for the Elephant.\n\n5. Deviations from spec\n- Label (c): with no prior state (a) is already the confirmation-required state, so (c) is built against a POPULATED store (mapping changed via an extra available model id). Extras not briefed: (d) admission-pending, (e) REUSED, and the write-detection control.\n- Only host-facing ports are faked (readApprovedPolicy reports no signed policy so the V3-baseline authority is used, collectObservations makes no probe, routeSource is the registered one). makeStore, readGitState and the family entry/runtime host are production defaults.\n- (b1) uses a synthetic activation status on the real host, because the real host cannot report active without trusted sources (b2 shows it answers uncertain). The active branch ignores readOnly entirely, so its zero-write result is incidental to the unqualified native port, not guaranteed by readOnly.\n- Not exercised: the process-entry wrapper observeModelRoleBootstrapReadback (not exported). This test calls the same function with the same bag; that the wrapper itself passes it stays covered only by the existing source pin (e). A seam to close it: export that wrapper (or accept rootDir/env/runner), a production change outside this slice. No PB-* stop was needed.\n- Process: the first Write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING until the loaded-plugin-root preflight ran (repo-copy preflight said plugin-refresh-required, advisory; loaded root said ready). Advisor consulted once.\n\n6. Open items\n- independent review: pending (Critic mandatory; criticRequired recorded, no criticSkip).\n- resultSha256 left null (not computed by me); dispatch-authorship-verify not run.\n- Tool uses: about 49 of the 60 base cap; no closing-allowance handover (finished within the base cap)."
+    ,
+    "changedFiles": ["plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs"]
+  }
+}

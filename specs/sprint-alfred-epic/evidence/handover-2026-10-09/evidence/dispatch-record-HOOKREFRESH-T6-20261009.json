@@ -1,0 +1,57 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "HOOKREFRESH-T6-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-contract-committed; Critic review and fix dispatch (HOOKREFRESH-F2) pending",
+  "routePrecheck": {
+    "requested": "goldfish-deep / claude-sonnet-5-5 / xhigh",
+    "observed": "runtime prompt: You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5.",
+    "verdict": "match (no A/G/S route line in field 6; disclosed anyway)"
+  },
+  "commits": [
+    { "sha": "02689a69c", "subject": "test(hook-refresh): RED pins for the four HOOKREFRESH Critic findings (Ruling 84)" }
+  ],
+  "evidence": {
+    "capture": "evidence/HOOKREFRESH-T6-20261009/red.txt (untracked, machine-written by capture-evidence.mjs; exit code 1 = the intended RED)",
+    "command": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/HOOKREFRESH-T6-20261009/red.txt --label hookrefresh-t6-red -- node --test --test-reporter=spec <4 touched test files>\"",
+    "totals": { "tests": 42, "pass": 27, "fail": 14, "todo": 1 },
+    "consumerSafe": "node --test harness/scripts/check-consumer-safe-paths.test.mjs -> exit 0 (9/9)"
+  },
+  "log": [
+    { "phase": "orientation", "toolUses": 37, "entry": "read briefing guard headers, Ruling 84, helper, coordinator, tests, model-role bootstrap, preflight seams; ran loaded-root preflight (ready)" },
+    { "phase": "authoring", "toolUses": 43, "entry": "advisor consulted; wrote 3 new test files and re-pointed one T0 case + added F4/F2 cases in the enforcement test" },
+    { "phase": "verify", "toolUses": 47, "entry": "first WSL run: 15 red, one of them a fixture fault of mine (F3 pending case used the F1 shape current+install); fixed with one Edit; second run 14 red, all for the stated reason" },
+    { "phase": "close", "toolUses": 51, "entry": "consumer-safe exit 0; git add by exact pathspec; commit 02689a69c (only the 4 test files); terminal record written" }
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs (new, F1)",
+      "plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs (new, F2)",
+      "plugins/pipeline-core/scripts/refresh-mandatory-hooks.test.mjs (new, F3)",
+      "plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs (modified: T0 case re-pointed, F4 and F2-seam cases added)"
+    ],
+    "red": [
+      "clone-hook-readiness.partial F1(a) assess current+install / refresh+install -> blocked, expected provisioning-required",
+      "clone-hook-readiness.partial F1(c) real repo inspect -> blocked, expected provisioning-required",
+      "clone-hook-readiness.partial F1(d) apply -> refused, expected ready (installs only commit-msg)",
+      "clone-hook-readiness.partial F1(e) mirror apply -> refused, expected ready",
+      "clone-hook-readiness.partial F1(f) rollback-only-own: applyCommitMsg called 0 times, expected 1",
+      "clone-hook-readiness.partial F1(g) real two-hop: hop 1 blocked, expected provisioning-required",
+      "model-role-bootstrap.readonly F2(a) persist called 2 times, expected 1",
+      "model-role-bootstrap.readonly F2(b) result ok true, expected admission-pending",
+      "model-role-bootstrap.readonly F2(e) entry call site lacks readOnly: true (source pin)",
+      "enforcement T0 re-point: status hook-provisioning-blocked, expected hook-provisioning-required",
+      "enforcement F4 x3: confirmation-required (2 codes) and admission-pending fold to unavailable",
+      "enforcement F2 seam: args bag readOnly undefined, expected true"
+    ],
+    "green": [
+      "new controls: F1(b), F1(h) (stale-marker fixture technique proven), F2 precondition, F2(c) REUSED, F2(d) confirmation-required, F4 control",
+      "F3 refresh-mandatory-hooks.test.mjs: all 8 GREEN (existing behaviour, characterization pins)",
+      "13 pre-existing enforcement cases unchanged and green; 1 pre-existing TODO"
+    ]
+  }
+}

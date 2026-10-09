@@ -1,0 +1,31 @@
+{
+  "taskId": "TR-I-S-D2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (TR-I-S slices)",
+  "outcome": "complete",
+  "commits": ["e42f6b7b1"],
+  "changedFiles": ["specs/sprint-alfred-epic/design/security-scan-snapshot-2026-10-09.md"],
+  "log": [
+    { "phase": "preflight, record opened, predecessor record read", "toolUses": 4 },
+    { "phase": "note written; consumer-safe-paths test exit 0 (9/9 pass); commit e42f6b7b1 via -F message file", "toolUses": 14 }
+  ],
+  "report": {
+    "dodResults": {
+      "noteSections0to7WithFileLine": "passed (by authoring; not machine-checked)",
+      "consumerSafePathsTest": "passed, exit 0, 9 of 9",
+      "oneDocsDesignCommit": "passed, e42f6b7b1",
+      "terminalRecord": "passed (this file)"
+    },
+    "evidence": "node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0 (console output, no artifact file)",
+    "deviations": [
+      "Added slice 10 (mitigation for the section 4 residual risk) beyond the record's slice list; TP and kernel status of its targets marked 'to check per target'.",
+      "Commit used -F scratch/commit-msg/TR-I-S-D2.txt (untracked), because the guard refused -m/--trailer forms."
+    ],
+    "openItems": [
+      "Elephant: confirm the worktree-vs-archive weighing noted in section 0.",
+      "Predecessor's superseded copy under specs/sprint-alfred-epic/evidence/ still for the dispatcher to delete.",
+      "Unmeasured items stay open (semgrep/osv without .git, Codex read-only .git, Windows long paths, LFS, round-trip, agy, WSL /mnt/c)."
+    ]
+  }
+}

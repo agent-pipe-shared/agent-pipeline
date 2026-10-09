@@ -1,0 +1,106 @@
+command: node plugins/pipeline-core/lib/dispatch-policy.test.mjs
+label: CRITIC-CKPT-T4-red
+exitCode: 1
+head: 143dab8dee3e219de4b5773e8d5644d9a7e69703
+tree: 90e4e734889be2253c75a20802c33c1f275a0e71
+dirty: true
+--- stdout ---
+✔ DPT01 DP1 the real 2026-08-06 briefing is refused (2.3495ms)
+✔ DPT02 DP2 a references-only Critic dispatch passes (0.7119ms)
+✔ DPT03 DP3 an expectation-conclusion is refused (0.4509ms)
+✔ DPT04 DP4 an implementor characterization is refused (0.327ms)
+✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.4133ms)
+✔ DPT06 DP6 a complete Goldfish briefing passes (0.5721ms)
+✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (0.5565ms)
+✔ DPT08 DP8 a Goldfish dispatch that names no model is refused (0.3544ms)
+✔ DPT09 DP8b every budget-bearing role binds its declared cap before launch (1.8036ms)
+✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (0.7567ms)
+✔ DPT11 DP8d a role without an adopted budget field receives no fabricated budget finding (0.1046ms)
+✔ DPT12 DP9 an unrelated subagent type is untouched (0.0988ms)
+✔ DPT13 DP10 a reworded steer passes -- the check is structural, not semantic (0.2697ms)
+✔ DPT14 DP11 the real critic-review.md template, filled, passes (1.2646ms)
+✔ DPT15 DP12 the real goldfish-task.md template, filled, passes (0.7062ms)
+✔ DPT16 DP13 every shipped role refuses an empty prompt before launch (1.213ms)
+✔ DPT17 DP14 an unknown pipeline role is refused before launch (0.0789ms)
+✔ DPT18 DP15 Workflow requires the plugin prefix for every shipped role (0.8639ms)
+✔ DPT19 DP16 an unrelated host role remains outside the pipeline registry (0.0792ms)
+✔ DPT20 DP17 the common envelope rejects a stale candidate tree before launch (238.1443ms)
+✔ DPT21 DP18 the common envelope rejects an unusable result destination (55.9546ms)
+✔ DPT22 DP18g one malformed packet reports independent static faults before launch (0.7457ms)
+✔ DPT23 DP18h independent role-policy faults are all log-safe and prelaunch (0.6779ms)
+✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (45.7614ms)
+✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (32.1835ms)
+✔ DPT26 DP18b a coordinator-owned result root is validated separately from candidate inputs (151.4784ms)
+✔ DPT27 DP18d explicit file destinations preserve the validated file contract (51.6241ms)
+✔ DPT28 DP18e return and stream destinations require no fabricated result path (100.2643ms)
+✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (1.6989ms)
+✔ DPT30 DP18a required source names are literal paths, never Git pathspecs (32.3174ms)
+✔ DPT31 DP18c a modified tracked source is rejected before launch (54.5443ms)
+✔ DPT32 DP19 every shipped role fails in PREPARE with zero launcher calls (306.9097ms)
+✔ DPT33 DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged (789.3529ms)
+✔ DPT34 DP21 batch execution propagates resultRoot and preserves mixed destinations (339.2187ms)
+✔ DPT35 DP22 legacy and explicit file destinations share one collision namespace (96.3566ms)
+✔ DPT36 DP23 occupied replacement after PREPARE blocks the affected launcher (197.0484ms)
+﹣ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (1.2902ms) # host limitation: symlinkSync was refused with EPERM on this host (no symlink privilege); the symlink-parent replacement case was not run
+✔ DPT38 DP24 required-input drift after PREPARE blocks the affected launcher (203.8808ms)
+✔ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.1676ms)
+✖ DPT40 DP26 the shipped Critic definition carries maxTurns 65 (Ruling 161, was 50) (0.9255ms)
+✖ DPT41 DP27 the default Critic budget binds base 30 under working cap 50 with 30 turns in reserve (Ruling 161, was 30/50/35/15) (0.5104ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 38
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 2719.4657
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ DPT40 DP26 the shipped Critic definition carries maxTurns 65 (Ruling 161, was 50) (0.9255ms)
+  AssertionError [ERR_ASSERTION]: Ruling 161: plugins/pipeline-core/agents/critic.md raises maxTurns to 65
+  
+  50 !== 65
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:728:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 50,
+    expected: 65,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ DPT41 DP27 the default Critic budget binds base 30 under working cap 50 with 30 turns in reserve (Ruling 161, was 30/50/35/15) (0.5104ms)
+  AssertionError [ERR_ASSERTION]: maxTurns read from the shipped definition
+  
+  50 !== 65
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:740:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 50,
+    expected: 65,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'input.txt', LF will be replaced by CRLF the next time Git touches it

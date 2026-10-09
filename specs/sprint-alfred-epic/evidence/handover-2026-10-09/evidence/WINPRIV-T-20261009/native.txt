@@ -1,0 +1,150 @@
+command: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs
+label: native
+exitCode: 1
+head: 77bd8dad894d353db3a991261c56d76d6b69ce57
+tree: 9b9619fd5b2b43bec44808642c4f0535343091fc
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-v4mMiJ
+# win32 witness privacy: 50 diagnostic witness file(s) assessed secure in one DACL batch
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (175.034ms)
+✔ installed pre-commit hook rejects a staged local private pattern before Git commits (11296.7235ms)
+✔ stagedPaths: lists a newly staged file relative to HEAD (2419.5355ms)
+✔ stagedPaths: falls back to the empty-tree comparison before any commit exists (2339.7353ms)
+✔ stagedPaths: nothing staged yields an empty array, not null (2399.5118ms)
+✔ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (2275.983ms)
+✔ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (2575.5265ms)
+✔ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (2609.5456ms)
+✔ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (2853.4393ms)
+✔ installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK (81.3071ms)
+✔ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (13209.46ms)
+✔ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (12883.9144ms)
+✔ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (12801.9741ms)
+✔ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (12496.2993ms)
+✔ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (12052.2473ms)
+✔ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (11262.3606ms)
+✔ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (10858.5937ms)
+✔ installed hook: refuses a late verify rewrite when it also stages lifecycle state (12330.8678ms)
+✔ installed hook: refuses late verify recovery when committed plan approval is stale (11316.1086ms)
+✔ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (11303.3017ms)
+✔ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (11620.1469ms)
+✔ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (10747.1347ms)
+✔ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (11274.0794ms)
+✔ installed hook: admits one complete proof-bound quality package, never a widened index (14794.3916ms)
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (7841.5798ms)
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (7777.896ms)
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (7464.8667ms)
+✔ installed hook: staged NON-protected path is unaffected -> commit succeeds (10637.0145ms)
+✔ installed hook: nothing staged (--allow-empty) -> commit succeeds (9981.738ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (2115.6882ms)
+✖ applyInstall then applyRemoval: removes exactly what was installed (9067.9869ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (7616.2116ms)
+✔ applyRemoval: nothing-to-remove when never installed (2265.5254ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (13037.2515ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.1128ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.0954ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (3088.3373ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (11.7867ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (3157.6863ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (7624.0139ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (8922.9142ms)
+✔ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (2172.02ms)
+✔ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (2241.6496ms)
+✔ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (2303.3816ms)
+✔ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (2403.7569ms)
+✔ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (2388.2467ms)
+✔ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (9993.6447ms)
+✔ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (10372.5637ms)
+✔ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (10024.3256ms)
+✔ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (10830.8573ms)
+✔ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (10257.8684ms)
+✔ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (10227.229ms)
+✔ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (2193.7606ms)
+✔ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (2264.5395ms)
+✔ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (2307.2397ms)
+✔ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (9857.2216ms)
+✔ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (9845.0285ms)
+# frozen plugin copy in use: pre-commit-hook-tofu-plugin-obIcny
+✔ trust-anchor bootstrap exemption: (a) REPLACING an existing single anchor with a different one stays BLOCKED (10953.104ms)
+✔ trust-anchor bootstrap exemption: (b) ADDING a second anchor to a policy that already has one stays BLOCKED (10692.8937ms)
+✔ trust-anchor bootstrap exemption: (c) an UNRELATED field change (requiredKinds) bundled alongside the first anchor addition stays BLOCKED (11708.7186ms)
+✔ trust-anchor bootstrap exemption: (d) a policy whose trustAnchors set is ALREADY non-empty gaining one more entry stays BLOCKED, regardless of current set size (11655.8176ms)
+✔ trust-anchor bootstrap exemption: a genuine v1(no-anchor) -> v3(one-anchor) upgrade, unrelated fields unchanged, commits ALLOWED (11666.2591ms)
+✔ trust-anchor bootstrap exemption: v1(no-anchor) -> v3(no-anchor, empty trustAnchors) is NOT the anchor upgrade -- still blocked (no anchor actually added) (11545.592ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 59
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 400111.0625
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:672:1
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (7841.5798ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:679:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:686:1
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (7777.896ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:693:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:701:1
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (7464.8667ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:709:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:748:1
+✖ applyInstall then applyRemoval: removes exactly what was installed (9067.9869ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:779:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+--- stderr ---

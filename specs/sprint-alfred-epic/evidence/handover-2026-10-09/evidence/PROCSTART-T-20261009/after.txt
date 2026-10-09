@@ -1,0 +1,19 @@
+command: node --test plugins/pipeline-core/lib/worktree-process-start.test.mjs
+label: PROCSTART-T
+exitCode: 0
+head: 552cbd2c4d3dd84f5755d4d72875dc29b283ce06
+tree: 98fb7e0f219bcbb8970821e3d70c8fd1f9cf2643
+dirty: true
+--- stdout ---
+✔ PROCSTART-T-1 a session descriptor records and re-reads the exact kernel starttime of a spaced, parenthesised comm (34.69815ms)
+✔ PROCSTART-T-2 an active verify-run lock bound to a spaced-comm process is a live writer, and another spaced process's identity is stale (68.545992ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 187.785083
+
+--- stderr ---

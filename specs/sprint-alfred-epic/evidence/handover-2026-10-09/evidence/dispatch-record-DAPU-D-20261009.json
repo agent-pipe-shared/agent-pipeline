@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 4,
+  "taskId": "DAPU-D-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "criticRequired": "T3",
+  "outcome": "committed-pending-report",
+  "log": [
+    { "phase": "opening: orientation", "toolUses": 5 },
+    { "phase": "diagnosis DWP21 (reproduced) and e2e (static)", "toolUses": 26 },
+    { "phase": "note + commit 28701aec6", "toolUses": 32 },
+    { "phase": "budget exhausted; check-consumer-safe-paths not run", "toolUses": 33 }
+  ],
+  "report": {
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/dapu-d-daa-public-unavailable-2026-10-09.md"],
+    "commit": "28701aec6",
+    "dod": {
+      "note": "passed",
+      "checkConsumerSafePathsTest": "not verifiable (budget guard refused the run at call 33)",
+      "commit": "passed, trailers Dispatch + AI-Assisted only"
+    },
+    "findings": "DWP21: fixture pins plan-approval.v7 (test:928) while CURRENT_APPROVAL_SCHEMA is v8 (plan-spec-state-v2.mjs:17); guard-devplan-policy.mjs:103 skips the package branch and returns the code at :185. Test/fixture defect, reproduced alone. e2e: same v7 literal at :1461, likely shared cause, NOT proven (case stops at :1036; :1580-1610 unread). po-human-approval patch: on neither path.",
+    "openItems": ["e2e cause unproven; rerun after R7-3-T2e", "consumer-safe-paths test unrun", "independent review: pending"]
+  }
+}

@@ -1,0 +1,145 @@
+command: node --test scratch/dispatch-wip/t0c-run/a.test.mjs
+label: red-run3
+exitCode: 1
+head: 02689a69ca23b2d39f36e53e08536f1f85a5d82d
+tree: 406bc53c09c4a63e4bba409a290d7e0790ac8f56
+dirty: true
+--- stdout ---
+✖ C1 admit  v8 chat record under configured chat (9210.000382ms)
+✖ C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode) (6434.566335ms)
+✖ C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH (5952.057698ms)
+✖ C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT (5713.057135ms)
+✖ C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT (5737.206745ms)
+✖ C6 admit  mini profile with both design keys null and no design artifact (5340.578186ms)
+✖ C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control (5829.539851ms)
+✔ FX1 fixture: the signature proof verifies against the empty anchor set (3289.813909ms)
+✔ FX2 fixture: the configured mode resolves from the committed user config (9988.729907ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 2
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57574.242738
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:305:1
+✖ C1 admit  v8 chat record under configured chat (9210.000382ms)
+  AssertionError [ERR_ASSERTION]: C1: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+  
+  2 !== 0
+  
+      at assertAdmitted (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:296:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:308:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:312:1
+✖ C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode) (6434.566335ms)
+  AssertionError [ERR_ASSERTION]: C2: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+  
+  2 !== 0
+  
+      at assertAdmitted (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:296:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:315:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:319:1
+✖ C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH (5952.057698ms)
+  AssertionError [ERR_ASSERTION]: C3: the refusal must name DAA-PO-APPROVAL-MODE-MISMATCH in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+      at assertRefusedWith (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:301:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:322:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:326:1
+✖ C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT (5713.057135ms)
+  AssertionError [ERR_ASSERTION]: C4: the refusal must name DAA-DESIGN-APPROVAL-BINDING-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+      at assertRefusedWith (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:301:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:340:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:344:1
+✖ C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT (5737.206745ms)
+  AssertionError [ERR_ASSERTION]: C5: the refusal must name DAA-DESIGN-SOURCE-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+      at assertRefusedWith (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:301:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:354:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:358:1
+✖ C6 admit  mini profile with both design keys null and no design artifact (5340.578186ms)
+  AssertionError [ERR_ASSERTION]: C6: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+  
+  2 !== 0
+  
+      at assertAdmitted (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:296:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:363:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/t0c-run/a.test.mjs:367:1
+✖ C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control (5829.539851ms)
+  AssertionError [ERR_ASSERTION]: C7 control (the same record with both keys present): expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+  
+  2 !== 0
+  
+      at assertAdmitted (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:296:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run/a.test.mjs:370:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

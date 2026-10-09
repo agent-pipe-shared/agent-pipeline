@@ -1,0 +1,54 @@
+{
+  "taskId": "ADR0085-F1-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-budget-checkpoint",
+  "commits": [],
+  "log": [
+    {"phase": "opening: route pre-check done (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the runtime prompt, no contradiction); preflight run first per GUARD-BOOTSTRAP-RECEIPT-MISSING; a stray first copy was written to specs/sprint-alfred-epic/evidence/ before the CONT15 header (repo-root evidence/) was read; this file is the canonical record", "toolUses": 13},
+    {"phase": "orientation + baselines", "toolUses": 40,
+     "findings": [
+       "Target baseline (evidence/ADR0085-F1-20261009/before.txt, WSL, exit 1): 28 cases, 5 pass, 23 fail, matches Ruling 79.",
+       "F1 cases = V0..V10 (11 red). F2a cases = R1..R12 (12 red, missing export rereadApprovedDesignWorkflowPackage). Already green and must stay green: V11, L1..L4.",
+       "Cross-slice risk: pipeline-state.mjs:8941 and :8999 call validCurrentPlanApproval alone; guard-devplan-policy.mjs:103 compares approval.schema against CURRENT_APPROVAL_SCHEMA (hooks tests are outside the DoD neighbour set)."
+     ]},
+    {"phase": "DISPATCH-BUDGET-CHECKPOINT at counted call 52 of 65 (hook-counted; the briefing said <= 75 + 5)", "toolUses": 52,
+     "findings": [
+       "No edit to plugins/pipeline-core/lib/plan-spec-state-v2.mjs was made. The in-tree route was NOT probed. Nothing committed.",
+       "Neighbour baseline (16 test files, WSL, background task b4lnj9vlt) was still running at the checkpoint; it writes evidence/ADR0085-F1-20261009/neighbours-before.txt when it ends. A waiter loop (task b521prkab) polls for that file and ends by itself."
+     ]}
+  ],
+  "report": {
+    "dodResults": {
+      "targetAfterCapture": "not reached (no edit made)",
+      "neighboursBeforeAfter": "before: running in background, file pending; after: not reached",
+      "consumerSafePaths": "not run",
+      "oneCommit": "not made (nothing proven to commit)",
+      "terminalRecord": "interim record only (this file)"
+    },
+    "evidence": [
+      {"path": "evidence/ADR0085-F1-20261009/before.txt", "command": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-F1-20261009/before.txt --label target-before -- node --test plugins/pipeline-core/lib/design-approval-route.test.mjs\"", "exitCode": 1, "result": "28 tests, 5 pass (V11, L1-L4), 23 fail (R1-R12, V0-V10)"},
+      {"path": "evidence/ADR0085-F1-20261009/neighbours-before.txt", "status": "pending (background run b4lnj9vlt)"}
+    ],
+    "changedFiles": [
+      "scratch/commit-msg/ADR0085-F1.txt (new, untracked scratch: the in-tree-route commit message; the patch route needs a different subject)",
+      "evidence/ADR0085-F1-20261009/before.txt and evidence/dispatch-record-ADR0085-F1-20261009.json (repo-root evidence/, ignored)",
+      "specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-F1-20261009.json (STRAY, untracked, written in error before the repo-root rule was read; superseded, to be dropped by the Elephant)"
+    ],
+    "notChanged": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs, scripts/pipeline-state.mjs (:8941, :8999), lib/guard-devplan-policy.mjs (:103), every test file, the contract file, spec.md.",
+    "deviations": [
+      "Stopped at the hook's 80 % checkpoint (counted call 52 of 65) with no edit made. About 40 calls went to orientation: 8 calls were refused or wasted by the closed shell grammar (&&-chain with ls, Write before preflight, Glob, two rg --glob, wc -c, two polls of a missing/empty file) and about 6 to waiting on the neighbour baseline.",
+      "Hook budget 65 differs from the briefed <= 75 (+5)."
+    ],
+    "openItems": [
+      "ROUTE NOT PROBED: the first Edit on plan-spec-state-v2.mjs (guard-maintenance-window.mjs:197 kernel module) has not been attempted; admitted vs refused is still unknown.",
+      "Next dispatch should open with the Edit attempt, after the neighbour baseline file exists (an edit during the baseline run would corrupt it).",
+      "Edit plan (F1, all in plan-spec-state-v2.mjs): (1) line 16: add const V7_CURRENT_APPROVAL_SCHEMA = v7 and make the exported CURRENT_APPROVAL_SCHEMA v8; (2) lines 120-133: rename the existing key list to V7_CURRENT_APPROVAL_KEYS, rebase V6 on it, add the v8 CURRENT_APPROVAL_KEYS = schema, approvedBy, approvedAt, submissionSha256, profileSha256, poGateAuthority, priorInvalidationSha256, designApproval; (3) after validDesignWorkflowApproval add validDesignApproval: closed key set schema, mode, approvedBy, approvedAt, bindingSha256, intentSha256, proofSha256, proof; schema pipeline.design-approval.v1; approvedBy non-blank; approvedAt canonical ISO; bindingSha256 and intentSha256 lowercase sha256 (chat intentSha256 NON-null, A5); chat requires proofSha256 === null && proof === null; signature requires sha proofSha256 and a five-key pipeline.po-approval-proof.v1 proof whose intentSha256 equals the record's; any other mode invalid; do NOT bind proofSha256 to the canonical proof (the fixture digest is unrelated), do NOT require plan approvedBy equality (T0c); (4) validCurrentPlanApproval: replace the four designAdvisor/designWorkflow lines with (designApproval === null || validDesignApproval(designApproval)); (5) validPreviousCurrentPlanApproval: prepend a v7 branch (V7 keys, V7 schema, the existing four-field checks including validDesignWorkflowApproval); (6) currentApproval(): v8 branch (mini => designApproval === null, else validDesignApproval), keep the old v7 profile check under V7_CURRENT_APPROVAL_SCHEMA, and add v7 to the sealed list; (7) approveSubmittedPlan line 1014: write V7_CURRENT_APPROVAL_SCHEMA (plan-spec-state-v2.test.mjs:700 and :996 pin v7 output; the v8 writer belongs to the approve-plan slice).",
+      "Expected after: V0-V10 green; R1-R12 still red on the missing export (F2a); V11 and L1-L4 stay green. Mini-profile nullable designApproval is an assumption (the test does not pin mini).",
+      "Neighbour red is likely and is the briefed stop condition: after the bump every v7 record the writer produces fails validCurrentPlanApproval in pipeline-state.mjs priorApprovedBriefingBinding (:8941) and reconstructPlanApprovalBriefing (:8999). V10 forbids widening validCurrentPlanApproval to accept v7. guard-devplan-policy.mjs:103 stops matching v7 records (they fall to the git path); hooks tests are excluded from the DoD set so this is unmeasured. Both belong to the F3 boundary and pipeline-state slices; the Elephant should decide whether F1 may land with those interim reds or must land only together with them.",
+      "Stray record specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-F1-20261009.json should be removed by the Elephant.",
+      "Background tasks b4lnj9vlt (baseline, ends by itself) and b521prkab (waiter loop, ends when the baseline file appears) may still be alive."
+    ]
+  }
+}

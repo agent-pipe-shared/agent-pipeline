@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "DoD 1: WSL capture evidence/TR-C-T3-20261009/guard-push.txt - started, did NOT finish within the 600 s Bash timeout (harness moved it to the background, session-local task bsztv3p5g, output file empty at last look); the script writes the evidence file itself when it ends, so check whether it exists now and compare its per-case states with evidence/TR-C-T-20261009/red.txt",
+      "DoD 2: node --test harness/scripts/check-consumer-safe-paths.test.mjs - not run",
+      "TR-C-MANIFEST.md amendment (new guard-push post-image sha256 and size, 'Declared substitution' section, qualify the head sentence 'nothing existing is edited or removed') - not started",
+      "commit of exactly the post-image and the manifest - not made; the commit message file scratch/commit-msg/TR-C-T3-20261009.txt - not written",
+      "UNCOMMITTED working-tree edits left in place: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs (two literals substituted, lines 123 and 130, working tree only: the INDEX still holds the earlier staged version with the old literals, so git add -- on this exact path is still required) and scratch/dispatch-wip/TR-C-T/guard-push.test.mjs (same substitution, gitignored)"
+    ],
+    "nextBriefingAdjustments": [
+      "Orientation is finished and need not be repeated: the two literals are the authorEmail value (line 123) and the user.email config value (line 130) inside configureAnonymousPublicPush, one identical string, same line numbers in the post-image and the scratch copy; the substitution is already applied to both with the neutral fixture address, and replace_all on the bare string is the whole edit",
+      "Stop-condition check for step 1 is answered: the guard (hooks/guard-push.mjs, publicPushIdentity loader ~lines 669-682 and the range check ~lines 797-799) only requires authorEmail to be a non-empty string and compares it by equality with the commit author/committer headers and the fixture repo local config; nothing compares it with the real repository identity and no shape or domain check exists; no other use of the value exists in the test file",
+      "The 17 calls I spent on orientation (3 of them wasted: one refused Write needing the preflight, one refused Grep with a directory plus negated glob = GUARD-READ-TARGET, one advisor consult) are why the 80 percent notice fired before the work started; the remaining work is 1 WSL run + 1 consumer-safe run + about 2 manifest edits + msg file + git add + git commit + terminal record, roughly 8 to 9 calls",
+      "The guard-push scratch run did not finish in 600 s this time (the earlier combined run of both files finished); suspect host load from concurrent background agents or WSL startup, not the substitution, but that is unmeasured. Next run: raise nothing, check the machine first, or run it with the harness backgrounded and poll; if it still hangs, bisect by running a single case id",
+      "Do not chain extra commands after the briefed WSL command unless needed; the word git must not appear inside a WSL bash -lc string (PGC-T85d refusal)",
+      "Commit by -F message file only (the Dispatch trailer holds a parenthesis, which guard-push refuses in -m/--trailer form, PGC-T82b); write the terminal record once after the commit"
+    ]
+  },
+  "log": [
+    { "phase": "opening: obligations, CONT17 header, goldfish-task lines 455-481, TR-C-T record and TR-C-MANIFEST read; first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING; preflight run from the loaded plugin root (status ready); record created and read back", "toolUses": 8 },
+    { "phase": "orientation: grepped both guard-push copies for e-mail shapes (literals at lines 123 and 130 only, identical string, fixture-internal); read lines 95-170; advisor consulted once", "toolUses": 14 },
+    { "phase": "stop-condition 1 answered NOT triggered by reading hooks/guard-push.mjs (non-empty-string and equality checks only); one Grep refused GUARD-READ-TARGET (directory plus negated glob)", "toolUses": 17 },
+    { "phase": "both files edited (replace_all of the bare literal with the neutral fixture address); DISPATCH-BUDGET-CHECKPOINT 80 percent notice fired on this call", "toolUses": 19 },
+    { "phase": "WSL guard-push capture started in the foreground; 600 s timeout, moved to background, output empty; second notice 'call 20 of 22'; handing back per the 80 percent rule", "toolUses": 21 },
+    { "phase": "after the hand-back was delivered: the background WSL capture ended; its own log line reads 'capture-evidence: wrote evidence/TR-C-T3-20261009/guard-push.txt (wrapped exit code 1)', wrapped exit 1 is the by-design value of the earlier red.txt run too. The evidence file EXISTS now; per-case states NOT yet compared with evidence/TR-C-T-20261009/red.txt (no budget left), so DoD 1 stays not verifiable until the dispatcher or a continuation does that comparison", "toolUses": 23 }
+  ],
+  "report": {
+    "text": "INTERIM HAND-BACK at the 80 percent checkpoint (closing-allowance style, nothing committed). Done: orientation; step-1 stop condition checked and not triggered; the identical substitution applied to the guard-push post-image and its scratch runnable copy (working tree only). Not done: the WSL verification (started, not finished in 600 s, evidence file is written by the script when it ends), consumer-safe check, manifest amendment, commit. Outcome is left in-progress on purpose: this is an interim record for the dispatcher to continue or supersede, not a terminal result. independent review: pending.",
+    "changedFiles": []
+  }
+}

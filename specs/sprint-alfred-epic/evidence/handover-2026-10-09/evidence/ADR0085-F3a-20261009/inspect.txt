@@ -1,0 +1,112 @@
+command: node plugins/pipeline-core/scripts/pipeline-state.mjs inspect (native)
+exit: 0
+--- output ---
+{
+  "schema": "pipeline.inspect.v1",
+  "generatedAt": "2026-10-09T04:07:18.357Z",
+  "status": "implementing",
+  "activeFeature": {
+    "id": "sprint-alfred-epic",
+    "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "phase": "implementation",
+    "phaseHistory": [
+      {
+        "phase": "implementation",
+        "at": "2026-09-20T14:30:49.650Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-28T19:32:41.934Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-03T11:29:06.577Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-03T11:29:06.577Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-03T11:29:06.577Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-03T11:29:06.577Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-10-04T14:39:37.949Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-06T21:21:17.119Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-10-07T06:43:11.228Z"
+      }
+    ]
+  },
+  "phase": "implementation",
+  "planApproved": true,
+  "lifecycle": {
+    "ok": true,
+    "code": "PLAN-LIFECYCLE-CURRENT",
+    "status": "implementing"
+  },
+  "mixedPlanRecovery": null,
+  "pushApproval": {
+    "present": true,
+    "relevance": "stale-candidate"
+  },
+  "closedFeaturesCount": 3,
+  "phoenixEpicHistory": {
+    "present": true,
+    "featureId": "sprint-phoenix-epic",
+    "continuityRevision": 8,
+    "note": "Preserved verbatim from origin/sprint_phoenix @ 25c97b589967bdb27a430f2cb6fda86f9501ca61 during the 2026-08-26 Phoenix merge into this branch. HISTORICAL RECORD ONLY, not active state -- the PO decided sprint-nova-epic (the top-level activeFeature/continuity/planApproval/planSubmission/planInvalidation/pushApproval above) remains authoritative going forward. This block records sprint-phoenix-epic's own continuity/authority/approval history as it stood on that branch, including work that continued past the earlier 2026-08-01 closure already recorded in closedFeatures above (revision 8, a 2026-08-17 re-approval, and feature-package-reconcile approvals) -- preserved rather than dropped per explicit PO instruction that no Phoenix data be lost in this merge. Not wrapped as a closedFeatures[] entry because no result.md/continuityClose evidence exists for this later work (continuity.authority.result was null on the Phoenix side) -- fabricating a closure record would misrepresent what actually happened."
+  },
+  "nextAction": {
+    "kind": "collect-input",
+    "mutation": false,
+    "requiresConfirmation": false,
+    "guidance": "the push signature is a detached Ed25519 proof made with a key kept outside this repository -- an agent must never produce or supply it. This state reader is running from the project source tree, which is not a lifecycle runtime entrypoint. Before the signature, rerun the ready Pipeline start preflight from PIPELINE_PLUGIN_ROOT and use only that result's absolute pluginRoot plus /scripts/push-init.mjs. Never substitute a repository plugins/pipeline-core path. The loaded driver walks doc-reconciliation, push-gate-satisfiability and push-prepare, then stops at the signature.",
+    "expected": {
+      "schema": "pipeline.inspect.v1",
+      "statuses": [
+        "implementing"
+      ]
+    }
+  },
+  "nextActionText": "## Next action\n\nThe plan is approved and the feature is in implementation. Proceed with the\napproved implementation packages; reopen design only through\n`pipeline-state reopen-design --by <name>` if it must change.\n"
+}
+

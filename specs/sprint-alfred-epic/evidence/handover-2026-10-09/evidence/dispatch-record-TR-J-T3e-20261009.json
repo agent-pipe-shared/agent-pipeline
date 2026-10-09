@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-J-T3e-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "87a327633 test(clone-hook-readiness): run against a frozen plugin-root copy -- plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs, plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs"
+  ],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17/CONT15 headers, goldfish-task field 6, both preflights (loaded root ready), T3 record, Ruling 116 grep read; opening record written", "toolUses": 11 },
+    { "phase": "orientation + before captures: native before = 9 tests, 6 pass, 3 fail (F1 f, g GHS-SOURCE-DRIFT; F1 h commit-msg-hook 'refresh' vs 'current'); WSL before = 9 tests, 8 pass, 1 fail (F1 h, refreshAvailable gained commit-msg-hook). Artifacts evidence/TR-J-T3e-20261009/native-before.txt, wsl-before.txt", "toolUses": 26 },
+    { "phase": "advisor consulted once; commit message file written; edits to both test files (five scripts imported from the frozen copy in the partial suite, two in the sibling; per-fixture planInstall proof in withRepository)", "toolUses": 31 },
+    { "phase": "after captures: native = 9/9 pass, wrapped exit 0; WSL = 9/9 pass, wrapped exit 0, duration 8.5 s vs 293 s before; consumer-safe check 9/9 exit 0; WSL /tmp has no leftover plugin copy (after() fires); native leftover check refused by guard (outside root), not verifiable. Artifacts native-after.txt, wsl-after.txt", "toolUses": 38 },
+    { "phase": "commit 87a327633 (two files, exact pathspec) and checkpoint of this record", "toolUses": 42 },
+    { "phase": "second advisor consult, final record written, hand-back", "toolUses": 44 }
+  ],
+  "report": {
+    "text": "Implementation complete; independent review: pending; PO acceptance pending.\n\n1. DoD results\n- Before captures, native and WSL, both files in one command each: passed (native-before.txt: 9 tests, 6 pass, 3 fail = F1 f and g GHS-SOURCE-DRIFT, F1 h commit-msg-hook 'refresh' instead of 'current'; wsl-before.txt: 9 tests, 8 pass, 1 fail = F1 h, refreshAvailable gained commit-msg-hook).\n- After captures: passed. native-after.txt and wsl-after.txt are both 9 tests, 9 pass, 0 fail, wrapped exit 0. No failing case absent from the matching before capture; no GHS-SOURCE-DRIFT; the copy is proven in use (stdout line '# frozen plugin copy in use: clone-hook-readiness-plugin-<rand>' once per file, plus the per-fixture planInstall lib-dir assertion in the partial suite, which would fail every fixture if the installers defaulted to the live lib).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed (9/9, exit 0).\n- One commit of the two test files with the exact subject and the two trailers: passed (87a327633).\n\n2. Evidence\n- evidence/TR-J-T3e-20261009/{native-before,wsl-before,native-after,wsl-after}.txt, written by node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <l> -- node --test plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs. Wrapped exit codes: native-before 1, wsl-before 1, native-after 0, wsl-after 0. WSL form: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; <same command>\".\n- Consumer-safe check exit 0 (console output, not an artifact).\n- WSL duration 293 s before, 8.5 s after (the copy sits on ext4 /tmp, not drvfs): an observation.\n- HEAD differed across all four captures (997356d7e, e7faf494a, 5b62139fc, c050c4116): the after-runs passed on a tree that was still moving, i.e. under the very drift condition.\n\n3. Changed files\n- plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs (committed 87a327633): copies the plugin root once at load (mkdtemp + cpSync, after() removes it), loads all five scripts under test from the copy by dynamic import, adds load-time proof assertions plus a per-fixture planInstall check in withRepository. No case body touched.\n- plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs (committed 87a327633): same copy, the two scripts it imports now come from the copy, load-time proof. The case and the completion-count guard untouched.\n- Untracked, for the Elephant: evidence/TR-J-T3e-20261009/*.txt, evidence/dispatch-record-TR-J-T3e-20261009.json, scratch/commit-msg/TR-J-T3e.txt (scratch is ignored).\n\n4. Deliberately not changed\n- registerTestCaseCompletion in the sibling stays on the live ../lib/: it is the harness, not the code under test (commented in the file).\n- The sibling's custom test() wrapper, completionCases.length guard and the F1 f..h case bodies.\n- No production file, hooks/, lib/guard/, harness/ or other test file.\n\n5. Deviations from spec\n- The 0ad7ab3df pattern was adapted, not transplanted: it passes pluginLibDir to installers, but the coordinator, refresh and provisioning scripts take no lib-dir option and default to the lib dir next to themselves (import.meta.url). So the scripts under test are dynamically imported from the copy; all five (partial) and both (sibling) must come from the same copy or every freshly installed hook reads stale against a differently inventoried lib.\n- No PIPELINE_CORE_TEST_PLUGIN_LIB_DIR gate (neither file read that variable; it would be a new knob): the copy is always made.\n- Added proof assertions (load-time in both files, per-fixture in withRepository with two newly imported names planPreCommit and planCommitMsg). No existing assertion changed; case count 9 -> 9.\n- Commit body slip: it says F1 f, g and h appear in the HOOKREFRESH-RECAP capture; Ruling 116 records only g and h there (f was red in this slice's own native baseline). Not amended; shared tree.\n\n6. Open items\n- Route pre-check: field 6 names no A/G/S class, only claude-sonnet-5-5 / xhigh; the runtime prompt names Sonnet 5.5, exact model ID claude-sonnet-5-5: match.\n- Stop conditions: none fired (the copy ran every transitive import of the scripts; the preflight GUARD-BOOTSTRAP-RECEIPT-MISSING was cured by the loaded-root preflight).\n- Observation: the sibling's single case (CHR001, non-repository root, throwing stubs) never inventories the plugin tree, so freezing it changes no outcome by itself; it was done as briefed, and costs one cpSync at load that could race a parallel writer (not seen).\n- Not verifiable: (a) native leftover check of the temp copies (the guard refused an out-of-root read; WSL /tmp showed none after two copies, so after() fires); (b) whether harness/scripts/verify.mjs treats the stderr-origin proof line as a fault (full Verify forbidden here; node --test surfaced it in the TAP stdout, stderr section empty); (c) macOS (tmpdir symlink): the proof compares realpaths, but it was not run there.\n- HR-D2 stays open until the idle-tree capture of the Elephant's pre-stamp run (Ruling 116).\n- Closing handover: Committed: 87a327633 (the two test files). Verified green: the four captures and the consumer-safe check as above. Remains undone: nothing in scope; the evidence files and this record are uncommitted. Next briefing: none needed for this slice.\n- Independent review: pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs",
+      "plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs"
+    ]
+  }
+}

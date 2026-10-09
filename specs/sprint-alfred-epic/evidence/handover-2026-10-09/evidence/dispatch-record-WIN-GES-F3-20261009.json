@@ -1,0 +1,95 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-F3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3d76cd1864f78d6eb55fec994eb0a62e0411c100",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "428cbb794f5af114ed23474cce3b9bfc9b37cd1fa6bcc280348fcb6df725963c",
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: record created; route pre-check matched (requested claude-sonnet-5-5 xhigh, observed claude-sonnet-5-5 from runtime prompt); preflight run after GUARD-BOOTSTRAP-RECEIPT-MISSING",
+      "toolUses": 7
+    },
+    {
+      "phase": "baselines landed: wsl-before 74/74 exit 0; native-gmw-before lib 59/3 (GMW26, GMW31, GMW48), scripts 8 pass / 9 fail (GES-LOCKED)",
+      "toolUses": 24
+    },
+    {
+      "phase": "edit done in guard-maintenance-window.mjs: import, storagePaths ensureHardenedPrivateDirectory(common, agent-pipeline), kernel-list entry",
+      "toolUses": 36
+    },
+    {
+      "phase": "verified: native signed-GMW 3/3 exit 0, wsl-after 74/74 exit 0, consumer-safe-paths 9/9; native-gmw-after lib 61/1, scripts 4 pass / 13 fail (4 new PB-WINDOWS-ASSURANCE reds); closure GMWKC01 red 23 violations",
+      "toolUses": 45
+    },
+    {
+      "phase": "closing: stop condition 3, nothing committed, edit left uncommitted, terminal record written",
+      "toolUses": 49
+    }
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/guard-maintenance-window.mjs"
+    ],
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded, Project Agent-Pipeline, Calibration not named in briefing (self-application), State briefing WIN-GES-F3-20261009, Role Goldfish.\nRoute (class S): requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed claude-sonnet-5-5 from this dispatch own runtime prompt; match (effort has no direct evidence, disclosed as unknown).\nCLOSING-ALLOWANCE HANDOVER, STOPPED ON A STOP CONDITION (stop 3: a guard-maintenance-window test red absent from before that cannot be resolved inside the file). Nothing committed. independent review: pending (no commit exists to review).\n\n1. DoD results.\n- WSL before (3 files): passed, 74/74, exit 0. WSL after: passed, 74/74, exit 0 (no red absent from before).\n- Native after, the three signed GMW cases: PASSED 3/3, exit 0 (before 0/3). The briefed fix turns the RED pins green.\n- Native GMW before/after, both test files: FAILED the no-new-red criterion. lib file: before 59 pass / 3 fail (GMW26 and GMW31 GES-LOCKED, GMW48), after 61 pass / 1 fail (GMW48 only; GMW26 and GMW31 now pass). scripts file: before 8 pass / 9 fail (8 script tests, all GES-LOCKED, plus the lib file counted once), after 4 pass / 13 fail (12 script tests plus the lib file). FOUR reds are absent from before: prepare with --authorship-mode goldfish-dispatch, prepare with --authorship-mode elephant-direct and a qualifying stage-0 self-check, committed global chat CLI install, close on an absent window is a no-op. The 8 reds that were already red are red again with a different cause (PB-WINDOWS-ASSURANCE instead of GES-LOCKED).\n- check-consumer-safe-paths test: passed, 9/9, exit 0 (run directly, no artifact file).\n- Commit: not made (the DoD forbids a known-red regression).\n- Extra, not in the DoD: guard-maintenance-window-kernel-closure test, native, exit 1, GMWKC01 red with 23 violations. No baseline was captured. The 13 lines I read name pre-existing gaps (git-null-device, fs-durability, hook-currentness, checkpoint-push-approval, agy-*, toolchain-preflight, continuity-authority-drift), none names hardened-private-directory; the other 10 lines are unread, so I cannot certify the new kernel-list entry closes its own edge.\n\n2. Evidence (all machine-written by capture-evidence.mjs unless noted). evidence/WIN-GES-F3-20261009/: wsl-before.txt (exit 0), wsl-after.txt (exit 0), native-after.txt (exit 0), native-gmw-before.txt (exit 1), native-gmw-after.txt (exit 1), native-closure-after.txt (exit 1). Commands: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <label> -- node --test [--test-name-pattern signed GMW] <files>; the WSL ones through wsl.exe -e bash -lc. The failing stack is in native-gmw-after.txt lines 569-583.\n\n3. Changed files. plugins/pipeline-core/lib/guard-maintenance-window.mjs, UNCOMMITTED and left in the shared tree, three edits: (a) import of ensureHardenedPrivateDirectory from ./hardened-private-directory.mjs; (b) storagePaths: inside the create branch only, ensureHardenedPrivateDirectory(common, join(common, agent-pipeline)) before the unchanged secureDirectory(leaf); (c) NEVER_LIFTABLE_KERNEL_PATHS gains plugins/pipeline-core/lib/hardened-private-directory.mjs, a required consequence of (a) under GMWKC01 (narrows capability, never widens). Untracked: the six evidence files, this record, scratch/win-ges-f3-finalize.mjs.\n\n4. Deliberately not changed. secureDirectory itself, so the leaf keeps its contract including the POSIX chmodSync repair. Call sites, per site: the ones near :1199 (prepare), :1655 (install), :1698 (currentGuardMaintenanceWindow) and :1947 (close) reach creation ONLY through storagePaths, so the single change covers all four; the one near :1897 is create:false and creates nothing. PrivateBoundaryError (PB-*) is not wrapped into GuardMaintenanceWindowError: it propagates with the installer semantics; the bare catch sites swallow both identically, prepare lets it reach the CLI. No test, hook, lib/guard, harness or other production file touched; governance-event-store.mjs untouched.\n\n5. Deviations and findings. No deviation from the ruling. The ruling is exactly what produces the new reds: ensureHardenedPrivateDirectory refuses an existing insecure agent-pipeline, where the old recursive mkdir tolerated it. In the scripts GMW test, agent-pipeline already exists with a non-owner DACL when prepare reaches storagePaths (thrown at guard-maintenance-window.mjs:866 via prepareGuardMaintenanceWindowRequest, called from scripts/guard-maintenance-window.mjs:331, test line 167). WHO pre-created it I did not establish (no budget left to read the fixture): candidates are the test fixture itself or an earlier creator in the same CLI path such as the governance-event-store recursive mkdir that WIN-GES-F2 is converting. I made no claim beyond the stack.\n\n6. Open items and next briefing. Committed: nothing. Verified green: WSL after 74/74, native signed-GMW 3/3, consumer-safe-paths 9/9. Remains undone: the commit, a clean native GMW pair, the closure-test classification, the uncommitted edit above. Elephant decision needed: either (a) keep the ruling, identify the pre-creator (read scripts/guard-maintenance-window.test.mjs setup around :164 and the CLI path before :331), land WIN-GES-F2 first or fix the fixture in a test-only dispatch, then re-run native; or (b) relax the ruling to tolerate a pre-existing insecure agent-pipeline (contradicts the stated assess-and-refuse semantics, so not mine to choose). The edit is still in the shared tree: while it stays, any slice running the native scripts GMW test (WIN-GES-F2 included) will see the 4 new reds; restore the file to HEAD if that is unwelcome. Next briefing must also capture a native baseline for the closure test. Tool use about 49 of 50 plus the closing allowance."
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "WSL after, three files 74/74",
+        "command": "capture-evidence wsl-after",
+        "exitCode": 0,
+        "artifact": "evidence/WIN-GES-F3-20261009/wsl-after.txt"
+      },
+      {
+        "check": "native signed GMW 3/3",
+        "command": "capture-evidence native-after",
+        "exitCode": 0,
+        "artifact": "evidence/WIN-GES-F3-20261009/native-after.txt"
+      },
+      {
+        "check": "check-consumer-safe-paths 9/9",
+        "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+        "exitCode": 0,
+        "artifact": "none (run directly)"
+      }
+    ],
+    "remainsUndone": [
+      "commit of plugins/pipeline-core/lib/guard-maintenance-window.mjs (edit present, uncommitted, incomplete as a DoD)",
+      "native GMW test pair without new reds (4 new PB-WINDOWS-ASSURANCE reds in scripts/guard-maintenance-window.test.mjs)",
+      "classification of GMWKC01 red (23 violations, no baseline)"
+    ],
+    "nextBriefingAdjustments": [
+      "name the pre-creator of an insecure agent-pipeline in the scripts GMW test or land WIN-GES-F2 first",
+      "decide assess-and-refuse versus tolerate for a pre-existing insecure agent-pipeline",
+      "capture a native baseline of guard-maintenance-window-kernel-closure.test.mjs"
+    ]
+  }
+}

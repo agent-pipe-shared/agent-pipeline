@@ -1,0 +1,75 @@
+command: node --test --test-name-pattern signature-anchor --test-name-pattern "signature anchor" --test-name-pattern "new-key bootstrap" --test-name-pattern "new-key post-setup" --test-name-pattern first-anchor --test-name-pattern existing-key --test-name-pattern "leaves no copy of the private key" --test-name-pattern "writes the machine plane into the injected home" --test-name-pattern "routes its later explicit language" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: after
+exitCode: 1
+head: f70f97ec6df181cf3d834dc6103a6b7777fa2ef3
+tree: 75a58ac493f0fa9b6bf51bebdc6169f847af237e
+dirty: true
+--- stdout ---
+✔ a failed first-anchor action returns an attended digest-bound recovery command (1.73139ms)
+✖ host-managed consent CLI routes its later explicit language into private intake state (15410.519927ms)
+✔ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (188785.297733ms)
+✔ a failed separate signature-anchor action preserves the completed initial chat-free transaction (52635.556932ms)
+✔ new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup (34617.056671ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor (1681.524807ms)
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1571.493221ms)
+✔ the in-process setup step writes the machine plane into the injected home and never into the ambient home (13.903315ms)
+✔ signature anchor reuses a key already at the canonical directory path without importing or replacing it (35044.011186ms)
+✔ first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary (111152.768171ms)
+✔ a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice (34877.614993ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 478241.166058
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:495:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (15410.519927ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:559:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1160:1
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (1571.493221ms)
+  AssertionError [ERR_ASSERTION]: a failed key derivation must leave no copy of the private key in the target directory
+  + actual - expected
+  
+  + [
+  +   'po-private.pem'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1184:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'po-private.pem' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

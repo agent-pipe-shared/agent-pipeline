@@ -1,0 +1,111 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: native-red
+exitCode: 1
+head: f58ced7bc3463f54f74f79e689fa52a0a6931a11
+tree: c1dac29a571ce63e5ed194b1a138fb4ad0e6a366
+dirty: true
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.7643ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.1178ms)
+✔ WPS003 rejects owner drift and reparse points (0.088ms)
+✔ WPS004 keeps malformed observations unavailable (0.0799ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.6103ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.1614ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.3974ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.1428ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.1259ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.1969ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.308ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.1295ms)
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1125.9239ms)
+✖ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (746.7731ms)
+✖ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (714.9819ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 12
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2657.4992
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1125.9239ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'secure',
+  +   'insecure'
+  -   'secure'
+    ]
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:142:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'secure', 'insecure' ],
+    expected: [ 'secure', 'secure' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (746.7731ms)
+  AssertionError [ERR_ASSERTION]: hardenWindowsPrivateDirectory call 2 of 3 (directory already hardened by an earlier call) returned {"status":"unavailable","reason":"native Windows DACL observation failed"}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'secure'
+  
+      at assertHardenerStaysSecure (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:158:12)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:169:5)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'secure',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (714.9819ms)
+  AssertionError [ERR_ASSERTION]: hardenWindowsPrivateDirectory call 2 of 3 (directory already hardened by an earlier call) returned {"status":"unavailable","reason":"native Windows DACL observation failed"}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'secure'
+  
+      at assertHardenerStaysSecure (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:158:12)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:181:5)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'secure',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

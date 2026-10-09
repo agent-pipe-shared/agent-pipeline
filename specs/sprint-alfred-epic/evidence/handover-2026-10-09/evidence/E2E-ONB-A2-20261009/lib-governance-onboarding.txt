@@ -1,0 +1,18 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/governance-onboarding.test.mjs
+label: lib-governance-onboarding
+exitCode: 0
+head: f9a2a8409f256a970954be89f738bae099b44075
+tree: 3dcdb1c0ba60203f89e61c94bca76ac62d20e0d9
+dirty: true
+--- stdout ---
+✔ RC13C001 actual authenticated V3 apply integrates central enrollment with real local Git and isolated machine plane (50309.207421ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53401.823499
+
+--- stderr ---

@@ -1,0 +1,82 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/codex-onboarding-app-server.test.mjs
+label: lib-codex-onboarding-app-server
+exitCode: 0
+head: f06b434a2ae709ae34641f92856cd69aa907e47f
+tree: 7bf1b6176112a71f82c0a3867658cf425e7196df
+dirty: true
+--- stdout ---
+ok - onboarding does not call App Server and returns the exact closed component
+ok - bootstrap requires exactly one health observation and never launches a model/thread
+ok - session requires exactly one health observation and never launches a model/thread
+ok - dispatch requires exactly one health observation and never launches a model/thread
+ok - execution detail EPERM maps to execution-denied
+ok - execution detail EACCES maps to execution-denied
+ok - execution detail EROFS maps to execution-denied
+ok - execution detail null maps to unavailable
+ok - execution detail EIO maps to unavailable
+ok - execution detail ETIMEDOUT maps to unavailable
+ok - CAS-READY maps to running
+ok - CAS-DAEMON-UNREACHABLE maps to not-running
+ok - CAS-DAEMON-INVALID-OBSERVATION maps to unavailable
+ok - CAS-DAEMON-VERSION-DRIFT maps to unavailable
+ok - CAS-DAEMON-RECOVERY-FAILED maps to unavailable
+ok - CAS-CODEX-UNAVAILABLE maps to unavailable
+ok - CAS-FUTURE-UNKNOWN maps to unavailable
+ok - malformed observation fails closed with a sanitized CAS code
+ok - invalid intent is rejected before observation
+ok - daemon-unreachable exposes the exact bounded recover action
+ok - CAS-DAEMON-INVALID-OBSERVATION exposes recover
+ok - CAS-DAEMON-VERSION-DRIFT exposes recover
+ok - CAS-CODEX-UNAVAILABLE exposes the exact doctor action
+ok - CAS-DAEMON-RECOVERY-FAILED exposes the exact doctor action
+ok - not-requested/null has no invented action
+ok - running/CAS-READY has no invented action
+ok - execution-denied/CAS-EXECUTION-UNAVAILABLE has no invented action
+ok - unavailable/CAS-EXECUTION-UNAVAILABLE has no invented action
+ok - unavailable/CAS-FUTURE-UNKNOWN has no invented action
+ok - incoherent component cannot manufacture a recovery action
+ok - doctor returns a closed completed diagnostic and never readiness
+ok - doctor failure is sanitized and never readiness
+ok - health CLI exit mapping is exact for doctor, observe, and usage
+ok - claude bootstrap returns not-applicable without ever observing the daemon
+ok - claude session returns not-applicable without ever observing the daemon
+ok - claude dispatch returns not-applicable without ever observing the daemon
+ok - claude onboarding is not-applicable, not merely not-requested
+ok - an invalid intent is still rejected before the runner short-circuit
+ok - not-applicable is a valid component that manufactures no action
+ok - a not-applicable component still cannot carry a CAS code
+ok - codex bootstrap keeps running/CAS-READY with and without an explicit runner
+ok - codex bootstrap keeps execution-denied/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex bootstrap keeps unavailable/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex bootstrap keeps not-running/CAS-DAEMON-UNREACHABLE with and without an explicit runner
+ok - codex bootstrap keeps unavailable/CAS-DAEMON-VERSION-DRIFT with and without an explicit runner
+ok - codex bootstrap keeps unavailable/CAS-UNKNOWN with and without an explicit runner
+ok - codex bootstrap keeps failing closed when the observation throws
+ok - codex session keeps running/CAS-READY with and without an explicit runner
+ok - codex session keeps execution-denied/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex session keeps unavailable/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex session keeps not-running/CAS-DAEMON-UNREACHABLE with and without an explicit runner
+ok - codex session keeps unavailable/CAS-DAEMON-VERSION-DRIFT with and without an explicit runner
+ok - codex session keeps unavailable/CAS-UNKNOWN with and without an explicit runner
+ok - codex session keeps failing closed when the observation throws
+ok - codex dispatch keeps running/CAS-READY with and without an explicit runner
+ok - codex dispatch keeps execution-denied/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex dispatch keeps unavailable/CAS-EXECUTION-UNAVAILABLE with and without an explicit runner
+ok - codex dispatch keeps not-running/CAS-DAEMON-UNREACHABLE with and without an explicit runner
+ok - codex dispatch keeps unavailable/CAS-DAEMON-VERSION-DRIFT with and without an explicit runner
+ok - codex dispatch keeps unavailable/CAS-UNKNOWN with and without an explicit runner
+ok - codex dispatch keeps failing closed when the observation throws
+ok - a not-applicable component cannot satisfy the lifecycle blocking guard
+ok - codex onboarding keeps the not-requested component, not not-applicable
+63 Codex onboarding App-Server checks passed.
+✔ plugins/pipeline-core/lib/codex-onboarding-app-server.test.mjs (226.42846ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 233.613886
+
+--- stderr ---

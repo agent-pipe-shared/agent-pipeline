@@ -1,0 +1,161 @@
+command: node --test plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs plugins/pipeline-core/lib/governance-scope.test.mjs
+label: after
+exitCode: 1
+head: b05867bffe122a705300714ca504b9b801019006
+tree: 496cd351824777ac7584378f8838c54b84887b3f
+dirty: true
+--- stdout ---
+✔ GUARD valid readback returns the journal and runs exactly the read-only inspect command (73.3683ms)
+✔ GUARD a valid document with the wrong schema is its own error, distinct from empty and invalid, with no retry (32.7926ms)
+✔ GUARD malformed output (truncated object) is INVALID, exec runs once, and no retry is offered (33.6798ms)
+✔ GUARD malformed output (plain text) is INVALID, exec runs once, and no retry is offered (32.0075ms)
+✔ GUARD malformed output (truncated mid-document) is INVALID, exec runs once, and no retry is offered (32.4143ms)
+✔ GUARD a child that fails outright propagates unchanged and is not retyped as a readback code or retry (33.2905ms)
+✔ GUARD empty readback (empty string) raises the EMPTY code after exactly one exec call and changes no state (60.4023ms)
+✔ GUARD empty readback (whitespace only) raises the EMPTY code after exactly one exec call and changes no state (63.6456ms)
+✔ GUARD empty readback (undefined (no output at all)) raises the EMPTY code after exactly one exec call and changes no state (62.4794ms)
+✔ GUARD empty readback (null) raises the EMPTY code after exactly one exec call and changes no state (59.1018ms)
+✔ RETRY empty readback (empty string) carries ONE exact, read-only, host-boundary nextAction (34.4263ms)
+✔ RETRY empty readback (whitespace only) carries ONE exact, read-only, host-boundary nextAction (34.0675ms)
+✔ RETRY empty readback (undefined (no output at all)) carries ONE exact, read-only, host-boundary nextAction (37.0296ms)
+✔ RETRY empty readback (null) carries ONE exact, read-only, host-boundary nextAction (33.5452ms)
+✔ RETRY the nextAction is bounded to one attempt, plain serialisable data, and identical for every empty variant (144.1529ms)
+✔ RETRY the host follows the nextAction once: a retry that returns valid output yields the journal (76.5649ms)
+✔ RETRY a second empty readback after the retry stays the typed EMPTY refusal and never loops (79.284ms)
+✔ RETRY invalid output after the retry is INVALID with no further retry (84.4469ms)
+✔ RETRY the retry flow changes no lifecycle state (98.5392ms)
+✔ RC14C001 documents, entry pointers and malformed arbitrary source never enroll; observation writes nothing (74.9848ms)
+✔ RC14C002 actual Git config stores a parseable root-bound decision and preserves unrelated bytes and mode (6178.7704ms)
+✔ RC14C003 actual linked worktrees enroll independently; linked decline does not deactivate primary (5382.0771ms)
+✔ RC14C004 non-Git decline persists only in sealed fixture host store and restores explicit enrollment (7666.7009ms)
+✔ RC14C005 existing exact onboarding consent qualifies partial enrollment; corrupt marker alone cannot activate (172.6249ms)
+✔ RC14C006 canonical V3 owned projection qualifies existing enrollment without invented receipt; drift fails closed (6665.9793ms)
+✔ RC14C007 paired canonical legacy authority qualifies; malformed source paired with valid authority stays governed (64.0348ms)
+✔ RC14C008 fabricated/cloned/stale plans cannot mutate storage; consumed plan cannot replay (665.3785ms)
+✖ RC14C009 dedicated malformed record/mode/alias refuse authority; aliases do not cause outside content reads (3095.3594ms)
+✔ RC14C010 root inode reuse invalidates bound record, oversized sparse record and hardlinks reject without adoption (2709.9301ms)
+✔ RC14C011 authenticated onboarding projection reuses enrollment and explicit activation reverses decline (61340.4524ms)
+✔ RC14C012 actual observations and absence errors satisfy closed published schema (3424.0069ms)
+✔ RC14C013 neutral V3 authority has precedence over retained runtime and no invented receipt is required (110.264ms)
+✖ RC14C014 broken physical Git control cannot be recast as non-Git enrollment (158.0399ms)
+✔ RC14C015 enrolled current Git root survives an unrelated removed registered worktree and can plan decline (2641.3775ms)
+✔ RC14C016 declined current Git root survives an unrelated removed worktree without hints or enforcement and can re-enroll (2627.5186ms)
+✔ RC14C017 closest containing nested linked worktree keeps its own decision despite a stale sibling (2690.8418ms)
+✖ RC14C018 path-component containment does not select a prefix sibling and selected alias paths cannot authorize decisions (2877.4162ms)
+✔ RC14C019 removed relevant linked directory remains unavailable and cannot be used to plan a decision (2373.605ms)
+✔ RC14C020 current Git root inode replacement retains record binding refusal rather than inactive admission (2382.6426ms)
+✖ RC14C021 owned Git config alias and hardlink refuse active authority and cannot become inactive admission (2235.3023ms)
+✖ RC14C022 broken relevant linked Git control and unreadable owned config remain fail-closed (4313.4033ms)
+✔ RC14C023 Git common-directory inode replacement invalidates enrollment without changing its record bytes (2868.184ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 37
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 123036.8212
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C009 dedicated malformed record/mode/alias refuse authority; aliases do not cause outside content reads (3095.3594ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'active'
+  - 'unverifiable-active'
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:67:255)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'active',
+    expected: 'unverifiable-active',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C014 broken physical Git control cannot be recast as non-Git enrollment (158.0399ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:89:366)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C018 path-component containment does not select a prefix sibling and selected alias paths cannot authorize decisions (2877.4162ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:120:40)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C021 owned Git config alias and hardlink refuse active authority and cannot become inactive admission (2235.3023ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:145:171)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C022 broken relevant linked Git control and unreadable owned config remain fail-closed (4313.4033ms)
+  Error: EPERM: operation not permitted, open '<home-path>'
+      at writeFileSync (node:fs:2483:20)
+      at put (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:27:100)
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:168:309)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'open',
+    path: '<host-path>'
+  }
+
+--- stderr ---

@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HGO-D2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "e7db47331",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "bee665399"
+  ],
+  "resultSha256": "0af85922574c954b061e1fb8f2a5f514d35b66cd16bf560057778d61010d1201",
+  "report": {
+    "text": "WIN-HGO-D2-20261009 completion report (goldfish-deep, Sonnet 5.5 / xhigh). Implementation complete, independent review: pending, PO acceptance pending.\n\nRoute pre-check: class is diagnosis (no code edit), not A/G/S. Requested route: goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed (this dispatch's runtime prompt): \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction. GUARD-BOOTSTRAP-RECEIPT-MISSING fired once on the first Write; I ran the named preflight once (exit 0) and retried.\n\n1. DoD results\n- Per-chunk captures (evidence/WIN-HGO-D2-20261009/chunk-*.txt): passed (three chunks written).\n- Report updated with a dated D2 section, each open case settled: passed.\n- One commit of the report: passed, bee665399 \"docs(alfred): settle the open native human-guard-override classifications\" (SHA taken from the commit output).\nVerdicts: (a) the 4 T90 pins are green after T90 (lib 6/6 matched by the (v) pattern, script :934 1/1). (b) Held-lock case (lib :2814, asserts :2829/:2835): TEST fault. win32AuditLockOwnerState (human-guard-override.mjs:2416-2429) has no \"live\" return by documented design (comment :2412-2415), so acquireAuditLock (:2559-2560) can only throw the ambiguous refusal (ambiguousAuditLockRefusal :2460), never HGO-AUDIT-LOCKED; the lock is still preserved (fail-closed). S4 becomes a test-only slice (accept HGO-AUDIT-LOCK-AMBIGUOUS on win32), P1 withdrawn. (c) CROSSREPOGUIDANCE-1a/1b: TEST fault. Raw text: actual backslash spelling of the temp directory (as returned by recordHumanGuardDenial, native), expected forward-slash spelling from git rev-parse --path-format=absolute --show-toplevel; same directory; plan.root === recorded.root passed. Fix: normalize the git output at :5829 and :5991. The D report's :5963 position for 1b is stale; it is now :5979 (assert :5991).\n\n2. Evidence (all native Windows, repo root as cwd)\n- chunk-1-lib-t90-pins.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... -- node --test --test-name-pattern=\"T90-T2 \\(v\\)\" plugins/pipeline-core/lib/human-guard-override.test.mjs ; wrapped exit 0 ; 6 pass, 0 fail.\n- chunk-2-script-t90-pin.txt: same wrapper, node --test --test-name-pattern=\"repair-audit prints the typed audit-lock recovery\" plugins/pipeline-core/scripts/guard-human-override.test.mjs ; wrapped exit 0 ; 1 pass, 0 fail (17.5 s).\n- chunk-3-heldlock-and-crossrepo.txt: same wrapper, node --test --test-name-pattern=\"failed repair or ordinary append never removes|NVA-CROSSREPOGUIDANCE-1\" plugins/pipeline-core/lib/human-guard-override.test.mjs ; wrapped exit 1 ; 3 fail (expected reds, the open cases; longest 23 s).\n- Uncaptured direct run of the CROSSREPOGUIDANCE pattern (same file) for the unsanitised text: exit 1, 2 fail; read in-session only, its content is recorded in the report in placeholder form (no host path written).\n- Finalizer dry run: node scratch/finalize-WIN-HGO-D2.mjs --dry ... exit 0.\n\n3. Changed files\n- specs/sprint-alfred-epic/evidence/win-hgo-d-native-reds-2026-10-09.md: appended the dated D2 section (settled classifications, updated slice list). The only hunk, confirmed with git diff before staging.\n- Untracked, git-ignored by design and not committed: evidence/WIN-HGO-D2-20261009/chunk-*.txt, evidence/dispatch-record-WIN-HGO-D2-20261009.json, scratch/finalize-WIN-HGO-D2.mjs, scratch/report-WIN-HGO-D2.txt, scratch/commit-msg/WIN-HGO-D2-20261009.txt.\n\n4. Deliberately not changed\n- Every source and test file (forbidden). The 17 other lib reds of sections A/B/C were not re-run natively in chunks; their classification still rests on the T90 capture. The stale :5963 reference in section C of the earlier report was left as history; D2-3 states the current position. No background job was touched. The foreign modified/untracked files in the working tree were not touched.\n\n5. Deviations from spec\n- GF-09-D \"append to the record log as findings land\": the record's log carries only the opening entry plus the finalizer's entry; per-chunk log entries were skipped to stay inside the 50-call budget. The evidence pointers above and the captures on disk carry the same information. The log's toolUses values are approximate; the hook-counted figure is authoritative (hand-back notice at call 40).\n- The briefing named no calibration file; the bootstrap line disclosed that.\n\n6. Open items\n- independent review: pending (only the Elephant may dispatch the Critic).\n- PO acceptance pending.\n- Follow-up slices proposed in the report: S1, S2, S3 (now including the CROSSREPOGUIDANCE normalization), S4 (test-only, win32 ambiguous expectation); re-confirm the 17 un-re-run reds per slice with targeted chunks. Optional, not recommended without a ruling: a same-process \"live\" proof on win32.\n- The DISPATCH-BUDGET-CHECKPOINT hand-back notice fired at call 40; the work was already complete and the closing sequence (commit, record, report) was run within the remaining budget.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/evidence/win-hgo-d-native-reds-2026-10-09.md"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read, preflight run, record created",
+      "toolUses": 11
+    },
+    {
+      "phase": "finalized at call 48 (hook-counted)",
+      "toolUses": null
+    }
+  ]
+}

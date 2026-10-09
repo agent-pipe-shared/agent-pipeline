@@ -1,0 +1,4 @@
+# compare before=evidence/WIN-AP-F3-20261009/wsl-after.txt after=evidence/WIN-AP-T3b-20261009/wsl-after.txt
+CHANGED: F1: without an emitWarning seam the repair surfaces as a typed process warning, so every caller sees it (seam-driven win32): fail -> pass
+CHANGED: ensureAgentPipelineRoot (Ruling 141 D0 root entry point): fail -> pass
+# unchanged: 117

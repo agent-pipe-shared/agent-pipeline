@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R7-3-F1e2-20261009",
+  "agent": "goldfish-deep",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (R7-3 family)",
+  "outcome": "in-progress",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "bootstrap done: obligations + CONT17 header + goldfish-task field 6 read; repo preflight run (ready; plugin-refresh advisory only); route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the dispatch runtime prompt, match; predecessor record read; first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, loaded-root preflight run alone (status ready), opening record written", "toolUses": 10 },
+    { "phase": "step 1 (with the change, WSL): DWP21 RED, assertion at design-workflow-package.test.mjs:936, {\"ok\":false,\"code\":\"DAA-PUBLIC-UNAVAILABLE\"}, wrapped exit 1", "evidence": "evidence/R7-3-F1e2-20261009/dwp21-with.txt", "toolUses": 14 },
+    { "phase": "step 2 prep: change saved as scratch/dispatch-wip/R7-3-F1e2/change.capture (capture-evidence header lines 1-7, then the git diff); blob hash of the changed file 90254953832ff7b7f0e33e68a9f12c4a541ac029 (= the diff 'index ..902549538'). git diff --output= refused (GUARD-READ-COMMAND-UNSUPPORTED)", "toolUses": 20 },
+    { "phase": "step 2 (without the change, WSL): git restore of the production file to HEAD, then DWP21 RED, same test, same line :936, same DAA-PUBLIC-UNAVAILABLE, wrapped exit 1. git apply of the saved capture refused (GUARD-TESTPATH-SHELL-FAULT: mutating git apply has unbound patch targets)", "evidence": "evidence/R7-3-F1e2-20261009/dwp21-without.txt", "toolUses": 23 },
+    { "phase": "change re-applied through five in-tree Edits reproducing the saved diff; git hash-object of the file = 90254953832ff7b7f0e33e68a9f12c4a541ac029, byte-identical to the saved blob. The change is in the tree, UNCOMMITTED", "toolUses": 31 },
+    { "phase": "discrimination read: DWP21 is red identically with and without the change (captures differ only in timing, HEAD and tree id). Budget checkpoint fired at call 36 of 45 before the four-file DoD, the consumer-safe check and the commit ran. HAND-BACK, nothing committed", "evidence": "evidence/R7-3-F1e2-20261009/dwp21-with.txt, evidence/R7-3-F1e2-20261009/dwp21-without.txt", "toolUses": 36 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "four-file WSL DoD with the change at HEAD into evidence/R7-3-F1e2-20261009/after.txt (expect 33/34, only EVDESC-h red)",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs (exit 0)",
+      "the single commit of plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "file left modified and uncommitted: plugins/pipeline-core/lib/design-workflow-package.mjs (the F1e change, blob 90254953832ff7b7f0e33e68a9f12c4a541ac029)"
+    ],
+    "nextBriefingAdjustments": [
+      "Step 2 is DECIDED: DWP21 is red without the change; the branch to run is 'red for the same reason', so the continuation starts at the four-file DoD, not at the discrimination.",
+      "Grant at least 12 calls: four-file WSL run, read the capture, consumer-safe check, read the prepared message, edit its Dispatch trailer, git add, git commit, checkpoint write, final write.",
+      "Do not re-run git restore or git apply: git diff --output= and git apply of a capture file are refused by the shell guard; the in-tree Edit route works and git hash-object verifies byte identity."
+    ]
+  },
+  "report": {
+    "text": "INTERIM (closing-allowance style hand-back at the budget checkpoint, call 36 of 45). Discrimination DECIDED; commit NOT made; implementation complete only in the tree; Critic review pending; PO acceptance pending. See the final message for the six-part report. Key result: DWP21 (design-workflow-package.test.mjs:936, DAA-PUBLIC-UNAVAILABLE) is red WITHOUT the F1e change as well as with it, so the change does not cause the DWP21 red. Remaining: four-file DoD, consumer-safe check, commit.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-package.mjs"
+    ]
+  }
+}

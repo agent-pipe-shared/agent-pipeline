@@ -1,0 +1,60 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-F4-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "e7db4733179edbf43cf4a9867aef94a2edfd9533",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "b20f9123c75f1e17e159f3933e610b2f11d8bcd1"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created; obligations and briefings read; preflight run once",
+      "toolUses": 15
+    },
+    {
+      "phase": "edit applied; scratch scaffolding built",
+      "toolUses": 36
+    },
+    {
+      "phase": "manifest section appended",
+      "toolUses": 41
+    },
+    {
+      "phase": "terminal record written (commit, report, resultSha256 in one write)",
+      "toolUses": 47
+    }
+  ],
+  "resultSha256": "8cd82d190935a41b437765fe25a606dc9a37bb45f311ede335bfae2baa5cf3ce",
+  "report": {
+    "text": "Closing state: implementation complete, one commit (b20f9123c); independent review: pending; not PO-accepted. Not a closing-allowance handover: the work was done and committed at counted call 45 of 55 (the 80 % notice arrived at call 44, the git add).\n\nRoute pre-check (class G): requested route goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed effective identity, from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5, exact model ID claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- Pins (l), (m), (n) green on WSL, whole test post-image: passed. 106 tests, 101 pass, 3 fail, 2 skipped. The three failures are exactly the three accepted 10 s timeouts of TR-G-T5 (orchestrating-session never-limited, orchestrator observation-sink, implementor base cap 40); every other case keeps its TR-G-T5 state (98 pass / 6 fail before, now 101 / 3).\n- Pins (p), (q) and (j) green natively, nothing else changes: passed. 17 tests, 15 pass, 0 fail, 2 skipped ((d), (e), POSIX-host pins with their typed skip text).\n- TR-G-F4 section in TR-G-MANIFEST.md (base sha, new sha256, bytes, anchored edits, commands): passed.\n- consumer-safe-paths: passed, node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0, 9/9 (terminal output only).\n- One commit with the briefed subject: passed.\n\n2. Evidence\n- evidence/TR-G-F4-20261009/wsl.txt (wrapped exit 1, the three accepted timeouts): wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F4-20261009/wsl.txt --label TR-G-F4-wsl -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-F4/guard-dispatch-budget.trf4.test.mjs\"\n- evidence/TR-G-F4-20261009/native.txt (wrapped exit 0): node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F4-20261009/native.txt --label TR-G-F4-native -- node --test --test-reporter=spec --test-name-pattern=\"TR-G T49\" scratch/dispatch-wip/TR-G-F4/guard-dispatch-budget.trf4.test.mjs\n- Redirect proof TRF4-REDIRECT-FIRED in both (WSL 137 runner-child loads, native 15). Scratch test body sha256 c9907cbf... equals the TR-G-T5 body, so the test post-image is unchanged (sha256 0bda864c..., 133519 bytes).\n- Guard post-image: base sha256 2ec5a564dc05f47d188bd3486919ee05dc9d232ba232b277ad8f76756012d808 (86028 bytes), new f7649839d83cfaad1f4163269a07284e91efe71751e3b3634f09b92ccbfa4c4f (87604 bytes, LF, 1520 lines).\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs: GIT_CLOSING_VERB_PATTERN anchored to /^git\\s+(add|commit)(\\s|$)/u; blocked() takes producerPath and, while closing slots remain, names the one admitted absolute producer path (relative spelling refused, win32 bare-backslash rule); the one blocked(...) call site passes join(resolveAgentPluginRoot(...), \"scripts\", COMMIT_FLOW_PRODUCER_SCRIPT); isCommitFlowProducerCommand refuses an unquoted token containing a backslash when process.platform is win32.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md: TR-G-F4 section appended (the previous file ending was normalised to one trailing newline before the append).\n\n4. Deliberately not changed\n- Test post-image, live hooks/ and lib/guard/, tranche README, push. The header doc comment of the guard (lines 98-101, describing the producer lane) was left as is; the new comments sit at the edit sites. Untracked evidence and scratch files are not committed (evidence/ is git-ignored).\n\n5. Deviations from spec\n- None.\n\n6. Open items\n- independent review: pending (next batched Opus Critic, Ruling 156); PO acceptance pending.\n- Not run: macOS, Codex, Antigravity; the native whole-file run (only the T49 pattern natively, as briefed). Pin (j) is green natively against the new guard.\n- evidence/dispatch-record-TR-G-F4-20261009.json and evidence/TR-G-F4-20261009/* are untracked (git-ignored).\n- closingAllowance: committed b20f9123c (guard post-image + manifest); verifiedGreen as listed above; remainsUndone none; nextBriefingAdjustments none.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs"
+    ]
+  }
+}

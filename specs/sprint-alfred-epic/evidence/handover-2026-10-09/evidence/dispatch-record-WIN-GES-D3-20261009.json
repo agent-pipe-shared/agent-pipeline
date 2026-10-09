@@ -1,0 +1,62 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-D3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "267fd4e29"
+  ],
+  "resultSha256": "c7f486ac9cee7812dc7500a85f46647b2f4d6224f9c1d62590320a4b06b6d7b0",
+  "report": {
+    "changedFiles": [
+      "specs/sprint-alfred-epic/evidence/win-ges-d3-reharden-2026-10-09.md"
+    ],
+    "text": "Route pre-check: requested claude-sonnet-5-5 / xhigh; field 6 names no MP-07 A/G/S route (the slice is labelled security-adjacent); observed model identity claude-sonnet-5-5 (this dispatch's runtime prompt); no contradiction. independent review: pending. Outcome: COMPLETED (diagnosis delivered and committed). NOT a closing-allowance handover: the 80 % notice arrived at hook call 28 when the goal work was already finished; what followed was commit and record.\n\n1. DoD results.\n(a) Note with exact calls, result codes per call, divergence file:line, classification and a one-module-each slice pair: passed (specs/sprint-alfred-epic/evidence/win-ges-d3-reharden-2026-10-09.md).\n(b) One commit of the note only, exact subject: passed (267fd4e29).\n(c) No production or test edit, no WSL run: respected. Stop conditions: none triggered (at most 2 child processes per hardener call, windowsHide true on every instrumented spawn; console windows not observable from a dispatch).\nVERDICT: product defect, not a fixture fault. hardenWindowsPrivateDirectory returns secure on the first call against a directory and unavailable on every later call (3 of 3 repeats, also with a child present): the child PowerShell exits 1 at Set-Acl (windows-private-state.mjs:77) with PrivilegeNotHeldException (SeSecurityPrivilege); :129 collapses that into 'unavailable'. assertRestrictedRoot (governance-event-store.mjs:231) hardens whenever create:true, and putRestrictedGovernanceEvent (:1716) always passes it, so every put into an already-hardened root is refused (probe B3/B4/D3/D4 reproduce the :1138 failure from a plain temp root, with and without the spawn wrapper). The fixture (test :1145) is correct.\nSlice pair: (1) windows-private-state.mjs, pin 'three consecutive hardener calls on one fresh directory each return secure' (win32-native, typed skip elsewhere, red at call 2), fix shape assess-first and skip the script when already secure; (2) governance-event-store.mjs, pin 'create:true on an existing root assesses and never hardens' (platform-independent via the io seam, red today), fix shape use mkdir's return value as 'created'. Slice 1 first; slice 2 serialised with WIN-GES-F4 / WIN-AP-S3 (same file).\n\n2. Evidence. Command: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-GES-D3-20261009/probe.txt --label native -- node scratch/dispatch/win-ges-d3-a1/probe.mjs, wrapped exit code 0. Artifacts: evidence/WIN-GES-D3-20261009/probe.txt (machine-written), evidence/WIN-GES-D3-20261009/probe.mjs (copy of the probe). Prior art read: evidence/WIN-GES-T3-20261009/native.txt:78-90. check-consumer-safe-paths not run (docs-only DoD).\n\n3. Changed files. specs/sprint-alfred-epic/evidence/win-ges-d3-reharden-2026-10-09.md (new, committed): the diagnosis note. Not committed by design: evidence/WIN-GES-D3-20261009/*, this record, scratch/ files.\n\n4. Deliberately not changed. All production and test files; worktree-lifecycle.mjs (call sites :352 and :1395 seen by grep only, context not read); windows-private-state.test.mjs (single hardener call at :107); the foreign staged and dirty files in the shared index.\n\n5. Deviations. (i) The probe adds experiments beyond the briefed pair: three hardener calls instead of two, a children-present run (C), and a default-io control without any spawn wrapper (D); all inside the 'reproduce the store path' intent. (ii) The capture header records head e51844ab8, not the briefed candidate 4ef3071a6: the shared tree advanced during the run. The files analysed are the working-tree files the probe executed; I did not diff them against the candidate. (iii) Field 6's one-write rule was honoured by a finalizer script (scratch/dispatch/win-ges-d3-a1/finalize-record.mjs) that computes resultSha256 and writes the terminal record once, as the call right after the commit, so there is no separate interim checkpoint write. (iv) The opening record write was refused once with GUARD-BOOTSTRAP-RECEIPT-MISSING; the preflight was run once and the identical write retried. (v) Hook-counted tool uses: 28 at the note write, about 33 at close by my own tally.\n\n6. Open items. (A) MECHANISM UNPROVEN: the failing statement, exit status and privilege name are measured; why the same Set-Acl needs SeSecurityPrivilege only against an already-protected DACL, and whether an elevated token passes, was not probed. The slice-1 author must probe that before choosing between assess-first and a section-limited .NET persist (the batch observer at windows-private-state.mjs:94-96 already uses Access,Owner sections). (B) Untested: elevated token, non-German locale, Codex/Antigravity on Windows; POSIX/WSL unaffected by the proposed changes (win32-only branch). (C) worktree-lifecycle.mjs:1395 is a second likely victim of the non-idempotent hardener; unverified. (D) Assess-first would skip a directory that is secure only by inheritance, because the observer returns no DACL 'protected' bit; a design decision. (E) Slice 2 changes behaviour for a pre-existing unhardened root with create:true (refused instead of fixed): PO/Elephant call. (F) The :1138 body after :1165 (inspect, replay, conflict, erasure) has never run natively; a further red may sit behind it. (G) independent review: pending; PO acceptance pending; evidence and this record stay untracked by repository convention."
+  },
+  "log": [
+    {
+      "phase": "opening: record created after reading agent-obligations, CONT17 header, CONT18 (whole file), goldfish-task 455-481; route pre-check matched (requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 from runtime prompt); preflight run once after GUARD-BOOTSTRAP-RECEIPT-MISSING",
+      "toolUses": 8
+    },
+    {
+      "phase": "orientation done (store 200-260, hardener module, T3 native.txt, Ruling 143); advisor consulted",
+      "toolUses": 23
+    },
+    {
+      "phase": "probe written and run natively (19 spawns, wrapped exit 0): second harden exits 1 at Set-Acl SeSecurityPrivilege; store route reproduces the :1138 failure",
+      "toolUses": 26
+    },
+    {
+      "phase": "cross-caller greps; note and commit message written; 80 percent notice at call 28",
+      "toolUses": 28
+    },
+    {
+      "phase": "committed 267fd4e29; terminal record written in one write by the finalizer",
+      "toolUses": 33
+    }
+  ]
+}

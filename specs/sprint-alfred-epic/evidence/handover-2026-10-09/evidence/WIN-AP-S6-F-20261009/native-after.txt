@@ -1,0 +1,119 @@
+command: node scratch/dispatch-wip/WIN-AP-S6-F/run-after.mjs all
+label: WINAPS6F-native-after
+exitCode: 1
+head: dd25190e3ec0a97f7d14fe54b6f8ef0019d43d11
+tree: 00b204668dc938b7aa5b03b1fc45c327cd12dcb1
+dirty: true
+--- stdout ---
+=== plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs 
+✔ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (1699.2722ms)
+✖ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (494.5367ms)
+✖ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (533.8194ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (1170.9333ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (2408.4788ms)
+✔ pin (f) private-boundary.ensurePrivateDirectory: leaves the agent-pipeline segment private on a fresh repository (1596.2056ms)
+✔ pin (g) private-boundary.ensurePrivateDirectory: repairs a pre-existing insecure agent-pipeline segment in place (2751.9813ms)
+✔ pin (h) private-boundary.ensurePrivateDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (3029.4672ms)
+✔ pin (f) human-guard-override.secureDirectory: leaves the agent-pipeline segment private on a fresh repository (1663.3133ms)
+✔ pin (g) human-guard-override.secureDirectory: repairs a pre-existing insecure agent-pipeline segment in place (2961.2254ms)
+✔ pin (h) human-guard-override.secureDirectory: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning (2426.5207ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20743.3122
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\agent-pipeline-root-creation.test.mjs:107:1
+✖ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (494.5367ms)
+  AssertionError [ERR_ASSERTION]: pin (b): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)
+      at assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+      at file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:118:5
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:108:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\agent-pipeline-root-creation.test.mjs:122:1
+✖ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (533.8194ms)
+  AssertionError [ERR_ASSERTION]: pin (c): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)
+      at assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+      at file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:132:5
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:123:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+WINAPS6-REDIRECT-FIRED private-boundary.mjs (1 loads)
+WINAPS6-REDIRECT-FIRED human-guard-override.mjs (1 loads)
+=== exit 1
+=== plugins/pipeline-core/lib/private-boundary.test.mjs 
+WINAPS6-REDIRECT-NOT-FIRED private-boundary.mjs (0 loads)
+WINAPS6-REDIRECT-NOT-FIRED human-guard-override.mjs (0 loads)
+=== exit 1
+=== plugins/pipeline-core/lib/human-guard-override.test.mjs --test-name-pattern secureDirectory|native Windows private-state assurance
+✔ native Windows private-state assurance is injected and fail-closed (4.6478ms)
+✔ secureDirectory hardens EVERY newly-created path component, not only the leaf (NVA-PAWINACL-2) (1.9489ms)
+✔ secureDirectory only ASSESSES an already-secure existing parent, never re-hardens it, when adding a new child (NVA-PAWINACL-2) (1.3729ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20.7453
+WINAPS6-REDIRECT-FIRED private-boundary.mjs (1 loads)
+WINAPS6-REDIRECT-FIRED human-guard-override.mjs (1 loads)
+=== exit 0
+
+--- stderr ---
+(node:20188) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20188) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+(node:20188) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+(node:20188) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+(node:20188) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<host-path>' imported from <host-path>
+    at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+    at moduleResolve (node:internal/modules/esm/resolve:879:10)
+    at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+    at nextResolve (node:internal/modules/esm/hooks:785:28)
+    at AsyncLoaderHooksOnLoaderHookWorker.resolve (node:internal/modules/esm/hooks:269:30)
+    at MessagePort.handleMessage (node:internal/modules/esm/worker:251:24)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:856:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///<repo-root>/plugins/pipeline-core/lib/private-boundary.test.mjs'
+}
+
+Node.js v24.20.0

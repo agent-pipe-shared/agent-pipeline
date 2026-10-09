@@ -1,0 +1,20 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs
+label: lib-claude-intake-prompt-capture
+exitCode: 0
+head: 3211c15eafe9d042e29ced644e0581853907a0c6
+tree: cae39dbc20f88836d4da65f38315c975eb5ba108
+dirty: true
+--- stdout ---
+✔ CIP001 Claude native intake capture preserves only consented pending material and rejects changed authority (128.579855ms)
+✔ CIP002 Claude first prompt pointer stores only private metadata before consent and resolves one exact native row after consent (71.615887ms)
+✔ CIP003 Claude first prompt pointer fails closed on unavailable, ambiguous, and nonhuman transcript rows (62.233355ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1725.825562
+
+--- stderr ---

@@ -1,0 +1,71 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "candidateCommit": "17a0897095be54b0327a82baf7f921a62282c163",
+  "commits": [],
+  "resultSha256": "6f1974f9b2b539d403cbc99864e0342532db6bd85da7a52ada10e75538fa4297",
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER (80 percent checkpoint reached at call 44 of 55). Implementation NOT complete. independent review: pending.\n\n1. DoD results\n- Pin per row, titles name the row: PARTIAL. T49(a) RED right reason, T49(b) GREEN control, T49(c) RED right reason, T37(a) RED right reason, T37(b) GREEN control, T57 GREEN (see deviations), T34 RED for the WRONG reason (fixture defect, not a verdict on the guard): failed.\n- Route (live hooks test never edited; copy run from scratch; final bytes at the tranche-2 path): passed. The final file exists on disk, UNCOMMITTED, and still contains the broken T34 case.\n- Baseline of the unmodified live file under WSL: passed as a capture. 85 tests, 81 pass, 4 fail (three 10 s runner timeouts: orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40; plus R7-11a).\n- Copy run under WSL: 92 tests, 85 pass, 7 fail = the same 3 timeouts + 4 new cases. R7-11a flipped from red (baseline) to green (copy); it is a timing-sensitive concurrency case, so treat it as flaky, not as a change. No other pre-existing case changed.\n- TR-G-MANIFEST.md: not written. consumer-safe check: not run. Commit: not made.\n\n2. Evidence\n- evidence/TR-G-T-20261009/baseline.txt: wsl.exe -e bash -lc \"cd <repo-root>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T-20261009/baseline.txt --label TR-G-T-baseline -- node --test --test-reporter=spec plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs\", wrapped exit 1.\n- evidence/TR-G-T-20261009/red.txt: same command, label TR-G-T-red, file scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs, wrapped exit 1.\n- Build: node scratch/dispatch-wip/TR-G-T/build.mjs, exit 0. liveSha256 e92bc503189bec44737699058643d6023230f38c196ad53e581765de2dc52a4d; finalSha256 773c5ed87869ef0b95c1e2855896b838e0688d02285dec54540ef339d8032f9b (will change when T34 is fixed); eol lf.\n- Reasons (red.txt): T49(a)/(c): producer call 6 of the run is refused with DISPATCH-BUDGET-EXHAUSTED (only git add/commit are closing verbs). T37(a): second same-role child under one parent tool id is refused with DISPATCH-BUDGET-INPUT-INVALID (DBB-PENDING-BINDING-MISSING), no re-dispatch wording. T34: Error GS-PLAN thrown by applyGovernanceScopeDecision (governance-scope.mjs:287) for the decline plan.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: UNCOMMITTED post-image = live file + 7 appended cases + assumptions header (no existing line changed).\n- scratch/dispatch-wip/TR-G-T/ (ignored, this machine only): pins.append.mjs.txt (the appended block), build.mjs (writes the final file and the runnable copy with the two import anchors swapped), guard-dispatch-budget.test.mjs (runnable copy), record.mjs.\n- evidence/TR-G-T-20261009/baseline.txt and red.txt, evidence/dispatch-record-TR-G-T-20261009.json (this record).\n\n4. Deliberately not changed\n- Production hooks and libs; the live hooks test; the tranche README; the other post-images. The 4 baseline reds were not touched (three are 10 s timeouts of observeGovernanceScope-heavy scenarios under WSL on the Windows mount, which is the T34 symptom itself).\n\n5. Deviations from spec\n- The capture used --test-reporter=spec (the briefing command shows plain node --test) so per-case results are readable.\n- The final file was produced by a Node build script (live bytes + pin block), not by the Write tool, so the post-image is byte-exact to the live file by construction and the scratch copy differs only by two import anchors.\n- T57: the budget guard own exhaustion denial ALREADY shows the charge (counted attempts), working cap and remaining closing slots (guard-dispatch-budget.mjs:228-245). Ruling 115 says no refusal prints its charge, which cannot be true of this guard. The pin is therefore GREEN (regression guard); the unmet half is refusals of OTHER guards and cannot be expressed in this file. Elephant should confirm this reading of TR-K4.\n- T34: the speed-up is not expressible (no seam, no decided cache location); only the invariant (a state change recomputes) is pinned, GREEN-expected.\n- T37 accepts either cure the row names (admit per dispatch, or refusal naming a re-dispatch action); the same-tool-id construction is an assumption (header A1). Side finding: that refusal also says the persisted counter was left unchanged and to repair it through the trusted host path, which is misleading for a first-call binding miss.\n\n6. Open items (closing-allowance handover)\n- Committed: nothing committed. Verified green: baseline capture ran (red-by-design set above); no DoD check is fully green.\n- Remains undone: (a) fix T34: most likely cause is that apply needs the same option as the enroll helper, i.e. applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 }); confirm by reading governance-scope.mjs around line 287 first (GS-PLAN); if a decline cannot be expressed, replace the case with the corrupt-state-file variant or report T34 as not expressible. (b) Edit pins.append.mjs.txt, run node scratch/dispatch-wip/TR-G-T/build.mjs, rerun the WSL copy capture, expect T34 green. (c) write TR-G-MANIFEST.md (target path, finalSha256 from build output, WSL command, per-pin state above). (d) node --test harness/scripts/check-consumer-safe-paths.test.mjs. (e) commit message file with the two trailers, git add -- the post-image and manifest, git commit -F ... -- those two paths. (f) checkpoint the record, then the final report.\n- Uncommitted and incomplete: the tranche-2 post-image above (contains the broken T34 case; do not commit as is).\n- Next briefing must say differently: budget at least 16 calls and point at this record instead of re-orienting; the scratch/dispatch-wip/TR-G-T/ files exist only on this machine (ignored); use a new task id for the continuation because this record is terminal.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "T34 pin fixture (GS-PLAN on decline apply)",
+      "rebuild and WSL re-run of the copy",
+      "TR-G-MANIFEST.md",
+      "consumer-safe check",
+      "commit of post-image plus manifest",
+      "UNCOMMITTED: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ],
+    "nextBriefingAdjustments": [
+      "budget at least 16 calls",
+      "point the continuation at this record and at scratch/dispatch-wip/TR-G-T/",
+      "new task id for the continuation"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening: bootstrap preflight (twice, first Write refused until run from the loaded plugin root), orientation reads",
+      "toolUses": 23
+    },
+    {
+      "phase": "design settled; baseline, pin block, build script written; baseline and copy captured under WSL",
+      "toolUses": 44
+    },
+    {
+      "phase": "80 percent checkpoint hit at call 44; red.txt read for T34 diagnosis; handback written, nothing committed",
+      "toolUses": 47
+    }
+  ]
+}

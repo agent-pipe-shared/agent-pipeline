@@ -1,0 +1,260 @@
+command: node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs
+label: TR-G-T-red
+exitCode: 1
+head: d056137d20460d1128dff087c5e053f952bc816f
+tree: 480fa80a83384645db8e4e97f9beca7a0f0e9604
+dirty: true
+--- stdout ---
+✔ subagentIdentity: transcript_path under a subagents/ directory with valid meta.json resolves as a dispatched subagent (1384.269865ms)
+✔ subagentIdentity: transcript_path NOT under a subagents/ directory resolves as the orchestrator (1704.562814ms)
+✔ subagentIdentity: missing transcript_path is unresolved (ambiguous), not orchestrator (1580.160019ms)
+✔ subagentIdentity: a present but relative transcript_path is a distinct kind, never merged into 'unresolved' (1932.266639ms)
+✔ subagentIdentity: a present but non-string, non-null transcript_path is invalid-identity, not unresolved (2014.022588ms)
+✔ subagentIdentity: a null transcript_path is unresolved (treated as absent), not invalid-identity (1621.625954ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id is the orchestrator to this guard regardless of its transcript_path shape -- exit 0 (2086.735388ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent_id writes no counter and no unresolved.jsonl -- it is the orchestrator to this guard, full stop, whatever its transcript_path looks like (2161.402513ms)
+✔ subagentIdentity: missing sibling meta.json is unresolved (1392.815879ms)
+✔ subagentIdentity: spawnDepth that is not a number >= 1 is unresolved, never force-fit (1306.405988ms)
+✔ resolveMaxTurns: reads the live maxTurns value out of a real agent definition's frontmatter (no mocking) (1623.706347ms)
+✔ resolveMaxTurns: unknown agent name resolves null rather than throwing (1329.360142ms)
+✔ resolveGitCommonDir: resolves a real .git directory in this checkout (no mocking) (1899.099648ms)
+✔ evaluateDispatchBudgetGuard: counts across calls, allowing every call up to the working cap (3200.510365ms)
+✔ evaluateDispatchBudgetGuard: refuses a non-closing working call once the cap is crossed (3217.656526ms)
+✔ evaluateDispatchBudgetGuard: malformed persisted counts fail closed without being reset or overwritten (7198.762664ms)
+✔ evaluateDispatchBudgetGuard: each permitted closing act still passes after the cap (3756.026939ms)
+✔ evaluateDispatchBudgetGuard: exactly five post-cap closing calls pass and the sixth is denied (5718.718708ms)
+✔ evaluateDispatchBudgetGuard: a denied work attempt consuming the final slot reports closing exhaustion (4632.024318ms)
+✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10012.493492ms)
+✔ evaluateDispatchBudgetGuard: the orchestrator branch records exactly one bounded observation for its session (NVA-BUDGETROOT-1) (1876.362494ms)
+✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10011.68958ms)
+✔ evaluateDispatchBudgetGuard: rootDir precedence -- assert the actual resolveGitCommonDirFn argument in all three precedence cases (5353.351887ms)
+✔ evaluateDispatchBudgetGuard: a null git common dir is observed on stderr, and the allow verdict is unchanged (1637.497841ms)
+✔ evaluateDispatchBudgetGuard: orchestrator with an unresolvable common dir is still allowed, observed via stderr only, and persists nothing (2055.776895ms)
+✔ evaluateDispatchBudgetGuard: a write failure in the new orchestrator observation sink never changes the allow verdict (2014.808111ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a subagents/-shaped transcript_path with no agent_id is still the orchestrator to this guard -- transcript_path shape is no longer read at all for this guard's own identity step (1843.19137ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): an unresolvable maxTurns (unknown agent_type carried directly on the payload) still allows and records (1980.234736ms)
+✔ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (8616.751441ms)
+✔ an altered pending record cannot overwrite an already-bound child counter (2309.924577ms)
+✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10012.379259ms)
+✔ a budget-bearing child with an attested parent tool id but no pending binding fails closed (1615.2912ms)
+✔ a live counter owner blocks a second acquisition and releases its exact inode (1501.047265ms)
+✔ a complete lock in its two-link publication interval is retryable contention (1554.195978ms)
+✔ a binding lock left by a dead process is identity-checked and recovered (3038.708004ms)
+✔ concurrent authenticated child calls serialize counter RMW without lost increments (3649.553223ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the two measured live PreToolUse payload key sets are pinned as fixtures (0.199794ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured subagent-shaped fixture is counted -- a counter file is written carrying its agentId and agentType (1859.999906ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the measured orchestrator-shaped fixture is never counted -- no per-agent counter file is ever written for it (1892.69991ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying agent_type without agent_id is recorded as unattributable, not silently absorbed into the orchestrator marker (2118.847869ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a blank agent_id is recorded as unattributable, not the orchestrator (1704.931062ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): a payload carrying a non-string agent_id is recorded as unattributable with its raw value preserved (1803.539496ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGETVIS-1): the three identity shapes land in three disjoint sinks -- counted, marker-only, and unresolved-only (2584.932958ms)
+✔ evaluateDispatchBudgetGuard: workingCap always equals each agent's own maxTurns minus the documented reserve (10612.161669ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): repeated unresolved identity observations are bounded once per session and reason (2806.806301ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): unresolved observation keys separate session, reason, and fallback session buckets (3099.427262ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): max-turns-unresolvable is deduplicated and sink failures remain fail-open (2569.194902ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): malformed and absent session identities share the explicit fallback bucket, retain legacy JSONL, and clean partial writes (3174.077989ms)
+✔ evaluateDispatchBudgetGuard (NVA-B-BUDGET-RESIDUE-1): concurrent real-filesystem callers claim one complete same-key observation (2421.805653ms)
+✔ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (3906.741887ms)
+✔ R7-11b: the wait variant recovers a lock left by a provably dead holder at once, without waiting out the bound (4388.92066ms)
+✔ R7-11b: the wait variant keeps a malformed lock fail-closed under its existing code and never waits for it (1384.212086ms)
+✔ R7-11b: the hook admits and counts exactly once a call whose lock was left by a provably dead holder (3621.158132ms)
+✔ R7-11c: a lock held for agent A leaves agent B's call admitted with no wait; the counters stay independent (3468.797103ms)
+✔ R7-11c: two agents each making concurrent calls are all admitted and keep separate counters, with agent A's lock held throughout the first contention (3949.273477ms)
+✔ R7-11d: COUNTER_LOCK_WAIT_BOUND_MS is exported as a positive integer ceiling of a few seconds (0.145403ms)
+✔ R7-11d: a live holder beyond the bound yields counter-lock-timeout naming the holder age, and the holder is left intact (2242.872775ms)
+✔ R7-11d: a holder that releases within the bound lets the call through as soon as the lock is free (1579.703054ms)
+✔ R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing (2927.831376ms)
+✔ R7-11d: at hook level a holder that releases within the bound lets the call through, counted exactly once (1903.332531ms)
+✔ R7-11d-T3: COUNTER_LOCK_WAIT_BOUND_MS is exactly 3000 ms (0.108612ms)
+✔ R7-11d-T3: counter-lock-busy is retried inside the bound and the call is admitted as soon as the lock is free (1367.892467ms)
+✔ R7-11d-T3: counter-lock-changed is retried inside the bound and the call is admitted as soon as the lock is free (1335.72079ms)
+✔ R7-11d-T3: counter-lock-recovery-busy is retried inside the bound and the call is admitted as soon as the lock is free (1334.935944ms)
+✔ R7-11d-T3: counter-lock-recovery-changed is never retried: one attempt, no sleep, refused with its own code (1469.729552ms)
+✔ R7-11d-T3: counter-lock-recovery-malformed is never retried: one attempt, no sleep, refused with its own code (1691.984572ms)
+✔ R7-11d-T3: counter-lock-malformed is never retried: one attempt, no sleep, refused with its own code (1471.247805ms)
+✔ R7-11d-T3: counter-lock-recovery-failed (a genuine dead-owner recovery failure) fails closed at once: one attempt, no sleep (1431.075183ms)
+✔ R7-11d-T5: counter-lock-recovery-raced is a retried benign race (1437.909475ms)
+✔ R7-11d-T3: only counter-lock-changed until the bound times out with counter-lock-timeout and no holderAgeMs (1453.776601ms)
+✔ R7-11d-T3: only counter-lock-recovery-busy until the bound times out with counter-lock-timeout and no holderAgeMs (1426.382225ms)
+✔ R7-11d-T3: a timeout without a holder age never says 'live holder' in the refusal text (1779.984019ms)
+✔ R7-11d-T3: the hook refuses a timeout (with-age) under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT with a retry-the-same-call repair (1686.932567ms)
+✔ R7-11d-T3: the hook refuses a timeout (no-age) under its own typed code DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT with a retry-the-same-call repair (1691.308488ms)
+✔ R7-11d-T3: with no injected clock the wait is monotonic: Date.now jumping back 60000 ms mid-wait ends the call within the bound plus 500 ms of real time (4496.763366ms)
+✔ R7-11d-T4: a recovery lock that vanishes between the EEXIST link attempt and the existence check is not a refusal: the call waits for the winner's live main lock, then is admitted and counted once (3860.329133ms)
+✔ R7-11d-T4: a stale-recovery-lock takeover that hits ENOENT because a parallel caller took it first is retried, admitted and counted once (3900.014221ms)
+✔ R7-11d-T4: a stale-recovery-lock takeover whose republish hits EEXIST because a parallel caller published first is retried, admitted and counted once (3824.938688ms)
+✔ R7-11d-T4: a main-lock republish that hits ENOENT after the dead-owner rename is retried, admitted and counted once (3874.366555ms)
+✔ R7-11d-T4: a genuine I/O failure (EACCES from the rename of the dead main lock into quarantine) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (3510.037444ms)
+✔ R7-11d-T4: a genuine I/O failure (EIO from the link that publishes the recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (3497.115716ms)
+✔ R7-11d-T4: a genuine I/O failure (EPERM from the rename of a stale recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (3482.476871ms)
+✔ R7-11d-T4: a genuine I/O failure (EIO from the unlink of a stale recovery lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (4290.888028ms)
+✔ R7-11d-T4: a genuine I/O failure (EACCES from the link that republishes the main lock) refuses at once, fail-closed, under counter-lock-recovery-failed, never retried, with no counter change (4134.362989ms)
+✔ R7-11d-T4: a main-lock republish that hits EEXIST because a fresh caller published first is retried, admitted and counted once (4075.194258ms)
+✖ TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted (3895.199396ms)
+✔ TR-G T49 (b): after the working cap nothing but the named closing acts is admitted (control, green today) (4891.248932ms)
+✖ TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused (4966.18402ms)
+✖ TR-G T37 (a): a second same-role child under one parent tool id is bound per dispatch, or its refusal names the re-dispatch action (2002.238713ms)
+✔ TR-G T37 (b): concurrent launches under DISTINCT parent tool ids each resolve their own binding (control, green today) (2071.271435ms)
+✔ TR-G T57 (Ruling 115, TR-K4 clause 2): this guard's own denial shows the budget charge -- counted attempts, working cap and remaining closing slots (green today) (4603.378657ms)
+✖ TR-G T34: a governance state change between two guard calls takes effect on the second call -- the scope observation recomputes (invariant for a future cache, green today) (5389.873657ms)
+ℹ tests 92
+ℹ suites 0
+ℹ pass 85
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 288416.342397
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:433:1
+✖ evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes (10012.493492ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:437:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:460:1
+✖ evaluateDispatchBudgetGuard: the orchestrator observation sink is bounded -- one write per session, not one per call (10011.68958ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:466:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:606:1
+✖ an implementor base cap of 40 is limited to the tier-safe cap of 35 (10012.379259ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:609:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1819:1
+✖ TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted (3895.199396ms)
+  AssertionError [ERR_ASSERTION]: the producer after the cap must be admitted -- got: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-EXHAUSTED: this dispatch (pipeline-core:goldfish-deep, agent abc123) has counted 6 tool-call attempts against a working cap of 5 (effective cap min(baseCalls=5, maxTurns=20 minus the fixed 5-closing + 10-safety reserve)).
+  The wor
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1828:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1850:1
+✖ TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused (4966.18402ms)
+  AssertionError [ERR_ASSERTION]: producer closing call 1 of 5 -- got: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-EXHAUSTED: this dispatch (pipeline-core:goldfish-deep, agent abc123) has counted 6 tool-call attempts against a working cap of 5 (effective cap min(baseCalls=5, maxTurns=20 minus the fixed 5-closing + 10-safety reserve)).
+  The wor
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1858:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1871:1
+✖ TR-G T37 (a): a second same-role child under one parent tool id is bound per dispatch, or its refusal names the re-dispatch action (2002.238713ms)
+  AssertionError [ERR_ASSERTION]: a refusal must name the re-dispatch action -- got: BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-INPUT-INVALID: this dispatch (pipeline-core:goldfish-implementor, agent def456) has invalid budget state (DBB-PENDING-BINDING-MISSING).
+  The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1891:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'BLOCKED (guard-dispatch-budget, plugin pipeline-core): DISPATCH-BUDGET-INPUT-INVALID: this dispatch (pipeline-core:goldfish-implementor, agent def456) has invalid budget state (DBB-PENDING-BINDING-MISSING).\nThe persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n',
+    expected: /re-?dispatch/iu,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1933:1
+✖ TR-G T34: a governance state change between two guard calls takes effect on the second call -- the scope observation recomputes (invariant for a future cache, green today) (5389.873657ms)
+  Error: GS-PLAN
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:31:64)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:287:125)
+      at applyGovernanceScopeDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:399:77)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:1945:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'GS-PLAN',
+    ownedGitTopology: false
+  }
+
+--- stderr ---

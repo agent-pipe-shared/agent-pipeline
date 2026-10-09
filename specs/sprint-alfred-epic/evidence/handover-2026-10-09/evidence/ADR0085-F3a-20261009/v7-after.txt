@@ -1,0 +1,16 @@
+command: wsl: node --test scratch/dispatch-wip/f3a-run/guard-devplan-design-approval-v7.test.mjs (scratch run copy of the tranche-2 post-image; only 14 import lines and the GUARD line differ)
+exit: 0
+--- output ---
+▶ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ✔ control: live-shaped v7 record, course store present -> both lanes admit (green today) (2029.006128ms)
+  ✔ target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today) (2055.458594ms)
+✔ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (6577.971705ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9545.068922
+

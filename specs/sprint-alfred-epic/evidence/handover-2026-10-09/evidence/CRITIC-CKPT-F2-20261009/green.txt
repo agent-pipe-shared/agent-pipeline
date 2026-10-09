@@ -1,0 +1,34 @@
+command: timeout 540 node --test --test-reporter=spec --test-name-pattern=CRITIC-CKPT-T[23] scratch/dispatch-wip/CRITIC-CKPT-T3/guard-dispatch-budget.ckpt3.test.mjs
+label: CRITIC-CKPT-F2-green
+exitCode: 0
+head: 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa
+tree: 39b40977bbca9168496586b518c77e8713838f15
+dirty: true
+--- stdout ---
+✔ CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED (32344.158767ms)
+✔ CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39 (27944.900004ms)
+✔ CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance (35161.178022ms)
+✔ CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today) (81075.331628ms)
+✔ CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today) (24379.647016ms)
+✔ CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today) (19353.722747ms)
+✔ CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed (19544.499943ms)
+✔ CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md path stays refused after its own cap (green today) (3904.936177ms)
+✔ CRITIC-CKPT-T3 (a): a Critic Write and a Critic Edit of scratch/dispatch/critic-<id>/critic-notes.md are admitted at call 1 and at call 20 (green today) (20412.730385ms)
+✔ CRITIC-CKPT-T3 (b): a Critic Write of any path but its notes file is refused with a typed code at call 1, before the cap (3512.659966ms)
+✔ CRITIC-CKPT-T3 (c): a Critic Write of any path but its notes file is refused with a typed code at call 20, before the cap (9344.823634ms)
+✔ CRITIC-CKPT-T3 (d): a Critic Edit of any path but its notes file is refused with a typed code at call 1, before the cap (3608.043206ms)
+✔ CRITIC-CKPT-T3 (e): a Critic Edit of any path but its notes file is refused with a typed code at call 20, before the cap (8634.719631ms)
+✔ CRITIC-CKPT-T3 (f): a Critic Write and Edit of scratch/dispatch/other/critic-notes.md are refused with a typed code from call 1, before the cap (T2 open item d4) (2606.809891ms)
+✔ CRITIC-CKPT-T3 (f): a Critic Write and Edit of scratch/dispatch/other/critic-notes.md are refused with a typed code from call 20, before the cap (T2 open item d4) (9098.950096ms)
+✔ CRITIC-CKPT-T3 (g, control): a goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1 stays admitted (green today) (2043.647582ms)
+CKPT3-REDIRECT-FIRED guard-dispatch-budget.mjs (20 runner-child loads served from the tranche-2 guard post-image)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 326890.076768
+
+--- stderr ---

@@ -1,0 +1,129 @@
+09i  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.project-onboarding.v4",
+  "status": "bootstrap-binding-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intent": "onboarding",
+  "repository": {
+    "status": "local-valid-writable",
+    "mode": "local",
+    "gitVersion": "2.53.0",
+    "initializesGit": false,
+    "rootWritable": "passed",
+    "sessionCapability": "not-required",
+    "worktreeCapability": "not-required"
+  },
+  "runtime": {
+    "status": "readback-not-applicable",
+    "sourceSha256": "4b91f3cdb947706e7677a91607b24fa4ebcb850fd9a93dec13e2ab3e555bc831",
+    "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+    "barrierSha256": null,
+    "readbackSha256": null
+  },
+  "continuity": {
+    "status": "absent-pristine",
+    "stateSha256": null,
+    "handoverSha256": null,
+    "historySha256": null
+  },
+  "appServer": {
+    "required": false,
+    "status": "not-applicable",
+    "code": null
+  },
+  "runnerPermissions": {
+    "target": ".claude/settings.local.json",
+    "status": "pending-runtime-initialization",
+    "lanes": [
+      "Bash",
+      "PowerShell"
+    ],
+    "exactEntries": []
+  },
+  "nextAction": {
+    "kind": "command",
+    "executionBoundary": "local-process",
+    "invocation": "agent-tool-call",
+    "mutation": true,
+    "requiresConfirmation": false,
+    "executable": "<wsl-node>",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "bootstrap-acknowledge-chat-apply",
+      "--root",
+      "<temp-repo>",
+      "--plan-sha256",
+      "eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157",
+      "--activate",
+      "--runner",
+      "claude"
+    ],
+    "expected": {
+      "schema": "pipeline.project-onboarding.v4",
+      "statuses": [
+        "bootstrap-binding-required"
+      ]
+    },
+    "guidance": "After the PO explicitly confirms in chat that staging PRD specs/onboarding-c6ec83912c1e/prd_onboarding-c6ec83912c1e.md (sha256 a47c7623b045759d267df982a676ca04d22d7c1f4cf819363f9840e8979528d4) is content-sound and consistent with specs/onboarding-c6ec83912c1e/spec.md (sha256 a2011f200998aa20e0d5d37a42ed9b11e03785b023e08a302d1209eaf17a0385), execute this exact action and read back the lifecycle. Do not ask the PO to edit the PRD or run a second terminal confirmation."
+  },
+  "diagnostics": [
+    {
+      "path": "$.continuity",
+      "code": "bootstrap_binding_required",
+      "message": "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD",
+      "guidance": "ask the PO to review the staging PRD and specification, then have them run the exact attended-terminal acknowledgement action; do not edit an acknowledgement marker manually"
+    }
+  ]
+}
+
+  --- end ---
+
+09a  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs bootstrap-acknowledge-plan --root <temp-repo> --activate --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.bootstrap-plan-acknowledgement-plan.v1",
+  "status": "signature-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intentSha256": "eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157",
+  "prd": {
+    "path": "specs/onboarding-c6ec83912c1e/prd_onboarding-c6ec83912c1e.md",
+    "sha256": "a47c7623b045759d267df982a676ca04d22d7c1f4cf819363f9840e8979528d4"
+  },
+  "spec": {
+    "path": "specs/onboarding-c6ec83912c1e/spec.md",
+    "sha256": "a2011f200998aa20e0d5d37a42ed9b11e03785b023e08a302d1209eaf17a0385"
+  },
+  "requestPath": "scratch/bootstrap-plan-acknowledgement-request-eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157.json",
+  "proofPath": "scratch/bootstrap-plan-acknowledgement-proof-eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157.json",
+  "requestWritten": true,
+  "nextAction": {
+    "kind": "external-operator",
+    "executionBoundary": "attended-external-tool",
+    "invocation": "user-copy-only",
+    "mutation": true,
+    "requiresConfirmation": true,
+    "executable": "<wsl-node>",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sign-intent",
+      "--repo-root",
+      "<temp-repo>",
+      "--request",
+      "scratch/bootstrap-plan-acknowledgement-request-eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157.json"
+    ],
+    "expected": {
+      "schema": "pipeline.po-approval-proof.v1",
+      "intentSha256": "eb63873bf5daaff89a7bddac8b2a1e2daf6006c1a5b00c3e29ae7c5a43a21157"
+    }
+  }
+}
+
+  --- end ---
+

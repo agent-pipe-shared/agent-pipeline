@@ -1,0 +1,43 @@
+command: node --test --test-name-pattern "keeps chat keyless" --test-name-pattern "reuses a key already at the canonical" --test-name-pattern "routes its later explicit language" --test-name-pattern "no terminal fails closed" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: targeted
+exitCode: 1
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+✖ host-managed consent CLI routes its later explicit language into private intake state (19814.63933ms)
+✔ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (186988.578523ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor (1725.819682ms)
+✔ signature anchor reuses a key already at the canonical directory path without importing or replacing it (35735.094211ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 246829.483453
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:495:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (19814.63933ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:559:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

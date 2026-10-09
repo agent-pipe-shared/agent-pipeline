@@ -1,0 +1,17 @@
+{
+  "taskId": "TEMP-SEAM-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "complete-pending-critic",
+  "commits": ["552cbd2c4"],
+  "evidence": ["evidence/TEMP-SEAM-T-20261009/after.txt"],
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/lib/test-private-tmp.test.mjs"],
+    "dod": {
+      "after.txt": "passed: 16 tests / 15 pass / 0 fail / 1 skipped (baseline 15/14/1 + the new case green on win32)",
+      "consumerSafe": "passed: 9/9, exit 0",
+      "commit": "552cbd2c4 by exact pathspec"
+    }
+  }
+}

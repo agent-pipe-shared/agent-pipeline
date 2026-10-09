@@ -1,0 +1,54 @@
+{
+  "taskId": "TR-I-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation complete (test-only, committed RED by design); independent Critic review and PO acceptance pending",
+  "commits": ["0b0e9224a"],
+  "log": [
+    { "phase": "opening: record created; requested route claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 (runtime prompt), no contradiction; preflight run", "toolUses": 8 },
+    { "phase": "orientation done; commit-msg file written; wsl-bpm-before.txt captured (TCC-FD-WRITE/EINVAL as expected)", "toolUses": 22 },
+    { "phase": "test edited (fd3 helper option, RED pin, green control); native.txt + wsl.txt captured; consumer-safe exit 0", "toolUses": 34 },
+    { "phase": "commit 0b0e9224a; WSL baseline of the pre-edit pins captured (wsl-head-baseline.txt); terminal record", "toolUses": 45 }
+  ],
+  "report": {
+    "route": "requested (field 6): claude-sonnet-5-5 / xhigh; observed: runtime prompt names claude-sonnet-5-5. Class not A/G/S. No contradiction.",
+    "dodResults": {
+      "nativeCapture": "passed: native.txt, 11 tests, 10 pass, 1 fail. The new pin is RED on the byte assertion only (test-case-completion.test.mjs:260, the last assertion); fd3 probe, registrationError null, exit 0, marks PR01/PR03 and per-case stdout all held. Control GREEN. The 8 existing cases GREEN.",
+      "wslCapture": "passed: wsl.txt, 11 tests, 9 pass, 2 fail. The new pin is RED on the byte assertion only (:260). Control GREEN. The existing pin 'outside Verify a completion suite runs as a plain single file' (was :207, now :227) is RED with TCC-FD-WRITE caused by EINVAL; it is red at the pre-edit baseline too (wsl-head-baseline.txt), so it is not caused by this edit. Existing pin 'inside Verify an unwritable ...' (was :217) GREEN.",
+      "wslBpmBefore": "passed: wsl-bpm-before.txt, wrapped exit 1, TCC-FD-WRITE with cause EINVAL, as expected",
+      "consumerSafePaths": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, 9/9",
+      "oneCommit": "passed: 0b0e9224a, test(test-case-completion), one file, trailers Dispatch + AI-Assisted only",
+      "terminalRecord": "passed: this file",
+      "stopConditionNewPinGreenOnBothHosts": "not triggered: the pin is RED on both hosts, both on the byte assertion"
+    },
+    "evidence": [
+      "evidence/TR-I-T2-20261009/wsl-bpm-before.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... --label wsl-bpm-before -- node --test plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs, run through wsl.exe -e bash -lc; wrapped exit 1",
+      "evidence/TR-I-T2-20261009/native.txt: same capture form, label native, node --test plugins/pipeline-core/lib/test-case-completion.test.mjs; wrapped exit 1 (head fa8aaf39)",
+      "evidence/TR-I-T2-20261009/wsl.txt: same via wsl.exe, label wsl; wrapped exit 1 (head 667b0433)",
+      "evidence/TR-I-T2-20261009/wsl-head-baseline.txt: label wsl-head-baseline, node --test scratch/tcc-baseline/baseline.test.mjs, an extract of the pre-edit (38cf9f547) helper and the two single-file pins; wrapped exit 1; 2 tests, 1 pass, 1 fail (the plain-single-file pin, EINVAL)",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0, 9/9"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/test-case-completion.test.mjs: runPlainFixtureSuite gains an opt-in fd3 option (temp file as descriptor 3, closed before the directory removal, read back as fd3 and fd3Probe); one RED pin and one green control added after the existing :217 pin"
+    ],
+    "deliberatelyNotChanged": [
+      "the two existing fixture-spawn cases ('one early failure ...', 'dual runtime skip and todo ...') that spawn with a fd 3 pipe and NO Verify signal in the child env. They are green today and will go red under TR-I-F2 unless the spawn env sets PIPELINE_VERIFY_CASE_COMPLETION_FD (briefing: existing cases unchanged)",
+      "the existing plain-file pin: it is RED on WSL today (EINVAL) and left that way",
+      "all production files, harness/verify.mjs registration, other tests"
+    ],
+    "deviations": [
+      "Additions beyond the brief: an fd3Probe (the child fstat of descriptor 3, asserted to be 'file') so a zero-byte result cannot pass vacuously because the descriptor never arrived; the new pin also asserts per-case stdout like the existing plain pin.",
+      "Descriptor 3 is a temp file, not a pipe (Ruling 107 says pipe; the briefing permits either).",
+      "The terminal record was preceded by an in-progress record created first (role-contract report durability); the terminal record overwrites it.",
+      "Baseline evidence is an extract of the pre-edit helper and two pins, not the whole pre-edit file: shell redirects and git inside wsl.exe strings were refused by the guard (guard-push 'prefix ambiguous' twice, guard-lifecycle-ready GUARD-REDIRECT-UNAPPROVED once)."
+    ],
+    "openItems": [
+      "native.txt and wsl.txt were taken at different HEADs (fa8aaf39 vs 667b0433, parallel commits in the shared checkout). The test file content was identical in both runs.",
+      "Committing a RED pin into this already-registered suite makes any Verify run that includes test-case-completion.test.mjs red until TR-I-F2 lands (the briefing asked for the commit).",
+      "Hidden acceptance criteria for TR-I-F2: (1) the new pin goes green on both hosts; (2) the existing plain-file pin (was :207) goes green on WSL; (3) the two fixture-spawn cases above need the Verify signal set in their spawn env, or they go red when the recorder becomes inert without it. Ruling 107 says :207 'cannot see' the defect; on Linux it partly does, because a 3-slot stdio child still inherits a Node-owned fd 3. What it cannot see is the silent write into a writable foreign descriptor, which the new pin covers.",
+      "scratch/tcc-baseline/baseline.test.mjs left behind (git-ignored; rm refused by the shell guard).",
+      "Not done: independent Critic review, PO acceptance, a Verify run."
+    ]
+  }
+}

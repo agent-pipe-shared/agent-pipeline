@@ -1,0 +1,50 @@
+{
+  "taskId": "TR-S1-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "outcome": "partial-stopped-at-budget-checkpoint-no-commit",
+  "commits": [],
+  "log": [
+    { "phase": "orientation: preflight (status ready), Ruling 78, predecessor record, test and production reads, advisor consulted once", "toolUses": 45 },
+    { "phase": "lever implemented in the test-local wrapper (part a), fakeSetupSpawn and r76Spy honour -passin, tr1Spawn marker, pin 4 marker", "toolUses": 52 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT fired; measured only: WSL run with a temporary untyped simulated gate -> evidence/TR-S1-T3-20261009/simulated.txt; gate reverted by Edit (grep: 0 matches); WSL run un-simulated -> after.txt; consumer-safe check", "toolUses": 59 }
+  ],
+  "report": {
+    "dodResults": {
+      "simulatedTxt": "NOT MET: 26 reds, not the expected 10. The 10 expected ones are present (pins 1,3,4,5; the five (b) cases; NVA-SWEEP-F2f-REWORK). 16 more are red (see openItems 1).",
+      "afterTxt": "NOT MET: identical 26 reds (170 tests, 144 pass, 26 fail). The un-simulated and simulated red sets are identical because every moved case is already encrypted by the lever.",
+      "consumerSafe": "passed (exit 0, 9 of 9)",
+      "commit": "NOT MADE (the tree carries 16 lever-induced red cases; never commit a known-red regression)",
+      "terminalRecord": "this file; outcome partial"
+    },
+    "evidence": [
+      "evidence/TR-S1-T3-20261009/simulated.txt  cmd: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T3-20261009/simulated.txt --label simulated -- node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs\"  wrapped exit 1. Run WITH the temporary gate, since reverted.",
+      "evidence/TR-S1-T3-20261009/after.txt  same command, --label after, gate absent; wrapped exit 1; 170 tests, 144 pass, 26 fail",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs  exit 0"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs (UNCOMMITTED working-tree edit, no simulated gate in it): imports resolvePoKeyDirectory and aliases runForkDispositionApproval; the central lever (LEVER_PASSPHRASE, KEEP_KEY_PLAIN, plainKey, leverKeyPaths, applyKeyLever) replaces the runHumanApproval wrapper at :79 and adds a runForkDispositionApproval wrapper; fakeSetupSpawn generates an encrypted key and derives the public half with -passin or LEVER_PASSPHRASE; r76Spy signing branch honours -passin; tr1Spawn marks its spawn KEEP_KEY_PLAIN; pin 4 passes plainKey({...})"
+    ],
+    "deliberatelyNotChanged": [
+      "po-human-approval.mjs and every production file, other test files, hooks/, lib/guard/, harness/",
+      "the (b) cases (1171, 1393, 1602, 1984, 4175) are NOT yet re-pointed; :634 confirmation assertions NOT yet changed; the header is NOT yet updated (A4 text, retired-subject list, literal-word measurement)",
+      "the 16 prompt-text cases listed in openItems 1"
+    ],
+    "deviations": [
+      "Record: the role contract wants an opening in-progress record, the briefing wants one terminal record. An interim record was written first at the repo-root evidence/ path and is overwritten by this one.",
+      "The simulated gate throws an UNTYPED error on purpose (no uppercase-hyphen token). This is the only reading under which the DoD can hold: a typed gate turns pins and (b) cases green, as T2 saw for pin 4.",
+      "Lever marker: pin 4 was edited to pass plainKey({...}); pins 1, 3, 5 are covered by a marker set inside the tr1Spawn helper instead of editing them. The pin ASSERTIONS are untouched. A Critic should confirm the pins still bite: without the marker the lever re-encrypts their key and they could never go green after TR-S1-F.",
+      "Gate placement in the simulation skips non-PEM trap keys (R76_TRAP), because the R7-6 cases require that the private key is never opened without a matching anchor. TR-S1-F must place the real gate after the anchor check for the same reason."
+    ],
+    "openItems": [
+      "1. DESIGN FINDING, needs a dispatcher decision (it is not in Ruling 78): 16 cases besides the five (b) cases read the TYPED-CONFIRMATION PROMPT TEXT through their readConfirmation stub. On the encrypted path production calls readConfirmation zero times and prints the disclosure to stdout (printDisclosureOnly, po-human-approval.mjs:2087-2088), so prompts[0] is undefined and the case is red. They are: AC-19 inherited registry (135); :634 end-to-end; Agy export (761); Critic export (832); bootstrap acknowledgement (878); NVA-SIGENTRY-1 x2 (2822, 2850); 2875, 2906, 2928, 2958; NVA-BL-74 German frame x3 (4143, 4202, 4238); R7-6d(iii) (4819); R7-6f(i) (4960). Their subject (what is disclosed, the language frame, probe order) survives on the encrypted path; only the channel changed. Options: (A) extend the central lever so that, when engaged and the case supplied readConfirmation, stdout printed during the call is captured and handed to that stub as the prompt (one place, but the stub is then called for a prompt production never presented); (B) per-case edits that read the printed output (about 14 edits, over the 15-edit cap once the (b) edits are added); (C) treat the German-frame trio and R7-6d/f as separate slices. Recommendation: (A) with a clear header note, or a ruling.",
+      "2. Remaining Ruling 78 work: re-point the five (b) cases to tr1AssertTypedRefusal under plainKey (their keys stay unencrypted; they are RED until TR-S1-F, expected); :634 (move; the encrypted path prints no confirmation, so replace the three prompt assertions by confirmationPrompts.length === 0 and name it in the header); the literal-word pair (2510, 4467) MEASURED: authorize-critical calls requireExplicitConfirmation unconditionally (po-human-approval.mjs:1909-1919) and approve/approve-critical likewise (:2147), so the pair MOVES with the lever; they are currently green in after.txt. Header: list the (b) cases as 'subject retired by TR-S1 (Ruling 78)', amend assumption A4 (it says migration is a separate dispatch), record the literal-word measurement and the :634 note.",
+      "3. Lever results that need no further work: 144 of 170 cases are green, including every setup recover/already-exists/--existing-key case, the machine-plane directory cases, fork-disposition, approve-critical, authorize-critical and the R7-6 block, all through the lever alone. No trust-anchor problem arose (the re-encryption keeps the keypair, stop condition 1 did not fire). No lever miss exists outside the prompt-text class above.",
+      "4. Acceptance re-run: re-add the untyped gate by Edit (it lives in a SIM-GATE-BEGIN/END block wrapping both wrappers: simulatedGate(argv, deps) iterates leverKeyPaths and throws Error('simulated gate: refusing ...') on an unencrypted PEM or an unreadable key, then both wrappers call it after applyKeyLever), run to simulated.txt, revert by Edit, run to after.txt. Expected reds then: pins 1,3,4,5 + five (b) + F2f-REWORK only.",
+      "5. Budget: the DISPATCH-BUDGET-CHECKPOINT fired at call 52 of 65. Nothing is committed; the edited test file is in the working tree for the next dispatch. The foreign staged and dirty files from the session start are untouched."
+    ]
+  }
+}

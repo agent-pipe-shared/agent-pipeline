@@ -1,0 +1,103 @@
+=== before (MP-07 occurrences in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills; text below the DE-REFERENCE marker excluded; count 23) ===
+docs/operating-model.md:267: guardrail/security/architecture-classified (MP-07) and each already Rigor
+plugins/pipeline-core/skills/close-block/SKILL.md:187: Conventions (MP-20): Role ∈ {Elephant, Goldfish, Critic, Workflow}; First-Pass/Interventions are maintained per goldfish dispatch, Elephant/Critic row
+policies/model-policy.md:73: - **Cross-note (Critic matrix, MP-07 untouched):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls 
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-t
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default, escalation on criticality
+policies/model-policy.md:138: 1. A real MP-05/MP-07-class escalation (Goldfish → higher tier, or Critic → Design-tier model on criticality) MUST set the tool-layer `model` paramete
+policies/model-policy.md:140: - **Why (live incident):** a mandated MP-07 escalation — a Critic dispatch with "opus at max" named explicitly in the dispatch text — actually ran on 
+policies/model-policy.md:145: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage t
+policies/model-policy.md:146: - **Execution phase — Implement-/Mechanic-tier default; orchestrator tier per the chosen profile (MP-01):** From Goldfish dispatch through merge (`doc
+policies/model-policy.md:153: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the or
+policies/model-policy.md:307: Conventions: role ∈ {Elephant, Goldfish, Critic, Workflow}; "tokens" = input/output plus cache-read share, as reported by the provider's usage display
+roles/critic.md:215: - **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high ris
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07). Disputed or contradictory review-tier findings → the Elephant MAY dispatch a higher-
+roles/critic.md:218: - **Plugin realization:** ONE agent + `model` invocation parameter (`plugins/pipeline-core/agents/critic.md`; no `critic-critical` fork) — resolves th
+roles/critic.md:238: - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
+roles/elephant.md:92: 6. **Dispatch metadata** — **always:** ruleset SHA/version from your bootstrap **and the explicit model + effort for this dispatch** (hardening — suba
+roles/elephant.md:370: - `policies/model-policy.md` — MP-01 (Elephant model), MP-05 (Goldfish escalation), MP-07 (Critic staffing), MP-17/MP-18 (cache discipline), MP-20 (te
+templates/prompts/critic-review.md:25: 2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
+templates/prompts/critic-review.md:275: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session function
+templates/prompts/critic-review.md:299: Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+templates/prompts/critic-review.md:300: GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/ef
+templates/retro.md:55: | Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
+
+=== after (MP-07 occurrences in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills; text below the DE-REFERENCE marker excluded; count 24) ===
+docs/operating-model.md:267: guardrail/security/architecture-classified (MP-07) and each already Rigor
+plugins/pipeline-core/skills/close-block/SKILL.md:187: Conventions (MP-20): Role ∈ {Elephant, Goldfish, Critic, Workflow}; First-Pass/Interventions are maintained per goldfish dispatch, Elephant/Critic row
+policies/model-policy.md:73: - **Cross-note (Critic matrix, MP-07):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls — the crit
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-t
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:140: 1. A real MP-05/MP-07-class escalation (Goldfish → higher tier, or Critic → Design-tier model on criticality) MUST set the tool-layer `model` paramete
+policies/model-policy.md:142: - **Why (live incident):** a mandated MP-07 escalation — a Critic dispatch with "opus at max" named explicitly in the dispatch text — actually ran on 
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage t
+policies/model-policy.md:148: - **Execution phase — Implement-/Mechanic-tier default; orchestrator tier per the chosen profile (MP-01):** From Goldfish dispatch through merge (`doc
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the or
+policies/model-policy.md:309: Conventions: role ∈ {Elephant, Goldfish, Critic, Workflow}; "tokens" = input/output plus cache-read share, as reported by the provider's usage display
+roles/critic.md:215: - **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high ris
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07). Disputed or contradictory review-tier findings → the Elephant MAY dispatch a higher-
+roles/critic.md:218: - **Plugin realization:** ONE agent + `model` invocation parameter (`plugins/pipeline-core/agents/critic.md`; no `critic-critical` fork) — resolves th
+roles/critic.md:238: - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
+roles/elephant.md:92: 6. **Dispatch metadata** — **always:** ruleset SHA/version from your bootstrap **and the explicit model + effort for this dispatch** (hardening — suba
+roles/elephant.md:370: - `policies/model-policy.md` — MP-01 (Elephant model), MP-05 (Goldfish escalation), MP-07 (Critic staffing), MP-17/MP-18 (cache discipline), MP-20 (te
+templates/prompts/critic-review.md:25: 2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
+templates/prompts/critic-review.md:275: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session function
+templates/prompts/critic-review.md:276: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Cr
+templates/prompts/critic-review.md:300: Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+templates/prompts/critic-review.md:301: GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/ef
+templates/retro.md:55: | Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
+
+=== before (MP-07 occurrences in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills; text below the DE-REFERENCE marker excluded; count 24) ===
+docs/operating-model.md:267: guardrail/security/architecture-classified (MP-07) and each already Rigor
+plugins/pipeline-core/skills/close-block/SKILL.md:187: Conventions (MP-20): Role ∈ {Elephant, Goldfish, Critic, Workflow}; First-Pass/Interventions are maintained per goldfish dispatch, Elephant/Critic row
+policies/model-policy.md:73: - **Cross-note (Critic matrix, MP-07):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls — the crit
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-t
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:140: 1. A real MP-05/MP-07-class escalation (Goldfish → higher tier, or Critic → Design-tier model on criticality) MUST set the tool-layer `model` paramete
+policies/model-policy.md:142: - **Why (live incident):** a mandated MP-07 escalation — a Critic dispatch with "opus at max" named explicitly in the dispatch text — actually ran on 
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage t
+policies/model-policy.md:148: - **Execution phase — Implement-/Mechanic-tier default; orchestrator tier per the chosen profile (MP-01):** From Goldfish dispatch through merge (`doc
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the or
+policies/model-policy.md:309: Conventions: role ∈ {Elephant, Goldfish, Critic, Workflow}; "tokens" = input/output plus cache-read share, as reported by the provider's usage display
+roles/critic.md:215: - **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high ris
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07). Disputed or contradictory review-tier findings → the Elephant MAY dispatch a higher-
+roles/critic.md:218: - **Plugin realization:** ONE agent + `model` invocation parameter (`plugins/pipeline-core/agents/critic.md`; no `critic-critical` fork) — resolves th
+roles/critic.md:238: - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
+roles/elephant.md:92: 6. **Dispatch metadata** — **always:** ruleset SHA/version from your bootstrap **and the explicit model + effort for this dispatch** (hardening — suba
+roles/elephant.md:370: - `policies/model-policy.md` — MP-01 (Elephant model), MP-05 (Goldfish escalation), MP-07 (Critic staffing), MP-17/MP-18 (cache discipline), MP-20 (te
+templates/prompts/critic-review.md:25: 2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
+templates/prompts/critic-review.md:275: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session function
+templates/prompts/critic-review.md:276: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Cr
+templates/prompts/critic-review.md:300: Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+templates/prompts/critic-review.md:301: GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/ef
+templates/retro.md:55: | Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
+
+=== undefined (MP-07 occurrences in roles, templates, policies, docs/operating-model.md, plugins/pipeline-core/skills; text below the DE-REFERENCE marker excluded; count 24) ===
+docs/operating-model.md:267: guardrail/security/architecture-classified (MP-07) and each already Rigor
+plugins/pipeline-core/skills/close-block/SKILL.md:187: Conventions (MP-20): Role ∈ {Elephant, Goldfish, Critic, Workflow}; First-Pass/Interventions are maintained per goldfish dispatch, Elephant/Critic row
+policies/model-policy.md:73: - **Cross-note (Critic matrix, MP-07):** as Goldfish implementation effort drops, the importance of the review gate RISES rather than falls — the crit
+policies/model-policy.md:82: - **Process:** no PRD document required; direct dispatch (or a mini-edit path for the smallest fixes); a light review stage replaces the full Design-t
+policies/model-policy.md:124: ### MP-07 — Critic staggering: Review tier by default; ONE batched Design-tier Critic for genuinely critical architecture and security only
+policies/model-policy.md:140: 1. A real MP-05/MP-07-class escalation (Goldfish → higher tier, or Critic → Design-tier model on criticality) MUST set the tool-layer `model` paramete
+policies/model-policy.md:142: - **Why (live incident):** a mandated MP-07 escalation — a Critic dispatch with "opus at max" named explicitly in the dispatch text — actually ran on 
+policies/model-policy.md:147: - **Design phase — Design-tier model mandatory** (session effort per MP-01; Design-tier subagent dispatches `max` per MP-07): Everything from Triage t
+policies/model-policy.md:148: - **Execution phase — Implement-/Mechanic-tier default; orchestrator tier per the chosen profile (MP-01):** From Goldfish dispatch through merge (`doc
+policies/model-policy.md:155: - **Execution phase:** "When in doubt whether a dispatch needs the Design-tier model, it does not — draft on the Implement-/Mechanic-tier, have the or
+policies/model-policy.md:309: Conventions: role ∈ {Elephant, Goldfish, Critic, Workflow}; "tokens" = input/output plus cache-read share, as reported by the provider's usage display
+roles/critic.md:215: - **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high ris
+roles/critic.md:217: - The dispatch metadata must state "criticality → model" (MP-07). Disputed or contradictory review-tier findings → the Elephant MAY dispatch a higher-
+roles/critic.md:218: - **Plugin realization:** ONE agent + `model` invocation parameter (`plugins/pipeline-core/agents/critic.md`; no `critic-critical` fork) — resolves th
+roles/critic.md:238: - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
+roles/elephant.md:92: 6. **Dispatch metadata** — **always:** ruleset SHA/version from your bootstrap **and the explicit model + effort for this dispatch** (hardening — suba
+roles/elephant.md:370: - `policies/model-policy.md` — MP-01 (Elephant model), MP-05 (Goldfish escalation), MP-07 (Critic staffing), MP-17/MP-18 (cache discipline), MP-20 (te
+templates/prompts/critic-review.md:25: 2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
+templates/prompts/critic-review.md:275: - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session function
+templates/prompts/critic-review.md:276: - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Cr
+templates/prompts/critic-review.md:300: Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+templates/prompts/critic-review.md:301: GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+templates/prompts/goldfish-task.md:478: - **Explicit override (the genuine MP-05/MP-07 case, distinguishable from an accidental typo).** A briefing MAY still dispatch at a deviating model/ef
+templates/retro.md:55: | Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
+

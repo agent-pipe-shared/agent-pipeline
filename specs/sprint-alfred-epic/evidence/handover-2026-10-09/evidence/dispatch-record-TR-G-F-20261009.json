@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-G-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "candidateCommit": "bcbb5e9c3bc36db94f3d7bde0f0e3944252d981a",
+  "commits": [
+    "0dfe853cc01f6ad3478766f922168814fbebadc2"
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded · Project agent-pipeline-share · Calibration not named in briefing field 6 (profile: standard) · State briefing TR-G-F-20261009 · Role Goldfish\n\nImplementation complete (post-image delivered and committed, not installed). independent review: pending (class G, Opus Critic). PO acceptance and the signed-package install at plugins/pipeline-core/hooks/guard-dispatch-budget.mjs: pending.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6, no A/G/S route named); observed from this dispatch's runtime prompt: Sonnet 5.5, model id claude-sonnet-5-5. No contradiction.\n\n1. DoD results\n- WSL capture green.txt: passed for the required pins. T49 (a), T49 (c), T37 (a) GREEN (were RED); T49 (b), T37 (b), T57, T34 still GREEN. 92 tests, 87 pass, 5 fail. Failures: the three accepted 10 s runner timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40) plus two timing cases reported either way: 'a preflight-bound base cap of 20 ...' (runner timeout 10013 ms; it passed in the TR-G-T2 run) and R7-11a (assertion 'the holder released its exact lock inode'; red in the TR-G-T baseline and in this run, green in the TR-G-T2 copy run).\n- 'preflight-bound' is not caused by this change: the same case against the UNMODIFIED live guard in the same session times out identically (10016 ms, control-live-timing.txt). R7-11a: red alone (6156 ms) against the post-image copy, green (5936 ms) in the live-guard control, one sample each; the change touches neither the counter lock nor the counter path, but I cannot prove R7-11a unaffected from these samples.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0 (9 tests, 9 pass).\n- Private-identifier scan: node plugins/pipeline-core/scripts/check-private-identifiers.mjs --root . exit 0, output {\"ok\":true,\"findings\":[]} (run after the commit, over the working tree including the two committed paths); the pre-commit hook also accepted the commit.\n- One commit of exactly the two paths (0dfe853cc01f6ad3478766f922168814fbebadc2), subject as briefed, trailers exactly Dispatch: TR-G-F-20261009 (goldfish) and AI-Assisted: true: passed.\n\n2. Evidence\n- evidence/TR-G-F-20261009/green.txt. Command: wsl.exe -e bash -lc 'cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F-20261009/green.txt --label TR-G-F -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs'; wrapped exit code 1 (the timeouts above). Comparison baseline: evidence/TR-G-T2-20261009/red.txt (92 tests, 86 pass, 6 fail).\n- evidence/TR-G-F-20261009/rerun-timing.txt (two timing cases alone, post-image copy) and control-live-timing.txt (same two cases, unmodified live guard), both via capture-evidence, wrapped exit 1.\n- Build: node scratch/dispatch-wip/TR-G-F/build.mjs, exit 0; post-image sha256 bad0bd5db55cbc362074f640e77d33dc9c2540a3bc915a0fb4c4fe2142b23d79 (84256 bytes), live sha256 61e8fc35463a9103336a7730a547680a7c18ab5779ca19ae14c0091c5e2d9cea (79351 bytes), test post-image sha256 33411458451a7dabd4c067f6b7e94601739ccdd0f7e5fc2e27b6a1325a1b817d unchanged.\n- Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0. Private identifiers: exit 0, no findings.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs: post-image of the live guard with 8 anchored edits: producer closing act (isCommitFlowProducerCommand, isClosingAct takes dependencies), pendingBindingMissingBlocked text naming the re-dispatch, exhaustion text lists the producer, comments.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md: manifest (target, shas, changes, T37 cure and reason, commands, per-pin table, boundaries, not done here).\n- Local only, uncommitted: scratch/dispatch-wip/TR-G-F/ (edits.txt, build.mjs, scratch guard and test copies), scratch/commit-msg/TR-G-F.txt, evidence/TR-G-F-20261009/*.txt, this record.\n\n4. Deliberately not changed\n- The live hook, the test post-image, the tranche README, other post-images and manifests, every lib/ module, the shared core (dispatch-budget-core), T34/cache.\n- Adjacent oddity: the existing git closing-verb pattern tests only the start of the command, so git add ... && <other> is admitted by this guard; left as is.\n- guard-lifecycle-ready: it does not mention the producer; whether it admits the producer call was not checked.\n\n5. Deviations from spec\n- T37 cure chosen: refusal naming re-dispatch, not per-dispatch binding (binding would contradict the consumption pins at test lines 576 and 1915 and needs a lib/dispatch-budget-binding.mjs change, which is stop condition 3). No change outside guard-dispatch-budget.mjs was needed.\n- Scratch guard copy carries a third relocation beyond import anchors: the module-relative plugin root (new URL('..', import.meta.url)) is re-pointed at the live plugin tree so no-injected-root cases resolve agents as the live hook does. Disclosed in the manifest.\n- Producer admission is stricter than the git verbs: absolute plugin-root script path equality plus no shell control characters (; & | < > backtick $ ( ) and line breaks) in the arguments. Parentheses in arguments are therefore refused.\n- candidateCommit in this record is the parent at commit time (bcbb5e9c3...), later than the briefed 393b8c8a2.\n- Two extra evidence runs (rerun and control) beyond the one briefed capture, to separate load from change.\n- win32 and macOS paths unverified (WSL only; no full Verify on Windows).\n\n6. Open items\n- independent review: pending (class G; only the Elephant dispatches the Opus Critic). PO acceptance: pending. Install of the post-image is the ceremony step.\n- Stop condition 2 (a pre-existing green case turns red) was examined for the preflight-bound red and is not triggered: the same case times out identically against the unmodified live guard in the same session (control-live-timing.txt). R7-11a is reported either way as briefed; a quiet-host rerun of both timing cases would settle them.\n- Whether guard-lifecycle-ready admits the producer call is a separate question for the owning slice.\n- No other stop condition triggered. Tool uses: 48 counted at the commit-show call, about 52 at close (base cap 60); closing allowance unused.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-G-F-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: bootstrap line and route pre-check printed as the first output text after the obligations and CONT17-header reads (requested claude-sonnet-5-5/xhigh; observed runtime identity Sonnet 5.5 / claude-sonnet-5-5; no contradiction); goldfish-task 455-481, TR-G-MANIFEST and TR-G-T2 record read; preflight run once after GUARD-BOOTSTRAP-RECEIPT-MISSING; record readback done",
+      "toolUses": 12
+    },
+    {
+      "phase": "orientation: guard, binding lib and test post-image pins read; advisor consulted; T37 cure = refuse naming re-dispatch (binding would need a lib change and contradict consumption pins); T49 = plugin-root-bound producer matcher in isClosingAct",
+      "toolUses": 30
+    },
+    {
+      "phase": "build.mjs exit 0 (post-image bad0bd5d..., 84256 bytes); WSL capture green.txt: 92 tests, 87 pass, 5 fail; T49 a/c and T37 a GREEN, T49 b / T37 b / T57 / T34 GREEN; preflight-bound timeout reproduced identically against the unmodified live guard (control); R7-11a timing-sensitive",
+      "toolUses": 41
+    },
+    {
+      "phase": "consumer-safe exit 0; manifest and commit message written; git add; commit 0dfe853cc01f6ad3478766f922168814fbebadc2 (2 files, trailers exact); record checkpointed committed-pending-report with report",
+      "toolUses": 48
+    },
+    {
+      "phase": "advisor review done; check-private-identifiers --root . exit 0, no findings; record report finalised; hand-back next",
+      "toolUses": 52
+    }
+  ]
+}

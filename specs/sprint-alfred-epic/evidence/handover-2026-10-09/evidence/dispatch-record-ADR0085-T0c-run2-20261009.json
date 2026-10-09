@@ -1,0 +1,71 @@
+{
+  "taskId": "ADR0085-T0c-run2-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing ADR0085-T0c-run2-20261009)",
+  "outcome": "stopped-stop-condition-1-no-commit",
+  "commits": [],
+  "log": [
+    { "phase": "opening: record created before substantive work; preflight status ready (run from the loaded plugin root); route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the runtime prompt (effort not directly observable; a reasoning_effort hint of 30 was visible, not model-identity evidence), no contradiction", "toolUses": 9 },
+    { "phase": "orientation: predecessor record, CONT17/CONT15 headers, both scratch drafts, plan-spec-state-v2 key set; advisor consulted once; commit message file written", "toolUses": 21 },
+    { "phase": "A-probe part 1 (v7 null-design shape, feature + mini) run under WSL; feature blocked, mini admitted; cause traced to plan-spec-state-v2.mjs:509-513; A-probe part 2 (feature v7 with package binding) run under WSL: passes the lifecycle layer", "toolUses": 28 },
+    { "phase": "B-fix applied (frozen candidate) and B rerun under WSL: same DWP2-CURRENT-CANDIDATE at the approval-request assert -> stop condition 1; no post-image written, no commit", "toolUses": 32 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT at counted call 32 of 40: no new work; terminal stop record written; hand-back", "toolUses": 33 }
+  ],
+  "report": {
+    "headline": "STOPPED on stop condition 1 (B fails a second time on the same fixture cause). Nothing committed, nothing staged, no post-image written, README untouched. A-probe is DONE and clears draft A.",
+    "dodResults": {
+      "aProbe": "passed (with a refinement, see aProbeResult): evidence/ADR0085-T0c-run2-20261009/a-probe.txt and a-probe-feature-package.txt",
+      "bCapture": "failed: control NOT reached; fixture build still fails at the approval-request assert with DWP2-CURRENT-CANDIDATE after the B-fix. evidence/ADR0085-T0c-b-20261009/red.txt overwritten (wrapped exit 1)",
+      "postImageSha256": "not verifiable: post-images not written (stop condition 1)",
+      "consumerSafeCheck": "not verifiable: not run, no tracked file was added or changed",
+      "commit": "failed (by design): none made, stop condition 1",
+      "terminalRecord": "this file"
+    },
+    "aProbeResult": {
+      "verdict": "A's reds are GENUINE. The A fixture is not faulty.",
+      "part1": "scratch/dispatch-wip/t0c-run2/a-probe.test.mjs: the A fixture rebuilt with CURRENT_APPROVAL_SCHEMA (v7) and the exact 11-key v7 set, all four design fields null. mini profile: ADMITTED (exit 0). feature profile: BLOCKED with the lifecycle text 'Feature authority-feature lifecycle is awaiting-approval ... authority is stale or closed'. This is NOT a fixture fault: plan-spec-state-v2.mjs:509-513 requires, under v7 and a non-mini profile, a non-null designWorkflowPackagePath, a sha and a valid designWorkflowApproval, so an all-null v7 is not a v7 control for the feature profile. Evidence: evidence/ADR0085-T0c-run2-20261009/a-probe.txt (wrapped exit 1: 1 pass mini, 1 fail feature).",
+      "part2": "scratch/dispatch-wip/t0c-run2/a-probe2.test.mjs: the same feature fixture with a v7-valid package binding (path, sha, chat designWorkflowApproval; no package file on disk). The lifecycle layer lets it through and the guard proceeds to the v7 package branch and refuses with DWP-PACKAGE-PHYSICAL (a package reason, exit 2, NOT awaiting-approval). Evidence: evidence/ADR0085-T0c-run2-20261009/a-probe-feature-package.txt (wrapped exit 0).",
+      "deviationNote": "The briefing said run the probe once; I ran it twice (part 1 was inconclusive on its own because of the profile rule above). Both captures are kept, neither overwritten.",
+      "headerSentenceForA": "RED reason for C1-C7 (to put in A's header): v8 is not yet a current plan-approval schema (CURRENT_APPROVAL_SCHEMA is pipeline.plan-approval.v7), so the lifecycle layer rejects every v8 record as awaiting-approval before the boundary's own checks run; an A-probe with a v7-shaped approval in the same fixture is admitted (mini) or passes the lifecycle layer (feature, DWP-PACKAGE-PHYSICAL), so the fixture is sound and the DAA codes become reachable with the F slice."
+    },
+    "bResult": {
+      "applied": "scratch/dispatch-wip/t0c-run/b.test.mjs: 'const readCandidate = () => observeAdvisorCandidate(root);' replaced by a frozen 'const readCandidate = () => ({ ...candidate });' (candidate observed at the top of buildLiveShapedV7Fixture, before the evidence commit), with an explanatory comment. The evidence commit stays above the request (predecessor fix 1).",
+      "observed": "test fails at b.test.mjs:182 ('prepared.ok' assert in buildLiveShapedV7Fixture): {\"ok\":false,\"code\":\"DWP2-CURRENT-CANDIDATE\"}. Control and target subtests never ran. Evidence: evidence/ADR0085-T0c-b-20261009/red.txt (wrapped exit 1, head f9007f38f).",
+      "whyStop": "Predecessor's defect 2 was DWP2-CURRENT-CANDIDATE at this exact assert; the briefed B-fix leaves the identical code at the identical assert: a second red on the same cause. Stop condition 1 says commit nothing and report. I made no third fix and did not investigate further (the budget checkpoint fired at counted call 32 of 40).",
+      "hypothesesUNVERIFIED": [
+        "H1: the request builder (design-workflow-approval.mjs createDesignWorkflowPackageApprovalRequest) does not route its readCandidate parameter to the check at design-workflow-package-v2.mjs:135; test-design-workflow-fixture.mjs injects the candidate under a dependency named gitCandidate (:106) via a deps object, a different seam than the readCandidate parameter B passes. Next step: read which parameter feeds :135 on the prepare path.",
+        "H2: the package candidate itself differs from HEAD in a way the freeze cannot fix, for example because 'candidate' (taken before coordinateInitialDesignAdvisory and the evidence export) is compared against the post-evidence-commit HEAD by a git read inside the builder. The existing fixture avoids this by building the package against the commit it later makes (it records 'head' after its commit and passes gitCandidate). A fix then needs the package candidate to equal the commit at request time, i.e. commit the evidence first and observe the candidate AFTER, which in turn requires the package to name that candidate (a package that is built, committed, and only then given its candidate is circular; the existing fixture resolves it by freezing the candidate through the dependency, not by the parameter).",
+        "Either hypothesis needs one read of design-workflow-approval.mjs and design-workflow-package-v2.mjs:100-160 before any edit."
+      ]
+    },
+    "evidence": [
+      "evidence/ADR0085-T0c-run2-20261009/a-probe.txt: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0c-run2-20261009/a-probe.txt --label a-probe -- node --test scratch/dispatch-wip/t0c-run2/a-probe.test.mjs\"; wrapped exit 1 (feature fail, mini pass); the capture script wrote the file",
+      "evidence/ADR0085-T0c-run2-20261009/a-probe-feature-package.txt: same form, label a-probe-2, a-probe2.test.mjs; wrapped exit 0",
+      "evidence/ADR0085-T0c-b-20261009/red.txt: same form, label red, scratch/dispatch-wip/t0c-run/b.test.mjs; wrapped exit 1",
+      "Note: HEAD moved during the dispatch (a-probe.txt head dfa9aba6a, the later captures head f9007f38f), consistent with parallel commits in the shared checkout"
+    ],
+    "changedFiles": [
+      "evidence/dispatch-record-ADR0085-T0c-run2-20261009.json (this record; created at the opening as in-progress and overwritten here; tension with 'written once, after the commit' disclosed under deviations)",
+      "evidence/ADR0085-T0c-run2-20261009/a-probe.txt and a-probe-feature-package.txt (machine-written captures, untracked)",
+      "evidence/ADR0085-T0c-b-20261009/red.txt (overwritten by the machine-written B rerun capture, untracked or ignored)",
+      "scratch/dispatch-wip/t0c-run2/a-probe.test.mjs and a-probe2.test.mjs (throw-away probes, untracked)",
+      "scratch/dispatch-wip/t0c-run/b.test.mjs (one edit: frozen readCandidate; scratch copy only)",
+      "scratch/commit-msg/ADR0085-T0c-run2.txt (commit message for the unrun commit; subject 'test(design-approval): tranche-2 post-images for the ADR-0085 boundary contract tests', exactly the two trailers Dispatch: ADR0085-T0c-run2-20261009 (goldfish) and AI-Assisted: true; its body claims B's control is green and target RED, which is NOT yet true, so edit the body before using it)"
+    ],
+    "deliberatelyNotChanged": "Nothing under plugins/, harness/, any existing test, the tranche-2 patch file, the tranche-2 README, or signed-package/tranche-2/hooks/ (no write to that directory was attempted, so whether a guard fires there is still UNKNOWN). Nothing staged or committed. scratch/dispatch-wip/t0c-run/a.test.mjs untouched (the header RED-reason sentence and the DRAFT-paragraph removal are only recipe steps, not done).",
+    "deviationsFromSpec": [
+      "Record: briefing says write the terminal record once after the commit; the role contract (GF-09-D) requires an opening record. The opening in-progress record was created at the same repo-root path and is overwritten here. No commit happened, so this is the terminal record of a stop.",
+      "A-probe run twice, not once (see aProbeResult.deviationNote).",
+      "Preflight needed once (GUARD-BOOTSTRAP-RECEIPT-MISSING on the first Write), cured from the loaded plugin root as briefed."
+    ],
+    "openItems": [
+      "STOP CONDITION 1 triggered for B (second red on DWP2-CURRENT-CANDIDATE). Needs a fresh decision: either a new dispatch that first reads design-workflow-approval.mjs (createDesignWorkflowPackageApprovalRequest) and design-workflow-package-v2.mjs:100-160 to find which dependency feeds the :135 check on the prepare path, and mirrors the existing fixture's seam (gitCandidate via a deps object) instead of the readCandidate parameter, or a re-scope of draft B.",
+      "Draft A is ready to land on its own: A-probe clears the fixture, predicted 7 red / 2 green behaviour stands (predecessor capture evidence/ADR0085-T0c-a-20261009/red.txt). To land A alone the briefing would have to be amended (it commits both post-images plus README together); I did not do that unilaterally.",
+      "Post-image recipes (unchanged from the predecessor record) still apply. A: original draft bytes minus the DRAFT paragraph (header lines 7-10), HOOKS_DIR = dirname(fileURLToPath(import.meta.url)), plus the headerSentenceForA above. B: the scratch b.test.mjs after the working fixture fix, paths rewritten to ../lib/, ../scripts/, ./, DRAFT paragraph removed, 'today' filled in with the observed re-read code.",
+      "The GUARD-READ-TARGET refusal also hits Grep with a glob over a directory (not only Glob), as CONT15 warns; use exact file paths.",
+      "Budget: DISPATCH-BUDGET-CHECKPOINT fired at counted call 32 of 40; this record and the hand-back used the closing allowance only."
+    ]
+  }
+}

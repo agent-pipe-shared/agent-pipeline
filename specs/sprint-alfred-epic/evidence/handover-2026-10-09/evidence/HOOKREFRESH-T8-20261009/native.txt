@@ -1,0 +1,32 @@
+command: node --test plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs
+label: native
+exitCode: 0
+head: 997356d7e8ab058935a0b3630fe2a4dab1b453fe
+tree: 616762af352ca70ec3705c518813bf77ca788670
+dirty: true
+--- stdout ---
+✔ GREEN precondition: WITHOUT readOnly, a later session with an unchanged mapping is admitted and persisted (this is the write the readback must not make) (6.2266ms)
+✔ RED F2 (a): readOnly never calls store.persist, even where the session would otherwise be admitted (2.5517ms)
+✔ RED F2 (b): readOnly where it would admit returns admission-pending with its own code (2.4619ms)
+✔ GREEN control F2 (c): readOnly leaves a REUSED (present) session ready and writes nothing (2.9216ms)
+✔ GREEN control F2 (d): readOnly on a fresh session that needs a human confirmation stays `confirmation-required` and writes nothing (1.0394ms)
+✔ RED F2 (e): the preflight's PROCESS-ENTRY readback call site passes readOnly: true (source-level pin; see header) (0.5634ms)
+﹣ T8 (a): no prior state -- the readOnly readback leaves a real repository byte-identical and never creates the store (0.0669ms) # the real model-role host store accepts only a POSIX '/'-rooted git common dir (model-role-host-store.mjs parent()); natively it answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE before touching disk, so a zero-bytes pin would pass for the wrong reason
+✔ T8 (b1): the model-family ACTIVE branch (synthetic activation over the real runtime host) writes nothing (236.2752ms)
+ℹ T8 (b1) active-branch result: ok=false status=unavailable code=MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED
+✔ T8 (b2): a real activation marker over the real runtime host -- activation read and controller construction write nothing (163.6155ms)
+ℹ T8 (b2) marker-backed result: ok=false status=unavailable code=MODEL-FAMILY-STATE-UNCERTAIN
+﹣ T8 (c): a POPULATED store whose mapping changed -- confirmation-required, store byte-identical (0.1057ms) # the real model-role host store accepts only a POSIX '/'-rooted git common dir (model-role-host-store.mjs parent()); natively it answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE before touching disk, so a zero-bytes pin would pass for the wrong reason
+﹣ T8 (d): an unchanged mapping reads admission-pending against the real store and writes nothing (0.0441ms) # the real model-role host store accepts only a POSIX '/'-rooted git common dir (model-role-host-store.mjs parent()); natively it answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE before touching disk, so a zero-bytes pin would pass for the wrong reason
+﹣ T8 (e): a recorded session reads REUSED against the real store and writes nothing (0.1063ms) # the real model-role host store accepts only a POSIX '/'-rooted git common dir (model-role-host-store.mjs parent()); natively it answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE before touching disk, so a zero-bytes pin would pass for the wrong reason
+﹣ T8 control: WITHOUT readOnly the same real path writes, so the snapshot would catch a write (0.0434ms) # the real model-role host store accepts only a POSIX '/'-rooted git common dir (model-role-host-store.mjs parent()); natively it answers MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE before touching disk, so a zero-bytes pin would pass for the wrong reason
+ℹ tests 13
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 5
+ℹ todo 0
+ℹ duration_ms 844.9652
+
+--- stderr ---

@@ -1,0 +1,27 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "HOOKREFRESH-RECAP-20261009",
+  "agentType": "goldfish-mechanic",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "read-only-completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "read-only" },
+  "candidateCommit": "8328f56bb437549da2a8f2caededf8219b99f4b8",
+  "commits": [],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "opening (preflight done, HEAD 8328f56bb)", "toolUses": 8 },
+    { "phase": "capture done: exit 1, 176 tests / 171 pass / 2 fail / 3 todo; failures F1(g) and F1(h), both GHS-SOURCE-DRIFT", "toolUses": 13 }
+  ],
+  "report": {
+    "text": "Capture evidence/HOOKREFRESH-F2-20261009/recap-head.txt (exit 1). head 8328f56bb437549da2a8f2caededf8219b99f4b8, dirty true (unrelated files only; none of the 4 fix files nor any operand file). tests 176, pass 171, fail 2, todo 3. Failing: 'RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop' (partial.test.mjs:190) and 'GREEN control F1 (h): the stale-marker fixture technique' (partial.test.mjs:222); both throw GHS-SOURCE-DRIFT from publishGitHookRuntimeSnapshot via applyInstall (pre-commit-hook-install.mjs:933). resultSha256 left null (no hashing tool budget). Independent review: pending.",
+    "changedFiles": ["evidence/HOOKREFRESH-F2-20261009/recap-head.txt", "evidence/dispatch-record-HOOKREFRESH-RECAP-20261009.json"]
+  }
+}

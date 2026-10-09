@@ -1,0 +1,30 @@
+ONB-T2-20261009 stopped-without-commit (closing-allowance handover; 80 % checkpoint reached at call 44 of 55 with no pin yet measured). independent review: pending.
+
+1. DoD results
+- F3 argv pin (new file onboarding-greenfield-walk.test.mjs): not done, drafted and unmeasured.
+- F4 pins (collected-mismatch plus --runner codex check): not done, drafted and unmeasured.
+- F7 pin and F9 pin (onboarding-continuity.test.mjs) and the 298 to 300 guard bump: not done, drafted and unmeasured.
+- WSL capture into evidence/ONB-T2-20261009/ and the commit: not done. No test was run by me, so no pin is known red or green.
+- Terminal record: written (this one).
+
+2. Evidence
+- Machine-written test output: none (no suite was executed). Drafts on disk (untracked, evidence only): evidence/ONB-T2-20261009/draft-onboarding-greenfield-walk.test.mjs.txt and evidence/ONB-T2-20261009/draft-onboarding-continuity-pins.test.mjs.txt. Each carries its owner, anchor text, expected red reason and the neighbours that must stay green.
+- Preflight: `node <plugin-root>/scripts/pipeline-start-preflight.mjs`, exit 0, status ready (it cured GUARD-BOOTSTRAP-RECEIPT-MISSING on the first Write).
+
+3. Changed files
+- Tracked files changed: none. Untracked, mine: evidence/dispatch-record-ONB-T2-20261009.json, evidence/ONB-T2-20261009/{draft-onboarding-greenfield-walk.test.mjs.txt, draft-onboarding-continuity-pins.test.mjs.txt, report.txt}.
+
+4. Deliberately not changed
+- The foreign uncommitted edits (pipeline-state.mjs, sanctioned-args-onboarding.mjs, onboarding-continuity.mjs LE-F2, harness/scripts/pipeline-state.test.mjs) and every production file. harness/verify-suites.json (TP-13, protected).
+
+5. Deviations from spec
+- The draft imports root, dispose, fakeDeps, fakeGit, clearRuntimeBarrier from ./project-onboarding-v3.test.mjs instead of copying them: the briefing said copy, but fakeDeps alone is about 250 lines and onboarding-first-restart-intake.test.mjs already borrows the same exports (imports register zero cases). Needs an Elephant ruling.
+- The F3 pin forbids a doubled --runner/--activate and a lost runner value, and allows at most one --text-file. CONT36 said "no --text-file"; Ruling 163 narrowed F3 to the doubled/dropped tokens. Rule whether the claude consent existingFileApplyAction may carry --text-file at all.
+- F9 is pinned on planOnboardingBootstrapAcknowledgementChat plus a no-request-file post-condition, not on the signature route: in a bare fixture the signature route fails earlier with the trust-anchor codes, which would make its pin red for the wrong reason. The accepted code is any BOOTSTRAP-ACK-* code containing PLACEHOLDER, DRAFT, TEMPLATE, SCAFFOLD or UNFINISHED; the briefing named no code.
+
+6. Open items (closing-allowance handover)
+- Committed: nothing committed.
+- Verified green: none.
+- Remains undone: everything in section 1 except the record. Files left: only the untracked evidence files in section 3.
+- Next briefing must say differently: (a) hand over the two draft files by path and forbid re-orientation ("Read the two drafts, create the new test file and make the one continuity Edit at once; do not grep the pins"); the first 44 calls went to the mandatory header reads (7 calls), the fixture and owner location, and the hook counts every parallel call separately; (b) supply the capture-evidence.mjs path and its --label/--out shape (Glob was refused with GUARD-READ-TARGET, the script was never located); (c) rule the three items in section 5; (d) say whether a new *.test.mjs needs an entry in harness/verify-suites.json (TP-13, protected, not editable by a Goldfish) or is discovered by glob; (e) in the F4 draft move the intake-generate-plan --runner assertions below the final deepEqual(mismatches, []) so both reds are reported; (f) the CLI route for intake-generate-plan/apply under fakeGit is unmeasured (v3 test 9239-9258 calls the library functions directly); if it cannot run, split generate-apply into a real-git case (project-onboarding-v3-argv-closure.test.mjs style) and keep the three other applies in the fakeGit case; (g) the unique anchor for the guard bump is the line `assert.equal(cases.length, 298, "the complete onboarding continuity corpus must be registered before execution begins");` (currently line 5013), and the two new cases insert directly before it.
+- Production owners for the F slice: F3 intakeConsentAction, lib/project-onboarding-v3.mjs 2755-2759 (indexOf of --text-file is -1 for claude, so slice(0,-1) drops the runner value); F4 CLI result assembly in scripts/project-onboarding-v3.mjs branches 904-952, 953-955, 956-964, 971-973, plus the nextAction builder of planOnboardingIntakeGenerate (lib/onboarding-continuity.mjs, locate with an unquoted search for intake-generate-apply); F7 buildKickoffPromotionPlan throw site, lib/onboarding-continuity.mjs 5184-5189; F9 bootstrapAcknowledgementPlan, lib/onboarding-continuity.mjs (shared first step of the Chat route at 7600 and the signature route at 7615).

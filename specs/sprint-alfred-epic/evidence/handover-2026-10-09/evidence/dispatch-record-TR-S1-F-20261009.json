@@ -1,0 +1,53 @@
+{
+  "taskId": "TR-S1-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh (requested; not directly observable from the dispatch prompt, disclosed)",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-stopped-at-budget-checkpoint-no-production-edit",
+  "commits": [],
+  "log": [
+    { "phase": "opening: bootstrap line, route pre-check (requested claude-sonnet-5-5 == observed claude-sonnet-5-5), preflight run from loaded plugin root (cured GUARD-BOOTSTRAP-RECEIPT-MISSING), opening in-progress record at repo-root evidence/", "toolUses": 7 },
+    { "phase": "orientation: pin header (A1-A4), pins 1/3/4/5, five (b) cases, Rulings 75/78/83/91, TOILRES 3.4, T4 and T5 records, production call sites; advisor consulted once", "toolUses": 29 },
+    { "phase": "baseline: neighbours before.txt launched under WSL (20 test files, background task bt8zptke8, pid 42746 inside WSL); scratch/commit-msg/TR-S1-F.txt drafted; waited on the baseline twice", "toolUses": 46 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT fired (hook count 52 of 65): stopped. NO production edit was made, so the in-flight baseline is still a true before-state", "toolUses": 47 }
+  ],
+  "report": {
+    "dodResults": {
+      "after.txt (po-human-approval.test.mjs, 169/170)": "not started: no production edit made",
+      "neighbours.txt vs before.txt": "not started; before.txt capture IS IN FLIGHT (see openItems 1)",
+      "consumer-safe check": "not run (nothing changed)",
+      "commit": "none; the scratch/commit-msg/TR-S1-F.txt message is drafted and ready",
+      "terminal record": "this is the interim record, outcome interim-stopped-at-budget-checkpoint-no-production-edit"
+    },
+    "evidence": [
+      "evidence/TR-S1-F-20261009/before.txt is being written by: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-F-20261009/before.txt --label before -- node --test <20 neighbour test files>\" (still running at record time, ~33 min, heavily contended: at least 5 other dispatches run WSL suites at the same time, among them project-onboarding-v3 and pipeline-state, which are in this set)."
+    ],
+    "changedFiles": [
+      "scratch/commit-msg/TR-S1-F.txt (new, untracked scratch: the prepared commit message with exactly the two trailers)",
+      "evidence/dispatch-record-TR-S1-F-20261009.json (this record)"
+    ],
+    "deliberatelyNotChanged": [
+      "plugins/pipeline-core/scripts/po-human-approval.mjs (no edit yet, deliberately: the in-flight before.txt must stay a pre-edit baseline)",
+      "all test files, hooks/, lib/guard/, harness/",
+      "NVA-SWEEP-F2f-REWORK (red before and after on SIGN-READINESS-FAILED key-anchor-mismatch; not this slice)"
+    ],
+    "deviations": [
+      "None from the spec. The briefing budget (75 + 5) and the hook budget (65) differ; the hook fired first and was obeyed."
+    ],
+    "openItems": [
+      "1. BASELINE IN FLIGHT. Do not edit po-human-approval.mjs until evidence/TR-S1-F-20261009/before.txt exists (the capture writes it only at the end). Check with Read of that path, or wait with: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; timeout 570 bash -c 'until [ -f evidence/TR-S1-F-20261009/before.txt ]; do sleep 5; done'\" (a loop of this shape is admitted by the guard and costs one call per <= ~9.5 min). If it is killed or never finishes, re-capture it before editing. Neighbour set (20 files, from the briefed rg, excluding the target and hooks): harness/scripts/check-auth-gate-inventory-drift.test.mjs; plugins/pipeline-core/lib/{copy-safe-command,guard-maintenance-window-kernel-closure,human-guard-override,onboarding-continuity,project-onboarding-v3,threat-model-approval-request,trust-anchor-bootstrap-circularity.repro}.test.mjs; plugins/pipeline-core/scripts/{design-workflow-signing-default,guard-human-override,model-family-approval-request,onboarding-init,pipeline-state-push-anchor,pipeline-state,po-approval-gate,push-init,push-release-flow-docs-contract,push-prepare,signing-ceremony,toolchain-preflight}.test.mjs. The tree carries foreign uncommitted test edits (pipeline-state.test.mjs and others), so the before/after pair must come from the same tree and the same set.",
+      "2. IMPLEMENTATION PLAN (all in plugins/pipeline-core/scripts/po-human-approval.mjs; settled, nothing left to decide):",
+      "   a. Codes: PO-KEY-UNENCRYPTED (named by pin-header A1 and Ruling 75 as the proposal) and PO-KEY-UNREADABLE (named by the briefing and the T4 simulated gate). Pins assert only a typed SHAPE (error.code or an uppercase hyphenated token in error.message), so both satisfy them; state this in the report so the Critic does not read it as a stop-condition-2 miss.",
+      "   b. Helpers next to isPrivateKeyPassphraseProtected (:1344): classifyPoPrivateKeyArmor(content): String(content).includes('-----BEGIN PRIVATE KEY-----') -> 'unencrypted' (checked FIRST, so a mixed file is refused); else includes('-----BEGIN ENCRYPTED PRIVATE KEY-----') -> 'encrypted'; else 'other' (non-PEM trap files pass through unchanged, not misclassified). A refusal builder mirroring readinessFailure (:992): message `${code}: ${cause}; repair: ${repairText}`, error.code = code, error.finding = readinessFinding('po-key-passphrase-protected','attended',cause,attendedRepair('po-key-passphrase-protected',repairText)), error.findings = [finding]. Do NOT use fail() (it sets no code). Repair text for UNENCRYPTED (PO decision 8 default): in your own terminal run openssl pkcs8 -topk8 -v2 aes-256-cbc -in \"<key>\" -out \"<key>.encrypted\" (it asks for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), same keypair so po-public.pem, trust-policy.json and the committed anchors stay valid, then re-run. Repair for UNREADABLE: make the key a regular file this OS user can read, then re-run. Let isPrivateKeyPassphraseProtected use the classifier (=== 'encrypted').",
+      "   c. Reads go through dependencies.readFile ?? readFileSync (pin 5 injects an EACCES readFile; its other variant is a DIRECTORY -> EISDIR); any throw -> PO-KEY-UNREADABLE (include the errno code in the cause, never key bytes).",
+      "   d. Call sites: (1) setup --existing-key: after the existence check (:1801-1803), read(args.existingKey) ONCE (move the existing :1811 read up), classify those bytes, refuse, then continue to the humanName check and the write of the SAME bytes. (2) setup recover branch (:1826): before localAuthority at :1830, classify read(paths.privateKey,'utf8'); only this branch (the :1840 all-three-present branch is not named by TOILRES; list it as deliberately not changed). (3) sign-intent: inside assertSigningReadyBeforePrompt (:1163) after the `if (!keyDirectoryReady) throw ...` line (:1167) and BEFORE assertAttendedTerminalWhenPassphraseKey: that is after the key-anchor check and before the first dependencies.spawn (the toolchain probe), as pin 4 / A2 needs, and the R7-6 trap-key cases (non-key string, anchor mismatch) keep ending at the anchor refusal with the private key never opened. (4) authorize-critical: right after the exists check at :1902, before criticalApprovalRequest and the request write at :1907. (5) approve / approve-critical: right after `if (!exists(paths.privateKey))` at :2140, before requireExplicitConfirmation. approve-fork-disposition delegates into (5). (6) signIntentIntoProof (:1639): one more call as the first statement, closing the swap window between a typed confirmation and the signing spawn (defence in depth; drop it only if it causes a new red).",
+      "   e. Expected result: po-human-approval.test.mjs 170 tests, 169 pass, only NVA-SWEEP-F2f-REWORK red. Any other red is named, not fixed (stop condition).",
+      "3. REPORT FLAGS for the Critic: only 'BEGIN PRIVATE KEY' PKCS#8 is classified unencrypted, as briefed. Traditional unencrypted armors (BEGIN RSA/EC PRIVATE KEY, OPENSSH) imported through --existing-key pass the gate and meet OpenSSL as before; widening is design latitude the briefing did not grant. The read-only readiness probe (probeSigningReadiness) is untouched on purpose: it must never open the private key; the up-front readiness finding is R7-7/T16.",
+      "4. GUARD GRAMMAR (seen live): Bash allows one simple command per call or the admitted pipelines; Glob and Grep with a directory-glob or a glob that touches protected roots are refused (GUARD-READ-TARGET), so Grep one exact file path; the repo-root evidence/ (not specs/.../evidence/) is where the record goes.",
+      "5. WSL LOAD: the machine is saturated by parallel dispatches. A 20-file neighbour run took more than 30 minutes before the checkpoint. Plan one WSL capture of the main file (fast) and one neighbour capture (slow), foreground with timeout 600000, or wait with the until-loop above.",
+      "Matrix: WSL only for the full files (OpenSSL/POSIX-bound); no Windows or macOS full run (no-full-verify-on-Windows rule)."
+    ]
+  }
+}

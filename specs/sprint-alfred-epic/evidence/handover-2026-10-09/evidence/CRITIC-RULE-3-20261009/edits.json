@@ -1,0 +1,64 @@
+[
+  {
+    "file": "harness/review-protocol.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "roles/critic.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "docs/adr/0003-role-implementation-subagents.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "docs/adr/0014-critic-contract.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "policies/model-policy.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "templates/prompts/critic-review.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  }
+]

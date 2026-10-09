@@ -1,0 +1,82 @@
+command: node --test plugins/pipeline-core/lib/dispatch-policy.test.mjs
+label: elephant-head
+exitCode: 1
+head: 8066b8f8f16ca252738d2c4e0b5fec64fbdaf2d0
+tree: 9b5c60625cf930b0d12ae6eb851e4f555329c075
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'input.txt', LF will be replaced by CRLF the next time Git touches it
+✔ DPT01 DP1 the real 2026-08-06 briefing is refused (2.5983ms)
+✔ DPT02 DP2 a references-only Critic dispatch passes (0.8042ms)
+✔ DPT03 DP3 an expectation-conclusion is refused (0.4911ms)
+✔ DPT04 DP4 an implementor characterization is refused (0.3938ms)
+✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.484ms)
+✔ DPT06 DP6 a complete Goldfish briefing passes (0.6511ms)
+✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (0.6533ms)
+✔ DPT08 DP8 a Goldfish dispatch that names no model is refused (0.4789ms)
+✔ DPT09 DP8b every budget-bearing role binds its declared cap before launch (2.4749ms)
+✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (0.9795ms)
+✔ DPT11 DP8d a role without an adopted budget field receives no fabricated budget finding (0.1553ms)
+✔ DPT12 DP9 an unrelated subagent type is untouched (0.1434ms)
+✔ DPT13 DP10 a reworded steer passes -- the check is structural, not semantic (0.3134ms)
+✔ DPT14 DP11 the real critic-review.md template, filled, passes (1.3392ms)
+✔ DPT15 DP12 the real goldfish-task.md template, filled, passes (0.7358ms)
+✔ DPT16 DP13 every shipped role refuses an empty prompt before launch (1.4065ms)
+✔ DPT17 DP14 an unknown pipeline role is refused before launch (0.0883ms)
+✔ DPT18 DP15 Workflow requires the plugin prefix for every shipped role (1.1038ms)
+✔ DPT19 DP16 an unrelated host role remains outside the pipeline registry (0.0992ms)
+✔ DPT20 DP17 the common envelope rejects a stale candidate tree before launch (247.3193ms)
+✔ DPT21 DP18 the common envelope rejects an unusable result destination (64.1654ms)
+✔ DPT22 DP18g one malformed packet reports independent static faults before launch (0.7734ms)
+✔ DPT23 DP18h independent role-policy faults are all log-safe and prelaunch (0.7347ms)
+✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (48.6382ms)
+✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (36.3697ms)
+✔ DPT26 DP18b a coordinator-owned result root is validated separately from candidate inputs (171.0329ms)
+✔ DPT27 DP18d explicit file destinations preserve the validated file contract (58.5709ms)
+✔ DPT28 DP18e return and stream destinations require no fabricated result path (111.1567ms)
+✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (1.9819ms)
+✔ DPT30 DP18a required source names are literal paths, never Git pathspecs (37.2728ms)
+✔ DPT31 DP18c a modified tracked source is rejected before launch (58.9368ms)
+✔ DPT32 DP19 every shipped role fails in PREPARE with zero launcher calls (342.4956ms)
+✔ DPT33 DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged (965.7297ms)
+✔ DPT34 DP21 batch execution propagates resultRoot and preserves mixed destinations (404.9531ms)
+✔ DPT35 DP22 legacy and explicit file destinations share one collision namespace (113.306ms)
+✔ DPT36 DP23 occupied replacement after PREPARE blocks the affected launcher (228.5572ms)
+✖ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (176.7239ms)
+✔ DPT38 DP24 required-input drift after PREPARE blocks the affected launcher (226.1704ms)
+✔ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.1388ms)
+✔ DPT40 DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40) (0.2979ms)
+✔ DPT41 DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11) (0.4679ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 40
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3399.5942
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (176.7239ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at launch (file:///<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:631:13)
+      at runRoleDispatchBatch (file:///<repo-root>/plugins/pipeline-core/lib/role-dispatch-preflight.mjs:347:24)
+      at file:///<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:622:28
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/dispatch-policy.test.mjs:290:9)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+--- stderr ---

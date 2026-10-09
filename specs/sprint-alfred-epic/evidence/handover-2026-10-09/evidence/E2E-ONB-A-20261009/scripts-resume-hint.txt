@@ -1,0 +1,61 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/resume-hint.test.mjs
+label: scripts-resume-hint
+exitCode: 1
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ capture --consume-card leaves a schema-invalid card on disk and reports the schema error (RED before the fix) (1726.92298ms)
+✔ capture --consume-card deletes the card only after a successful capture is observable via inspect (3990.003387ms)
+✔ a card that fails validation AFTER contextCard() (invalid materialInput) also survives --consume-card (1899.992991ms)
+✔ capture records a cardDigest, and inspect exposes the SAME value back (4593.423002ms)
+✔ capture output states the verify-gate coupling and names both consume and discard (2967.745258ms)
+✖ a materialInput chunk change alters the recorded cardDigest (3294.954939ms)
+✖ capture preserves a complete disposable Greenfield fixture in the private intake checkpoint for inspect and the next identified SessionStart (4490.55184ms)
+✔ query before any capture reports the no-card outcome (2969.312525ms)
+✔ query after capture but before consume reports not-consumed with an absent-receipt code (5349.861125ms)
+✔ consume then query reports consumed with a matching digest -- never from a caller-supplied assertion (11954.941104ms)
+✔ a corrupt receipt is reported via the query outcome, never fatal (7959.362404ms)
+✔ a receipt bound to a stale digest (the card changed after it was read) reports a digest mismatch, never fatal (5567.709029ms)
+✔ an unreadable card-digest record is reported via inspect/query, never fatal (4995.308537ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 11
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64145.204181
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/resume-hint.test.mjs:191:1
+✖ a materialInput chunk change alters the recorded cardDigest (3294.954939ms)
+  SyntaxError: Unexpected end of JSON input
+      at JSON.parse (<anonymous>)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/resume-hint.test.mjs:195:26)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/scripts/resume-hint.test.mjs:205:1
+✖ capture preserves a complete disposable Greenfield fixture in the private intake checkpoint for inspect and the next identified SessionStart (4490.55184ms)
+  Error: GS-PRIVATE-MODE
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:31:64)
+      at privatePath (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:394:232)
+      at ensureHostRoot (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:327:5)
+      at persistPositiveProof (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:189:5)
+      at Object.applyDecision (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:313:75)
+      at enrollFixtureGovernance (file://<repo-root>/plugins/pipeline-core/scripts/resume-hint.test.mjs:58:24)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/resume-hint.test.mjs:207:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'GS-PRIVATE-MODE',
+    ownedGitTopology: false
+  }
+
+--- stderr ---

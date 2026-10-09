@@ -1,0 +1,20 @@
+command: node --test --test-name-pattern=existing-key plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: f4-after
+exitCode: 0
+head: 902fe1b74859a53fb0f736ccf8c46aedad0bcbc2
+tree: c1835a99be648a18e5b71625dc933d4e39542a24
+dirty: true
+--- stdout ---
+✔ new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup (42721.891566ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor (2045.529134ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (2065.56269ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49753.164267
+
+--- stderr ---

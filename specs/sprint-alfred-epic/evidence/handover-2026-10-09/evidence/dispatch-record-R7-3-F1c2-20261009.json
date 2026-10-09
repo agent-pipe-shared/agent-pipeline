@@ -1,0 +1,30 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R7-3-F1c2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "e8dcc8c79",
+  "outcome": "completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "commits": ["870fb81ed"],
+  "resultSha256": null,
+  "report": {
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded; Project Agent-Pipeline; Role Goldfish (printed after the initial orientation reads and before any substantive work, not as the literal first output). Route pre-check: requested claude-sonnet-5-5/xhigh (goldfish-deep); observed claude-sonnet-5-5 from this dispatch runtime prompt; match, no contradiction.\n1. DoD: EVDESC-b green at both entry points (reader and approval request): passed. CANDBINDX-a, CANDBINDX-c, R7-3a x3 unchanged red: passed. Nothing green before is red after (22 pass/6 fail before, 23 pass/5 fail after, the same five failing names): passed. Consumer-safe paths test: passed, exit 0. Commit by exact pathspec with -F: passed, 870fb81ed, one file. Independent review: pending. PO acceptance: open.\n2. Evidence: AFTER = wsl.exe -e bash -lc (cd repo; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/R7-3-F1c2-20261009/after.txt --label R7-3-F1c2-after -- node --test <the identical 5 files>), wrapped exit code 1 (5 expected reds), artifact evidence/R7-3-F1c2-20261009/after.txt, recorded head f929da250 dirty. BEFORE = evidence/R7-3-F1c2-20261009/before.txt (dispatcher, head 410d0addf dirty). Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, no artifact file. The target file was not edited between the AFTER capture and the commit, so the captured working-tree bytes equal the committed bytes. HEADs in play: dispatch HEAD e8dcc8c79, before 410d0addf, after f929da250, commit 870fb81ed (parent 4c555b5d7) because parallel dispatches moved HEAD.\n3. Changed: plugins/pipeline-core/lib/design-workflow-package-v2.mjs only (evidence-only-descendant admission at the old :108, requireCurrentCandidate forwarded as false after admission, stale comment :33 corrected).\n4. Deliberately not changed: Codex tool-free forwarding chain (CANDBIND-F2 owns it, keeps CANDBINDX-a/c red); R7-3a reds (R7-3-F1b); design-readiness-host-evidence.mjs and readiness-advisor-context-v2.mjs (covered by the forward); no test touched.\n5. Deviations from Ruling 68: none in behaviour. Implementation details: the ancestry and diff use the observed HEAD commit id instead of the literal HEAD (same commit, race-free); any git failure or unverifiable candidate refuses with the old DWP2-CURRENT-CANDIDATE code instead of DWP2-PHYSICAL-OR-GIT; an empty descendant diff (no changed path) is admitted vacuously per the ruling text.\n6. Open: independent review pending (Critic, security-relevant per Ruling 65); PO acceptance open; hook GUARD-BOOTSTRAP-RECEIPT-MISSING required one pipeline-start-preflight run before the first Write (done, then identical write passed).",
+    "changedFiles": ["plugins/pipeline-core/lib/design-workflow-package-v2.mjs"]
+  },
+  "log": [
+    { "phase": "bootstrap-route-precheck-record-created-requested-sonnet-5-5-xhigh-observed-sonnet-5-5-match", "toolUses": 10 },
+    { "phase": "orientation-read-ruling-68-test-file-v2-reader-before-baseline", "toolUses": 20 },
+    { "phase": "edit-done-four-edits-one-file-WSL-after-capture-23-pass-5-fail-EVDESC-b-green-five-reds-unchanged", "toolUses": 26 },
+    { "phase": "consumer-safe-exit-0-commit-870fb81ed", "toolUses": 31 },
+    { "phase": "closing-record-and-report", "toolUses": 36 }
+  ]
+}

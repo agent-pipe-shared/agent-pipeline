@@ -1,0 +1,94 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-F3a2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "6305f867ffa70cbb8f96e28f8542723e091eef56",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a"
+  ],
+  "resultSha256": "c95401a78fc04c276eac5a341171c4b5b4f30e6192d371535e2819f98a0f4b7c",
+  "report": {
+    "text": "CLOSING-ALLOWANCE-STYLE INTERIM HANDOVER (80 % checkpoint notice at counted call 32 of 40). Production edit COMMITTED and green on every fast measure; M2 probes NOT yet run. independent review: pending.\n\nRoute pre-check (class G): requested claude-sonnet-5-5 / xhigh; observed model claude-sonnet-5-5 (dispatch runtime prompt); effort not directly observable; no contradiction.\n\n1. DoD results\n- Edit (three regions): done and committed as 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a. git diff showed exactly four hunks (import, local V7_APPROVAL_SCHEMA const, the :103 selector, the call with readCandidate dropped), all mine.\n- after-fast: PASSED. v7 post-image run copy 3 tests / 3 pass / 0 fail (before: 3 fail); design-workflow-package.test.mjs 21 tests / 21 pass / 0 fail (before: 20 pass, 1 fail = DWP21). No other change in the package suite.\n- after-hooks (WSL guard-devplan.test.mjs): PASSED, exit 0, 1 test / 1 pass, identical to hooks-before (no new red).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: PASSED, exit 0, 9 tests / 9 pass.\n- m2.txt (both probes): NOT RUN. Not verifiable yet; see section 6.\n- One commit of the production file only with the prepared message and the changed Dispatch trailer: done.\n\n2. Evidence (machine-written, repo-relative)\n- evidence/ADR0085-F3a-20261009/v7-after.txt (driver after-fast; exit 0), pkg-after.txt (exit 0), hooks-after.txt (driver after-hooks; exit 0). Commands: node scratch/dispatch-wip/f3a-capture.mjs after-fast, then after-hooks. Before-captures untouched.\n- Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0 (console output, not a file).\n\n3. Changed files\n- plugins/pipeline-core/lib/guard-devplan-policy.mjs (the only tracked change, commit 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a): import the re-read, local V7_APPROVAL_SCHEMA, selector, re-read call without readCandidate. The CURRENT_APPROVAL_SCHEMA import is kept (now unused here) for F3b, as Ruling 149 says.\n- Untracked scratch/evidence only: the three after-captures, evidence/ADR0085-F3a-20261009/inspect.txt (a stray by-product of the driver's after-fast phase; M2 no longer uses inspect), scratch/commit-msg/ADR0085-F3a2-20261009.txt, scratch/dispatch-wip/f3a2-finalize.mjs, this record.\n\n4. Deliberately not changed\n- Any test file, hooks/, lib/guard/, harness/, .claude/pipeline-state.json (never read or written by me), the v8 branch, the mode check, the remediation text (F3b). Pre-existing modifications of other agents in the working tree untouched (the commit used an exact pathspec). The stray inspect.txt was left, not deleted.\n\n5. Deviations from spec\n- The M2 probes were not run: the budget notice arrived after the edit and the three suite phases, and the briefing's 80 % rule says stop, commit what is green, hand back. The commit was therefore made BEFORE M2, whereas the DoD lists m2.txt first. This is a disclosed ordering deviation, not a silent one.\n\n6. Open items\n- M2 (decisive, do it first): write scratch/dispatch-wip/f3a-m2.mjs (read-only; reads the live planApproval from .claude/pipeline-state.json at run time inside the script) and run it natively through capture-evidence.mjs into evidence/ADR0085-F3a-20261009/m2.txt. Probe 1: rereadApprovedDesignWorkflowPackage on the real package, print ok, code, mode. Probe 2: designAdvisoryAdmission(state, projectDir, planPath, specPath) as hooks/guard-devplan.mjs:505-512 calls it; print result and mode. I did not look up the capture-evidence.mjs command line and a Grep on .claude/pipeline-state.json was refused with GUARD-READ-TARGET, so the next briefing should name both (or tell the probe to read the file itself).\n- RISK to measure with probe 2: the selector now matches only pipeline.plan-approval.v7. If this repository's live planApproval is v8 (CURRENT_APPROVAL_SCHEMA is v8 since F1b), the live admission moves from the workflow branch to the pre-v7 branch and would be refused until F3b; if it is v7, the edit fixes it. I did not read the live schema. If probe 2 fails, report its code and consider reverting commit 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a (the briefing forbids changing the probe to pass).\n- The installed guard hooks run from the local marketplace copy of the plugin, not from this working tree, so the edit cannot have changed how this session's guards behave.\n- Closing-allowance statements: Committed: 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a (guard-devplan-policy.mjs only). Verified green: after-fast, after-hooks, consumer-safe (commands above). Remains undone: m2.txt with both probes; the dispatch record's critic receipt (independent review pending). Next briefing: lead with M2, name the capture-evidence.mjs invocation, state whether the live planApproval is v7 or v8.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/guard-devplan-policy.mjs"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening: record created; briefing, CONT17/18/24 headers, obligations read; route pre-check (requested claude-sonnet-5-5/xhigh; observed claude-sonnet-5-5 per runtime prompt; effort not directly observable; no contradiction)",
+      "toolUses": 13
+    },
+    {
+      "phase": "edit done (4 hunks), after-fast green (v7 3/3, pkg 21/21), after-hooks green (1/1)",
+      "toolUses": 31
+    },
+    {
+      "phase": "80 % notice at call 32; consumer-safe green; committed 1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a; M2 not run; terminal record written",
+      "toolUses": 38
+    }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [
+      "1c7c37f4a60ffa34a004ce0293dbcf1ccf9ece7a fix(guard-devplan-policy): verify a v7 design approval through the package re-read"
+    ],
+    "verifiedGreen": [
+      {
+        "check": "after-fast (v7 3/3, package suite 21/21)",
+        "command": "node scratch/dispatch-wip/f3a-capture.mjs after-fast",
+        "exit": 0,
+        "artifacts": [
+          "evidence/ADR0085-F3a-20261009/v7-after.txt",
+          "evidence/ADR0085-F3a-20261009/pkg-after.txt"
+        ]
+      },
+      {
+        "check": "after-hooks (guard-devplan.test.mjs 1/1)",
+        "command": "node scratch/dispatch-wip/f3a-capture.mjs after-hooks",
+        "exit": 0,
+        "artifacts": [
+          "evidence/ADR0085-F3a-20261009/hooks-after.txt"
+        ]
+      },
+      {
+        "check": "consumer-safe paths (9/9)",
+        "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+        "exit": 0,
+        "artifacts": []
+      }
+    ],
+    "remainsUndone": [
+      "evidence/ADR0085-F3a-20261009/m2.txt (both M2 probes not run)",
+      "independent Critic receipt"
+    ],
+    "nextBriefingAdjustments": [
+      "lead with M2 and name the capture-evidence.mjs invocation",
+      "state whether the live planApproval is v7 or v8 (probe 2 may fail for v8 until F3b)"
+    ]
+  }
+}

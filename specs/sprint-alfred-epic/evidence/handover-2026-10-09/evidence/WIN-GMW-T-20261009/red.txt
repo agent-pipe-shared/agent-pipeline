@@ -1,0 +1,568 @@
+command: node --test plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
+label: red
+exitCode: 1
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+PASS GMW01 GS-6 and TP-* are liftable; GS-1..GS-5/GS-7 and arbitrary ids are not
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW02 prepare rejects a scope naming a non-liftable rule id
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW03 prepare -> install -> active -> windowCoversRule -> close -> absent
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS global committed chat arms GMW without an anchor/proof and records chat-attributed-unattested
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS signature/default/uncommitted/invalid human approval remains fail-closed without an anchor
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW04 a missing/malformed subject.expiresAtMs resolves to NOT active (fail-closed)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW04b editing expiresAtMs in the stored record (a plaintext-looking field) fails verification, not renews
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW09 repeating install() with the identical {request, proof} never moves expiry later than the signed bound
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW10 install refuses a request whose signed expiresAtMs has already passed
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW06 a window prepared for one physical repository does not verify for another
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW07 a tampered window.json (any byte changed post-install) fails currentGuardMaintenanceWindow
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW11 install rejects a hand-built request naming a non-liftable rule id, bypassing prepare()
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW12 currentGuardMaintenanceWindow/windowCoversRule never report a non-liftable id as covered, even from an already-stored record
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW08 isNeverLiftableKernelPath matches both anchors and nothing else
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW15 an unresolvable digest yields no lines at all -- no record, no invented description
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW14 prepare rejects a missing/invalid authorshipMode -- mandatory, not skippable
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the "any well-formed key" posture, unlike the CRITICAL_ACTION_KINDS ceremonies
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/side-file.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/main-file.mjs', LF will be replaced by CRLF the next time Git touches it
+PASS GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+PASS GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'special-protected.mjs', LF will be replaced by CRLF the next time Git touches it
+PASS GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'unrelated-widened-match.mjs', LF will be replaced by CRLF the next time Git touches it
+PASS GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'narrow-protected.mjs', LF will be replaced by CRLF the next time Git touches it
+PASS GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW15 prepare rejects authorshipMode "elephant-direct" with a missing/malformed stage0Selfcheck
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW16 prepare rejects authorshipMode "elephant-direct" whose declared diff does not qualify for EL-01 stage-0 (the actual gate DoD demonstration)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW17 prepare+install accept authorshipMode "elephant-direct" whose declared diff DOES qualify for EL-01 stage-0, and the declaration survives into the active window's status
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW18 install independently re-verifies the stage-0 declaration (F3 defense in depth): a hand-built request cannot bypass prepare()'s check
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW19 authorshipMode "goldfish-dispatch" never requires (or carries) a stage0Selfcheck
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW20 a legacy stored window record with authorshipMode entirely absent (pre-existing field) still reads as active, not absent
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW21 a stored window record that DOES carry an authorshipMode key, but an invalid/unrecognised one, is still rejected as absent (backcompat is for absence only, not for tampering)
+PASS GMW22 validStoredStage0Declaration: unit-level split between a genuinely absent field (legacy, valid) and a present-but-invalid one (rejected)
+PASS GMW44 repoPathIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity
+PASS GMW45 repoFingerprint hashes the /mnt/c/... and <host-path> spellings of one physical repo to the same value, and two genuinely different repos still differ
+PASS GMW46 a plain POSIX repo path is unaffected (current formula equals the pre-fix legacy one -- no migration needed for the majority case)
+PASS GMW47 a fingerprint recorded under the pre-fix legacy formula for a WSL-mount repo is still recognized as bound (repoFingerprintMatches)
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+FAIL GMW48 an installed window is still found end-to-end when its stored repoFingerprintSha256 fields are the pre-fix legacy value (real repo/plugin fixtures, functional level): AssertionError [ERR_ASSERTION]: a window record carrying the pre-fix legacy repoFingerprintSha256 must still read back as active
+
+'absent' !== 'active'
+
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1736:12
+    at check (file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:61:15)
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1709:9
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+FAIL GMW49 (WIN-GMW-T) a GS-6-scoped window refuses an intervening commit whose only file is an ordinary out-of-scope repository file on a DIFFERENT volume from the live plugin root -- relative() across volumes returns the absolute target, which must not read as 'inside the anchor': AssertionError [ERR_ASSERTION]: an intervening commit touching only a file on a different volume than the live plugin root was ADMITTED as in-scope (install status: active)
++ actual - expected
+
++ {
++   authorshipMode: 'goldfish-dispatch',
++   expiresAtMs: 1791517650918,
++   humanApproval: {
++     mode: 'signature-verified'
++   },
++   intentSha256: 'd5a5debc7eb57d84971152b4025c755ee3c2bfe5d52af8cb9716a109c57607b8',
++   observedTreeSha256: '8dc1ce1866ec6027bb39f64125d8a50395a81273ffab2af84a483b7854baff0c',
++   openingTreeSha256: '8dc1ce1866ec6027bb39f64125d8a50395a81273ffab2af84a483b7854baff0c',
++   reason: 'cross-volume file must not read as inside the plugin root',
++   remainingMs: 298901,
++   scopeRuleIds: [
++     'GS-6'
++   ],
++   stage0Selfcheck: null,
++   status: 'active'
++ }
+- null
+
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1785:14
+    at check (file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:61:15)
+    at file:///<repo-root>/plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1763:11
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plugins/pipeline-core/hooks/guard-example.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PASS GMW50 (WIN-GMW-T control) on ONE volume, an intervening commit whose only file is inside the live plugin root stays in scope and install tolerates it
+
+guard-maintenance-window: 62 passed, 2 failed
+✖ plugins\pipeline-core\lib\guard-maintenance-window.test.mjs (154556.4417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 154561.7711
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\guard-maintenance-window.test.mjs:1:1
+✖ plugins\pipeline-core\lib\guard-maintenance-window.test.mjs (154556.4417ms)
+  'test failed'
+
+--- stderr ---

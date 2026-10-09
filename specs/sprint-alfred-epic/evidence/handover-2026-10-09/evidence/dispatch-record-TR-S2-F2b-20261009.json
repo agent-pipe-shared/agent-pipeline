@@ -1,0 +1,54 @@
+{
+  "taskId": "TR-S2-F2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh (requested; not directly observable from the runtime prompt)",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "agent": "goldfish-deep",
+  "class": "SECURITY",
+  "outcome": "implementation-complete-pending-elephant-recapture-and-delta-critic",
+  "headAtStart": "d0fdf3c9ceb1c790a6ff463f0078d8b4f946d7c0",
+  "headBeforeCommit": "193c405117e4d7f56f6db0c8b9cc3d8413a3cd6e",
+  "commits": [
+    { "sha": "8328f56bb437549da2a8f2caededf8219b99f4b8", "subject": "fix(execution-lane-credential): apply the Ruling 90/97/106 fix set to the classifier", "files": ["plugins/pipeline-core/lib/execution-lane-credential.mjs"] }
+  ],
+  "log": [
+    { "phase": "route pre-check + preflight", "toolUses": 8, "note": "requested claude-sonnet-5-5 matches observed claude-sonnet-5-5 (runtime prompt); effort unknown, disclosed" },
+    { "phase": "orientation: module, pin file, Rulings 90/97/106, predecessor record", "toolUses": 21 },
+    { "phase": "module written in one pass; native capture 322/322 exit 0", "toolUses": 24 },
+    { "phase": "WSL capture 322/322 exit 0; consumer-safe 9/9 exit 0; ad-hoc probe 52/53 (the one miss is a probe-reader artifact)", "toolUses": 31 },
+    { "phase": "commit 8328f56bb (module only); terminal record", "toolUses": 41 }
+  ],
+  "report": {
+    "status": "implementation complete; Elephant re-capture at HEAD and the delta Critic (Opus) pending. Not accepted.",
+    "dod": {
+      "native capture": "passed: 322 tests, 322 pass, 0 fail, 0 skipped (evidence/TR-S2-F2b-20261009/after.txt, wrapped exit 0)",
+      "wsl capture": "passed: 322 tests, 322 pass, 0 fail, 0 skipped (evidence/TR-S2-F2b-20261009/wsl.txt, wrapped exit 0)",
+      "consumer-safe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9",
+      "commit": "passed: 8328f56bb, module only, trailers Dispatch + AI-Assisted, no Co-Authored-By",
+      "record": "this file"
+    },
+    "testCount": "322 at capture (298 + the 24 TR-S2-T4 rows, test commit 667b04336, already in the tree). The test file had no working-tree edits.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/execution-lane-credential.mjs (committed 8328f56bb)",
+      "evidence/dispatch-record-TR-S2-F2b-20261009.json (this record, untracked)",
+      "evidence/TR-S2-F2b-20261009/after.txt and wsl.txt (captures, untracked)",
+      "scratch/commit-msg/TR-S2-F2b.txt (commit message, untracked)",
+      "scratch/probe-tr-s2-f2b.mjs (throwaway ad-hoc probe with fixture-name spellings, untracked, not committed)"
+    ],
+    "deviationsAndOverRefusals": [
+      "Wrapper seek-forward also stops at search tools (rg, grep, egrep, fgrep, git grep, Select-String/sls), not only carriers, so `sudo rg -n <key name> docs/` keeps the pattern exemption.",
+      "Over-refusal beyond the pins, allowed direction: secret patterns also meet option values (`--include=*.pem`, `-g '*.pem'`), redirect targets (`> server.key`) and assignment right-hand sides.",
+      "-ea stays refused by the existing own-flag walk (isEncodedName); it is only excluded from the new F1 token pass, as briefed.",
+      "scriptTarget hands a relative operand to readScript as written, and the cwd-resolved path only after a cd moved the cwd.",
+      "node: after the first positional, dash words are script arguments, not node options (so a later -e cannot suppress reading the script).",
+      "F6 is implemented as a second full scan of the text with escapes removed (sh syntax only), so a text containing a backslash outside single quotes is scanned twice per level."
+    ],
+    "wiringNotes": [
+      "With every node positional read, a real readScript that returns null for non-file positionals (the --out value, the literal `node` in the capture-evidence route) will refuse; N3-1 is green only because the fake reader falls back to a benign script.",
+      "cd handling is syntactic: cd -, subshell scoping and pushd/popd stack semantics are not modelled."
+    ],
+    "probeNote": "Ad-hoc probe: 52 of 53 as expected. The one miss (`node ../plugins/x.test.mjs` against an exempt `plugins/x.test.mjs`) is a probe-reader artifact: the module correctly did not exempt it, and the probe reader returned its benign fallback for the unmatched key.",
+    "notRun": "Full verify (forbidden on Windows). capture-evidence descent and evaluate.mjs wiring are out of scope. critic-TR-S2-20261009.md was not read (the briefing pre-oriented the design)."
+  }
+}

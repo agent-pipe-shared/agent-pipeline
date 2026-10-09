@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-F2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f43bc8564f61cf98456cf76b5384eb84cee996d8",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "913d2ac8c5933dff51b1dc27df3f760398df302e"
+  ],
+  "log": [
+    {
+      "phase": "opening: route pre-check done (requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 from this dispatch's runtime prompt, no contradiction; effort not observable); obligations + CONT17 header + goldfish-task 455-481 + T2c record read; GUARD-BOOTSTRAP-RECEIPT-MISSING cured by preflight from the loaded plugin root; record created before any other work",
+      "toolUses": 8
+    },
+    {
+      "phase": "edit + verify: route-after 39/39 pass (exit 0); pkg-after 20 of 21 pass, only DWP21 red, identical to pkg-before (DAA-PUBLIC-UNAVAILABLE at test:936); arch before/after exit 0; v2 WSL before/after exit 0; consumer-safe exit 0; artifacts under evidence/ADR0085-F2b-20261009/; then commit (exact pathspec) and this checkpoint",
+      "toolUses": 43
+    },
+    {
+      "phase": "final: report written with resultSha256 in one write",
+      "toolUses": 45
+    }
+  ],
+  "resultSha256": "c29eef9c622d1cf9c211f6e4ba1e4db777fe7f061668eb20dff2e1e6fdc1ce2b",
+  "report": {
+    "text": "independent review: pending. Implementation complete and committed; not PO-accepted, no independent Critic receipt yet.\n\nRoute pre-check (class S): requested route claude-sonnet-5-5 / xhigh (field 6, agentType goldfish-deep). Observed model identity claude-sonnet-5-5, quoted from this dispatch's runtime prompt (\"The exact model ID is claude-sonnet-5-5\"). No contradiction. Effort is not observable from the prompt and I did not read the agent definition, so xhigh is unverified. Disclosure: MP-07 normally routes class S to the higher-capability model at max; field 6 explicitly names the role default and says an Opus Critic follows the F chain, so requested and observed agree.\n\n1. DoD results\n- BEFORE captures: passed. pkg-before 21 tests, 20 pass, 1 fail (DWP21 only), wrapped exit 1. arch-before wrapped exit 0.\n- AFTER route-after: passed. design-approval-route 39 tests, 39 pass, 0 fail, wrapped exit 0 (S1-S8, S10, S11 now green; S9 and R/V/L stay green).\n- AFTER pkg-after: passed (no red absent from before). 21 tests, 20 pass, 1 fail; the only red is DWP21, with the same assertion (DAA-PUBLIC-UNAVAILABLE at design-workflow-package.test.mjs:936) as in pkg-before. Wrapped exit 1, same as before.\n- AFTER arch-after: passed, wrapped exit 0 (counts not extracted; exit 0 means no failing test).\n- WSL v2: passed. v2-wsl-before and v2-wsl-after both wrapped exit 0 (counts not extracted).\n- check-consumer-safe-paths.test.mjs: passed, wrapped exit 0, captured through capture-evidence (counts not extracted).\n- One commit, exact subject, trailers exactly \"Dispatch: ADR0085-F2b-20261009 (goldfish)\" and \"AI-Assisted: true\": passed, 913d2ac8c5933dff51b1dc27df3f760398df302e, design-workflow-approval.mjs only. No Co-Authored-By or Claude-Session trailer, per GIT-03 and the CONT17 header.\n- Regression set (Ruling 138): no outcome change observed. design-workflow-package.test.mjs has the same single failing test before and after; design-workflow-package-v2.test.mjs exits 0 under WSL before and after. I compared per-file pass/fail sets, not each test by line number against :794-853 and :148-151.\n\n2. Evidence (all under evidence/ADR0085-F2b-20261009/, written by plugins/pipeline-core/scripts/capture-evidence.mjs)\n- Command shape: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-F2b-20261009/<name>.txt --label <name> -- node --test <file>\n- pkg-before.txt (exit 1), arch-before.txt (0), route-after.txt (0), pkg-after.txt (1), arch-after.txt (0), consumer-safe.txt (0): native, files design-workflow-package.test.mjs, architecture-design.test.mjs, design-approval-route.test.mjs, harness/scripts/check-consumer-safe-paths.test.mjs.\n- v2-wsl-before.txt (0), v2-wsl-after.txt (0): via wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; ...\" on design-workflow-package-v2.test.mjs. This was the only WSL capture.\n- Dispatch record: evidence/dispatch-record-ADR0085-F2b-20261009.json.\n\n3. Changed files\n- plugins/pipeline-core/lib/design-workflow-approval.mjs (18 insertions, 18 deletions): import gains rereadApprovedDesignWorkflowPackage; verifyStoredDesignWorkflowPackageSignature re-reads through it (no readCandidate, no trustedAdvisorExecutablePath), drops the request object and the nested verifyDesignWorkflowPackageApproval call, and calls verifyAgainstTrustAnchors directly. Kept in order: RECORD-SHAPE, intent recompute and INTENT-DRIFT, trust-anchor verdict (code passthrough, else DWP-APPROVAL-PROOF-INVALID), RECORD-DRIFT on proofSha256/approvedBy, success code DWP-APPROVAL-STORED-SIGNATURE-VERIFIED. Same returned fields as before (ok, code, packageSha256, intentSha256, proof, proofSha256, signer, packageRead, advisorException when present). Doc comment extended; readCandidate and trustedAdvisorExecutablePath stay in the parameter list, unused.\n- Untracked, not committed: evidence/ADR0085-F2b-20261009/*.txt, evidence/dispatch-record-ADR0085-F2b-20261009.json, scratch/commit-msg/ADR0085-F2b-20261009.txt, scratch/finalize-ADR0085-F2b.mjs, scratch/report-ADR0085-F2b-20261009.txt.\n\n4. Deliberately not changed\n- Every test file; verifyDesignWorkflowPackageApproval and validateDesignWorkflowPackageApprovalRequest (other callers); the readApprovedDesignWorkflowPackage import (still used at :131); candidateReader.\n- DWP21 (pre-existing red, DAA-PUBLIC-UNAVAILABLE, same before and after); I did not investigate it.\n- The stale header note in design-approval-route.test.mjs (T2c left it, test-only slice).\n- Foreign staged and dirty files; the commit used the exact pathspec.\n\n5. Deviations from spec and points for the Critic\n- No deviation from the briefed edit. Two behaviour differences are disclosed rather than fixed:\n  a. packageRead in the success result is now the re-read's object (mode DWP2-LEGACY-APPROVED-REREAD, candidate, workflowPackage, approvedBinding true, implementationAuthority false), not readApprovedDesignWorkflowPackage's. I did not search production callers for fields of the old shape; only the whole-file captures above cover them.\n  b. The nested path ran validApprovalIntent on the rebuilt request (DWP-APPROVAL-REQUEST-SHAPE, including candidate commit and tree being 40-64 hex and different) plus redundant binding re-checks. The stored path no longer runs validApprovalIntent. I did not verify that the re-read's closed package-shape check rejects a degenerate candidate, so one old refusal may not be reproduced. No test pins it; the Critic should decide whether it matters.\n- S1/S2 went green without any nested-request-validation change, so T2c's suspicion did not materialise.\n\n6. Open items\n- independent review: pending (only the Elephant dispatches the Critic).\n- Carried from T2c: verifyAgainstTrustAnchors derives trust from the proof itself when the anchor list is empty. The stored path passes anchors straight through, as the old nested path did, so no new exposure, but which callers can pass an empty list is still unanswered.\n- No stop condition triggered; no PB-* or kernel refusal at Edit or commit; no index.lock. One GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the preflight from the loaded plugin root) and one GUARD-READ-TARGET refusal (a Grep over a directory; cost one call). About 45 of 50 hook-counted tool uses.\n- Closing handover facts: committed 913d2ac8c5933dff51b1dc27df3f760398df302e (design-workflow-approval.mjs); verified green: the captures listed in sections 1 and 2; remains undone: nothing in the briefed scope; modified-and-uncommitted by me: only the untracked evidence and scratch files in section 3. Next briefing adjustments: none; DoD wording could name exact evidence files, since a Grep on the evidence directory is refused.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-approval.mjs"
+    ]
+  }
+}

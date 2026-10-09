@@ -1,0 +1,63 @@
+{
+  "taskId": "T90-T-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-pins-committed",
+  "commits": ["b395f1c47"],
+  "log": [
+    { "phase": "opening: record created (first Write refused GUARD-BOOTSTRAP-RECEIPT-MISSING, cured by preflight status ready)", "toolUses": 6 },
+    { "phase": "orientation: no injection seam in auditLockOwnerState/localAuditLockOwner; public handle = humanGuardOverrideInternals.acquireAuditLock", "toolUses": 24 },
+    { "phase": "first placement: new sibling lib test file; native run 1 all HGO-DACL (harness precondition), cured with hardenWindowsPrivateDirectory in sandbox()", "toolUses": 31 },
+    { "phase": "native run 2 + wsl run on the sibling file: intended states", "toolUses": 37 },
+    { "phase": "git add refused once: index.lock (parallel dispatch); did other work, retried once, succeeded", "toolUses": 41 },
+    { "phase": "discovered Verify discovers tests from a pinned list in harness/scripts/verify.mjs (:287 names human-guard-override.test.mjs); a new file would not run and registering it needs harness/ (forbidden); moved the block into the registered file, deleted the untracked sibling", "toolUses": 52 },
+    { "phase": "final captures of the registered file (pattern T90-T): native + wsl, consumer-safe exit 0, commit b395f1c47", "toolUses": 59 }
+  ],
+  "report": {
+    "state": "Implementation complete; RED pins committed deliberately. Independent Critic review (G class) and PO acceptance pending. Verify suite human-guard-override-tests is red by design until T90-F.",
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/lib/human-guard-override.test.mjs", "committed": "b395f1c47", "rationale": "append-only: one import (hardenWindowsPrivateDirectory) plus a block-scoped T90-T section with pins (a), (a2), (b), (c), (d1), (d2), (e), (f), (L)" }
+    ],
+    "uncommittedArtifacts": [
+      "evidence/T90-T-20261009/native.txt",
+      "evidence/T90-T-20261009/wsl.txt",
+      "evidence/dispatch-record-T90-T-20261009.json",
+      "scratch/commit-msg/T90-T-20261009.txt"
+    ],
+    "perPinState": {
+      "win32-native": {
+        "a": "RED: acquireAuditLock threw HGO-AUDIT-LOCK-AMBIGUOUS where a reclaim (recovered: true) is expected",
+        "a2": "RED: HGO-AUDIT-LOCK-AMBIGUOUS from the recovery-guard path (:2402)",
+        "b": "RED: HGO-AUDIT-LOCK-AMBIGUOUS",
+        "c": "RED: HGO-AUDIT-LOCK-AMBIGUOUS",
+        "d1": "green",
+        "d2": "green",
+        "e": "green",
+        "f": "RED: error.recovery is undefined",
+        "L": "skipped (typed reason: needs /proc on a Linux host)"
+      },
+      "wsl": {
+        "a-d2": "skipped x6 (typed reason: needs a native win32 host, no injection seam)",
+        "e": "green",
+        "f": "RED: error.recovery is undefined",
+        "L": "green"
+      }
+    },
+    "seamForT90F": "auditLockOwnerState(record) and localAuditLockOwner() need an injectable { platform, hostname, bootId/uptime, pidAlive }, threaded through acquireAuditLock's dependencies; neither is exported today. Once it exists, (a)-(d) should be re-pinned to run on every host.",
+    "assumptions": [
+      "recovery is a new own property on the refusal: exactly { files, command }; files non-empty string array including the exact lock path (auditLock, or auditLockRecovery for the recovery guard); command a non-empty string; verb not pinned",
+      "win32 boot-time encoding is not fixed by Ruling 111: (c) records the literal decimal string 1; (d1) takes the matching value from a live acquisition with up to 3 minute-boundary retries; (d1) and (d2) coincide until T90-F records a real boot time",
+      "(a) and (b) overlap until T90-F records a real boot time",
+      "planted records always carry the host's own platform"
+    ],
+    "deviations": [
+      "Placement: first written as a new sibling test file, then moved into the registered human-guard-override.test.mjs because Verify uses a pinned list in harness/scripts/verify.mjs and registering a new file needs a forbidden harness/ edit",
+      "Captures are scoped with --test-name-pattern=T90-T; the whole 5900-line file was not run natively or under WSL, so 'callers gain no new red' is not verified for the rest of the file (change is append-only in a block scope plus one import)",
+      "DISPATCH-BUDGET-CHECKPOINT fired at call 52 of 65; I finished the remaining DoD inside the budget (about 60 calls) instead of handing back uncommitted",
+      "No Co-Authored-By or Claude-Session trailer, per briefing section 4 and GIT-03, despite the harness attribution reminder"
+    ]
+  }
+}

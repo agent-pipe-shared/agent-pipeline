@@ -1,0 +1,12 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "1774bf07a"
+  ],
+  "report": {
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md"
+    ]
+  }
+}

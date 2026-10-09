@@ -1,0 +1,25 @@
+STEP 07 minimal architecture authoring, inspect, bootstrap-acknowledge-plan (the PO signature boundary)
+Placeholders: <repo-root-in-wsl>, <temp-repo>, <wsl-node>. Prefix CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core.
+
+07a  sed -i inside <temp-repo>/specs/onboarding-c7166f570a9a/prd_onboarding-c7166f570a9a.md (manual authoring): delete the "<!-- DRAFT TEMPLATE: ... -->" line; replace four REPLACE strings (disposition rationale, module responsibility, one nonResponsibility, fitnessModel.profileId) with one-line test values. Example paths (src/application.mjs, tests/application.test.mjs, docs/contracts/application.md) left untouched.
+     exit code: 0 (echo SED_EXIT=0)
+     NOT authored (budget): product framing (What/Why/Scope/Non-goals/Risks/Alternatives/DoD) in the PRD; EARS acceptance criteria and the traceability row in spec.md; reconciliation of the spec cross-reference digest.
+
+07b  node .../project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+     exit code: 0
+     status: bootstrap-binding-required (unchanged); ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE is gone after the placeholder edit.
+     nextAction: <node> project-onboarding-v3.mjs bootstrap-acknowledge-plan --root <temp-repo> --activate --runner claude (mutation true, requiresConfirmation false; expected status signature-required)
+     guidance: "Do not create the signature request until the agent has completed and internally reviewed the full design package ... author the staging PRD and specification from their generated drafts ... reconcile their exact cross-reference digest."
+
+07c  node .../project-onboarding-v3.mjs bootstrap-acknowledge-plan --root <temp-repo> --activate --runner claude   (measured as a probe; not a real approval request)
+     exit code: 0
+     status: signature-required (pipeline.bootstrap-plan-acknowledgement-plan.v1), requestWritten true, intentSha256 bbd2eba4...46af36c
+       prd sha256 0ae6a8be...79f060, spec sha256 371cf819...beac6 (spec UNCHANGED: still the generated draft with "AC-01: WHEN <trigger>, the system SHALL <observable result>." and REPLACE traceability cells)
+     requestPath: scratch/bootstrap-plan-acknowledgement-request-<intentSha256>.json
+     nextAction.kind: external-operator, executionBoundary attended-external-tool, invocation user-copy-only, mutation true, requiresConfirmation true:
+       <node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/po-human-approval.mjs sign-intent --repo-root <temp-repo> --request scratch/bootstrap-plan-acknowledgement-request-<intentSha256>.json
+       expected: pipeline.po-approval-proof.v1 for the same intentSha256
+     STOP: this is the first point that needs a real PO signature. Not run, not signed.
+     finding: the plan step issued a signature request over a spec still containing template placeholders; only the architecture block is machine-checked.
+
+07d  cleanup: rm -rf <wsl-home>/tmp/e2e-onb-b-20261009 ; ls -d <that path>  ->  "No such file or directory", ls exit 2 (confirms removal). Nothing was written to the source checkout by the walk.

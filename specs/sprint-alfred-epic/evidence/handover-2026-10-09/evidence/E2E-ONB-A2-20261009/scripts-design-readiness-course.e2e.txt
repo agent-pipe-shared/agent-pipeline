@@ -1,0 +1,18 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/scripts/design-readiness-course.e2e.test.mjs
+label: scripts-design-readiness-course.e2e
+exitCode: 0
+head: 1503a68287f491411f30a85c58516279d345badb
+tree: db8f0773cd78b1ce9414caf1b4fe70bf881556c4
+dirty: true
+--- stdout ---
+✔ DREC001 each native runner has a terminal no-child Advisor route and cannot loop into plan approval (554.754504ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 936.332499
+
+--- stderr ---

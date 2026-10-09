@@ -1,0 +1,71 @@
+label: wsl-fixture-probe
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node scratch/dispatch-wip/LE-F/probe.mjs inner"
+exitCode: 0
+--- stdout ---
+{
+  "platform": "linux",
+  "version": "git version 2.53.0",
+  "toplevel": {
+    "args": [
+      "rev-parse",
+      "--show-toplevel"
+    ],
+    "status": 128,
+    "stderr": "fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).",
+    "stdout": ""
+  },
+  "inside": {
+    "args": [
+      "rev-parse",
+      "--is-inside-work-tree"
+    ],
+    "status": 128,
+    "stderr": "fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).",
+    "stdout": ""
+  },
+  "plan": {
+    "ok": false,
+    "code": "LINE-ENDINGS-GIT-FAILED",
+    "detail": "fatal: not a git repository (or any parent up to mount point /)\nStopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).",
+    "exitCode": 128
+  }
+}
+
+--- stderr ---
+
+
+label: native-fixture-probe
+command: node scratch/dispatch-wip/LE-F/probe.mjs inner
+exitCode: 0
+--- stdout ---
+{
+  "platform": "win32",
+  "version": "git version 2.55.0.windows.5",
+  "toplevel": {
+    "args": [
+      "rev-parse",
+      "--show-toplevel"
+    ],
+    "status": 128,
+    "stderr": "fatal: not a git repository (or any of the parent directories): .git",
+    "stdout": ""
+  },
+  "inside": {
+    "args": [
+      "rev-parse",
+      "--is-inside-work-tree"
+    ],
+    "status": 128,
+    "stderr": "fatal: not a git repository (or any of the parent directories): .git",
+    "stdout": ""
+  },
+  "plan": {
+    "ok": false,
+    "code": "LINE-ENDINGS-GIT-FAILED",
+    "detail": "fatal: not a git repository (or any of the parent directories): .git",
+    "exitCode": 128
+  }
+}
+
+--- stderr ---
+

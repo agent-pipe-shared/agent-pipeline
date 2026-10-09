@@ -1,0 +1,41 @@
+command: node --test plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
+label: diagnostics
+exitCode: 0
+head: 63ba0c32cb3e6cf960b0ea9a615c5081c1fb2c72
+tree: 7ace42f8b46b4caf3b8e93d8a15571a35bc4824e
+dirty: true
+--- stdout ---
+✔ G13D001 one existing child call preserves clean verdict, argv/deadline and fixed offline env (2.5276ms)
+✔ G13D002 clean JSON preceding ETIMEDOUT remains ERROR with original raw null and useful structural facts (1.0535ms)
+✔ G13D003 throw EPERM retains execution-environment ERROR; unknown code/signal never transport text (0.7768ms)
+✔ G13D004 nonzero, malformed and tool error payload preserve their original ERROR classifications (2.7683ms)
+✔ G13D005 untrusted version suffix and over-budget JSON are unknown rather than persisted or re-probed (1.7676ms)
+✔ G13D006 bound envelope keeps exact evidence/candidate; closed validator rejects injection, duplicate records and coercion (0.4747ms)
+✔ G13D007 absent child is explicit and never confuses missing capability or gate authority (0.4067ms)
+﹣ G13D008 unsupported rules mechanics never follow alias/special files or manufacture digests (0.1843ms) # host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)
+﹣ G13D009 supported Linux genuinely publishes bounded owned latest data and atomically replaces a valid predecessor (0.1017ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+✔ G13D010 foreign existing regular bytes survive rejected publication (2.5165ms)
+﹣ G13D011 terminal symlink and hardlink are not followed/replaced and unrelated referent survives (0.0946ms) # host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)
+﹣ G13D012 actual special socket target is rejected without removal (0.0724ms) # host limitation: Unix-domain socket listen on a filesystem path is not permitted on win32 (EACCES)
+﹣ G13D013 shared/unsafe evidence directory and root aliases are rejected (0.0483ms) # host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)
+﹣ G13D014 ancestor directory replacement is detected; anchored cleanup touches only owned staging inode (0.0389ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D015 detected terminal content drift keeps the changed bytes instead of overwriting (0.0861ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D016 foreign staging replacement is neither published nor reclaimed by cleanup (0.0708ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D017 cooperative concurrent publisher is rejected busy and cannot overwrite the admitted publisher (0.0456ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D018 new terminal alias during preparation is detected without following or deleting it (0.0365ms) # host limitation: creating symlinks needs a privilege this win32 account lacks (EPERM)
+✔ G13D019 strict readback rejects duplicate/escaped duplicate keys, invalid UTF8, oversized bytes and stale binding (1.7536ms)
+﹣ G13D020 public CLI genuine missing-tool result publishes an empty bound diagnostic without native scanner execution (0.0768ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D021 producer completed synthetic Semgrep preserves clean v1 and binds genuine sidecar executable observation (0.0497ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D022 producer selected child EPERM after real preflight retains ERROR and withholds secret error text (0.0392ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D023 producer clean JSON before timeout remains ERROR while bounded diagnostic retains completed output facts (0.0349ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+﹣ G13D024 producer publication refusal preserves original evidence and verdict semantics and unrelated foreign bytes (0.1663ms) # host limitation: the scanner-diagnostics publisher is Linux-only and reports unavailable on win32
+ℹ tests 24
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 15
+ℹ todo 0
+ℹ duration_ms 100.4983
+
+--- stderr ---

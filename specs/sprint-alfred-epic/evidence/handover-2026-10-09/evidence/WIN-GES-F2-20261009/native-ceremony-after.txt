@@ -1,0 +1,89 @@
+command: node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: native-ceremony-after
+exitCode: 1
+head: 03bddc63d665fdfb5828406ed8031864b5965646
+tree: 5912617e2d5b166c691c51b735eeee620a3667f6
+dirty: true
+--- stdout ---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: d4579b0119c583c1dcf9a045079c03e68955792248eea6473ec2fed4cf0e4606
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T03:12:07.570Z
+  candidate commit: 94598565ff914ae2e41d742d831c8bd52e80aafa
+  candidate tree: 26275e49d0da3d8da79898b528f56ba67b54fca1
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 19b7411edc5634babe9ce5d67bf1926639d98b554006556dc670c0ac5efd5ac1
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T03:12:13.652Z
+  candidate commit: 971f5d7db7034bad5fe6cec6ee099dab8a8b4822
+  candidate tree: 1764c33c9cabf2a5e58d280f8ef78865fdc66d46
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from <home-path>
+B4690000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../openssl-3.5.7/providers/implementations/ciphers/ciphercommon_block.c:107:
+B4690000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../openssl-3.5.7/crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'plan.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/capture-policy.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'governance/events/registry.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'unrelated.txt', LF will be replaced by CRLF the next time Git touches it
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: c02a5ac9a74ed355ac7e76f6e1db019c5856e238956a4f686bc0be82294e9b88
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T03:12:16.562Z
+  candidate commit: 4b332d8b016728b1af5bf76a5bc66d00e01169c7
+  candidate tree: 6ee0a23add9aa7a0493affab0c4168d47fb5ffea
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (6078.0223ms)
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (2945.8759ms)
+✖ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (5850.2012ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.5253ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.1717ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15169.8017
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\signing-ceremony.test.mjs:328:1
+✖ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (5850.2012ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/signing-ceremony.test.mjs:349:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+--- stderr ---

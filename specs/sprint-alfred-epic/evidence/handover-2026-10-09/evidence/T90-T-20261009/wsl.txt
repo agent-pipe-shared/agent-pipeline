@@ -1,0 +1,46 @@
+command: node --test --test-name-pattern=T90-T plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: wsl
+exitCode: 1
+head: 8328f56bb437549da2a8f2caededf8219b99f4b8
+tree: 226dc80fa0fed6972ca9efea198e46f36d19b651
+dirty: true
+--- stdout ---
+﹣ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (3.48259ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+﹣ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (0.063821ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+﹣ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (0.042481ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+﹣ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (0.033381ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+﹣ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (0.090202ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+﹣ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (0.039411ms) # needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (25.667951ms)
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1.371518ms)
+✔ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (28.296373ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 2854.421029
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/human-guard-override.test.mjs:6135:3
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (1.371518ms)
+  AssertionError [ERR_ASSERTION]: (f) ordinary lock: the HGO-AUDIT-LOCK-AMBIGUOUS refusal carries no typed recovery (error.recovery is undefined)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6146:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

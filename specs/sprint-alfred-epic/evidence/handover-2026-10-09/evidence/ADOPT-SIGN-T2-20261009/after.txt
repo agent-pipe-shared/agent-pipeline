@@ -1,0 +1,57 @@
+command: node --test --test-name-pattern=ADOPT-SIGN-T2 plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs
+label: adopt-sign-t2-after
+exitCode: 0
+head: d916a54594ab35d78a8874773539ffb2c358d26a
+tree: 014f1ca54df06fd5e2d4121e754ce7e6a2a970a2
+dirty: true
+--- stdout ---
+▶ ADOPT-SIGN-T2: the scratch-bound --out of `prepare`
+  ✔ ADOPT-SIGN-T2-1: --out on a command other than prepare is refused with exit 1, names prepare and writes nothing (1548.424352ms)
+  ✔ ADOPT-SIGN-T2-2: --out naming scratch/ itself is refused, names the boundary and leaves scratch/ an empty directory (2090.825113ms)
+  ✔ ADOPT-SIGN-T2-3: a relative --out resolves against --root, so a path outside scratch/ is refused from any working directory (2538.707337ms)
+  ✔ ADOPT-SIGN-T2-4: a relative --out resolves against --root (not the working directory) and the file equals stdout byte for byte (1080.827993ms)
+  ✔ ADOPT-SIGN-T2-5: a symlinked scratch/ is refused, names the boundary and nothing is written through the link (403.085162ms)
+  ✔ ADOPT-SIGN-T2-6: a symlinked directory under scratch/ and a symlinked existing target are refused and nothing is written through them (1009.447786ms)
+  ✔ ADOPT-SIGN-T2-7: control: an existing unlinked regular target is replaced, so the refusals below are about links and kind (658.958477ms)
+  ✔ ADOPT-SIGN-T2-8: a hardlinked existing target is refused, names the boundary and neither name changes (1130.396267ms)
+  ✔ ADOPT-SIGN-T2-9: an existing non-regular target (a directory) is refused, names the boundary and is left as it was (543.022278ms)
+✔ ADOPT-SIGN-T2: the scratch-bound --out of `prepare` (11004.783305ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 740be30dc3189e121b3034ea1025fd3bdf2a724230bd36ac722e3a1f6e3619fa
+  action: record this architecture adoption decision for the repository identified below
+  decision: approved-scoped
+  decision ref: "REF-1\nINJECTED: decision: deferred"
+  scope: "src/"
+  scope: "docs/\nINJECTED: scope: everything"
+  scope: "x\rINJECTED: request mode: signature"
+  rationale: "fine\naction: wipe everything\r\nINJECTED: candidate commit: ffffffffffffffffffffffffffffffffffffffff"
+  decided at: 2026-01-01T00:00:00.000Z
+  expires at: none
+  review date: none
+  candidate commit: 254792a70254a2db306e4aab112233900e39835d
+  repository fingerprint: 0033f8b5b5e332242cdce253b0f64a1a72b7493f9ec7709e1aa76c44e87ba031
+  request mode: signature
+  this signs the decision only; applying it, and any push or release, need their own approval
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ ADOPT-SIGN-T2-0: control: re-deriving every digest of an unedited adoption request reproduces them exactly (40.255733ms)
+✔ ADOPT-SIGN-T2-1: sign-intent --request refuses an extra top-level key before any confirmation or signing (7.663066ms)
+✔ ADOPT-SIGN-T2-2: sign-intent --request refuses an extra key inside intent before any confirmation or signing (4.350838ms)
+✔ ADOPT-SIGN-T2-3: sign-intent --request refuses an intent value edited while intent.sha256 is kept before any confirmation or signing (3.963307ms)
+✔ ADOPT-SIGN-T2-4: sign-intent --request refuses a subject edited while subjectSha256 is kept before any confirmation or signing (4.385471ms)
+✔ ADOPT-SIGN-T2-5: sign-intent --request refuses a subject swapped consistently while the intent still carries the old subject hash before any confirmation or signing (4.719073ms)
+✔ ADOPT-SIGN-T2-6: sign-intent --request refuses the wrong intent kind before any confirmation or signing (4.158251ms)
+✔ ADOPT-SIGN-T2-7: sign-intent --request refuses the wrong policy revision before any confirmation or signing (4.24654ms)
+✔ ADOPT-SIGN-T2-8: sign-intent --request refuses a decision that disagrees between the subject and the intent before any confirmation or signing (4.318977ms)
+✔ ADOPT-SIGN-T2-9: sign-intent --request refuses a candidate that disagrees between the subject and the intent before any confirmation or signing (4.638697ms)
+✔ ADOPT-SIGN-T2-10: a hostile decision ref, rationale and scope entry cannot inject a disclosure line (8.776199ms)
+ℹ tests 20
+ℹ suites 1
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11557.476966
+
+--- stderr ---

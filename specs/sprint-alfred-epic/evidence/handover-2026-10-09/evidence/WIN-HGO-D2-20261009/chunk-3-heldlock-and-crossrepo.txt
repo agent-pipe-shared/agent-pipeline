@@ -1,0 +1,98 @@
+command: node --test "--test-name-pattern=failed repair or ordinary append never removes|NVA-CROSSREPOGUIDANCE-1" plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: WIN-HGO-D2 chunk 3: held-lock case and CROSSREPOGUIDANCE pair
+exitCode: 1
+head: 4fedcd69e4b58b62d8b8088e00550db7815f8d1a
+tree: f5f8624f07a80fe8195d90fb8b97be05b6673869
+dirty: true
+--- stdout ---
+✖ a failed repair or ordinary append never removes the active repair writer's lock (23428.1047ms)
+✖ NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinator's own root, and the ceremony runs against exactly that root (9116.8391ms)
+✖ NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET root, which is the only root its ceremony can be run against (6704.8839ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39556.174
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:2814:1
+✖ a failed repair or ordinary append never removes the active repair writer's lock (23428.1047ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  HumanGuardOverrideError: audit lock owner state is ambiguous
+      at Object.afterLedgerWriteFn (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2829:18)
+      at repairHumanGuardOverrideAudit (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:4623:40)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2824:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: HumanGuardOverrideError: audit lock owner state is ambiguous
+        at ambiguousAuditLockRefusal (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2460:17)
+        at acquireAuditLock (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:2560:36)
+        at repairHumanGuardOverrideAudit (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:4582:12)
+        at file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2829:31
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at Object.afterLedgerWriteFn (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2829:18)
+        at repairHumanGuardOverrideAudit (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.mjs:4623:40)
+        at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:2824:5)
+        at Test.runInAsyncScope (node:async_hooks:227:14),
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:5811:1
+✖ NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinator's own root, and the ceremony runs against exactly that root (9116.8391ms)
+  AssertionError [ERR_ASSERTION]: an ordinary in-root denial must still name the coordinator's own root, unchanged
+  + actual - expected
+  
+  + '<host-path>'
+  - 'C:<host-path>'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:5829:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at node:internal/test_runner/test:1300:31
+      at node:internal/process/task_queues:151:7
+      at AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+      at AsyncResource.runMicrotask (node:internal/process/task_queues:148:8) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '<host-path>',
+    expected: 'C:<host-path>',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:5979:1
+✖ NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET root, which is the only root its ceremony can be run against (6704.8839ms)
+  AssertionError [ERR_ASSERTION]: a cross-repository denial must name the target repository, not the coordinator
+  + actual - expected
+  
+  + '<host-path>'
+  - 'C:<host-path>'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:5991:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '<host-path>',
+    expected: 'C:<host-path>',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

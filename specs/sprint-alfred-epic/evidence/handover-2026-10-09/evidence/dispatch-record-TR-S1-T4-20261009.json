@@ -1,0 +1,51 @@
+{
+  "taskId": "TR-S1-T4-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "outcome": "partial-stopped-at-budget-checkpoint-no-commit",
+  "commits": [],
+  "log": [
+    { "phase": "orientation: CONT17 header, Rulings 75/78/83, predecessor record, lever, production disclosure code, case reads; preflight ready; advisor consulted once", "toolUses": 30 },
+    { "phase": "edits: adapter (callWithLever, disclosureChannel, LEVER_ENGAGED) + header comment block; 16 channel markers incl. 5 instruction-line assertion edits; (b) re-point of the NVA-BL-74 German cancellation loop", "toolUses": 40 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT fired at hook-count 40 of 50; read-only checks only (grep count of markers = 17 incl. one comment, node --check exit 0); interim record written; hand-back", "toolUses": 43 }
+  ],
+  "report": {
+    "dodResults": {
+      "simulatedTxt": "NOT RUN (budget checkpoint). Prediction, not evidence: with a TYPED simulated gate the pins and (b) cases go GREEN, so the only red would be NVA-SWEEP-F2f-REWORK. See openItems 1.",
+      "afterTxt": "NOT RUN (budget checkpoint). The tree is not verified at all; no WSL run was made by this dispatch.",
+      "consumerSafe": "not run",
+      "commit": "NOT MADE: four (b) cases are not yet re-pointed and would be red for the wrong reason, so the tree is not green-by-design; the hook and the briefing forbid committing a known-red regression",
+      "terminalRecord": "this file is the INTERIM record (outcome partial)"
+    },
+    "evidence": [
+      "grep -c style count of 'disclosureChannel(' in plugins/pipeline-core/scripts/po-human-approval.test.mjs = 17 (16 marked sites + 1 comment), as intended",
+      "node --check plugins/pipeline-core/scripts/po-human-approval.test.mjs  exit 0 (syntax only; no test was executed)"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs (UNCOMMITTED working-tree edit on top of the T3 lever, no simulated gate in it): applyKeyLever now stamps LEVER_ENGAGED; new block with the TR-S1-T4 doc comment (lists the five retired-subject cases, the 16 channel cases, the literal-word measurement), LEVER_ENGAGED, DISCLOSURE_CHANNEL, disclosureChannel(carrier), callWithLever(argv, deps, unguarded) used by both wrappers; 16 cases marked; 5 typed-token-instruction assertions dropped or re-pointed (sign-intent end-to-end, reason/scope/expiry case, German frame, English fallback, the identical-data-lines token loop); the NVA-BL-74 German cancellation loop re-pointed to plainKey + tr1AssertTypedRefusal"
+    ],
+    "deliberatelyNotChanged": [
+      "production files, other test files, hooks/, lib/guard/, harness/",
+      "test titles (kept, so red sets can be matched by name)",
+      "the literal-word pair (authorize-critical and approve-critical 'still requires the literal word approve'): measured by the predecessor, they move with the lever and need no edit"
+    ],
+    "deviations": [
+      "Adapter timing: the stub is called AT WRITE TIME with the verbatim chunk (not after the call), so the order against spawns survives (R7-6d(iii) asserts probe < prompt < signing). The adapter acts only when the case is marked AND the lever re-encrypted its key (LEVER_ENGAGED), so a marked case whose key was not re-encrypted still gets production's own prompt. Marker for the two R7-6 cases rides on the spy's spawn function: disclosureChannel(spy.spawn).",
+      "Ruling 83 gap, five assertion edits: printDisclosureOnly prints header + data lines + consequence and NEVER the typed-token instruction (frame.instruction), so assertions on that line cannot pass on any honest adapter. Edited: sign-intent end-to-end (dropped, Ruling 78(b) :634 note), reason/scope/expiry case (dropped), German frame (dropped 'Tippen Sie exakt'), English fallback (re-pointed to the consequence sentence 'cannot be undone once signed'), identical-data-lines loop '/\"approve\"/' (dropped). Substantive edit tally so far: 5 assertion edits + 1 re-point = 6 of 15; four re-points remain, so 10 in total.",
+      "Briefing DoD sentence 'expected reds in both captures: pins 1,3,4,5 + five (b) + F2f' contradicts Ruling 83's TYPED simulated gate: a typed refusal is exactly what tr1AssertTypedRefusal accepts, so under the gate the pins and (b) cases turn green. T3's record already named this mechanic. Only the un-simulated after.txt can have the pins and (b) red.",
+      "Header placement: the lists (retired subject, channel moved, literal-word measurement) are in a comment block directly above the adapter, not inside the TR-S1-T pin header; the A4 amendment inside the pin header is still PENDING.",
+      "Record: opening interim record written first (role contract), overwritten here; both at repo-root evidence/.",
+      "Budget: the hook counted 40 of 50 when it fired; my own count was about 43. Stopped at the checkpoint as directed."
+    ],
+    "openItems": [
+      "1. Remaining edits (4 re-points + A4), all test-only, anchored by test title: (b1) 'sign-intent cancels on a mismatched confirmation' (stub 'nope'); (b2) 'NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key' (isTTY false, stub approve; drop the result.ok assertion); (b3) 'NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel' (stub 'definitely not approve'); (b4) 'sign-intent cancels on an empty confirmation answer' (stub empty). Each: wrap deps in plainKey(...), replace assert.throws(.../approval cancelled/) by const error = thrown(() => runHumanApproval(...)); tr1AssertTypedRefusal(error, label); keep the r76KeyPathSpawns and no-artifact assertions. The German loop (b5) is already done in that shape. A4: replace 'They are left unchanged here (briefing); migrating them to encryptedKeyFixture() is test maintenance for a separate dispatch.' by 'moved onto an encrypted key by the central lever, or re-pointed (see the TR-S1-T4 block above)'.",
+      "2. Acceptance after those edits: add a SIM-GATE block by Edit around callWithLever (function simulatedGate(argv, deps): for each key in leverKeyPaths(argv, deps) read with leverReadFile; a read error throws Object.assign(new Error('PO-KEY-UNREADABLE: ...'), {code:'PO-KEY-UNREADABLE'}); a PEM containing '-----BEGIN PRIVATE KEY-----' throws code 'PO-KEY-UNENCRYPTED'; non-PEM trap files are skipped; call it after applyKeyLever). WSL capture simulated.txt, revert by Edit, grep -c SIM-GATE must be 0, WSL capture after.txt, consumer-safe check, then commit with scratch/commit-msg/TR-S1-T4.txt (two trailers only) after git add -- of the one path.",
+      "3. UNMEASURED risk: none of the 16 channel cases has been run. Lines after the ones I read could still assert the instruction line or a prompt count (bootstrap acknowledgement case after its first assertions; the :634 case after its signer checks). Expected after.txt reds: pins 1,3,4,5 + five (b) + NVA-SWEEP-F2f-REWORK. Any other red must be NAMED, not edited (stop condition 1).",
+      "4. The four un-re-pointed (b) cases are currently red for the wrong reason (the lever encrypts their key, so production skips the typed prompt and nothing cancels). Do not run an acceptance capture before they are re-pointed.",
+      "5. Raising the briefing's DoD sentence (deviation 3) to the dispatcher: decide whether the simulated capture is expected to show F2f only (typed gate) or the 10-case set (untyped gate, as T3 captured)."
+    ]
+  }
+}

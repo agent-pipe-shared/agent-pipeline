@@ -1,0 +1,2281 @@
+command: node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs
+label: TR-S2-T-red
+exitCode: 1
+head: d2f647bc74da93ced6ff8437089f4e488688d45f
+tree: 84d500e9d26c6e8714b2dabd3158fee95045eb41
+dirty: true
+--- stdout ---
+▶ TR-S2 a2 positives: the execution lane refuses a credential target
+  ✖ A2-1 [bash] node -e naming po-private.pem in the native key directory (1.3152ms)
+  ✖ A2-1 [powershell] node -e naming po-private.pem in the native key directory (0.4905ms)
+  ✖ A2-2a [bash] a path inside the native key-directory pointer (no secret basename involved) (0.4294ms)
+  ✖ A2-2a [powershell] a path inside the native key-directory pointer (no secret basename involved) (0.452ms)
+  ✖ A2-2b [bash] a path inside the WSL key-directory pointer (no secret basename involved) (0.4326ms)
+  ✖ A2-3 [bash] ~/.ssh/id_ed25519 (0.4124ms)
+  ✖ A2-4a [bash] an APPDATA credential file named by its literal path (0.3936ms)
+  ✖ A2-4a [powershell] an APPDATA credential file named by its literal path (0.4128ms)
+  ✖ A2-4b [powershell] an APPDATA credential file via $env:APPDATA (assumption 4) (0.4424ms)
+  ✖ A2-4c [bash] an APPDATA credential file via %APPDATA% (assumption 4) (0.4844ms)
+  ✖ A2-5 [bash] python -c reading the key (0.4ms)
+  ✖ A2-5 [powershell] python -c reading the key (0.404ms)
+  ✖ A2-6 [bash] bash -c 'cat <key>' (0.3891ms)
+  ✖ A2-7 [bash] a scratch/ script whose content names the key (0.5536ms)
+  ✖ A2-7 [powershell] a scratch/ script whose content names the key (0.4864ms)
+✖ TR-S2 a2 positives: the execution lane refuses a credential target (8.5174ms)
+▶ TR-S2 a3 positives: every executable, not a list of interpreters
+  ✖ A3-1 [bash] raw openssl pkeyutl -sign -inkey <key path> (0.5204ms)
+  ✖ A3-1 [powershell] raw openssl pkeyutl -sign -inkey <key path> (0.3822ms)
+  ✖ A3-2 [bash] openssl pkey -in <key path> (0.4693ms)
+  ✖ A3-2 [powershell] openssl pkey -in <key path> (0.4105ms)
+  ✖ A3-3 [bash] openssl ... -passin file:<path in a protected root> (0.3664ms)
+  ✖ A3-3 [powershell] openssl ... -passin file:<path in a protected root> (0.3908ms)
+  ✖ A3-4 [bash] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.4161ms)
+  ✖ A3-4 [powershell] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.3998ms)
+  ✖ A3-5 [bash] wsl.exe -e cat /mnt/<drive>/<home-path> (0.414ms)
+  ✖ A3-5 [powershell] wsl.exe -e cat /mnt/<drive>/<home-path> (0.3813ms)
+  ✖ A3-6 [bash] the MSYS spelling /<drive>/<home-path> (0.4434ms)
+  ✖ A3-7 [bash] bash -lc "cd ~/.ssh; cat id_ed25519" (the cd operand is matched itself) (0.3528ms)
+  ✖ A3-8 [bash] cp <key path> scratch/k (0.4148ms)
+  ✖ A3-8 [powershell] cp <key path> scratch/k (0.4059ms)
+  ✖ A3-9 [bash] cmd.exe /c type <credential path> (0.5948ms)
+  ✖ A3-10 [bash] powershell.exe -Command "Get-Content <key path>" (0.4748ms)
+  ✖ A3-10 [powershell] powershell.exe -Command "Get-Content <key path>" (0.3567ms)
+  ✖ A3-11 [powershell] PowerShell-tool type <key path> (0.434ms)
+  ✖ A3-12 [powershell] PowerShell-tool copy <key path> scratch/k (0.373ms)
+  ✖ A3-13a [bash] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.3631ms)
+  ✖ A3-13a [powershell] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.4115ms)
+  ✖ A3-13b [bash] powershell.exe -enc <base64> is refused outright (0.4117ms)
+  ✖ A3-13b [powershell] powershell.exe -enc <base64> is refused outright (0.4366ms)
+  ✖ A3-13c [bash] pwsh -EncodedCommand <base64> is refused outright (0.3709ms)
+  ✖ A3-13c [powershell] pwsh -EncodedCommand <base64> is refused outright (0.3554ms)
+✖ TR-S2 a3 positives: every executable, not a list of interpreters (11.309ms)
+▶ TR-S2 a3 positive A3-14 / FAULT: a classifier fault refuses (I7)
+  ✖ A3-14a [bash] a throwing readScript on a script operand refuses (no exception, no null) (0.5623ms)
+  ✖ A3-14b [powershell] a throwing readScript refuses under the powershell tool as well (0.487ms)
+  ✖ A3-14c [bash] null targets refuse even for a command that names nothing protected (0.4334ms)
+  ✖ A3-14d [bash] malformed targets (a non-array root list) refuse (0.4146ms)
+✖ TR-S2 a3 positive A3-14 / FAULT: a classifier fault refuses (I7) (2.007ms)
+▶ TR-S2 negatives: ordinary commands stay admitted
+  ✖ N2-1 [bash] node -e naming a repository file (0.4899ms)
+  ✖ N2-1 [powershell] node -e naming a repository file (0.3604ms)
+  ✖ N2-2 [bash] node --test on a tracked test file (0.3748ms)
+  ✖ N2-2 [powershell] node --test on a tracked test file (0.3451ms)
+  ✖ N3-1 [bash] the prescribed WSL suite route (T78, L83) stays admitted (0.3464ms)
+  ✖ N3-1 [powershell] the prescribed WSL suite route (T78, L83) stays admitted (0.4345ms)
+  ✖ N3-2 [bash] openssl version (0.9268ms)
+  ✖ N3-2 [powershell] openssl version (0.4078ms)
+  ✖ N3-3 [bash] cp scratch/a scratch/b (0.4723ms)
+  ✖ N3-3 [powershell] cp scratch/a scratch/b (0.4726ms)
+  ✖ N3-4 [bash] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.3619ms)
+  ✖ N3-4 [powershell] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.3471ms)
+✖ TR-S2 negatives: ordinary commands stay admitted (5.612ms)
+▶ TR-S2 CARR: every carrier of the Inputs list tokenizes its inline source again
+  ✖ CARR-1 [bash] node --eval (0.5131ms)
+  ✖ CARR-1 [powershell] node --eval (0.4549ms)
+  ✖ CARR-2 [bash] node -p (0.4236ms)
+  ✖ CARR-2 [powershell] node -p (0.4611ms)
+  ✖ CARR-3 [bash] node --print (0.3798ms)
+  ✖ CARR-3 [powershell] node --print (0.3723ms)
+  ✖ CARR-4 [bash] sh -c (0.4225ms)
+  ✖ CARR-5 [bash] dash -c (0.5071ms)
+  ✖ CARR-6 [bash] zsh -c (0.3612ms)
+  ✖ CARR-7 [bash] bash -lc (combined flags) (0.3534ms)
+  ✖ CARR-8 [bash] wsl.exe -- <argv> (after the -- separator) (0.3447ms)
+  ✖ CARR-8 [powershell] wsl.exe -- <argv> (after the -- separator) (0.39ms)
+  ✖ CARR-9 [bash] wsl.exe --exec <argv> (0.473ms)
+  ✖ CARR-9 [powershell] wsl.exe --exec <argv> (0.4217ms)
+  ✖ CARR-10 [bash] pwsh -Command (0.3454ms)
+  ✖ CARR-10 [powershell] pwsh -Command (0.3439ms)
+  ✖ CARR-11 [bash] powershell.exe -c (0.3355ms)
+  ✖ CARR-11 [powershell] powershell.exe -c (0.4026ms)
+  ✖ CARR-12 [bash] cmd.exe /k (0.4321ms)
+  ✖ CARR-12 [powershell] cmd.exe /k (0.3621ms)
+  ✖ CARR-13 [bash] python script operand (content names the key) (0.4149ms)
+  ✖ CARR-13 [powershell] python script operand (content names the key) (0.3586ms)
+  ✖ CARR-14 [bash] bash script operand (content names ~/.ssh/id_ed25519) (0.3643ms)
+  ✖ CARR-15 [bash] sh script operand (content names ~/.ssh/id_ed25519) (0.5644ms)
+  ✖ CARR-16 [bash] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.3898ms)
+  ✖ CARR-16 [powershell] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.8051ms)
+  ✖ CARR-17 [bash] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.5193ms)
+  ✖ CARR-17 [powershell] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.3868ms)
+  ✖ CARR-18 [bash] powershell.exe -File <script> (content names the key) (0.4ms)
+  ✖ CARR-18 [powershell] powershell.exe -File <script> (content names the key) (0.4015ms)
+✖ TR-S2 CARR: every carrier of the Inputs list tokenizes its inline source again (13.2768ms)
+▶ TR-S2 MATCH positives: equals-or-inside a protected root; directory component + secret basename
+  ✖ MATCH-ROOT-EQ [bash] the key directory itself (0.4836ms)
+  ✖ MATCH-ROOT-EQ [powershell] the key directory itself (0.3492ms)
+  ✖ MATCH-ROOT-EQ-SLASH [bash] the key directory with a trailing separator (0.3345ms)
+  ✖ MATCH-ROOT-EQ-SLASH [powershell] the key directory with a trailing separator (0.3418ms)
+  ✖ MATCH-MACHINE [bash] a file inside a machine-plane root (no secret basename involved) (0.325ms)
+  ✖ MATCH-MACHINE [powershell] a file inside a machine-plane root (no secret basename involved) (0.3644ms)
+  ✖ MATCH-BASENAME-DIR [bash] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.4476ms)
+  ✖ MATCH-BASENAME-DIR [powershell] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.4598ms)
+  ✖ MATCH-BASENAME-DOT [bash] ./id_ed25519 (the ./ is a directory component) (0.3716ms)
+  ✖ MATCH-BACKSLASH [bash] the same key file spelled with backslashes in a quoted token (both separators accepted) (0.3923ms)
+✖ TR-S2 MATCH positives: equals-or-inside a protected root; directory component + secret basename (4.1445ms)
+▶ TR-S2 MATCH negatives: not equal to and not inside a protected root
+  ✖ MATCH-BARE [bash] a bare secret basename with no directory component does not match (0.38ms)
+  ✖ MATCH-BARE [powershell] a bare secret basename with no directory component does not match (0.3987ms)
+  ✖ MATCH-SIBLING [bash] a sibling directory whose name only starts like the key directory is not inside it (0.3401ms)
+  ✖ MATCH-SIBLING [powershell] a sibling directory whose name only starts like the key directory is not inside it (0.3654ms)
+  ✖ MATCH-PARENT [bash] the parent of a machine-plane root is not inside it (0.3512ms)
+  ✖ MATCH-PARENT [powershell] the parent of a machine-plane root is not inside it (0.3572ms)
+  ✖ MATCH-SCRIPT-BENIGN [bash] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.3862ms)
+  ✖ MATCH-SCRIPT-BENIGN [powershell] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.3283ms)
+  ✖ MATCH-SCRIPT-BENIGN-SH [bash] a bash script operand with benign content is admitted (0.4667ms)
+  ✖ MATCH-PS-BENIGN [powershell] PowerShell-tool Get-Content on a repository doc is admitted (0.4319ms)
+  ✖ MATCH-PS-COPY-BENIGN [powershell] PowerShell-tool copy between scratch files is admitted (0.3483ms)
+✖ TR-S2 MATCH negatives: not equal to and not inside a protected root (4.3478ms)
+▶ TR-S2 NORM: each spelling normalises to a native absolute path before matching
+  ✖ NORM-OPT-EQ [bash] an option-attached --opt=<path> (0.4936ms)
+  ✖ NORM-OPT-EQ [powershell] an option-attached --opt=<path> (0.357ms)
+  ✖ NORM-FILE-COLON [bash] an option-attached file:<path> on a non-openssl executable (0.3901ms)
+  ✖ NORM-FILE-COLON [powershell] an option-attached file:<path> on a non-openssl executable (0.398ms)
+  ✖ NORM-AT [bash] an option-attached @<path> (curl --data-binary @file) (0.727ms)
+  ✖ NORM-AT [powershell] an option-attached @<path> (curl --data-binary @file) (0.3541ms)
+  ✖ NORM-CYGDRIVE [bash] the /cygdrive/<drive>/ spelling (0.3272ms)
+  ✖ NORM-MNT [bash] the /mnt/<drive>/ spelling of a credential root (0.6593ms)
+  ✖ NORM-MNT [powershell] the /mnt/<drive>/ spelling of a credential root (0.5057ms)
+  ✖ NORM-MSYS [bash] the MSYS /<drive>/ spelling of a credential root (0.4267ms)
+  ✖ NORM-MNT-KEYDIR [bash] the /mnt/<drive>/ spelling of the key directory (0.3988ms)
+  ✖ NORM-MNT-KEYDIR [powershell] the /mnt/<drive>/ spelling of the key directory (0.4939ms)
+  ✖ NORM-UNC-WSL-DOLLAR [powershell] the \\wsl$\<distro>\ spelling maps to the distro path (0.3997ms)
+  ✖ NORM-UNC-WSL-LOCALHOST [powershell] the \\wsl.localhost\<distro>\ spelling maps to the distro path (0.349ms)
+  ✖ NORM-HOME-DOLLAR [bash] $HOME (0.3677ms)
+  ✖ NORM-HOME-BRACES [bash] ${HOME} (0.3685ms)
+  ✖ NORM-USERPROFILE-PCT [bash] %USERPROFILE% (0.3799ms)
+  ✖ NORM-USERPROFILE-ENV [powershell] $env:USERPROFILE (0.42ms)
+  ✖ NORM-HOME-WSL [bash] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.4114ms)
+  ✖ NORM-HOME-WSL [powershell] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.3494ms)
+  ✖ NORM-HOME-WSL-DOLLAR [bash] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.3913ms)
+  ✖ NORM-HOME-WSL-DOLLAR [powershell] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.3601ms)
+  ✖ NORM-HOME-NATIVE [bash] outside a WSL carrier, ~ resolves to the native home (credential set holds only the native .ssh root) (0.4383ms)
+✖ TR-S2 NORM: each spelling normalises to a native absolute path before matching (10.187ms)
+▶ TR-S2 PURE: the module is pure
+  ✖ PURE-1 the module source imports neither fs nor child_process (0.4859ms)
+✖ TR-S2 PURE: the module is pure (0.5327ms)
+ℹ tests 131
+ℹ suites 9
+ℹ pass 0
+ℹ fail 131
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 148.4645
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-1 [bash] node -e naming po-private.pem in the native key directory (1.3152ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-1 [powershell] node -e naming po-private.pem in the native key directory (0.4905ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-2a [bash] a path inside the native key-directory pointer (no secret basename involved) (0.4294ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-2a [powershell] a path inside the native key-directory pointer (no secret basename involved) (0.452ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-2b [bash] a path inside the WSL key-directory pointer (no secret basename involved) (0.4326ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-3 [bash] ~/.ssh/id_ed25519 (0.4124ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-4a [bash] an APPDATA credential file named by its literal path (0.3936ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-4a [powershell] an APPDATA credential file named by its literal path (0.4128ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-4b [powershell] an APPDATA credential file via $env:APPDATA (assumption 4) (0.4424ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-4c [bash] an APPDATA credential file via %APPDATA% (assumption 4) (0.4844ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-5 [bash] python -c reading the key (0.4ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-5 [powershell] python -c reading the key (0.404ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-6 [bash] bash -c 'cat <key>' (0.3891ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-7 [bash] a scratch/ script whose content names the key (0.5536ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A2-7 [powershell] a scratch/ script whose content names the key (0.4864ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-1 [bash] raw openssl pkeyutl -sign -inkey <key path> (0.5204ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-1 [powershell] raw openssl pkeyutl -sign -inkey <key path> (0.3822ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-2 [bash] openssl pkey -in <key path> (0.4693ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-2 [powershell] openssl pkey -in <key path> (0.4105ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-3 [bash] openssl ... -passin file:<path in a protected root> (0.3664ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-3 [powershell] openssl ... -passin file:<path in a protected root> (0.3908ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-4 [bash] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.4161ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-4 [powershell] wsl.exe -e bash -lc "cat /mnt/<drive>/<key dir>/po-private.pem" (0.3998ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-5 [bash] wsl.exe -e cat /mnt/<drive>/<home-path> (0.414ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-5 [powershell] wsl.exe -e cat /mnt/<drive>/<home-path> (0.3813ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-6 [bash] the MSYS spelling /<drive>/<home-path> (0.4434ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-7 [bash] bash -lc "cd ~/.ssh; cat id_ed25519" (the cd operand is matched itself) (0.3528ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-8 [bash] cp <key path> scratch/k (0.4148ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-8 [powershell] cp <key path> scratch/k (0.4059ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-9 [bash] cmd.exe /c type <credential path> (0.5948ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-10 [bash] powershell.exe -Command "Get-Content <key path>" (0.4748ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-10 [powershell] powershell.exe -Command "Get-Content <key path>" (0.3567ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-11 [powershell] PowerShell-tool type <key path> (0.434ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-12 [powershell] PowerShell-tool copy <key path> scratch/k (0.373ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13a [bash] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.3631ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13a [powershell] powershell.exe -EncodedCommand <base64> is refused outright (its text cannot be matched) (0.4115ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13b [bash] powershell.exe -enc <base64> is refused outright (0.4117ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13b [powershell] powershell.exe -enc <base64> is refused outright (0.4366ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13c [bash] pwsh -EncodedCommand <base64> is refused outright (0.3709ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ A3-13c [powershell] pwsh -EncodedCommand <base64> is refused outright (0.3554ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:391:3
+✖ A3-14a [bash] a throwing readScript on a script operand refuses (no exception, no null) (0.5623ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:394:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:398:3
+✖ A3-14b [powershell] a throwing readScript refuses under the powershell tool as well (0.487ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:401:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:405:3
+✖ A3-14c [bash] null targets refuse even for a command that names nothing protected (0.4334ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:407:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:411:3
+✖ A3-14d [bash] malformed targets (a non-array root list) refuse (0.4146ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:414:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N2-1 [bash] node -e naming a repository file (0.4899ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N2-1 [powershell] node -e naming a repository file (0.3604ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N2-2 [bash] node --test on a tracked test file (0.3748ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N2-2 [powershell] node --test on a tracked test file (0.3451ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-1 [bash] the prescribed WSL suite route (T78, L83) stays admitted (0.3464ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-1 [powershell] the prescribed WSL suite route (T78, L83) stays admitted (0.4345ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-2 [bash] openssl version (0.9268ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-2 [powershell] openssl version (0.4078ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-3 [bash] cp scratch/a scratch/b (0.4723ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-3 [powershell] cp scratch/a scratch/b (0.4726ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-4 [bash] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.3619ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ N3-4 [powershell] rg -n "po-private.pem" docs/ (a bare basename is not a target) (0.3471ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-1 [bash] node --eval (0.5131ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-1 [powershell] node --eval (0.4549ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-2 [bash] node -p (0.4236ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-2 [powershell] node -p (0.4611ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-3 [bash] node --print (0.3798ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-3 [powershell] node --print (0.3723ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-4 [bash] sh -c (0.4225ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-5 [bash] dash -c (0.5071ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-6 [bash] zsh -c (0.3612ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-7 [bash] bash -lc (combined flags) (0.3534ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-8 [bash] wsl.exe -- <argv> (after the -- separator) (0.3447ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-8 [powershell] wsl.exe -- <argv> (after the -- separator) (0.39ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-9 [bash] wsl.exe --exec <argv> (0.473ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-9 [powershell] wsl.exe --exec <argv> (0.4217ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-10 [bash] pwsh -Command (0.3454ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-10 [powershell] pwsh -Command (0.3439ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-11 [bash] powershell.exe -c (0.3355ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-11 [powershell] powershell.exe -c (0.4026ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-12 [bash] cmd.exe /k (0.4321ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-12 [powershell] cmd.exe /k (0.3621ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-13 [bash] python script operand (content names the key) (0.4149ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-13 [powershell] python script operand (content names the key) (0.3586ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-14 [bash] bash script operand (content names ~/.ssh/id_ed25519) (0.3643ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-15 [bash] sh script operand (content names ~/.ssh/id_ed25519) (0.5644ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-16 [bash] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.3898ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-16 [powershell] wsl.exe -e bash <script in the /mnt/<drive>/ spelling of an in-root path> (0.8051ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-17 [bash] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.5193ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-17 [powershell] wsl.exe -e node <script in the /mnt/<drive>/ spelling of an in-root path> (0.3868ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-18 [bash] powershell.exe -File <script> (content names the key) (0.4ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ CARR-18 [powershell] powershell.exe -File <script> (content names the key) (0.4015ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-ROOT-EQ [bash] the key directory itself (0.4836ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-ROOT-EQ [powershell] the key directory itself (0.3492ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-ROOT-EQ-SLASH [bash] the key directory with a trailing separator (0.3345ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-ROOT-EQ-SLASH [powershell] the key directory with a trailing separator (0.3418ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-MACHINE [bash] a file inside a machine-plane root (no secret basename involved) (0.325ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-MACHINE [powershell] a file inside a machine-plane root (no secret basename involved) (0.3644ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BASENAME-DIR [bash] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.4476ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BASENAME-DIR [powershell] a relative path outside every root that ends in po-private.pem (directory component + secret basename) (0.4598ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BASENAME-DOT [bash] ./id_ed25519 (the ./ is a directory component) (0.3716ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BACKSLASH [bash] the same key file spelled with backslashes in a quoted token (both separators accepted) (0.3923ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BARE [bash] a bare secret basename with no directory component does not match (0.38ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-BARE [powershell] a bare secret basename with no directory component does not match (0.3987ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-SIBLING [bash] a sibling directory whose name only starts like the key directory is not inside it (0.3401ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-SIBLING [powershell] a sibling directory whose name only starts like the key directory is not inside it (0.3654ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-PARENT [bash] the parent of a machine-plane root is not inside it (0.3512ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-PARENT [powershell] the parent of a machine-plane root is not inside it (0.3572ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-SCRIPT-BENIGN [bash] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.3862ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-SCRIPT-BENIGN [powershell] a node script operand with benign content is admitted (a script operand alone is not a refusal) (0.3283ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-SCRIPT-BENIGN-SH [bash] a bash script operand with benign content is admitted (0.4667ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-PS-BENIGN [powershell] PowerShell-tool Get-Content on a repository doc is admitted (0.4319ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ MATCH-PS-COPY-BENIGN [powershell] PowerShell-tool copy between scratch files is admitted (0.3483ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-OPT-EQ [bash] an option-attached --opt=<path> (0.4936ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-OPT-EQ [powershell] an option-attached --opt=<path> (0.357ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-FILE-COLON [bash] an option-attached file:<path> on a non-openssl executable (0.3901ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-FILE-COLON [powershell] an option-attached file:<path> on a non-openssl executable (0.398ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-AT [bash] an option-attached @<path> (curl --data-binary @file) (0.727ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-AT [powershell] an option-attached @<path> (curl --data-binary @file) (0.3541ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-CYGDRIVE [bash] the /cygdrive/<drive>/ spelling (0.3272ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-MNT [bash] the /mnt/<drive>/ spelling of a credential root (0.6593ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-MNT [powershell] the /mnt/<drive>/ spelling of a credential root (0.5057ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-MSYS [bash] the MSYS /<drive>/ spelling of a credential root (0.4267ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-MNT-KEYDIR [bash] the /mnt/<drive>/ spelling of the key directory (0.3988ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-MNT-KEYDIR [powershell] the /mnt/<drive>/ spelling of the key directory (0.4939ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-UNC-WSL-DOLLAR [powershell] the \\wsl$\<distro>\ spelling maps to the distro path (0.3997ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-UNC-WSL-LOCALHOST [powershell] the \\wsl.localhost\<distro>\ spelling maps to the distro path (0.349ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-DOLLAR [bash] $HOME (0.3677ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-BRACES [bash] ${HOME} (0.3685ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-USERPROFILE-PCT [bash] %USERPROFILE% (0.3799ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-USERPROFILE-ENV [powershell] $env:USERPROFILE (0.42ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-WSL [bash] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.4114ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-WSL [powershell] inside a WSL carrier, ~ resolves to the distro home (credential set holds only the WSL .ssh root) (0.3494ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-WSL-DOLLAR [bash] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.3913ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-WSL-DOLLAR [powershell] inside a WSL carrier, $HOME resolves to the distro home (credential set holds only the WSL .ssh root) (0.3601ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:203:9
+✖ NORM-HOME-NATIVE [bash] outside a WSL carrier, ~ resolves to the native home (credential set holds only the native .ssh root) (0.4383ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async classify (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:167:43)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:204:26)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\execution-lane-credential.test.mjs:729:3
+✖ PURE-1 the module source imports neither fs nor child_process (0.4859ms)
+  AssertionError [ERR_ASSERTION]: module missing: lib/execution-lane-credential.mjs does not exist yet (RED until TR-S2 lands)
+      at loadClassifier (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:85:14)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/execution-lane-credential.test.mjs:730:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Promise.all (index 0)
+      at async Suite.run (node:internal/test_runner/test:1889:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+--- stderr ---

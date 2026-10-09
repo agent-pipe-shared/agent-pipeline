@@ -1,0 +1,12 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "02ba09ad1"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+      "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/intake-material-reference.test.mjs
+label: lib-intake-material-reference
+exitCode: 0
+head: d916a54594ab35d78a8874773539ffb2c358d26a
+tree: 014f1ca54df06fd5e2d4121e754ce7e6a2a970a2
+dirty: true
+--- stdout ---
+✔ an existing project document is used byte-for-byte with an optional digest (2.738977ms)
+✔ out-of-root files and symlink escapes never become intake material (0.697371ms)
+✔ invalid UTF-8, oversized files and unsupported chat refs have typed outcomes (1.587987ms)
+✔ R5-1 reader regression: a default call keeps the 1,000,000-byte cap and the INTAKE-CAPTURE-TEXT-FILE-* codes (9.113014ms)
+✔ R5-2 maxBytes 65536: 30,720 and 65,536 bytes are accepted, 65,537 bytes are INTAKE-ANSWERS-FILE-TOO-LARGE (1.687019ms)
+✔ R5-2 maxBytes counts raw bytes, BOM included (1.068918ms)
+✔ R5-2 maxBytes alone keeps the INTAKE-CAPTURE-TEXT-FILE-* codes (1.051468ms)
+✔ R5-3 Windows shapes: UTF-8 BOM and CRLF variants of the same JSON parse after decoding; sha256 covers the raw bytes; no BOM in the text (9.042603ms)
+✔ R5-4 non-UTF-8 content is -INVALID-UTF8; NUL inside the content, a NUL path and an empty path are -INVALID (1.005847ms)
+✔ R5-5 paths: missing is -MISSING, a directory is -UNREADABLE, escapes and the root itself are -OUTSIDE-ROOT, an absolute path inside the root is accepted (1.092609ms)
+✔ R5-5 paths (leaf symlink): a symlinked leaf is -UNREADABLE, a link out of the root is -OUTSIDE-ROOT (0.549139ms)
+✔ R5-6 digest: a matching digest is accepted, a mismatch is -DIGEST-MISMATCH, uppercase/short/non-hex is -DIGEST-INVALID (0.56632ms)
+✔ R5-7 error identity: every answers-route refusal is an Error whose .code equals its message and carries the INTAKE-ANSWERS-FILE- prefix (1.439225ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 105.414842
+
+--- stderr ---

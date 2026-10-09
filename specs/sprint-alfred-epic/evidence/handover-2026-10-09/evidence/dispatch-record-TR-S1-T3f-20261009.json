@@ -1,0 +1,96 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-T3f-20261009",
+  "agentType": "goldfish-deep",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "candidateCommit": "5e19c84c58dd3232851fba721098b98c2389b5ab",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "c79dc8c2a4bd26faabc43350f9f23e4c563227bb2b547ac5063be1ced23b91c5",
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations, CONT17 header, goldfish-task 455-481, T3d record read; test file clean at start (git status empty); preflight run (GUARD-BOOTSTRAP-RECEIPT-MISSING cured, status ready); record created",
+      "toolUses": 9
+    },
+    {
+      "phase": "orientation (test cells, onboarding-init main/applyTrustAnchorBootstrap, po-human-approval setup branch, seam pattern); advisor consulted",
+      "toolUses": 31
+    },
+    {
+      "phase": "four edits to onboarding-init.test.mjs: helpers, encrypted fixture key, approval cell in-process, reuse import in-process plus pin (c)",
+      "toolUses": 36
+    },
+    {
+      "phase": "WSL targeted capture after.txt: 4 tests, 1 pass (c), 3 fail; approval and reuse red at onboarding-init.mjs:561 (REPOSITORY-POINTER-READBACK-FAILED), :519 unchanged red",
+      "toolUses": 38
+    },
+    {
+      "phase": "WSL whole-file capture exceeded 600000 ms, backgrounded by harness; check-consumer-safe-paths 9/9 exit 0; budget checkpoint fired at call 40",
+      "toolUses": 40
+    },
+    {
+      "phase": "diagnosis: repository pointer contract drift after R7-6-T11; stopped without commit; record finalised",
+      "toolUses": 48
+    }
+  ],
+  "report": {
+    "text": "CLOSING HANDOVER (stop condition 2/3: a second, pre-existing red sits behind the first one): stopped WITHOUT a commit. The test file is modified and UNCOMMITTED. This is a hand-back, not a completed run. independent review: pending.\nRoute pre-check: class is test authorship, not A/G/S; requested goldfish-deep claude-sonnet-5-5 / xhigh; observed model identity claude-sonnet-5-5 (runtime prompt), effort not observable; no contradiction.\n\n1. DoD results\n- Both key cells green in a WSL targeted capture: FAILED. after.txt: 4 tests, 1 pass, 3 fail. The new fail-closed pin (c) passed (1.8 s). The approval cell and the reuse case are both still red, now at a DIFFERENT site than before (see 6). The :519 case is unchanged and red (INTAKE-GENERATE-LINE-ENDINGS-REFUSED / LINE-ENDINGS-GIT-FAILED).\n- Whole-file WSL capture file-after.txt: NOT PRODUCED under this record. The run exceeded the 600000 ms tool timeout and the harness moved it to the background (harness task id buhxas323, output empty at hand-back). Any file-after.txt that appears later was not written under this record's verification. Consequence: 'no other case changes state against TR-S1-T3c wsl.txt' is NOT verified for the whole file; only the four targeted cases were run.\n- check-consumer-safe-paths.test.mjs: PASSED (9 tests, 9 pass, exit 0).\n- One commit of the test file only: NOT MADE (nothing green to commit as a unit; see 6).\n\n2. Evidence\n- evidence/TR-S1-T3f-20261009/after.txt, written by capture-evidence.mjs: wsl.exe -e bash -lc 'cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T3f-20261009/after.txt --label after -- node --test --test-name-pattern=keeps chat keyless --test-name-pattern=reuses a key already at the canonical --test-name-pattern=routes its later explicit language --test-name-pattern=no terminal fails closed plugins/pipeline-core/scripts/onboarding-init.test.mjs'. Wrapped exit code 1; 4 tests, 1 pass, 3 fail. The capture recorded head 03f32e33 and dirty: true: foreign commits moved HEAD after my opening (candidateCommit in this record stays 5e19c84c5).\n- Host: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, 9/9 (stdout only, no artifact file).\n\n3. Changed files\n- plugins/pipeline-core/scripts/onboarding-init.test.mjs: MODIFIED, UNCOMMITTED. Adds the runHumanApproval import and three helpers (encryptedKeyPem, passinSpawn, inProcessSetup); the approval-cell fixture key is now PKCS#8 encrypted (aes-256-cbc); the approval cell drives main(attendedArgv.slice(1), {write, writeError, env, applyTrustAnchor}) in-process with applyTrustAnchorBootstrap and an injected runSetup that calls runHumanApproval(setupArgs.slice(1), {spawn: passinSpawn(), homedirFn, isTTY: true}); the reuse case imports its key through the same in-process call; the new pin (c) sits right before the reuse case.\n- Assertion shape changes, exactly the allowed ones: approval cell anchored.status became the main return code (anchoredCode); anchored.stdout became the captured write output (anchoredStdout); the failure message now carries the captured writeError and the in-process setup errors instead of anchored.stderr; reuse case: the setup.status assertion was removed (runHumanApproval throws on failure, which fails the case with its reason). No other assertion was touched.\n- New untracked evidence: evidence/TR-S1-T3f-20261009/after.txt and this record.\n\n4. Deliberately not changed\n- Every production file (including the foreign dirty po-human-approval.mjs and pipeline-state.mjs), every other test file, the :519 case, hooks/, lib/guard/, harness/. I did not revert the test edits: they are the mechanically proven base for the next dispatch.\n\n5. Deviations from spec\n- The CONT15 header that the CONT17 header points to was not read, because the dispatch limited me to the CONT17 header.\n- No commit and no file-after.txt (see 1). Pin (c) was added because it failed closed reliably once under WSL (1.8 s); one run is not a reliability proof. (c) is skipped on win32 (detaching from the console needs a POSIX session) and runs git init on its fixture root first.\n\n6. Open items (triggered stop: 2/3, 5)\n- ROOT CAUSE of the remaining red. Both cells now get past the encrypted-key gate and past 'openssl pkey -pubout' (the -passin seam works; the authority readback at onboarding-init.mjs:527 passed). They fail at onboarding-init.mjs:561-564 with TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED: applyTrustAnchorBootstrap reads back .git/agent-pipeline/po-key-directory.json and it is absent. applyTrustAnchorBootstrap writes that pointer itself only in the recoveringNewAuthority branch (550-560). On every other path it expects the setup child to have written it, but po-human-approval.mjs persistExplicitDirectoryPointers (366-381, R7-6-T11 decision AC, 2026-10-07) writes the machine plane only; the repo-scope writer (344) is not called from it.\n- This is NOT caused by the in-process seam: in the reuse case the failing call is the SECOND step, applyTrustAnchorBootstrap with the default spawnSync runSetup, a real child taking the idempotent branch (no openssl, no passphrase), and it returns the same code. T3d predicted the red would only move to the derivation step; that was a code read, not a run. It moves to this pointer contract drift, which the encrypted-key gate masked until now. The old assertion on that pointer file (approval cell, after the policy checks) expects it too, so the cells cannot pass without a production or spec ruling on who writes the repository pointer on the non-recovery existing/new path. Out of this dispatch's authority.\n- Findings: (i) by code reading (po-human-approval.mjs:1869 before 1874), a spawned setup --existing-key on an encrypted key leaves a copy of po-private.pem in the target directory when openssl fails; pin (c) asserts only that no authority record, no public key and no machine pointer exist, it does not pin the leftover copy. (ii) Not verified: that homedirFn is honoured by readMachinePlane for the write path, i.e. that the in-process setup never touched the real machine plane; one WSL check is needed. (iii) The whole-file WSL capture needs more than 600 s now that the two cells run further; split it by name patterns.\n\nCLOSING ALLOWANCE HANDOVER: committed: nothing. verified green: check-consumer-safe-paths (exit 0) and pin (c) inside after.txt (one run). remains undone: approval cell red at onboarding-init.mjs:561; reuse case red at :561; DoD commit; whole-file capture; the modified test file left uncommitted. next briefing must say: rule who writes the repository pointer (production/spec); keep the current test edits as the base; confirm (c) reliability; split the whole-file capture; check the real machine plane stays untouched.",
+    "changedFiles": []
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "check-consumer-safe-paths.test.mjs",
+        "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+        "exitCode": 0,
+        "artifact": "stdout only (9 tests, 9 pass)"
+      },
+      {
+        "check": "pin (c) setup --existing-key no-terminal fails closed (one run)",
+        "command": "WSL capture-evidence targeted run",
+        "exitCode": 1,
+        "artifact": "evidence/TR-S1-T3f-20261009/after.txt (the wrapped run failed overall because the other three targeted cases are red; this test is the one pass)"
+      }
+    ],
+    "remainsUndone": [
+      "approval cell (checkApprovalCell) red at onboarding-init.mjs:561 TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED",
+      "reuse case red at the same site (second step, real spawned setup child)",
+      "DoD commit of the test file: not made",
+      "whole-file WSL capture file-after.txt: exceeded 600000 ms, not produced under this record",
+      "plugins/pipeline-core/scripts/onboarding-init.test.mjs is MODIFIED and UNCOMMITTED (helpers, three cell edits, pin (c))"
+    ],
+    "nextBriefingAdjustments": [
+      "production/spec ruling on who writes .git/agent-pipeline/po-key-directory.json on the non-recovery existing/new path (onboarding-init.mjs:550-564 versus po-human-approval.mjs persistExplicitDirectoryPointers after R7-6-T11); a test-only dispatch cannot close the two cells",
+      "keep the current uncommitted test edits as the base: the in-process route is proven through the key gate and the openssl derivation",
+      "confirm pin (c) reliability beyond one 1.8 s run, or rule",
+      "split the whole-file WSL capture by --test-name-pattern groups (more than 600 s now)",
+      "one WSL check that homedirFn keeps the in-process setup off the real machine plane"
+    ]
+  }
+}

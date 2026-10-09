@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HGO-S-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "862db7a68",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "89faa3fb7"
+  ],
+  "resultSha256": "d3c28706c3384c0aedf29e0d38504fc54d2f4f5716229a816cf61d0801516b8e",
+  "report": {
+    "text": "WIN-HGO-S-20261009 report (goldfish-deep, Sonnet 5.5 / xhigh). CLOSING-ALLOWANCE / 80 % CHECKPOINT HANDOVER: partial. Slices S2 and S4 are implemented and committed; S1 and S3 are NOT done. Implementation partial, independent review: pending, PO acceptance pending.\n\nRoute pre-check: class is test-only (QG-04), not A/G/S. Requested route: goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed (this dispatch's runtime prompt): \"Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction. GUARD-BOOTSTRAP-RECEIPT-MISSING fired once on the first Write; the named preflight ran once (exit 0), then the write succeeded.\n\nClosing-allowance handover (pipeline.dispatch-closing-allowance.v1)\n1. Committed: 89faa3fb7 \"test(human-guard-override): make the win32 cases measure the product, not the host\" (SHA from my own commit output): S2 (three killed-writer helpers) and S4 (held-lock case), in plugins/pipeline-core/lib/human-guard-override.test.mjs only. Nothing else committed.\n2. Verified green: see section 2. Native: 10 of 11 targeted cases pass; WSL: the same 11 patterns, wrapped exit 0.\n3. Remains undone: S1 (symlink gate, 4 cases); S3 (NVA-HGOFIX-2 x3, the script-file backslash case, CROSSREPOGUIDANCE-1a/1b); one further native red in the S2 chunk (below). No tracked file is left modified or uncommitted.\n4. Next briefing adjustments: see section 6.\n\n1. DoD results\n- S2 killed-writer helper injects the win32 private-state assurance and does not assert SIGKILL on win32: passed natively (the 10 killed-writer cases that reached the helper assertion are green except the one below).\n- S4 held-lock case accepts HGO-AUDIT-LOCK-AMBIGUOUS on win32 and still asserts the lock survives: passed natively (case \"a failed repair or ordinary append never removes the active repair writer's lock\").\n- S1 symlink cases gated on the shared probe: NOT DONE (no edit made).\n- S3 NVA-HGOFIX-2 explicit platform, backslash-filename fixture typed skip, CROSSREPOGUIDANCE normalisation: NOT DONE (no edit made).\n- Per-chunk native captures showing the targeted cases green: partial. One chunk captured; 10 pass, 1 fail. No chunk exists for S1/S3.\n- WSL capture of the same chunk showing no change: passed (wrapped exit 0; I did not read the artifact's counts).\n- One commit with the prescribed subject: passed for the slices landed (89faa3fb7).\n\n2. Evidence (repo-root-relative; evidence/ is git-ignored)\n- evidence/WIN-HGO-S-20261009/chunk-1-lib-killed-writer-and-held-lock.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --label WIN-HGO-S-chunk-1 --out <that path> -- node --test --test-name-pattern=<11 name patterns> plugins/pipeline-core/lib/human-guard-override.test.mjs ; native Windows ; wrapped exit 1 ; ℹ pass 10, ℹ fail 1.\n- evidence/WIN-HGO-S-20261009/wsl-chunk-1-lib-killed-writer-and-held-lock.txt: the same command run under WSL via wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; ...\" ; wrapped exit 0.\n- The one native red: \"a recovery guard excludes a second reclaimer and a raced replacement is never unlinked\" (test at lib test line 2579 after my edit; afterRecoveryGuardFn at 2590 re-enters acquireAuditLock). It throws HumanGuardOverrideError \"audit lock recovery owner state is ambiguous\", raised at human-guard-override.mjs:2527 (clearAbandonedAuditRecovery, called from acquireAuditLock at :2545). Same root cause as S4: the recovery guard is held by this very live process and win32 has no \"live\" owner answer by documented design. I did NOT read this test's assertions, so \"test fault, not product fault\" is a strong hypothesis, not a confirmed verdict. Before my change this case died earlier, at the helper's SIGKILL assertion.\n\n3. Changed files\n- plugins/pipeline-core/lib/human-guard-override.test.mjs: S2 (hardenKilledWriterStore + assertChildKilled, called from killedAuditWriter, killedAuditLockPublisher, killedAuditReclaimer) and S4 (heldLockCode per platform). 51 insertions, 5 deletions; every hunk confirmed with git diff before staging.\n- Untracked, git-ignored, not committed: evidence/WIN-HGO-S-20261009/*.txt, evidence/dispatch-record-WIN-HGO-S-20261009.json, scratch/finalize-WIN-HGO-S.mjs, scratch/report-WIN-HGO-S-20261009.txt, scratch/commit-msg/WIN-HGO-S-20261009.txt.\n\n4. Deliberately not changed\n- All production files (forbidden). The script test file guard-human-override.test.mjs (no edit; S3 not reached). The recovery-guard exclusion case (left red, see above). Line 2137 (a git rev-parse show-toplevel comparison in the author-repair case) was not touched; that case is gated by S1, not S3. The foreign untracked files in specs/sprint-alfred-epic/evidence were not touched.\n\n5. Deviations from spec\n- The briefing asked for S1-S4; only S2 and S4 landed, because orientation consumed about 35 of 55 calls (the files are 6000+ lines and the work needed regions across five places) and the 80 % notice fired at call 44.\n- S2 \"injects the win32 private-state assurance\": the child is a bare node -e process and publishAuditLock() calls safePrivateFile() with its defaults, so there is no injection seam. I used the repository's own T90 precedent instead (harden the store directory so created files inherit an owner-only DACL, assert status \"secure\"). That is a design choice inside the briefed latitude.\n- GF-09-D: the record log carries only the opening entry and the final entry (the finalizer is the first and only run of that script; it was not dry-tested). The first capture attempt failed on a usage error (capture-evidence.mjs needs --label); one call wasted.\n- The advisor tool was not consulted, because of the call budget.\n\n6. Open items\n- independent review: pending (only the Elephant may dispatch the Critic). PO acceptance pending. This is a closing-allowance handover, not a completed run.\n- Next briefing must say: (a) capture-evidence.mjs needs --label <label> besides --out; (b) split the remainder into two dispatches: S1+S3 (pure edits; anchor by TEXT, not line numbers, because my commit shifted every later line by about +46), and a separate one for the recovery-guard exclusion case plus its confirmation (read the test body from its title, accept HGO-AUDIT-LOCK-AMBIGUOUS on win32 at the nested call if the assertions confirm the same live-owner design, keep the recovery-lock survival assertions); (c) give the exact edits to reduce orientation: S1 = add { skip: DIRECTORY_SYMLINK_SKIP } (constant already defined near the top of the lib test file) to the four tests \"security and authority boundaries return typed recovery without an ambient bypass\", \"NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command\", \"pipeline author repair binds one exact source root and action without State readiness\", \"NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target\"; S3 CROSSREPOGUIDANCE = wrap the git(...) results in join(...) at the two assert.equal(recorded.root, git(..., \"--show-toplevel\"), ...) lines of 1a and 1b (join is already imported and normalises separators natively; POSIX unchanged); (d) a budget of 55 is enough for S1+S3 plus one native and one WSL chunk only if orientation stays under about 15 calls.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read, preflight run, record created",
+      "toolUses": 13
+    },
+    {
+      "phase": "finalized: partial",
+      "toolUses": null
+    }
+  ]
+}

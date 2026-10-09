@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-SIGN-T2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "37862e2953e3de7d413a2dc290b8e31e179a032e",
+  "resultSha256": "93da0d614b60eb44332b442084f8a82b8e17a27eaf12074403747beff0c485b8",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "2e875d0218b2b6aec32fbd59996284c3d5525d2e"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created after reading obligations, CONT17/18/35/36 headers+section, ADOPT-SIGN-F record, preflight",
+      "toolUses": 12
+    },
+    {
+      "phase": "orientation done: candidate diff and the existing ADOPT-SIGN-T pins read, advisor consulted",
+      "toolUses": 25
+    },
+    {
+      "phase": "pins written (architecture-adoption 9, po-human-approval 11); native runs green (7 pass + 2 explicit symlink skips; 11 pass)",
+      "toolUses": 29
+    },
+    {
+      "phase": "WSL capture after.txt exit 0 (20 pass, 0 skipped); consumer-safe-paths exit 0; production unchanged since candidate",
+      "toolUses": 33
+    },
+    {
+      "phase": "committed 2e875d0218b2b6aec32fbd59996284c3d5525d2e (two test files, 248 insertions)",
+      "toolUses": 38
+    },
+    {
+      "phase": "terminal record written by assemble script",
+      "toolUses": 41
+    }
+  ],
+  "report": {
+    "text": "ADOPT-SIGN-T2-20261009: completion report (class S, test-only signing CLI pins). Independent review: pending. Implementation complete, committed, PO acceptance and Critic review outstanding.\nBootstrap line: printed after the opening reads of the briefing files (not as the very first output line), ruleset 0.7.0+claude.20261008194106.da20519d.\nRoute pre-check: requested goldfish-deep / sonnet (Sonnet 5.5) / effort xhigh. Observed from this dispatch's own runtime prompt: \"powered by the model named Sonnet 5.5\", id claude-sonnet-5-5. Effort is not directly observable. No contradiction.\n\n1. DoD results\n- Pins in plugins/pipeline-core/scripts/architecture-adoption.test.mjs (ADOPT-SIGN-T2-1..9, 9 pins) and plugins/pipeline-core/scripts/po-human-approval.test.mjs (ADOPT-SIGN-T2-0..10, 11 pins): passed. WSL capture with --test-name-pattern=ADOPT-SIGN-T2: tests 20, pass 20, fail 0, skipped 0, wrapped exit code 0. All pins are GREEN against the shipped behaviour of 37862e295 (production files are unchanged since that commit: git log 37862e295..HEAD on the three production files is empty).\n- Native Windows run of each file (targeted, single file): architecture-adoption 7 pass + 2 skipped (T2-5, T2-6: directory symlink creation refused with EPERM, explicit skip reason printed); po-human-approval 11 pass. Under WSL the two symlink pins executed and passed.\n- consumer-safe-paths (harness/scripts/check-consumer-safe-paths.mjs, native, single script): passed, wrapped exit code 0.\n- One commit with the briefed subject: passed, 2e875d0218b2b6aec32fbd59996284c3d5525d2e.\n- Terminal record evidence/dispatch-record-ADOPT-SIGN-T2-20261009.json: this file.\n- Independent review: pending (only the Elephant dispatches the Critic).\n\n2. Evidence (repo-root evidence/ is gitignored: on disk, not committed)\n- evidence/ADOPT-SIGN-T2-20261009/after.txt: wsl.exe -e bash -lc 'cd <repo-root-in-wsl> && export CLAUDECODE=1 && mkdir -p evidence/ADOPT-SIGN-T2-20261009 && timeout 540 node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADOPT-SIGN-T2-20261009/after.txt --label adopt-sign-t2-after -- node --test --test-name-pattern=ADOPT-SIGN-T2 plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs'; wrapped exit 0 (the capture ran with the two test files uncommitted; its head line shows a later HEAD than the candidate, with the production files unchanged).\n- evidence/ADOPT-SIGN-T2-20261009/consumer-safe-paths.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADOPT-SIGN-T2-20261009/consumer-safe-paths.txt --label adopt-sign-t2-csp -- node harness/scripts/check-consumer-safe-paths.mjs; wrapped exit 0.\n\n3. Changed files (commit 2e875d0218b2b6aec32fbd59996284c3d5525d2e, 248 insertions, no deletions)\n- plugins/pipeline-core/scripts/architecture-adoption.test.mjs: new describe \"ADOPT-SIGN-T2\" for prepare --out: non-prepare command (status, propose, apply) exit 1; scratch/ itself in four spellings; relative values outside scratch/ run from cwd = scratch/ (so a cwd-resolving implementation would be caught) including a prefix sibling scratch-sibling/; relative --out resolved against --root from a foreign cwd, file equals stdout byte for byte; symlinked scratch/; symlinked parent directory and symlinked existing target; control that an unlinked regular target is replaced; hardlinked target (both names keep their bytes); directory as existing target. Each refusal asserts exit 1, no stdout, scratch/ named (except the non-prepare case, see 5), and an unchanged filesystem. Link cases skip with an explicit reason via t.skip.\n- plugins/pipeline-core/scripts/po-human-approval.test.mjs: helpers adoptSignForged (re-derives only the digests a case needs, so each case reaches the branch it names), adoptSignSession (counts spawns and confirmations); control T2-0 (rebinding an unedited request is the identity); T2-1..9 refusals (extra top-level key, extra intent key, intent value edited with digest kept, subject edited with subjectSha256 kept, subject swapped consistently while the intent keeps the old subject hash, wrong kind, wrong policyRevision, decision disagreement, candidate disagreement) each asserting the exact sentence \"the adoption approval request does not bind its exact subject and intent digest\", zero spawns, zero confirmations, no proof or signer mirror and no proof-<digest>.json; T2-10 hostile decision ref, rationale and scope entries (embedded LF, CR, CRLF and a fake \"action:\" line) on a self-consistent request: signs, discloses each string on one JSON-escaped line, exactly one line starts with \"action:\", the four INJECTED-bearing lines all start with their own label.\n\n4. Deliberately not changed\n- No production file, no other test file; the foreign uncommitted edits (pipeline-state.mjs, sanctioned-args-onboarding.mjs, onboarding-continuity.mjs, harness pipeline-state.test.mjs, guard-push test, other dispatch records) were never staged. The known-red NVA-SWEEP-F2f-REWORK case was not run (pattern runs only) and not touched.\n- Not pinned: chat-mode adoption requests (disclosed, not refused), --out given as the last argument without a value (generic \"Unknown or incomplete option\" path), full intent derivation (verifyAdoptionAuthority at apply time, out of scope for the describer).\n\n5. Deviations from spec\n- Non-prepare --out: the briefing says every refusal names scratch/. The shipped refusal for --out on a command other than prepare is \"Error: --out is only valid with the 'prepare' command\", which does not contain scratch/ (that check runs before the command switch and is not a scratch-boundary refusal). I pinned the shipped sentence, exit 1, empty stdout and an untouched filesystem; the assertion the literal briefing wording would add, assert.match(stderr, /scratch\\//u) on status --out scratch/request.json, would be RED against 37862e295. Finding for the Elephant: accept the message as pinned, or schedule a production change that names scratch/ there.\n- \"Before any key access\" is pinned observably as zero calls to the injected spawn dependency, zero confirmation reads and no proof or signer artefact. The in-process key file read (isPrivateKeyPassphraseProtected) cannot be observed from the test; its order is established from the source: the fail on the non-binding adoption request (po-human-approval.mjs near line 2180) precedes assertSigningReadyBeforePrompt and the passphrase check, while the key-presence check (\"run setup before sign-intent\") precedes the describer, so the key files must exist for the describer to be reached.\n- Extra pins beyond the briefed list (same files, shipped behaviour): symlinked parent directory and symlinked existing target (T2-6), the replaced-plain-file control (T2-7), the extra-intent-key and consistent-subject-swap describer cases, the prefix-sibling path.\n- Each describer case trips its named branch by construction (only the digests that would trip an earlier check are re-derived; control T2-0 and the signing success in T2-10 show the helper adds no difference), not by mutating production, which was forbidden; no mutation run was done.\n- Bootstrap line printed late (after the opening reads); about 41 tool uses (cap 55); two skipped pins on native Windows, executed on WSL.\n\n6. Open items\n- Independent review: pending; class S, signing CLI test pins: the Elephant should dispatch the Critic.\n- Decision for the Elephant on the non-prepare --out message (see 5).\n- No stop condition triggered; no pin was red; no closing-allowance handover (the run completed).\n",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

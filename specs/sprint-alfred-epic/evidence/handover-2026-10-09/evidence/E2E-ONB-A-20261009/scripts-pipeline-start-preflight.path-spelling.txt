@@ -1,0 +1,30 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/pipeline-start-preflight.path-spelling.test.mjs
+label: scripts-pipeline-start-preflight.path-spelling
+exitCode: 0
+head: dd25190e3ec0a97f7d14fe54b6f8ef0019d43d11
+tree: 00b204668dc938b7aa5b03b1fc45c327cd12dcb1
+dirty: true
+--- stdout ---
+﹣ FSLASH: the canonical backslash spelling is recognised by the receipt trigger and the lifecycle admission (1.018956ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: forward-slash separators name the same file and are recognised (0.113482ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: opposite-case drive letter, backslash separators name the same file and are recognised (0.124462ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: opposite-case drive letter, forward-slash separators name the same file and are recognised (0.066641ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: case-swapped path, backslash separators name the same file and are recognised (0.062521ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: case-swapped path, forward-slash separators name the same file and are recognised (0.101741ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: a different file name in the same directory stays refused (0.113482ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: the same file name in another directory stays refused (0.082462ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: the same path on another drive stays refused (0.160372ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: a dot-segment detour to the same file stays refused (0.182023ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: a sibling script spelled with forward slashes stays refused (0.112642ms) # win32-only: POSIX has exactly one spelling of a path
+﹣ FSLASH: the matching spelling plus any extra argument stays refused (0.117962ms) # win32-only: POSIX has exactly one spelling of a path
+✔ FSLASH: POSIX keeps one spelling -- the exact path is recognised, a case-variant is not (1.189809ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 12
+ℹ todo 0
+ℹ duration_ms 3670.13514
+
+--- stderr ---

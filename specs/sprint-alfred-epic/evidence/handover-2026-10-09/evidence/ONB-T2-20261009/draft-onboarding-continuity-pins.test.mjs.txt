@@ -1,0 +1,58 @@
+// DRAFT, UNMEASURED (ONB-T2-20261009 hand-back). Target: plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+// ONE Edit, anchored on the unique line (currently line 5013):
+//   assert.equal(cases.length, 298, "the complete onboarding continuity corpus must be registered before execution begins");
+// Replace that line with the two check() cases below followed by the same line with 298 -> 300.
+// Existing helpers in that file (do not re-import): check (line 100), expectKickoffError (172),
+// bootstrapBindPureGeneratorRoot (4449, returns { root, featureId, generatePlan }),
+// planOnboardingBootstrapBind (import at 54), planOnboardingBootstrapAcknowledgementChat (used at 4307).
+// Before editing: confirm readFileSync, existsSync, readdirSync and join are already imported in that file
+// (readFileSync/join/existsSync are used nearby; add readdirSync to the node:fs import only if missing).
+// Neighbours that must stay green: lines 4326-4344, 4465-4472 (the marker-less refusal), 4474+ (acknowledged bind).
+// Do not stage plugins/pipeline-core/lib/onboarding-continuity.mjs (the Elephant's uncommitted LE-F2 edit).
+
+// F7. Owner: buildKickoffPromotionPlan throw site, plugins/pipeline-core/lib/onboarding-continuity.mjs 5184-5189
+// (`fail("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", ...)`); the F slice must attach a typed
+// nextAction (kind "architecture-design-required", the same action `inspect` returns while architecture
+// authoring is incomplete) to the thrown error, or move the seam but keep a typed next step.
+// Expected RED today: refusal.nextAction is undefined.
+check("planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f7-next-step", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture must hold the unfinished architecture draft");
+  let refusal = null;
+  try { planOnboardingBootstrapBind({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.equal(refusal?.code, "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+  assert.equal(refusal?.nextAction?.kind, "architecture-design-required",
+    "the refusal must name the next step inspect would return, not leave the walker with a code and no action");
+});
+
+// F9. Owner: bootstrapAcknowledgementPlan in plugins/pipeline-core/lib/onboarding-continuity.mjs (the shared
+// first step of BOTH planOnboardingBootstrapAcknowledgementChat at 7600 and the signature route
+// planOnboardingBootstrapAcknowledgement at 7615, before writeBootstrapAcknowledgementRequest at 7627).
+// The F slice adds the generated-draft-marker refusal there so both routes inherit it.
+// Pin is on the Chat route because the signature route needs a configured PO key directory and trust
+// policy (BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE in a bare fixture, which would make the signature route red
+// for the wrong reason); the post-condition below still checks that no signature request file exists.
+// The accepted code is any BOOTSTRAP-ACK-* code naming placeholder, draft, template, scaffold or unfinished
+// (the briefing named no code; the Elephant may tighten this to the chosen code when it rules).
+// Expected RED today: planOnboardingBootstrapAcknowledgementChat does not throw (refusal stays null).
+check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with a typed code and writes no request (greenfield walk F9)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f9-draft-markers", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  const spec = readFileSync(join(root, generatePlan.targets.spec.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture PRD must hold the DRAFT TEMPLATE comment");
+  assert.match(prd, /REPLACE/u, "fixture PRD must hold a REPLACE value");
+  assert.match(spec, /AC-01: WHEN <trigger>, the system SHALL <observable result>\./u, "fixture spec must hold the AC-01 template line");
+  let refusal = null;
+  try { planOnboardingBootstrapAcknowledgementChat({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.match(refusal?.code ?? "", /^BOOTSTRAP-ACK-[A-Z-]*(PLACEHOLDER|DRAFT|TEMPLATE|SCAFFOLD|UNFINISHED)/u,
+    "a generated draft must be refused with a typed BOOTSTRAP-ACK code before any acknowledgement request is offered");
+  const scratch = join(root, "scratch");
+  const requests = existsSync(scratch)
+    ? readdirSync(scratch).filter((name) => name.startsWith("bootstrap-plan-acknowledgement-request-"))
+    : [];
+  assert.deepEqual(requests, [], "no signature request file may be written over an unfinished package");
+});
+
+// Then the guard line, bumped by the two cases above (298 + 2):
+// assert.equal(cases.length, 300, "the complete onboarding continuity corpus must be registered before execution begins");

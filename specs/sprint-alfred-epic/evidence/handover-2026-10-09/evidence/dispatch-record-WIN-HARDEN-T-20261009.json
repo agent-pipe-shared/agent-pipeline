@@ -1,0 +1,75 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HARDEN-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "225f9b1eeacb586df057e265e0c540d46474aa1d",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "16057306bce04316e8fea3b2c7cd9da92a4b2b56"
+  ],
+  "resultSha256": "22582404c134a4d113b7a763f0a0ec1131061c5f2224df5db01098a2a8ccf461",
+  "report": {
+    "text": "Completion report WIN-HARDEN-T-20261009 (goldfish-deep, claude-sonnet-5-5). Implementation complete; independent review: pending (Critic is the Elephant's dispatch); not PO-accepted.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6, security class named). Observed model identity from this dispatch's own runtime prompt: \"Sonnet 5.5, exact model ID claude-sonnet-5-5\" -> matches. Effort xhigh is not directly evidenced (the prompt carries only a numeric reasoning_effort of 30, which I did not map to a tier): disclosed, not a contradiction. The briefing names no calibration file; the bootstrap line cited project/guard-config.json as the nearest observed config.\n\n1. DoD results\n- Native before capture: passed (captured first). Baseline already has WPS013 red (pre-existing, see 4).\n- Native red capture: passed. WPS014 and WPS015 (both new) are RED at call 2 of 3 with {\"status\":\"unavailable\",\"reason\":\"native Windows DACL observation failed\"}; call 1 (control) is green in both. WPS001-WPS012 pass; WPS013 fails exactly as in before.txt (same assertion, same line, actual [secure, insecure]). So every old case is unchanged.\n- WSL capture: passed. Wrapped exit 0; 12 pass, 0 fail, 3 skipped: WPS013 (its prior skip), WPS014 and WPS015 skipped with the typed reason \"win32-native only: no seam for the fixed powershell.exe lookup\"; nothing else changed.\n- check-consumer-safe-paths.test.mjs: passed, exit 0, 9 of 9.\n- One commit with the exact subject \"test(windows-private-state): pin that hardening a hardened directory stays secure\": passed, only the test file in it.\n- NOT verifiable yet: the last assertion of each case (assessor returns secure after three hardener calls) is never reached on this host, because both cases stop red at call 2. It becomes exercised only once the hardener fix lands.\n\n2. Evidence (artifacts untracked by repository convention)\n- evidence/WIN-HARDEN-T-20261009/before.txt : node plugins/pipeline-core/scripts/capture-evidence.mjs --out <that file> --label native-before -- node --test plugins/pipeline-core/lib/windows-private-state.test.mjs ; wrapped exit 1 (WPS013 only).\n- evidence/WIN-HARDEN-T-20261009/red.txt : same command, label native-red ; wrapped exit 1 (WPS013, WPS014, WPS015).\n- evidence/WIN-HARDEN-T-20261009/wsl.txt : wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out <that file> --label wsl -- node --test plugins/pipeline-core/lib/windows-private-state.test.mjs\" ; wrapped exit 0.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 0 (console output only).\n- Commit 16057306bce04316e8fea3b2c7cd9da92a4b2b56 (git show --name-only: one file).\n\n3. Changed files\n- plugins/pipeline-core/lib/windows-private-state.test.mjs (+39/-1): shared helper assertHardenerStaysSecure (three hardener calls, each asserted separately with a message naming the call, then the assessor), cases WPS014 (fresh directory) and WPS015 (one child file written before call 1), and the case-count drift guard 13 -> 15. Messages carry status and reason only, no path.\n- Untracked support files: evidence/WIN-HARDEN-T-20261009/{before,red,wsl}.txt, scratch/commit-msg/WIN-HARDEN-T.txt, this record.\n\n4. Deliberately not changed\n- WPS013 is red on this host already in before.txt (\"invoke() stays independent of an inherited PS7-polluted PSModulePath\"): its batch assertion at test line 142 gets \"insecure\" for the unhardened probeRoot temp directory. It looks like a fixture assumption about the TEMP directory's inherited DACL, unrelated to idempotency; left untouched, needs its own triage.\n- No production file, no other test file, no hooks/, lib/guard/, harness/ edit. harness/verify-suites.json has no entry naming this suite (grep, no match). The probe.mjs was not committed.\n\n5. Deviations from spec\n- The skip does not use the file's existing name-prefix mechanism (names starting \"invoke()\" get mode skip off win32), because that emits a bare \"# SKIP\" with no reason and the briefing demands a typed reason. The new cases call context.skip(\"<typed reason>\") at run time and repeat the reason in the title. The platform check only selects the skip; on win32 call 1 is a hard assertion, so a broken host fails instead of skipping.\n- Pre-commit diff check: I used \"git diff --stat\" (one file, +39/-1, equal to my single Edit; the file was unmodified at dispatch start per the opening status) instead of reading the full hunk listing.\n\n6. Open items\n- independent review: pending. No stop condition triggered (call 2 came out unavailable on this host, as the diagnosis predicted).\n- The shared tree moved during the run: capture headers show HEAD 6305f867, f58ced7b and 5428bfec, all different from the briefed candidate 225f9b1ee; the record keeps the briefed candidate. First \"git add\" hit a transient index.lock refusal; one retry succeeded; no lock file was removed by me.\n- Next: the production fix slice (Ruling 148, slice 1: make the hardener idempotent in windows-private-state.mjs) is what turns WPS014 and WPS015 green; it must not edit these pins. Tool use about 33 of the 35 base cap; no closing-allowance handover needed.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/windows-private-state.test.mjs"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 9
+    },
+    {
+      "phase": "orientation-read (module, tests, diagnosis, probe)",
+      "toolUses": 16
+    },
+    {
+      "phase": "baseline native capture before.txt (WPS013 already red)",
+      "toolUses": 18
+    },
+    {
+      "phase": "edit: WPS014/WPS015 + count guard, commit message file",
+      "toolUses": 22
+    },
+    {
+      "phase": "native red capture: both new cases red at call 2",
+      "toolUses": 24
+    },
+    {
+      "phase": "wsl capture (3 skipped), consumer-safe check green",
+      "toolUses": 28
+    },
+    {
+      "phase": "commit (add retried once after index.lock)",
+      "toolUses": 30
+    },
+    {
+      "phase": "terminal record",
+      "toolUses": 33
+    }
+  ]
+}

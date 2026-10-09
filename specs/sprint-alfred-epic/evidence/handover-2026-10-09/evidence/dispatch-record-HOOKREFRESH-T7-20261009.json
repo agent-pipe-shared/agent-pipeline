@@ -1,0 +1,16 @@
+{
+  "taskId": "HOOKREFRESH-T7-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed-red-as-expected",
+  "commit": "ba5121821",
+  "changedFiles": ["plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs"],
+  "evidence": ["evidence/HOOKREFRESH-T7-20261009/red.txt"],
+  "log": [
+    {"phase": "orientation+preflight", "toolUses": 6},
+    {"phase": "edit CHRB007", "toolUses": 9},
+    {"phase": "red capture (WSL), consumer-safe check, commit", "toolUses": 14}
+  ],
+  "report": "DoD: WSL red capture passed (exit 1 wrapped; only CHRB007 red, actual 'blocked' vs expected 'provisioning-required'; CHRB001-006, 008, 009 green). check-consumer-safe-paths exit 0 (9/9). One commit ba5121821. F2 not landed (HEAD 40ee6b60a at start). Deviation: opening in-progress record not written because the briefing demands one terminal record written once after the commit."
+}

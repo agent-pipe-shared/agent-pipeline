@@ -1,0 +1,12 @@
+a	"git grep -n \"^(foo|bar)\" -- x"	=> commandIsGitPush = true
+b	"git grep --no-index -e \"^x\" a b"	=> commandIsGitPush = false
+b2	"git grep --no-index -e \"^(x)\" a b"	=> commandIsGitPush = true
+c	"git commit -m \"s\" --trailer \"AI-Assisted: true\""	=> commandIsGitPush = false
+c2	"git commit -m \"s\" --trailer \"Dispatch: X-20261009 (goldfish)\" --trailer \"AI-Assisted: true\""	=> commandIsGitPush = true
+d	"git commit -m $'a\\nb'"	=> commandIsGitPush = true
+e	"git push origin HEAD"	=> commandIsGitPush = true
+f	"git push"	=> commandIsGitPush = true
+h	"git grep -n 'a|b' -- x"	=> commandIsGitPush = false
+i	"git grep -n \"^foo\" -- x"	=> commandIsGitPush = false
+j_accepted_fp_doc	"git commit -m \"$(date)\""	=> commandIsGitPush = true
+k_accepted_fp_doc	"git commit -m '{\"a\":1}'"	=> commandIsGitPush = true

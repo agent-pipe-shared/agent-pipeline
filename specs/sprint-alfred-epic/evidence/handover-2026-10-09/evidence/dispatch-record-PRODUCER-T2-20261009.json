@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "PRODUCER-T2-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "6b3acec96",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "c28ea5619"
+  ],
+  "resultSha256": "a2f62f6c7c4820b8a18478bfd3f179748c2b1cc598a332cd4d337423d619fcbe",
+  "report": {
+    "text": "PRODUCER-T2 completed. DoD: whole goldfish-commit-command-flow.test.mjs green (26 pass, 0 fail; native capture evidence/PRODUCER-T2-20261009/after.txt, exit 0); check-consumer-safe-paths.test.mjs exit 0 (9 pass). Commit c28ea5619 changes plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs only. Two legacy cases re-pinned, titles kept: case 1 now asserts commit argv [commit,-F,messagePath,--,paths], no body text in the command, body inside plan.message; case 2 writes plan.message to plan.messagePath before the steps and still checks the real commit's name-only, subject, body and trailer block. Deliberately not changed: production files, other tests. Deviations: none. Open: independent review: pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 9
+    },
+    {
+      "phase": "closing",
+      "toolUses": 27
+    }
+  ]
+}

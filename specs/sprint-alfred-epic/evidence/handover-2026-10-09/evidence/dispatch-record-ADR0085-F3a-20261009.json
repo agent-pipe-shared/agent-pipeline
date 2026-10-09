@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-F3a-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "4ef3071a666ba755780c17d4a2c86668af66ef53",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": "1b3cd21bde8650e1c57af768369231fd41a8934d362ec7d2baab400379208cf2",
+  "report": {
+    "text": "CLOSING-ALLOWANCE-STYLE INTERIM HANDOVER (80 % checkpoint at hook call 44 of 55; stop condition 5/2 for M2 disclosed below). independent review: pending.\n\nRoute pre-check (class G): requested claude-sonnet-5-5 / xhigh; observed model claude-sonnet-5-5 (dispatch runtime prompt); effort not directly observable; no contradiction.\n\n1. DoD results\n- Not done: the production edit is NOT made. No commit. Nothing is modified in tracked files.\n- hooks-before (WSL guard-devplan.test.mjs): captured, exit 0. v7-before: captured, exit 1 (3 tests, 3 fail). pkg-before: captured, exit 1 (21 tests, 20 pass, 1 fail = DWP21).\n- v7 after / pkg after / hooks after / inspect.txt / consumer-safe check / commit: NOT RUN (remaining).\n\n2. Evidence (machine-written, repo-relative, host paths scrubbed)\n- evidence/ADR0085-F3a-20261009/v7-before.txt  (cmd: wsl node --test scratch/dispatch-wip/f3a-run/guard-devplan-design-approval-v7.test.mjs; exit 1)\n- evidence/ADR0085-F3a-20261009/pkg-before.txt (cmd: node --test plugins/pipeline-core/lib/design-workflow-package.test.mjs; exit 1; DWP21 fails with {ok:false,code:DAA-PUBLIC-UNAVAILABLE})\n- evidence/ADR0085-F3a-20261009/hooks-before.txt (cmd: wsl node --test plugins/pipeline-core/hooks/guard-devplan.test.mjs; exit 0)\n- Driver: node scratch/dispatch-wip/f3a-capture.mjs <before-fast|before-hooks|after-fast|after-hooks>. It builds the run copy (exactly 14 import lines and the GUARD line differ from the post-image; it throws otherwise), scrubs host paths, writes the captures, and the after-fast phase also writes inspect.txt. The commit message file scratch/commit-msg/ADR0085-F3a-20261009.txt already exists (briefed subject; trailers AI-Assisted: true and Dispatch: ADR0085-F3a-20261009 (goldfish) only).\n\n3. Changed files\n- Tracked: none. Untracked scratch/evidence only: the three captures above, scratch/dispatch-wip/f3a-capture.mjs, f3a-finalize.mjs, f3a-run/ copy, the commit message file, this record.\n\n4. Deliberately not changed\n- plugins/pipeline-core/lib/guard-devplan-policy.mjs (the target): not yet edited. CURRENT_APPROVAL_SCHEMA import kept for F3b. Pre-existing working-tree modifications of other agents (pipeline-state.mjs etc.) untouched.\n\n5. Deviations from spec / findings the next briefing must absorb\n- F-1 (briefing premise stale): CONT18 says control green, target red today. After F1b (fad3b88e1) CURRENT_APPROVAL_SCHEMA is plan-approval.v8, so :103 no longer selects a v7 record at all. v7-before shows BOTH the control and the target red with DAA-PUBLIC-UNAVAILABLE (a v7 record falls through to the pre-v7 branch). Rulings 117 and 130 state the same gap and assign it to F3.\n- F-2 (consequence for the edit): swapping the readApprovedDesignWorkflowPackage call alone cannot turn v7 or DWP21 green. The selector at :103 must also select the v7 schema. Planned edit, three regions of the one file: (a) line 53 import readApprovedDesignWorkflowPackage becomes rereadApprovedDesignWorkflowPackage; (b) add const V7_APPROVAL_SCHEMA = \"pipeline.plan-approval.v7\" after the imports (the lib constant is not exported and plan-spec-state-v2.mjs is out of scope) and change the :103 test to approval?.schema === V7_APPROVAL_SCHEMA; (c) replace the :114-126 call with rereadApprovedDesignWorkflowPackage({ repoRoot: root, packagePath: approval.designWorkflowPackagePath, packageSha256: approval.designWorkflowPackageSha256, featureId, planPath, planSha256, specPath, specSha256, advisorExceptionBinding: approval.designWorkflowApproval?.advisorException ?? null }) dropping readCandidate from it (the const readCandidate stays, the signature branch passes it). Keep the :151 mode strings: DWP21 pins approved-workflow-package-signature, approved-workflow-package-chat and, for mini, not-required. v8 records then fall to the pre-v7 branch (refused, as today); F3b adds the v8 branch.\n- F-3 (M2 cannot be met by this edit; stop condition 2/5 in waiting): node plugins/pipeline-core/scripts/pipeline-state.mjs inspect on this repository was run (pre-edit). Its JSON (schema pipeline.inspect.v1: status implementing, lifecycle PLAN-LIFECYCLE-CURRENT) carries no design-approval admission or mode field, and pipeline-state.mjs has no reference to designAdvisoryAdmission, the re-read, or guard-devplan-policy. The briefed M2 ('inspect reports DWP2-LEGACY-APPROVED-REREAD valid') therefore cannot be produced by an edit to guard-devplan-policy.mjs. Also, designAdvisoryAdmission returns mode approved-workflow-package-signature (pinned by DWP21), while DWP2-LEGACY-APPROVED-REREAD is the mode of the re-read result itself. The Elephant must rule: re-define the M2 measurement (for example a read-only probe calling rereadApprovedDesignWorkflowPackage on the real r5d.package.json and quoting its mode) or assign the inspect surfacing to another slice.\n\n6. Open items\n- Triggered: 80 % budget checkpoint (the cap, not a failure); briefing-vs-repo contradictions F-1 and F-3. The hand-back is deliberate: edit, after-captures (after-fast, after-hooks), consumer-safe check, add, commit and the terminal record need about 9 further calls; the dispatcher decides whether to grant budget or re-dispatch with F-1..F-3 in the briefing. Do not re-run the before phases; the captures and run copy exist.\n- Closing-allowance statements: Committed: nothing committed. Verified green: none (hooks-before exit 0 is a baseline, not a result of this change). Remains undone: all of the DoD except the three before captures; untracked files listed in section 3. Next briefing: use the F-2 edit recipe, drop the stale 'control green today' premise, and decide M2 first.",
+    "changedFiles": []
+  },
+  "log": [
+    {
+      "phase": "opening: record created, briefing read, route pre-check (requested claude-sonnet-5-5/xhigh; observed model claude-sonnet-5-5 per runtime prompt; effort not directly observable)",
+      "toolUses": 11
+    },
+    {
+      "phase": "orientation done; baseline captures v7-before, pkg-before, hooks-before written",
+      "toolUses": 44
+    },
+    {
+      "phase": "80 % checkpoint hit before the edit: findings F-1 (v8 selector), F-3 (M2 not producible by inspect); stopped without commit",
+      "toolUses": 46
+    }
+  ]
+}

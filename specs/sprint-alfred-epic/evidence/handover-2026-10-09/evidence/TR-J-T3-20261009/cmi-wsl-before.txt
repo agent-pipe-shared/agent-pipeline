@@ -1,0 +1,58 @@
+command: node --test plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs
+label: cmi-wsl-before
+exitCode: 1
+head: 34c0abb1dd65276b9da777fd75bce75b08b8ffbb
+tree: 430fbc5c37d6481ffa1d21b3256ef33a65458a2f
+dirty: true
+--- stdout ---
+✔ CMI001 installed hook allows a valid contiguous Pipeline provenance block (18537.324246ms)
+✔ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (18004.360835ms)
+✔ CMI003 installed hook blocks provenance split by a blank line (20677.006356ms)
+✔ CMI004 installed hook blocks marker-only provenance (20503.305258ms)
+✔ CMI005 installed hook blocks dispatch-only provenance (20350.495277ms)
+✔ CMI006 installed hook blocks provider and session correlation (19929.645319ms)
+✔ CMI007 installed hook blocks an unprovenanced commit in a Pipeline-managed repository (19543.889496ms)
+✔ CMI008 installed hook blocks a shell-script-wrapped commit without Pipeline provenance (18791.909578ms)
+✔ CMI009 absent policy defaults to blocking incomplete signaled provenance (15821.163586ms)
+✔ CMI010 warn policy reports incomplete signaled provenance but allows the commit (17954.244137ms)
+✔ CMI011 off policy does not produce provenance findings (16895.494539ms)
+✔ CMI012 off policy still blocks provider and session correlation (13757.57605ms)
+✔ CMI013 applyInstall refuses a foreign commit-msg hook without changing it (2151.298923ms)
+✔ CMI014 install, managed upgrade and removal preserve ownership checks (50360.906835ms)
+✔ CMI015 commit hook blocks unapproved staged implementation paths but still permits documentation (17210.156478ms)
+✔ CMI016 upgrade and removal refuse a modified managed hook (13765.635239ms)
+✔ CMI017 upgrade and removal refuse a modified managed implementation (14881.263537ms)
+✔ CMI018 generated hook fails closed when Git's message file is unreadable (11864.110945ms)
+✔ CMI019 generated hook fails closed when its install-bound policy module is unavailable (8103.046691ms)
+✔ CMI020 decline marker has the same reversible, non-overwriting contract as the other hook installers (23473.185397ms)
+✔ CMI021 installed hook permits first permissions settings but rejects new hook authority (12550.462864ms)
+✖ CMI022 installed hook compares settings hooks against Git base and exact staged deletions (10651.474536ms)
+✔ CMI023 --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (139.932046ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 22
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 389011.507165
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ CMI022 installed hook compares settings hooks against Git base and exact staged deletions (10651.474536ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file://<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file://<repo-root>/plugins/pipeline-core/scripts/commit-msg-hook-install.mjs:459:27)
+      at install (file://<repo-root>/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs:68:18)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs:345:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+--- stderr ---

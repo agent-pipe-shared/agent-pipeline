@@ -1,0 +1,60 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-D2-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["6290c89f2"],
+  "resultSha256": null,
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["6290c89f2: the diagnosis note only (specs/sprint-alfred-epic/evidence/win-ges-d2-native-reds-2026-10-09.md)"],
+    "verifiedGreen": [
+      { "check": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "result": "9 tests, 9 pass, 0 fail (exit code not echoed by the tool output); no machine-written artifact, stdout only" }
+    ],
+    "remainsUndone": [
+      "No native probe was run: the three inferred causes (cross-volume relative path, which validFile predicate fails, DACL harden result) are tier I, not measured",
+      "No native targeted capture-evidence runs were made by this dispatch (DoD native-run clause not met); baselines used are the WIN-GES-F2 captures",
+      "Uncommitted modified files: none from this dispatch"
+    ],
+    "nextBriefingAdjustments": [
+      "Brief a probe dispatch of about 6 tool uses: one scratch script under scratch/ run once through capture-evidence, plus the ceremony drift case rerun with the temp environment pointing at the checkout volume",
+      "Warn that a Bash rg pattern containing the word git trips guard-push (push command prefix is ambiguous) and that backslash-spelled paths in rg are refused",
+      "Warn that a note written under an evidence directory is refused on any drive-letter spelling, including synthetic ones"
+    ]
+  },
+  "report": {
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/win-ges-d2-native-reds-2026-10-09.md"],
+    "text": "CLOSING-ALLOWANCE / 80 % CHECKPOINT HANDOVER (partial). Route pre-check: not an A/G/S dispatch; requested claude-sonnet-5-5 / xhigh, observed model identity claude-sonnet-5-5 (runtime prompt), no contradiction. independent review: pending.\n\n1. DoD results. (a) Note exists, every claim anchored by file:line or capture line, each item classified, evidence tier marked per claim (M measured in the WIN-GES-F2 captures, R read from source, I inferred): PASSED as a partial note. (b) Native targeted runs through capture-evidence: NOT DONE, the 80 % checkpoint (hook call 36 of 45) arrived before the probe could be written; no probe value was observed, so the three root causes below are inferred (tier I), not measured. (c) node --test harness/scripts/check-consumer-safe-paths.test.mjs: PASSED, 9 tests, 9 pass, 0 fail (exit code not echoed by the tool output). (d) One commit of the note only, exact subject, trailers Dispatch: WIN-GES-D2-20261009 (goldfish) and AI-Assisted: true only: PASSED, 6290c89f2.\n\n2. Evidence. Baselines read: evidence/WIN-GES-F2-20261009/native-store-after.txt and native-ceremony-after.txt. Check run: node --test harness/scripts/check-consumer-safe-paths.test.mjs. No new machine-written artifact; no probe artifact exists.\n\n3. Changed files. specs/sprint-alfred-epic/evidence/win-ges-d2-native-reds-2026-10-09.md (new, the diagnosis note). This record is untracked, as the other dispatch records.\n\n4. Deliberately not changed. All production and test files, hooks, lib/guard, harness, the live .git/agent-pipeline tree, foreign staged files.\n\n5. Deviations from spec. (i) Native targeted capture runs and the scratch-copy probe were not performed (checkpoint hit); the note says so in its first paragraph and in section 5 and marks each claim M/R/I. (ii) Record resultSha256 left null (not computable without extra calls; same gap as the F2 record). (iii) Hook-counted calls were lost to guard refusals: a Write before the preflight receipt, a Bash with backslash paths, two Bash rg calls whose pattern contained the word git (guard-push: push command prefix is ambiguous), and the first note write (drive-letter spelling refused in an evidence path).\n\nFindings in one place. Item 1 (signing-ceremony.test.mjs:328/:349): PRODUCT fault, bites real win32 users when plugin and repo sit on different drive volumes. Every named candidate (CRLF, separators, core.autocrlf, git binary) can only push intervenedCommitsStayWithinScope toward false, so the admission must come from pathWithinScope, i.e. normalizeRepoRelativePath (guard-maintenance-window.mjs:736-744, exact line :742): path.win32.relative returns the absolute target when the roots differ, which the .. test does not catch, so :1352 reads an out-of-tree file as under the plugin root. Under WSL a single root keeps the .. prefix. Slice S1: production, GUARDRAIL class (design-tier route), add an isAbsolute(rel) rejection; RED pin must be host-independent (inject path.win32 with two roots) because the :328 case is red only on cross-volume hosts. Item 2: :1100 is a TEST fault (restricted root built with bare mkdtemp, never hardened; store.mjs:232 reports insecure) -> S5 harden the fixture; :1307 and :1332 are a PRODUCT fault (store.mjs:901, (mode & 0o022n) === 0n is never true for win32 files, caught and hidden by the catch-all at :930; every existing-v2 observation refuses on win32; four passing refusal tests at :1298/:1302/:1312/:1328 pass vacuously) -> S2 production fix using the DACL assessor. Item 3: :1247 is a TEST/HOST fault (platform: linux injected but real win32 stat mode) -> S4 probe skip; the five symlink EPERM cases are HOST faults (errno -4048) -> S3 typed probe skip in the form of pipeline-start-preflight.test.mjs:58-77 (SYMLINK-EPERM, helper symlinkOrSkip, EPERM only, no platform check); :1320 must be split, and the four earlier cases may hide further reds.\n\n6. Open items. Triggered: 80 % budget checkpoint (call 36 of 45), hand-back. Committed: 6290c89f2 (note only). Verified green: consumer-safe-paths 9/9. Remains undone: the native probe (cross-volume relative value, validFile predicates, harden result), the ceremony rerun with the temp directory on the checkout volume, targeted store captures. Next briefing: probe dispatch of about 6 tool uses, then S3+S4+S5 as one test-only slice, then S1 and S2 each as RED-pin-then-fix (QG-04). PO acceptance pending."
+  },
+  "log": [
+    { "phase": "opening: record created after reading agent-obligations, CONT17 header (1-17), goldfish-task 440-489, F2 record; preflight run once (receipt refusal)", "toolUses": 7 },
+    { "phase": "orientation done: Ruling 138, guard-maintenance-window 736-761 and 1255-1540, store 195-255 and 860-960, test lines 1100/1247/1307-1340, F2 captures, SYMLINK-EPERM helper located", "toolUses": 35 },
+    { "phase": "80 percent checkpoint notice at hook call 36; stopped investigating, no probe run; note written (second attempt, first refused for drive-letter spelling)", "toolUses": 38 },
+    { "phase": "check-consumer-safe-paths 9/9 pass; committed 6290c89f2 (note only)", "toolUses": 43 },
+    { "phase": "final record write: outcome partial, closingAllowance handover", "toolUses": 44 }
+  ]
+}

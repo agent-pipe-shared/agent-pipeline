@@ -1,0 +1,17 @@
+STEP 02 onboarding-init (guided driver, two calls)
+Placeholders: <repo-root-in-wsl>, <temp-repo>, <wsl-node>. Every call prefixed CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core, cwd <temp-repo>, single-quoted outer so EXIT is measured.
+
+02a  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/onboarding-init.mjs --root <temp-repo> --runner claude        (the action returned by step 01c, verbatim)
+     exit code: 0
+     outcome: pending-asks; stepsExecuted 3 (inspect, plan, apply-portable-seed --activate), all exitCode 0, faultCode null
+     final status: runtime-initialization-required (runtime missing; repository local-valid-writable, initializesGit false)
+     pendingAsks: gitAuthorName, gitAuthorEmail, humanApprovalMode, advisorExportConsent, language; reviewedDefaults: language en, humanApproval signature, advisorExportConsent declined
+     next action: the returned applyAction with placeholders (mutation true, requiresConfirmation true)
+
+02b  same script + --git-author-name "E2E Walk" --git-author-email e2e@example.invalid --human-approval signature --advisor-export-consent declined --language en
+     answers used: author E2E Walk / e2e@example.invalid (fake pair), human approval signature (machine default), Advisor export declined (preselected), language en.
+     exit code: 0
+     outcome: collect-input; stepsExecuted 3 (inspect, plan-runtime, initialize-runtime --activate), all exit 0
+     initialAnswers: INITIAL-ANSWERS-APPLIED (pushApprovalPreference signature, language en, advisorExportConsent declined, trustAnchor not-requested)
+     final status: intake-required (continuity absent-pristine)
+     next action: collect language + profile, then intake-consent-apply (applyAction) -- NOTE the language is asked a second time although the guidance says it is reused; the existingFileApplyAction argv is malformed (see step-03).

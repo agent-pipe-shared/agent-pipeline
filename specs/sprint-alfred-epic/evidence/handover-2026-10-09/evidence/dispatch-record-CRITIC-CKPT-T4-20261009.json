@@ -1,0 +1,21 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-CKPT-T4-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f9a2a8409f256a970954be89f738bae099b44075",
+  "outcome": "completed",
+  "commits": ["e28888585"],
+  "log": [
+    { "phase": "opening: briefings read, preflight run, record created", "toolUses": 13 },
+    { "phase": "edits applied, native run captured (2 red: DP26, DP27), committed", "toolUses": 29 }
+  ],
+  "report": {
+    "text": "CRITIC-CKPT-T4: test-only commit e28888585 on plugins/pipeline-core/lib/dispatch-policy.test.mjs. DP26 expects maxTurns 65; DP27 binds maxTurns 65, workingCap 50, reserve 30 (65-35); default base cap 30, effectiveCap 30, closingEnd 35 unchanged; DP25 untouched; comment block and titles updated. Native single-file run (capture-evidence.mjs, exit 1): tests 41, pass 38, fail 2 (DP26, DP27 only, both 'actual 50, expected 65' because agents/critic.md still says 50), skipped 1 (DP23, pre-existing symlink EPERM host limitation). Evidence file evidence/CRITIC-CKPT-T4-20261009/red.txt is gitignored (evidence/ is ignored), so it is not in the commit. No production file, critic.md, DP25 or other test touched. Next: CRITIC-CKPT-F2.",
+    "changedFiles": ["plugins/pipeline-core/lib/dispatch-policy.test.mjs"]
+  }
+}

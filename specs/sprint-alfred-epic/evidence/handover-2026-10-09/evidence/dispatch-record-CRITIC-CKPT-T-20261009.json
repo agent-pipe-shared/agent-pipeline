@@ -1,0 +1,67 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-CKPT-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "862db7a68de4a9353d73c3efc861a733f78df8a4",
+  "resultSha256": "c0959d33f6f110008bd69309b2fff02fe1ef777084836fe9f1117dcd37cbd89a",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "log": [
+    {
+      "phase": "opening: orientation done (briefings, record schema), record created",
+      "toolUseCount": 23
+    },
+    {
+      "phase": "orientation: guard, core cap math, ruling 159, test harness read; no pin written",
+      "toolUseCount": 43
+    },
+    {
+      "phase": "80 percent checkpoint notice at call 44: stop, finalize, hand back",
+      "toolUseCount": 44
+    }
+  ],
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER (interim, stopped at the 80 percent checkpoint, call 44 of 55). Nothing authored, nothing committed. independent review: pending.\n\nROUTE PRE-CHECK (disclosed late, in this report only): requested route from field 6 = goldfish-deep, Sonnet 5.5, xhigh, tool-layer model sonnet. Observed effective identity, quoted from this dispatch's own runtime prompt: 'powered by the model named Sonnet 5.5, exact model ID claude-sonnet-5-5'. No contradiction. Effort is not observable from the prompt, so it stays unknown.\n\n1. DoD results\n- red.txt for the new pins (WSL): failed - not produced, no pin was written.\n- controls green / nothing else changes: not verifiable - no post-image changed.\n- consumer-safe-paths exits 0: not verifiable - not run (no tracked change to check).\n- one commit of the test post-image and CRITIC-CKPT-MANIFEST.md: failed - no commit.\n\n2. Evidence\n- No machine-written artifact. The only files written are this dispatch record (git-ignored evidence/) and scratch/dispatch-wip/CRITIC-CKPT-T/finalize.mjs (git-ignored). Finalizer command: node scratch/dispatch-wip/CRITIC-CKPT-T/finalize.mjs\n\n3. Changed files\n- None tracked.\n\n4. Deliberately not changed\n- Tranche-2 guard post-images, live guards, hooks.json, agents/critic.md, TR-G-MANIFEST.md (all forbidden or read-only). The tranche-2 test post-image hooks/guard-dispatch-budget.test.mjs is untouched (still the 0bda864c base).\n\n5. Deviations from spec\n- The briefing said to run the finalizer by call 44. Orientation consumed all 44 calls, so no pin was written. Cost drivers: learning the v4 dispatch-record schema (it needs a full 40-hex candidateCommit, agentType, effort, runner and a criticRequired decision, found only by reading lib/dispatch-record.mjs), two refused reads (a Glob with a pattern and a Grep on a file that does not exist), and the code reading below.\n\n6. Open items\n- STOP CONDITION CHECK: the Critic IS distinguishable from a Goldfish in the hook input. The payload carries agent_id plus agent_type = pipeline-core:critic. The tranche-2 guard post-image already classifies it: isCriticAgentType() = normalizedAgentType(agentType) === 'critic'. No stop condition fired on that.\n- BRIEFING DEFECT A (cap arithmetic): Ruling 159 says working cap 50 with maxTurns 60. In plugins/pipeline-core/lib/dispatch-budget-core.mjs dispatchWorkingCap(maxTurns) = maxTurns - (CLOSING_ALLOWANCE 5 + SAFETY_MARGIN 10), so maxTurns 60 gives 45 and a cap of 50 needs maxTurns 65 (a grant ceiling of maxTurns - 6 does not raise the base cap). Either the ruling means maxTurns 65 or CRITIC-CKPT-F gives the Critic a role-specific rule. The pins should be written against behaviour, so both routes can turn them green, but the Elephant should settle which one CRITIC-CKPT-F implements.\n- BRIEFING DEFECT B (today's 25): I found no 25 for the Critic. By source reading (not measured): agents/critic.md has maxTurns 50, so the effective cap today is min(baseCalls, 35); DEFAULT_DISPATCH_BASE_CALL_CAP.critic = 30 in lib/dispatch-policy.mjs; the critic is in BUDGETED_ROLES. The red for a 50-cap pin will therefore be 'refused at call 36', not 'at call 26'.\n- FACT: checkpoint threshold is dispatchCheckpointThreshold(cap) = floor((4*cap+4)/5), so cap 50 gives 40 and cap 35 gives 28. The closing allowance (+5) is generic and already applies to any counted agent. The critic text variant of the notice and the post-cap Write lane already exist in the post-image guard (CRITIC_NOTES_PATTERN, checkpointNoticeStdout).\n- FACT (the real RED for the confinement): CRITIC_NOTES_PATTERN = scratch/dispatch/<any subdir>/critic-notes.md. A Write to scratch/dispatch/other/critic-notes.md is admitted today after the cap, so the pin 'critic-notes.md outside scratch/dispatch/critic-*/ is refused' is genuinely red. The pattern must become critic-prefixed subdirs.\n- FACT (limit): the guard's Write lane exists only AFTER the working cap (closing acts). I found no hook in hooks.json that confines a Critic's Write BEFORE the cap (I read the hook list only, not the internals of guard-lifecycle-ready or guard-testpath). If pre-cap confinement is wanted it needs a new guard or the agent's tools frontmatter; the test post-image can only pin the post-cap lane unless the Elephant names that guard.\n- FACT: the tranche-2 test post-image has no critic case and no DISPATCH-BUDGET-CHECKPOINT assertion (searched, zero matches).\n\nclosingAllowance structured handover:\n- Committed: nothing committed.\n- Verified green: none.\n- Remains undone: every DoD item; no tracked file is modified or untracked-new from this run.\n- Next briefing must say differently: see the plan below.\n\nPLAN FOR THE RE-DISPATCH (read once, then write; about 14 calls plus the commit chain)\n- Harness facts (tranche-2 hooks/guard-dispatch-budget.test.mjs): run({rootDir: FAKE_ROOT, files, steps:[{op:'guard', input}]}) returns results[i].exitCode/stderr; lines 196-240 are run(), seedSubagentFiles(maxTurns), readInputObj(tool_input, agentType). Lines 1809-1900 are the TR-G T49 helpers (trgDeepCall builds a payload with tool_name and agent_type; trgPostCap runs five cap calls then your commands; trgAssertRefusedAfterCap and trgAssertAdmittedAfterCap). The default scenario stubs dispatchBudgetContractForRoleFn to non-applicable, so the cap is maxTurns - 15 read from the agent definition seeded at agentDefPath(name).\n- Critic fixture: meta agentType pipeline-core:critic, agent definition at agentDefPath('critic') holding the text of the SHIPPED agents/critic.md (read it from the plugin tree at test time, so CRITIC-CKPT-F's frontmatter change flips the pins and the test never hard-codes maxTurns).\n- Pins: (a) 50 critic calls exit 0 and the 51st is DISPATCH-BUDGET-EXHAUSTED (red today); (b) the call-40 result carries DISPATCH-BUDGET-CHECKPOINT and call 39 does not (red today); (c) five closing acts after call 50 pass, the sixth says 'closing allowance of 5 tool calls is exhausted'; (d) post-cap Write to scratch/dispatch/critic-abc/critic-notes.md admitted; Write to scratch/x.md, evidence/other.json (not a dispatch-record name), scratch/dispatch/critic-abc/other.md, scratch/critic-notes.md refused; Edit of another path refused; Write to scratch/dispatch/other/critic-notes.md refused (red today); controls green: a goldfish-deep Write to a critic-notes.md path stays refused post-cap.\n- Method: TR-G-MANIFEST.md TR-G-T4 section, 'Command and result' (the load-hook redirect; copy scratch/dispatch-wip/TR-G-T4/tool.mjs to a CRITIC-CKPT-T scratch dir). Write CRITIC-CKPT-MANIFEST.md with base sha256 0bda864c5087f90de59216231522ae81529fe8ad8d7a44dd479092ad557e431e (133519 bytes), the new sha256 and bytes. Edit the post-image in place by appending after the last test (TR-G T34, final lines 2117-2121).\n- Budget: give the re-dispatch the cap 55 and these pointers, and tell it the record needs the full candidate SHA (git rev-parse 862db7a68 = 862db7a68de4a9353d73c3efc861a733f78df8a4) so orientation drops to about 5 calls.\n\nIndependent review: pending. PO acceptance: pending.",
+    "changedFiles": []
+  },
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "taskId": "CRITIC-CKPT-T-20261009",
+    "committed": [],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "all DoD items: pins, red.txt, CRITIC-CKPT-MANIFEST.md, consumer-safe-paths run, the commit"
+    ],
+    "nextBriefingAdjustments": [
+      "state the candidate SHA in full and the v4 record fields",
+      "settle Ruling 159 cap 50 versus maxTurns 60 (needs 65 under dispatchWorkingCap)",
+      "name the guard that confines the Critic Write before the cap, or accept pinning the post-cap lane only",
+      "list the harness line ranges so orientation costs about 5 calls"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

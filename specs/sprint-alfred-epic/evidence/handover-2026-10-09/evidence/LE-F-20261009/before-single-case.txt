@@ -1,0 +1,38 @@
+label: before-single-case-wsl
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test --test-name-pattern "routes its later explicit language" plugins/pipeline-core/scripts/onboarding-init.test.mjs"
+exitCode: 1
+--- stdout ---
+✖ host-managed consent CLI routes its later explicit language into private intake state (17326.780807ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20087.422992
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:495:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (17326.780807ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root-in-wsl>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:559:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
+

@@ -1,0 +1,68 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-F3b-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "sonnet",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "08b896e61",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "c1ef8d69a"
+  ],
+  "resultSha256": "19379d0009e29bfe4a5f5462e1423c57a1c603189e60be07e1c0160e2cb6c31e",
+  "report": {
+    "text": "Hunk re-applied to onboarding-init.mjs and committed as c1ef8d69a. before.txt (HEAD): 11 tests, 7 pass, 4 fail. after.txt: 11 tests, 9 pass, 2 fail; only the key-copy pin and the language case red (identical to with-fix.txt); first-anchor rollback matrix green. check-consumer-safe-paths exit 0. Not done: resultSha256 not computed (budget exhausted, no call left to hash report.text); git diff hunk-ownership check not run (budget guard refused it; module was clean before and edited only by this dispatch, restored once with git restore and re-edited for the before run). evidence/ is gitignored, so before.txt/after.txt/record are on disk but untracked. independent review: pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/onboarding-init.mjs"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 10
+    },
+    {
+      "phase": "before-run",
+      "toolUses": 24
+    },
+    {
+      "phase": "after-run",
+      "toolUses": 28
+    },
+    {
+      "phase": "consumer-safe-paths",
+      "toolUses": 34
+    },
+    {
+      "phase": "commit",
+      "toolUses": 39
+    },
+    {
+      "phase": "Elephant digest bind (Ruling 159): resultSha256 computed over the unchanged report.text",
+      "toolUses": null
+    }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3",
+    "decision": "pending"
+  }
+}

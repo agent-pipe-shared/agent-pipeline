@@ -1,0 +1,24 @@
+=== plugins/pipeline-core/scripts/check-routing-projections.test.mjs
+exit 1
+
+
+=== plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs
+exit 1
+
+
+=== plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs
+exit 1
+
+
+=== plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+exit 1
+
+
+=== plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+exit 1
+
+
+=== plugins/pipeline-core/scripts/runner-contracts.schema.test.mjs
+exit 1
+
+

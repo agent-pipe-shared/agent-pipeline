@@ -1,0 +1,10 @@
+command: node harness/scripts/check-consumer-safe-paths.mjs
+label: TR-S2-T-consumer-safe
+exitCode: 0
+head: 3a1a2e507bf827388f02cedf0fcf5198aab6a887
+tree: 1becc982e85fd12747e617dd7d0a3b7d4f8dc5e4
+dirty: true
+--- stdout ---
+Consumer-safe-path check passed: 1758 tracked file(s) under plugins/pipeline-core/, 152 allowlist entries (all used).
+
+--- stderr ---

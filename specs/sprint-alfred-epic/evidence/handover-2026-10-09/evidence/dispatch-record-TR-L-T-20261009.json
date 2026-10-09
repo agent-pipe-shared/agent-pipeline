@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-L-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": ["2eb6c273258516503948e4a3876848a54dba5723"],
+  "resultSha256": null,
+  "report": {
+    "text": "TR-L-T-20261009: implementation complete, independent review: pending, PO acceptance: open. Commit 2eb6c2732.\n\n1. DoD results\n- Baseline FIRST, unmodified live files, WSL: passed (override 19/19, guard-testpath TPC001-018 18/18, wrapped exit 0).\n- New pins run from scratch copies under WSL: passed, each in the state it was written for. TP19, TP20, TP21 (guard-testpath.test.mjs) GREEN; OT20, OT22 (override) GREEN; OT21, OT23 (override) RED, reason lane=git-working-tree-write rule=TP-3 (protectedTestPathShellHit refuses every git restore of a protected path).\n- Pre-existing cases keep their result: passed (all 18 + 19 old PASS lines present in baseline and in the scratch run). The override file exits 1 in the scratch run only because of the two RED pins.\n- Post-images + TR-L-MANIFEST.md committed: passed (one commit, exact pathspec, trailers Dispatch: TR-L-T-20261009 (goldfish) and AI-Assisted: true).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed (exit 0, 9/9).\n- Every new case title contains T84: passed.\n- independent review: pending.\n\n2. Evidence\n- evidence/TR-L-T-20261009/baseline.txt: wsl.exe -e bash -lc 'cd <repo>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-L-T-20261009/baseline.txt --label baseline -- node --test --test-reporter=spec <the two live files>', exit 0.\n- evidence/TR-L-T-20261009/red.txt: same wrapper, label TR-L-T-red, files scratch/dispatch-wip/TR-L-T/guard-testpath.test.mjs and guard-testpath-override.test.mjs, wrapped exit 1 (OT21, OT23).\n- Post-image vs live diff (WSL diff): only additions, plus two intended edits in file 1 (cleanup list gained T84_DIR; last names entry gained a comma). Post-image vs run copy: only import paths and the GUARD/HOOKS lines.\n- sha256: guard-testpath.test.mjs 2753b664ae50a42696d7815b61278e9176b0d17b5a632f3a964735eec8a20951; guard-testpath-override.test.mjs 234cf45ccadf61f2ae36b7dfe0dc5d0ef1034111c4a6de264b04725802b07d3c.\n\n3. Changed files (committed)\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-testpath.test.mjs: TP-2 post-image, new cases TP19-TP21.\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-testpath-override.test.mjs: TP-7 post-image, new cases OT20-OT23.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-L-MANIFEST.md: targets, sha256, WSL command, per-pin state, assumptions.\nUncommitted by design: evidence/TR-L-T-20261009/{baseline,red}.txt, this record, scratch copies and message under scratch/.\n\n4. Deliberately not changed\n- Nothing under plugins/, harness/, the tranche README.md, other post-images, the real staged lib/guard/sanctioned-args-onboarding.mjs (fixtures in temp repos only), the calibration file.\n- A plain git restore -- <file> while the index differs from HEAD, git checkout -- <file>, --staged/--worktree alone, --source=<sha of HEAD>: left unpinned (named in the headers).\n\n5. Deviations from spec\n- The T84 text does not name the admitted spellings. I pinned the two that provably yield HEAD's bytes (plain restore with a clean index; explicit --source=HEAD --staged --worktree) and named the rest as unpinned assumptions rather than choosing verdicts.\n- The write-lane half ('one decision per file across hunks') is GREEN, not RED: the lane decides from the path alone and I could not reproduce the log's (L88) admitted-hunk-1 mechanism. TP19-TP21 and OT20 are therefore invariants the TR-L change must keep, not a reproduction. Stated in both headers and the manifest.\n- The restore pins drive the library classifier protectedTestPathShellHit({command, rules, root}); neither post-image spawns guard-lifecycle-ready.mjs. If TR-L moves the decision to another function, OT21-OT23 need re-pointing.\n- Bootstrap line: the briefing names no calibration file, so the line says so instead of naming one. Route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5, no contradiction.\n- Post-images were produced by Write twice (run copy, then final) and verified by diff, not by cp+Edit.\n\n6. Open items\n- Independent Critic review pending (Elephant dispatches it). Placement of both files is the signed ceremony (TP-2, TP-7).\n- Finding for the Elephant: po-list T84 gives 'git restore -- plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs'. That file is staged (index modified, tree equal to index), and a plain git restore -- <file> restores the tree from the INDEX, so it would be a no-op there. The command that really returns a staged file to committed bytes is git restore --source=HEAD --staged --worktree -- <file> (pinned in OT23).\n- OT21 and OT23 stay RED until the TR-L implementation lands. No stop condition triggered. Budget: 47 of 55 counted calls.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-L-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-testpath-override.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-testpath.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {"phase": "opening: record created before other work; obligations + CONT17/CONT15 headers + goldfish-task field 6 read; preflight ready", "toolUses": 7},
+    {"phase": "baseline (unmodified live files, WSL) green: override 19/19, guard-testpath TPC001-018 18/18; evidence/TR-L-T-20261009/baseline.txt exit 0", "toolUses": 28},
+    {"phase": "scratch copies written (scratch/dispatch-wip/TR-L-T/) and run once under WSL; evidence/TR-L-T-20261009/red.txt exit 1: all 37 old cases PASS; TP19-TP21 and OT20, OT22 GREEN; OT21 and OT23 RED (lane=git-working-tree-write, rule=TP-3, the stated reason)", "toolUses": 36},
+    {"phase": "post-images written to tranche-2/hooks; diffed against live files (additions only; 2 intended edits in file 1) and against the run copies (import/path lines only); sha256 taken; manifest written; consumer-safe check green; committed 2eb6c2732", "toolUses": 46},
+    {"phase": "final record written, report handed back", "toolUses": 47}
+  ]
+}

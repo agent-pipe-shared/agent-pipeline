@@ -1,0 +1,44 @@
+{
+  "taskId": "ADR0085-D2-20261009",
+  "model": "claude-opus-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "role": "goldfish",
+  "agent": "goldfish-deep",
+  "candidate": "feat/sprint-alfred@f929da250b594f4b7b9dcc3b9d151b1b882ccfa1",
+  "routePreCheck": {
+    "requested": "claude-opus-5-5 / effort xhigh (MP-07 design tier)",
+    "observed": "runtime prompt states exact model ID claude-opus-5-5; effort not directly observable (unknown)",
+    "result": "no contradiction; proceed"
+  },
+  "outcome": "completed",
+  "log": [
+    { "phase": "bootstrap + preflight receipt + opening record", "toolUses": 6 },
+    { "phase": "reading: briefing, findings, note, guard-devplan 470-577, policy 85-213, plan-spec-state-v2 488-668/1095-1139, pipeline-state 704-715/4022-4043/10686-10725, contract 1-40/190-254, ADR-0085", "toolUses": 36 },
+    { "phase": "budget checkpoint fired at call 36; continued only with the one deliverable Write plus the closing ceremony, inside the briefed 45", "toolUses": 36 },
+    { "phase": "note written in one Write (guard-devplan admitted it); pre-commit terminal record", "toolUses": 38 }
+  ],
+  "commits": [],
+  "report": {
+    "status": "implementation complete; Critic delta review and PO acceptance pending",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/design/adr-0085-removal-2026-10-08.md",
+      "evidence/dispatch-record-ADR0085-D2-20261009.json"
+    ],
+    "dod": {
+      "F1": "passed (self-assessed; delta Critic pending): PO item 1 and M4 state both refusal mechanisms with file:line; S17-R route via existing reopen-design added to section 4, M3, M4, C1(d), slice 17; rejected alternatives one line each",
+      "F2": "passed (self-assessed): Consistency check aligned with contract :17-20, :25, :31-33, :247-248 and decision Y (po-decisions-2026-10-07.md:31); Y added to inputs",
+      "F4": "passed (self-assessed): C1(a) mode comparison + per-mode verification; §17 Implementation authority wording; T0a/T0c rows; signature-only acceptance sentence -> one PO signature; P1 amendment stated in C4",
+      "F3/commit": "see commits[] (filled after the commit)"
+    },
+    "deviations": [
+      "F1 mechanism refined: after a PRD/Spec digest change the lifecycle projection (plan-spec-state-v2.mjs:495, :533, :612-643) already returns nextAction reopen-design, so guard-devplan.mjs:505 is false and the admission is not reached; exempt prefixes stay admitted, the PRD/Spec themselves are refused (:528-536, :563-564). Exempt paths are refused when an admission is reached and fails (:510-512 before :517-537). Both are stated in the note."
+    ],
+    "openItems": [
+      "Shell-guard admission of reopen-design for the agent not measured (R1 contract; S17 briefing measures first)",
+      "readHumanApprovalMode body not read (only its call at pipeline-state.mjs:10931)",
+      "Contract file P1 amendment is a follow-up for the slice-4 briefing (no spec edit here)"
+    ]
+  }
+}

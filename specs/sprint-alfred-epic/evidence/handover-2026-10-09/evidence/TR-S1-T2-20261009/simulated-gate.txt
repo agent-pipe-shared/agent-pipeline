@@ -1,0 +1,1778 @@
+command: node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs
+label: simulated-gate
+exitCode: 1
+head: 83d9caf9790f25d9f07820f48532af8e0c37c501
+tree: 345b0531bcf261c56e0b11ebfae76bffcfc2325c
+dirty: true
+--- stdout ---
+NOTE: --key-reference "roa-full-name" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).
+NOTE: --key-reference "roa-full-name" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 31595657b2c9b9d7e7d7a348b0f153697d23f06f46a12f736a7dd65b959e6e84
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 45de81fd9104cc90f79b9bcbf68293c4175150f6405566150b2a4b65a68fe23e
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 503472e12566089c878ea773b5c410df00dc7139d5a1c0488cb082caa06a8ced
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✖ DWP nested digest transport reaches the unchanged default complete-package validator without a top-level alias (5.159936ms)
+✖ DWP nested digest transport rejects malformed nested hashes even when a generic top-level digest exists (0.728903ms)
+✖ DWP nested transport cannot bypass closed request or changed intent validation before confirmation/signing (0.628702ms)
+✔ AC-19 inherited source signing disclosure binds every source and rejects drift (0.964908ms)
+✖ AC-19 sign-intent presents the exact inherited registry before signing (0.725264ms)
+✔ terminal-template PO setup producer preserves argv and independently reads authority (3.370973ms)
+✔ setup fresh-key creation with a custom --key-reference prints the H-AC-11 O-4 privacy nudge (6.206576ms)
+✔ setup fresh-key creation with the default --key-reference (local-po-key) does not print the nudge (3.363814ms)
+✔ setup's recovered branch (private+public key exist, no authority yet) does not print the nudge even with a custom --key-reference (6.075073ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key registers a pre-existing key file as the trust anchor with zero repair-command detours (3.264141ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses to overwrite key material already present at --directory (5.956711ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses cleanly when the named path does not exist (2.622619ms)
+✔ setup's already-exists branch (matching trust policy already present) does not print the nudge even with a custom --key-reference (5.753648ms)
+✔ sign-intent fails closed before setup (no key material present) (2.498157ms)
+✔ sign-intent rejects an invalid --intent-sha256 (wrong length / non-hex) (0.373647ms)
+✖ sign-intent signs a digest end-to-end with a real OpenSSL round trip and the proof verifies, after an accepted confirmation naming the digest (0.55098ms)
+✖ NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between (0.54456ms)
+✖ sign-intent discloses the exact redacted Agy authorship export and its non-attestation boundary (1.097791ms)
+✖ sign-intent rejects a tampered portable Agy request before signing (0.696703ms)
+✖ sign-intent refuses a well-shaped portable Agy request without local host and Critic PASS (0.691793ms)
+✖ sign-intent discloses a bound portable Critic export and no release authority (0.869326ms)
+✖ sign-intent rejects a changed or unbacked portable Critic request before signing (0.635162ms)
+✖ sign-intent discloses the exact reviewed PRD, specification, and checkpoint for a bootstrap acknowledgement request (0.679423ms)
+✖ sign-intent rejects a bootstrap acknowledgement request whose displayed action and intent digest disagree (0.53464ms)
+✖ NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree (0.547ms)
+✔ NVA-SWEEP-F2: sign-intent rejects supplying both --intent-sha256 and --request, and rejects supplying neither (0.354987ms)
+✖ NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a missing intentSha256 field, and a basename that cannot derive a sibling proof/signer name (0.529869ms)
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path (0.54301ms)
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request rejects a symlink planted at the --request path itself, pointing outside scratch/ (0.461939ms)
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request fails with the pre-existing message, not a raw exception, when the request path does not exist yet (0.416078ms)
+✔ NVA-SWEEP-F2f-REWORK: sign-intent rejects a malformed --intent-sha256 supplied together with --request as "both flags together", while the standalone malformed-digest rejection (no --request) still works (0.400418ms)
+✖ NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct (0.643592ms)
+✖ NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name (0.760404ms)
+✖ sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked and no artifact is written (0.551741ms)
+✔ NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-protected private key, but still prints the disclosure (11.482156ms)
+✔ NVA-W5-TTYSIGN: sign-intent for a passphrase-protected key fails closed with an attended-terminal message, and never spawns OpenSSL, when no TTY is attached (7.387998ms)
+✔ NVA-CF-MINORPUSH-RETRY: sign-intent accepts a REAL controlling terminal even when stdin itself is redirected/piped (10.123569ms)
+✔ NVA-CF-MINORPUSH-RETRY: sign-intent refuses when the controlling terminal cannot be opened at all (no isTTY dependency supplied) (6.864888ms)
+✔ 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows (dependencies.platform === "win32"), the controlling-terminal probe and its refusal message name the Windows console handle, not /dev/tty (6.895529ms)
+✔ 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows, a real controlling terminal (injected openControllingTty/isatty) is accepted exactly like on POSIX (8.184163ms)
+✖ NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a missing TTY -- OpenSSL never prompts, so no terminal is required (0.472539ms)
+✖ TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a typed code and copies nothing (3.352503ms)
+✔ TR-S1-T pin 2 (regression guard, green today): setup --existing-key accepts an ENCRYPTED key and copies it verbatim (3.874083ms)
+✖ TR-S1-T pin 3: setup's recover branch refuses an UNENCRYPTED key with a typed code and registers no authority (6.280708ms)
+✔ TR-S1-T pin 4: sign-intent refuses a REGISTERED unencrypted key with a typed code before any OpenSSL spawn (0.770634ms)
+✖ TR-S1-T pin 5: setup --existing-key refuses an UNREADABLE key with a typed code (the gate fails closed) and copies nothing (2.588928ms)
+✖ NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel on a mismatched confirmation, OpenSSL never invoked (0.55825ms)
+✔ a fork-disposition request built by the CLI, signed with the PO key, is accepted by the store's own verifier (171.619915ms)
+✔ the fork-disposition commands refuse every self-minting shortcut (125.40295ms)
+✔ approve-fork-disposition refuses a tampered approvalIntent before any signing side effect (F2) (77.593463ms)
+✔ prepare-critical keeps composing push/deploy/publication requests exactly as before (9.217653ms)
+✔ the -critical trio refuses the fork-disposition kind, so no operator route can build the unverifiable request or overwrite the correct one (96.722783ms)
+PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays /tmp/po-sign-intent-external-7KwAxF; this setup used /tmp/po-sign-intent-external-z1qj7a and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory /tmp/po-sign-intent-external-z1qj7a --replace /tmp/po-sign-intent-external-7KwAxF
+PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays /tmp/po-sign-intent-external-xR4M8d; this setup used /tmp/po-sign-intent-external-Y1ejfg and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory /tmp/po-sign-intent-external-Y1ejfg --replace /tmp/po-sign-intent-external-xR4M8d
+✔ po-approval-gate.mjs drives the public half of the fork-disposition ceremony, and only the public half (114.23467ms)
+✖ sign-intent cancels on an empty confirmation answer the same way as a mismatched one (0.667652ms)
+✔ setup's already-exists branch accepts a 3-key trust policy carrying humanName (5.712357ms)
+✔ setup's already-exists branch still fails closed on an unrelated extra field (not humanName) (5.550015ms)
+✖ sign-intent accepts a 3-key trust policy carrying humanName (0.474629ms)
+✖ sign-intent still fails closed on an unrelated extra field (not humanName) (0.468878ms)
+✔ approve-critical accepts a 3-key trust policy carrying humanName and the confirmation summary names the intent digest (fix 3) (9.868314ms)
+✔ parseHumanArgs accepts --kind feature-package-reconcile on the -critical commands (0.180054ms)
+✔ parseHumanArgs still refuses --kind governance-fork-disposition on the -critical commands (regression guard) (0.134503ms)
+✖ authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation (0.636932ms)
+✖ authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt (0.432689ms)
+✖ authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence (0.426328ms)
+✖ authorize-critical --subject refuses a --subject-sha256 that disagrees with the digest it recomputes, before any prompt or write (0.569261ms)
+✖ authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded (0.392887ms)
+✖ authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too (0.407378ms)
+✖ authorize-critical aborts on an input failure before the prompt and before any signing, writing neither artifact (0.459169ms)
+✖ authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one (0.456189ms)
+✖ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (0.429078ms)
+✔ authorize-critical fails closed before setup and prepares nothing when key material is absent (2.905705ms)
+✔ authorize-critical fails closed before setup and prepares nothing when key material is absent (fixtureDirs variant) (2.891923ms)
+✖ authorize-critical requires a feature id, exactly as prepare-critical does (0.656602ms)
+✖ authorize-critical requires a feature id, exactly as prepare-critical does (fixtureDirs variant) (0.422328ms)
+✔ the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (0.464379ms)
+✔ prepare-critical names the offending field instead of only saying the request is invalid (10.864753ms)
+✔ GF-080 Gap B: --expires-at accepts any parseable ISO-8601 timestamp and normalizes it to the exact Date#toISOString() form used everywhere downstream (5.997402ms)
+✔ the two-invocation prepare-critical + approve-critical flow is unchanged and still yields a verifiable proof (10.859293ms)
+✖ NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry (192.386045ms)
+✖ NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged (195.794378ms)
+✖ sign-intent states the reason, scope and expiry of the request recorded behind the digest (27.211721ms)
+✖ sign-intent says so plainly when no record resolves for the digest, and invents nothing (26.633088ms)
+✖ a tampered record cannot change what is signed: the summary disappears, the digest does not (31.505291ms)
+✖ the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt (24.775844ms)
+✔ an explicit --directory always wins and behaves exactly as before: the environment variable is not even read (0.378577ms)
+✔ PIPELINE_PO_APPROVAL_DIRECTORY resolves the directory when --directory is absent (8.446878ms)
+✔ a relative PIPELINE_PO_APPROVAL_DIRECTORY value fails the same absolute-path check as a relative --directory (8.308716ms)
+✔ NVA-SIGDISCLOSE-1 Finding 8: a bad --repo-root (e.g. '.') explains the problem and how to fix it, not only the bare usage dump (8.01785ms)
+✔ when neither --directory nor the machine plane nor PIPELINE_PO_APPROVAL_DIRECTORY is present, the usage error names all three routes and prints no path (11.361573ms)
+✔ an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused exactly like the same unsafe value passed via --directory, and the refusal names its own source without printing the path (12.947083ms)
+✖ PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory (0.914897ms)
+✔ AC-11: PIPELINE_PO_APPROVAL_DIRECTORY wins over the machine plane's poKeyDirectory when --directory is absent; the plane resolves the directory only when the variable is unset (30.317607ms)
+✔ AC-11/AC-13: an explicit --directory still wins over a present, valid machine plane (24.54992ms)
+✔ AC-12: an invalid machine plane fails closed, naming the plane as the cause, when no higher tier resolves; PIPELINE_PO_APPROVAL_DIRECTORY or --directory resolves without consulting it (22.777616ms)
+✔ AC-12: an unreadable machine plane (a directory at the leaf) is also reported as invalid, not silently absent (23.830357ms)
+✔ AC-11: a valid machine plane with no poKeyDirectory configured (null) falls through to the environment variable, exactly like an absent plane (23.335877ms)
+✔ AC-14: a plane-sourced directory runs through the identical unsafe-directory refusal as a flag- or environment-sourced one, naming the plane as its source and never printing the path (32.282165ms)
+✔ AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory (25.240122ms)
+✔ NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that no longer exists on disk IS replaced by a later call (69.86612ms)
+✔ NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is never replaced -- the property this change must not break (36.78293ms)
+✔ 2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error: a writeMachinePlane() failure produces a visible warning and still does not throw (32.821655ms)
+✔ PO-KEYDIR-01(A): setup with an explicit --directory persists it into the MACHINE PLANE (decision AC), never the legacy REPO-SCOPED store or the repository; a later command resolves it without repeating --directory in the SAME repo and, the plane being machine-wide, in a DIFFERENT repo too (23.132894ms)
+✔ PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different MACHINE-WIDE poKeyDirectory, and never writes the legacy REPO-SCOPED store (decision AC) (4.784849ms)
+✔ PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory is never written back into the repo-scoped store either (nothing new to persist) (45.208227ms)
+✔ R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC) (0.786755ms)
+✔ R7-6k: set-po-key-directory replaces a different existing default only when --replace names the current value exactly: none and a wrong value are refused with the plane byte-identical, the exact value succeeds and changes only poKeyDirectory and updatedAt (decision AC, ruling 5) (0.926538ms)
+✔ R7-6k: set-po-key-directory refuses a relative path and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (0.52159ms)
+✔ R7-6k: set-po-key-directory refuses a path that is not a directory and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (0.392767ms)
+✔ R7-6k: set-po-key-directory refuses a path inside a repository and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (3.689738ms)
+✔ R7-6k: set-po-key-directory refuses a path inside .git and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (3.417484ms)
+✔ R7-6k: set-po-key-directory reports an invalid machine plane and leaves it byte-identical, never repairing it; the same command on a valid home succeeds (positive control) (decision AC) (0.624572ms)
+✔ R7-6k: setup --directory on a home with no machine plane writes a new valid plane (poKeyDirectory and updatedAt set, every other field not configured) and nothing into the repository or the git-common-dir (decision AC, test-list 5) (1.151832ms)
+✔ R7-6k: setup --directory with a different existing default leaves the plane byte-identical and reports the current default plus the set-po-key-directory --replace repair command (decision AC, test-list 6) (1.546919ms)
+✔ R7-6k: the catalogue entry for set-po-key-directory is agent-runnable, with a non-null executable and an argv that names the command (decision AC, test-list 7) (0.083632ms)
+✔ PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value (0.447748ms)
+✔ PO-KEYDIR-01(A) / Spec 22.6 (R7-6-T3, D1): the machine-wide value resolves the directory when --directory is absent and wins over a present legacy repo-scoped value (30.595294ms)
+✔ R7-6-T3 (Spec 22.6, D1): poKeyDirectory resolves explicit argument, then machine-wide value, then the legacy per-repository value, and the legacy result is marked legacy (41.558479ms)
+✔ GF-104: setup fails loudly when an explicit --human-name differs from an existing named authority record (11.067508ms)
+✔ GF-104: setup fails loudly when an explicit --key-reference differs from an existing named authority record (10.632548ms)
+✔ GF-104: setup against an existing named authority record stays unchanged (idempotent) when supplied values match, or when none are supplied at all (43.843271ms)
+✔ GF-112: setup upgrades a legacy-shape (no humanName) authority record when --human-name is supplied (34.315403ms)
+✔ GF-112: setup still refuses a legacy-shape record when --human-name is supplied together with a conflicting --key-reference (11.170719ms)
+✔ GF-112: setup still fails with the original message for a legacy-shape record when no --human-name is supplied (10.454706ms)
+✖ PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both (0.779035ms)
+✔ GF-105: authorizeCriticalPushCommand omits the configured private directory and assembles the exact authorize-critical argv (1.959917ms)
+✔ GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory (0.322926ms)
+✔ GF-105: the copyCommand rendering is bounded on every shell, and the posix rendering round-trips through a real bash eval to the exact intended argv -- including a value with a space and a value with non-ASCII characters (6.427991ms)
+✖ NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before (0.725154ms)
+✖ NVA-BL-74: cancellation semantics are unchanged under the German prompt -- every non-token answer, including a plausible German translation of the token, cancels before OpenSSL and before any artifact exists (0.722054ms)
+✖ NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt (0.51419ms)
+✖ NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics (0.425988ms)
+✔ NVA-WINPATH-1: outside() classifies a same-drive external win32 path as outside, not as inside (0.195204ms)
+✔ NVA-WINPATH-1: outside() behavior on POSIX hosts is unchanged by the platform-selection fix (0.232995ms)
+✖ authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation (0.50768ms)
+✖ authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call (0.389127ms)
+✖ authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes) (3.15384ms)
+✖ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (fixtureDirs variant) (0.613041ms)
+✔ R7-6a(i): with the machine-wide key directory set and no repository value, a second repository on the same machine resolves it with no --directory (14.238428ms)
+✔ R7-6a(ii): with the machine-wide and the repository value both unset the result is the typed SIGN-KEY-DIRECTORY-UNSET with the set-po-key-directory setup action (0.737664ms)
+✖ R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on-path result before any prompt and no process receives a key path (0.813225ms)
+✖ R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt (0.712284ms)
+✖ R7-6b(iii): an openssl that fails the Ed25519 round trip (non-zero exit on sign, a signature that fails verification, no raw-sign support) yields the typed openssl-no-ed25519 result before any prompt (0.620632ms)
+✖ R7-6c: a failing openssl stub yields a typed result carrying the exit code and the stub's first stderr line, bounded and without any host path (0.670833ms)
+✖ R7-6c: a failing signing spawn reports its exit code (0.630522ms)
+✖ R7-6d(iii) (sign-intent's own defence-in-depth probe): a probe spawn without any key path runs before the first prompt and before the signing spawn (0.831306ms)
+✔ R7-6e (static): no code path in po-human-approval.mjs hands the injectable spawn an executable other than the constant bare name openssl (7.081562ms)
+✖ R7-6e (dynamic): every spawn of sign-intent and its probe runs from an explicit working directory outside every repository, and the signing spawn from the PO key directory (0.770044ms)
+✖ R7-6e (dynamic, win32 dialect): every spawn carries NoDefaultCurrentDirectoryInExePath in its child environment and keeps the PATH of the signing terminal (0.636761ms)
+✖ R7-6e (dynamic): the signing flow only ever names the constant bare executable openssl (0.576151ms)
+✔ R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup (3.056188ms)
+✖ R7-6f(i): a key directory whose public key matches the committed trust anchor yields ok: the probe passes and signing proceeds (0.650962ms)
+✔ R7-6f(i): a stored key directory value that names no directory yields the typed key-directory-missing result with the set-po-key-directory repair (0.599381ms)
+✖ R7-6f(i)/(ii): a key whose public key digest equals no committed trust anchor yields the typed key-anchor-mismatch result, opens no private key and starts no process with a key path (1.335525ms)
+✔ R7-6f(i): an unreadable key directory yields the typed key-directory-unreadable result; a host that cannot create the condition reports not-run, which FAILS the case (0.734893ms)
+✖ R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anchor-mismatch without opening the private key file and without passing its path to any process (0.807705ms)
+✔ R7-6g(ii)-a (F6): the probe child's working directory is the OS user's home directory, never the OS temporary directory (1.650111ms)
+✔ R7-6g(ii)-b (F6): with no admissible working directory outside every repository the probe never falls back to the OS temporary directory and is not classified openssl-no-ed25519 (1.269254ms)
+✔ R7-6g(ii)-c (F6): a local I/O failure while preparing the throwaway material is not classified openssl-no-ed25519 (0.760934ms)
+✖ R7-6g(iii) (F8): an absolute host path that contains a space is fully redacted from the stderr-head detail of a failing probe (0.650262ms)
+✔ R7-6h: the key directory resolves --directory, then PIPELINE_PO_APPROVAL_DIRECTORY, then the machine-wide value, then the legacy per-repository value, reporting the tier, and finally the typed SIGN-KEY-DIRECTORY-UNSET (decision AC, test-list 1) (108.912962ms)
+✔ R7-6h: PIPELINE_PO_APPROVAL_DIRECTORY beats the machine-wide value and the legacy per-repository value, and an explicit --directory still beats it (decision AC, test-list 2) (93.925049ms)
+✔ R7-6h: an invalid machine-wide store is bypassed by --directory and by PIPELINE_PO_APPROVAL_DIRECTORY and is a reported failure otherwise, never absent and never a fall-through to the legacy value (decision AC, test-list 3) (163.462653ms)
+✖ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as --directory, and the machine-wide value is unchanged (decision AC, test-list 12) (8.968088ms)
+✖ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as PIPELINE_PO_APPROVAL_DIRECTORY for one process, and the machine-wide value is unchanged (decision AC, test-list 12) (8.112212ms)
+✖ R7-6o: handed-over commands carry no --directory (decision AC, test-list 12) (7.731835ms)
+✖ R7-6i: with two committed trust anchors A and B, the key directories of A and of B each pass step (c) of the readiness probe and the key of B signs (decision AD, test-list 8) (2.292553ms)
+✖ R7-6i: a key C outside the committed anchor set fails key-anchor-mismatch at the probe and at sign-intent before its private key is read (decision AD, test-list 8) (2.12794ms)
+✔ R7-6i: pair matching at the readiness probe: the same public-key digest under a different keyReference is refused, as is a digest and a keyReference taken from two different anchors (decision AD, test-list 9) (3.17473ms)
+✖ R7-6i: pair matching at sign-intent's pre-prompt check: the same public-key digest under a different keyReference ends in key-anchor-mismatch before the private key is read, any prompt or any key-path spawn (decision AD, test-list 9) (0.622152ms)
+✔ the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant) (0.292015ms)
+ℹ tests 170
+ℹ suites 0
+ℹ pass 95
+ℹ fail 75
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4156.079179
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:100:1
+✖ DWP nested digest transport reaches the unchanged default complete-package validator without a top-level alias (5.159936ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /design-workflow approval request does not bind a current, complete package/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:104:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:104:23
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:104:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.start (node:internal/test_runner/test:1096:17)
+        at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17),
+    expected: /design-workflow approval request does not bind a current, complete package/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:108:1
+✖ DWP nested digest transport rejects malformed nested hashes even when a generic top-level digest exists (0.728903ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /approvalIntent.sha256/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:112:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:112:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:112:14)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approvalIntent.sha256/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:116:1
+✖ DWP nested transport cannot bypass closed request or changed intent validation before confirmation/signing (0.628702ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /design-workflow approval request does not bind a current, complete package/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:120:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:120:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:120:14)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /design-workflow approval request does not bind a current, complete package/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:146:1
+✖ AC-19 sign-intent presents the exact inherited registry before signing (0.725264ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:165:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:645:1
+✖ sign-intent signs a digest end-to-end with a real OpenSSL round trip and the proof verifies, after an accepted confirmation naming the digest (0.55098ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:653:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:712:1
+✖ NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between (0.54456ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:723:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:772:1
+✖ sign-intent discloses the exact redacted Agy authorship export and its non-attestation boundary (1.097791ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:782:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:797:1
+✖ sign-intent rejects a tampered portable Agy request before signing (0.696703ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /does not bind its exact subject and intent digest/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:806:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:806:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:806:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /does not bind its exact subject and intent digest/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:812:1
+✖ sign-intent refuses a well-shaped portable Agy request without local host and Critic PASS (0.691793ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not bound to a current local host and Critic PASS/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:820:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:820:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:820:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /not bound to a current local host and Critic PASS/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:843:1
+✖ sign-intent discloses a bound portable Critic export and no release authority (0.869326ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:853:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:867:1
+✖ sign-intent rejects a changed or unbacked portable Critic request before signing (0.635162ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /portable Critic export request does not bind its exact subject/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:876:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:876:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:876:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /portable Critic export request does not bind its exact subject/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:889:1
+✖ sign-intent discloses the exact reviewed PRD, specification, and checkpoint for a bootstrap acknowledgement request (0.679423ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:917:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:934:1
+✖ sign-intent rejects a bootstrap acknowledgement request whose displayed action and intent digest disagree (0.53464ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /bootstrap acknowledgement request does not bind its exact action and intent digest/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:954:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:955:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:954:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /bootstrap acknowledgement request does not bind its exact action and intent digest/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:967:1
+✖ NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree (0.547ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--request must be a path inside this repository's own scratch\/ directory/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:974:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:975:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:974:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--request must be a path inside this repository's own scratch\/ directory/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1007:1
+✖ NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a missing intentSha256 field, and a basename that cannot derive a sibling proof/signer name (0.529869ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--request must contain valid JSON/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1016:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1017:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1016:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--request must contain valid JSON/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1045:1
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path (0.54301ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch mirror artifacts must be unlinked regular files/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1061:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1062:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1061:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /scratch mirror artifacts must be unlinked regular files/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1075:1
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request rejects a symlink planted at the --request path itself, pointing outside scratch/ (0.461939ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--request must be a path inside this repository's own scratch\/ directory/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1087:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1088:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1087:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--request must be a path inside this repository's own scratch\/ directory/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1100:1
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request fails with the pre-existing message, not a raw exception, when the request path does not exist yet (0.416078ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--request could not be read/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1105:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1106:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1105:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--request could not be read/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1138:1
+✖ NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct (0.643592ms)
+  AssertionError [ERR_ASSERTION]: the message must diagnose the REAL problem (missing --human-name), not a key mismatch
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1150:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'PO-KEY-UNENCRYPTED: simulated gate (measurement)',
+    expected: /predates --human-name/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1158:1
+✖ NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name (0.760404ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'key-anchor-mismatch' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1174:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1182:1
+✖ sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked and no artifact is written (0.551741ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /approval cancelled: explicit confirmation was not given/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1193:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1194:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1193:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1404:1
+✖ NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a missing TTY -- OpenSSL never prompts, so no terminal is required (0.472539ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1411:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1496:1
+✖ TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a typed code and copies nothing (3.352503ms)
+  AssertionError [ERR_ASSERTION]: TR-S1-T unencrypted --existing-key: must be refused with a typed code, but the call returned normally
+      at tr1AssertTypedRefusal (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1460:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1506:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1537:1
+✖ TR-S1-T pin 3: setup's recover branch refuses an UNENCRYPTED key with a typed code and registers no authority (6.280708ms)
+  AssertionError [ERR_ASSERTION]: TR-S1-T recover with an unencrypted key: must be refused with a typed code, but the call returned normally
+      at tr1AssertTypedRefusal (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1460:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1550:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1580:1
+✖ TR-S1-T pin 5: setup --existing-key refuses an UNREADABLE key with a typed code (the gate fails closed) and copies nothing (2.588928ms)
+  AssertionError [ERR_ASSERTION]: TR-S1-T unreadable --existing-key (a directory where the key file should be): the refusal must carry a typed code (A1), got code=EISDIR message=EISDIR: illegal operation on a directory, read
+      at tr1AssertTypedRefusal (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1461:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1604:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1613:1
+✖ NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel on a mismatched confirmation, OpenSSL never invoked (0.55825ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /approval cancelled: explicit confirmation was not given/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1628:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1629:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1628:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1995:1
+✖ sign-intent cancels on an empty confirmation answer the same way as a mismatched one (0.667652ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /approval cancelled: explicit confirmation was not given/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2006:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2007:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2006:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2088:1
+✖ sign-intent accepts a 3-key trust policy carrying humanName (0.474629ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2095:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2104:1
+✖ sign-intent still fails closed on an unrelated extra field (not humanName) (0.468878ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /external trust policy does not match the local public key/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2111:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2112:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2111:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /external trust policy does not match the local public key/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2222:1
+✖ authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation (0.636932ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2236:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2307:1
+✖ authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt (0.432689ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2314:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2351:1
+✖ authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence (0.426328ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2359:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2383:1
+✖ authorize-critical --subject refuses a --subject-sha256 that disagrees with the digest it recomputes, before any prompt or write (0.569261ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /--subject-sha256 does not match the digest computed from --subject/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2393:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2394:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2393:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--subject-sha256 does not match the digest computed from --subject/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2409:1
+✖ authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded (0.392887ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2415:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2427:1
+✖ authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too (0.407378ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2434:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2445:1
+✖ authorize-critical aborts on an input failure before the prompt and before any signing, writing neither artifact (0.459169ms)
+  AssertionError [ERR_ASSERTION]: --expires-at that is not a timestamp at all
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2468:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2468:27
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2468:14)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /--expires-at/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2480:1
+✖ authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one (0.456189ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2498:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2521:1
+✖ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (0.429078ms)
+  AssertionError [ERR_ASSERTION]: answer "nope" must cancel
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2528:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2529:15
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2528:14)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2578:1
+✖ authorize-critical requires a feature id, exactly as prepare-critical does (0.656602ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /critical approval requires a feature id/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2582:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2583:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2582:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /critical approval requires a feature id/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2595:1
+✖ authorize-critical requires a feature id, exactly as prepare-critical does (fixtureDirs variant) (0.422328ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /critical approval requires a feature id/u. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2599:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2600:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2599:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /critical approval requires a feature id/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2833:1
+✖ NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry (192.386045ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2840:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2861:1
+✖ NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged (195.794378ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2872:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2886:1
+✖ sign-intent states the reason, scope and expiry of the request recorded behind the digest (27.211721ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2893:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2917:1
+✖ sign-intent says so plainly when no record resolves for the digest, and invents nothing (26.633088ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2925:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2939:1
+✖ a tampered record cannot change what is signed: the summary disappears, the digest does not (31.505291ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2953:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:2969:1
+✖ the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt (24.775844ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:2979:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:3101:1
+✖ PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory (0.914897ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:3119:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:3981:1
+✖ PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both (0.779035ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:3995:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4154:1
+✖ NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before (0.725154ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4162:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4186:1
+✖ NVA-BL-74: cancellation semantics are unchanged under the German prompt -- every non-token answer, including a plausible German translation of the token, cancels before OpenSSL and before any artifact exists (0.722054ms)
+  AssertionError [ERR_ASSERTION]: "nope" must cancel under the German prompt
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4195:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4196:15
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4195:14)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4213:1
+✖ NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt (0.51419ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4234:22)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4249:1
+✖ NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics (0.425988ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4258:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4327:1
+✖ authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation (0.50768ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4340:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4381:1
+✖ authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call (0.389127ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4394:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4423:1
+✖ authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes) (3.15384ms)
+  Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4445:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'PO-KEY-UNENCRYPTED'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4478:1
+✖ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (fixtureDirs variant) (0.613041ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /approval cancelled: explicit confirmation was not given/. Input:
+  
+  'Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4490:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:86:27)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4491:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4490:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+        at Test.postRun (node:internal/test_runner/test:1330:19)
+        at Test.run (node:internal/test_runner/test:1258:12),
+    expected: /approval cancelled: explicit confirmation was not given/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4764:1
+✖ R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on-path result before any prompt and no process receives a key path (0.813225ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'openssl-not-on-path' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4770:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4777:1
+✖ R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt (0.712284ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'openssl-not-on-path' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4783:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4788:1
+✖ R7-6b(iii): an openssl that fails the Ed25519 round trip (non-zero exit on sign, a signature that fails verification, no raw-sign support) yields the typed openssl-no-ed25519 result before any prompt (0.620632ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'openssl-no-ed25519' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4795:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4802:1
+✖ R7-6c: a failing openssl stub yields a typed result carrying the exit code and the stub's first stderr line, bounded and without any host path (0.670833ms)
+  AssertionError [ERR_ASSERTION]: a typed result (one of the closed cause classes) is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4808:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4819:1
+✖ R7-6c: a failing signing spawn reports its exit code (0.630522ms)
+  AssertionError [ERR_ASSERTION]: the signing spawn's exit code must be reported; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4826:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'PO-KEY-UNENCRYPTED: simulated gate (measurement)\nPO-KEY-UNENCRYPTED',
+    expected: /\b53\b/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4830:1
+✖ R7-6d(iii) (sign-intent's own defence-in-depth probe): a probe spawn without any key path runs before the first prompt and before the signing spawn (0.831306ms)
+  AssertionError [ERR_ASSERTION]: a healthy stub must let the whole flow complete; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4836:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4872:1
+✖ R7-6e (dynamic): every spawn of sign-intent and its probe runs from an explicit working directory outside every repository, and the signing spawn from the PO key directory (0.770044ms)
+  AssertionError [ERR_ASSERTION]: observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4878:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4890:1
+✖ R7-6e (dynamic, win32 dialect): every spawn carries NoDefaultCurrentDirectoryInExePath in its child environment and keeps the PATH of the signing terminal (0.636761ms)
+  AssertionError [ERR_ASSERTION]: observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4896:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4909:1
+✖ R7-6e (dynamic): the signing flow only ever names the constant bare executable openssl (0.576151ms)
+  AssertionError [ERR_ASSERTION]: observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4915:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4971:1
+✖ R7-6f(i): a key directory whose public key matches the committed trust anchor yields ok: the probe passes and signing proceeds (0.650962ms)
+  AssertionError [ERR_ASSERTION]: observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4977:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:4999:1
+✖ R7-6f(i)/(ii): a key whose public key digest equals no committed trust anchor yields the typed key-anchor-mismatch result, opens no private key and starts no process with a key path (1.335525ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'key-anchor-mismatch' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5007:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5098:1
+✖ R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anchor-mismatch without opening the private key file and without passing its path to any process (0.807705ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'key-anchor-mismatch' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5106:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5181:1
+✖ R7-6g(iii) (F8): an absolute host path that contains a space is fully redacted from the stderr-head detail of a failing probe (0.650262ms)
+  AssertionError [ERR_ASSERTION]: <host-path> Doe\keys\x (path at the end of the line): harness: the failing stub's exit code reaches the result
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5190:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'PO-KEY-UNENCRYPTED: simulated gate (measurement)\nPO-KEY-UNENCRYPTED',
+    expected: /\b87\b/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5377:1
+✖ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as --directory, and the machine-wide value is unchanged (decision AC, test-list 12) (8.968088ms)
+  AssertionError [ERR_ASSERTION]: flag: sign-intent must complete; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at r76hPersonAChoosesK2 (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5361:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5379:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5382:1
+✖ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as PIPELINE_PO_APPROVAL_DIRECTORY for one process, and the machine-wide value is unchanged (decision AC, test-list 12) (8.112212ms)
+  AssertionError [ERR_ASSERTION]: environment: sign-intent must complete; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at r76hPersonAChoosesK2 (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5361:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5384:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5395:1
+✖ R7-6o: handed-over commands carry no --directory (decision AC, test-list 12) (7.731835ms)
+  AssertionError [ERR_ASSERTION]: environment: sign-intent must complete; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5404:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5432:1
+✖ R7-6i: with two committed trust anchors A and B, the key directories of A and of B each pass step (c) of the readiness probe and the key of B signs (decision AD, test-list 8) (2.292553ms)
+  AssertionError [ERR_ASSERTION]: observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5446:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5454:1
+✖ R7-6i: a key C outside the committed anchor set fails key-anchor-mismatch at the probe and at sign-intent before its private key is read (decision AD, test-list 8) (2.12794ms)
+  AssertionError [ERR_ASSERTION]: R7-6: a typed 'key-anchor-mismatch' result with the closed fields findingId/status/cause/repair is required; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+      at r76AssertTyped (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:4582:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5471:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:5509:1
+✖ R7-6i: pair matching at sign-intent's pre-prompt check: the same public-key digest under a different keyReference ends in key-anchor-mismatch before the private key is read, any prompt or any key-path spawn (decision AD, test-list 9) (0.622152ms)
+  AssertionError [ERR_ASSERTION]: control: the matching pair signs; observed threw: PO-KEY-UNENCRYPTED: simulated gate (measurement)
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:5516:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

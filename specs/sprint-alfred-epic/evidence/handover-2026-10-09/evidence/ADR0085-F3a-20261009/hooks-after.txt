@@ -1,0 +1,92 @@
+command: wsl: node --test plugins/pipeline-core/hooks/guard-devplan.test.mjs
+exit: 0
+--- output ---
+PASS  DP01 allow  no manifest at all
+PASS  DP02 allow  manifest present but gate dev-plan absent
+PASS  DP03 allow  gate mode off
+PASS  DP04 allow  no state file at all
+PASS  DP05 allow  no activeFeature in state
+PASS  DP06 block approved design before explicit implementation phase
+PASS  DP06b allow exact approved implementation
+PASS  DP07 block  unapproved + non-exempt path -> names feature id
+PASS  DP08 allow  default exempt prefix "docs/"
+PASS  DP08 allow  default exempt prefix "specs/"
+PASS  DP08 allow  default exempt prefix ".claude/"
+PASS  DP08 allow  default exempt prefix "backlog/"
+PASS  DP08 allow  default exempt prefix "scratch/"
+PASS  DP27 allow  draft-phase write under scratch/
+PASS  DP27b block draft-phase write to a real source path is unchanged
+PASS  DP28 allow  scratch/ write while the neutral State is refused as unportable
+PASS  DP28b block  same fixture still refuses a non-scratch write
+PASS  DP29 block  scratch/../src traversal is not exempt
+PASS  DP29b block  a file literally named scratch is not exempt
+PASS  DP29c block  a sibling directory named scratchpad is not exempt
+PASS  DP29d allow  a nested path under scratch/ is exempt
+PASS  DP30 allow exact dispatch receipt before approval
+PASS  DP30b block unrelated evidence before approval
+PASS  DP30c block dispatch receipt traversal
+PASS  DP30d block empty dispatch receipt id
+PASS  DP09 allow  the activeFeature.planPath itself
+PASS  DP10 allow  custom exemptPaths from manifest honored
+PASS  DP10b block  non-exempt path in same custom-exempt fixture still blocks
+PASS  DP11 warn  mode warn, unapproved + non-exempt -> exit 1
+PASS  DP12 warn  malformed state JSON surfaces as WARN, not block
+PASS  DP13 block  Write tool covered alongside Edit
+PASS  DP14 block  backslash path still matches non-exempt (blocked)
+PASS  DP14b allow  backslash path under an exempt prefix (Windows docs\ variant)
+PASS  DP15 warn  malformed manifest YAML surfaces as WARN, not block
+PASS  DP16 allow  absolute exempt path (backslash, drive letter) under docs/
+PASS  DP17 block  absolute non-exempt path inside root
+PASS  DP18 allow  absolute path outside the project root (sibling tree, same drive)
+PASS  DP19 allow  absolute path resolving to the activeFeature.planPath itself
+PASS  DP20 allow  absolute path resolving under manifest exemptPaths (custom/)
+PASS  DP20b block  different absolute non-exempt path in same custom-exempt fixture still blocks
+PASS  DP21 allow  mixed-separator absolute exempt path
+PASS  DP21b block  mixed-separator absolute non-exempt path still blocks
+PASS  DP22 block  relative traversal out of docs/ (docs/../src/foo.ts) is NOT exempt
+PASS  DP22b allow  traversal that resolves back under docs/ (docs/../docs/state.md) stays exempt
+PASS  DP23 block  backslash relative traversal out of docs\ is NOT exempt
+PASS  DP24 block  absolute path with a traversal segment resolving outside docs/ is NOT exempt
+PASS  DP25 allow  draft exact PRD authority
+PASS  DP25b allow  draft exact Spec authority
+PASS  DP25c block  draft implementation path remains gated
+PASS  DP26 block  awaiting-approval exact PRD authority
+PASS  DP26b block  awaiting-approval exact Spec authority
+PASS  DP27 block  legacy/v2 approval + present-but-unresolvable decision reference fails closed
+PASS  DP28 allow  legacy/v2 approval + genuinely ledger-granted decision reference agrees
+PASS  private Advisor transaction and exact final-approval matrix in direct and shell lanes
+PASS  DP29 allow  root-level HISTORY.md is a sanctioned close artifact
+PASS  DP29b allow  telemetry/costs.md is a sanctioned close artifact
+PASS  DP29c allow  root-level HISTORY.md matched case-insensitively
+PASS  DP30 block  HISTORY.md.bak is NOT exempted by the close-artifact exact match
+PASS  DP30b block  nested docs/HISTORY.md (not root) is NOT the sanctioned close artifact
+PASS  DP30c block  telemetry-extra/costs.md is NOT the telemetry/ close-record prefix
+PASS  DP30d block  ordinary product file src/foo.ts remains gated as before
+PASS  DP31 allow  HISTORY.md stays exempt even under an approved-but-not-implementation state
+PASS  DP31b block  sanity: src/foo.ts is still gated in the same fixture
+PASS  feature approval request producer argv admitted
+PASS  legacy approve-plan argv preserved
+PASS  bootstrap receipt argv preserved
+PASS  wrong or additional approval option refused
+PASS  request path traversal refused
+PASS  missing request path refused
+PASS  symlinked feature approval request refused
+PASS  short glob filter is a value, not an out-of-root read
+PASS  long glob filter is a value, not an out-of-root read
+PASS  pattern file remains an explicit contained read target
+PASS  outside pattern file is refused
+PASS  glob cannot select a hidden path
+PASS  unknown rg option remains refused
+PASS  rg grammar keeps glob operand separate from read roots
+
+86/86 cases passed.
+✔ plugins/pipeline-core/hooks/guard-devplan.test.mjs (233499.684731ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 233507.738295
+

@@ -1,0 +1,75 @@
+command: node --test --test-name-pattern "signed GMW" plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: native-before
+exitCode: 1
+head: 5e19c84c58dd3232851fba721098b98c2389b5ab
+tree: 15ce5c46f17105d376cf51142543a72d47a1b1c7
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-2jfByt
+# win32 witness privacy: 3 diagnostic witness file(s) assessed secure in one DACL batch
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (8632.7383ms)
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (8620.0576ms)
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (9334.9451ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28344.4273
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:672:1
+✖ installed hook: matching signed GMW permits a non-kernel TP rewrite (8632.7383ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:679:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:686:1
+✖ installed hook: wrong-scope signed GMW does not permit a TP rewrite (8620.0576ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:693:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\scripts\pre-commit-hook-install.test.mjs:701:1
+✖ installed hook: matching signed GMW never permits hooks.json kernel rewrite (9334.9451ms)
+  Error [PrivateBoundaryError]: private-state directory Windows assurance is insecure for agent-pipeline: private path DACL grants a non-owner principal. The directory already existed and was left untouched.
+  Remedy: an existing insecure private directory must be removed or re-secured by its owner before the installer is re-run.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:40:9)
+      at assureSegment (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:80:5)
+      at ensureHardenedPrivateDirectory (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.mjs:132:31)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:932:3)
+      at installHook (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:318:19)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs:709:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19) {
+    code: 'PB-WINDOWS-ASSURANCE'
+  }
+
+--- stderr ---

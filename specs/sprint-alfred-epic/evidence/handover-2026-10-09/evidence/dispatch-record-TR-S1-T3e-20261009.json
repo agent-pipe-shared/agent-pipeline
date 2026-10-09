@@ -1,0 +1,27 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-T3e-20261009",
+  "agentType": "goldfish-mechanic",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "stopped-without-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening", "toolUses": 5 },
+    { "phase": "edit-done (fileURLToPath + import)", "toolUses": 11 },
+    { "phase": "consumer-safe-paths test green (exit 0, 9/9); commit-msg write blocked by budget guard", "toolUses": 13 }
+  ],
+  "report": {
+    "text": "Closing-allowance handover. Committed: nothing. Verified green: node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0, 9 pass. Remains undone: scratch/commit-msg/TR-S1-T3e-20261009.txt not written (budget guard refused the Write: the 12-call working cap was spent by two failed/extra calls, the receipt-missing preflight and the first record Write), git add and git commit not run. Modified and uncommitted: plugins/pipeline-core/scripts/signing-ceremony.test.mjs (decline-case spawn now fileURLToPath(new URL('./guard-maintenance-window.mjs', import.meta.url)); import of fileURLToPath from node:url added). Next briefing: grant >=4 more calls; steps are write the commit msg file, git add -- path, git commit -F, checkpoint record. independent review: pending",
+    "changedFiles": ["plugins/pipeline-core/scripts/signing-ceremony.test.mjs"]
+  }
+}

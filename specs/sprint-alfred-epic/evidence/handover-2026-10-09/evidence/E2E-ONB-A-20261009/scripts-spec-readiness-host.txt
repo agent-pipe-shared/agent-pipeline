@@ -1,0 +1,20 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/spec-readiness-host.test.mjs
+label: scripts-spec-readiness-host
+exitCode: 0
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ readiness uses the generic selected duty with only fresh refs and binds the resulting review (1.84422ms)
+✔ readiness returns the selector's typed unavailable result without a child or a prose workaround (0.261774ms)
+✔ readiness refuses to invent a direct Codex route when the host has no physical sandbox runtime (1.291321ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 868.802766
+
+--- stderr ---

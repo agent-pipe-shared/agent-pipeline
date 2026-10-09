@@ -1,0 +1,59 @@
+command: node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: wsl-signing-ceremony-only
+exitCode: 0
+head: 8c5c4cd5d94e24334ed015b7bb40e2a45745ae02
+tree: ff3e9d0ea9893c96665a918e9222095c3ab97491
+dirty: true
+--- stdout ---
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 12c8d13550734e65e76ee88914b1fb27ac04299746b5eeccba761bbfe41ffbc0
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T02:15:12.972Z
+  candidate commit: b179f177aff5b01f8330a50a1323d5bbd5532260
+  candidate tree: 1a6980391510db57cedeaea408f46d36667239b3
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 6269b8acc1aff0240e84b7d0ef465538caad1cb425fe45aa9ad4378882748517
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T02:15:33.944Z
+  candidate commit: 3228f180ad26623241e887d589cb30082bbf70eb
+  candidate tree: 824b0539d63b605459b23cc657cf0899b7e699da
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from /tmp/signing-ceremony-external-decline-GQBuy5/po-private.pem
+4017A831E37F0000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../providers/implementations/ciphers/ciphercommon_block.c:107:
+4017A831E37F0000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 98d94390ab2a5cc049071491fa216c0671fc686d835be314d40026a738cef0ff
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T02:15:46.052Z
+  candidate commit: ec8f1e19e456951f8d43dc59021090267276735e
+  candidate tree: af2f090fc9bd79ca83ea3eda2547df5360ebfee7
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (20966.704659ms)
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (12108.286985ms)
+✔ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (10434.685815ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.184783ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.239154ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44892.359784
+
+--- stderr ---

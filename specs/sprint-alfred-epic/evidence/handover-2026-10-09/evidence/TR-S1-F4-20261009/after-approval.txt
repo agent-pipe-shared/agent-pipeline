@@ -1,0 +1,422 @@
+command: node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: f4-approval
+exitCode: 1
+head: 902fe1b74859a53fb0f736ccf8c46aedad0bcbc2
+tree: c1835a99be648a18e5b71625dc933d4e39542a24
+dirty: true
+--- stdout ---
+NOTE: --key-reference "roa-full-name" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).
+NOTE: --key-reference "roa-full-name" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: b6e1b9033bebc3dd4650264dd582db8bd5bf2fd0cd9dfea5b473d9f3e6c16ea2
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 98a5c03bfc71bf339e22e5f9e5e6b8b9aee0b86565127f168e16c7a6a3ccc893
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 31595657b2c9b9d7e7d7a348b0f153697d23f06f46a12f736a7dd65b959e6e84
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 45de81fd9104cc90f79b9bcbf68293c4175150f6405566150b2a4b65a68fe23e
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 503472e12566089c878ea773b5c410df00dc7139d5a1c0488cb082caa06a8ced
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ DWP nested digest transport reaches the unchanged default complete-package validator without a top-level alias (18.996312ms)
+✔ DWP nested digest transport rejects malformed nested hashes even when a generic top-level digest exists (14.335547ms)
+✔ DWP nested transport cannot bypass closed request or changed intent validation before confirmation/signing (38.351656ms)
+✔ AC-19 inherited source signing disclosure binds every source and rejects drift (1.535844ms)
+✔ AC-19 sign-intent presents the exact inherited registry before signing (31.265691ms)
+✔ terminal-template PO setup producer preserves argv and independently reads authority (4.683533ms)
+✔ setup fresh-key creation with a custom --key-reference prints the H-AC-11 O-4 privacy nudge (8.345828ms)
+✔ setup fresh-key creation with the default --key-reference (local-po-key) does not print the nudge (5.728818ms)
+✔ setup's recovered branch (private+public key exist, no authority yet) does not print the nudge even with a custom --key-reference (11.067141ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key registers a pre-existing key file as the trust anchor with zero repair-command detours (6.957967ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses to overwrite key material already present at --directory (11.042761ms)
+✔ NVA-CF-KEYBOOTSTRAP: setup --existing-key refuses cleanly when the named path does not exist (4.134682ms)
+✔ setup's already-exists branch (matching trust policy already present) does not print the nudge even with a custom --key-reference (11.990035ms)
+✔ sign-intent fails closed before setup (no key material present) (4.260155ms)
+✔ sign-intent rejects an invalid --intent-sha256 (wrong length / non-hex) (0.6279ms)
+✔ sign-intent signs a digest end-to-end with a real OpenSSL round trip and the proof verifies, after an accepted confirmation naming the digest (77.711799ms)
+✔ NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between (38.278048ms)
+✔ sign-intent discloses the exact redacted Agy authorship export and its non-attestation boundary (31.298093ms)
+✔ sign-intent rejects a tampered portable Agy request before signing (4.962076ms)
+✔ sign-intent refuses a well-shaped portable Agy request without local host and Critic PASS (239.198926ms)
+✔ sign-intent discloses a bound portable Critic export and no release authority (29.668168ms)
+✔ sign-intent rejects a changed or unbacked portable Critic request before signing (768.571913ms)
+✔ sign-intent discloses the exact reviewed PRD, specification, and checkpoint for a bootstrap acknowledgement request (30.48484ms)
+✔ sign-intent rejects a bootstrap acknowledgement request whose displayed action and intent digest disagree (4.738492ms)
+✔ NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree (4.721033ms)
+✔ NVA-SWEEP-F2: sign-intent rejects supplying both --intent-sha256 and --request, and rejects supplying neither (0.546978ms)
+✔ NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a missing intentSha256 field, and a basename that cannot derive a sibling proof/signer name (13.931614ms)
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path (28.352167ms)
+✔ NVA-SWEEP-F2f-REWORK: sign-intent --request rejects a symlink planted at the --request path itself, pointing outside scratch/ (4.382098ms)
+✔ NVA-SWEEP-F2f-REWORK: sign-intent --request fails with the pre-existing message, not a raw exception, when the request path does not exist yet (4.414568ms)
+✔ NVA-SWEEP-F2f-REWORK: sign-intent rejects a malformed --intent-sha256 supplied together with --request as "both flags together", while the standalone malformed-digest rejection (no --request) still works (0.342736ms)
+✔ NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct (48.097171ms)
+✔ NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name (12.715925ms)
+✔ sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked and no artifact is written (11.902633ms)
+✔ NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-protected private key, but still prints the disclosure (15.278856ms)
+✔ NVA-W5-TTYSIGN: sign-intent for a passphrase-protected key fails closed with an attended-terminal message, and never spawns OpenSSL, when no TTY is attached (16.579802ms)
+✔ NVA-CF-MINORPUSH-RETRY: sign-intent accepts a REAL controlling terminal even when stdin itself is redirected/piped (13.65654ms)
+✔ NVA-CF-MINORPUSH-RETRY: sign-intent refuses when the controlling terminal cannot be opened at all (no isTTY dependency supplied) (13.66132ms)
+✔ 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows (dependencies.platform === "win32"), the controlling-terminal probe and its refusal message name the Windows console handle, not /dev/tty (12.447546ms)
+✔ 2026-08-30-signing-ceremony-tty-check-has-no-windows-fallback: on native Windows, a real controlling terminal (injected openControllingTty/isatty) is accepted exactly like on POSIX (16.50121ms)
+✔ NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a missing TTY -- OpenSSL never prompts, so no terminal is required (11.48056ms)
+✔ TR-S1-T pin 1: setup --existing-key refuses an UNENCRYPTED key with a typed code and copies nothing (4.514746ms)
+✔ TR-S1-T pin 2 (regression guard, green today): setup --existing-key accepts an ENCRYPTED key and copies it verbatim (5.767359ms)
+✔ TR-S1-T pin 3: setup's recover branch refuses an UNENCRYPTED key with a typed code and registers no authority (9.739333ms)
+✔ TR-S1-T pin 4: sign-intent refuses a REGISTERED unencrypted key with a typed code before any OpenSSL spawn (11.420496ms)
+✔ TR-S1-T pin 5: setup --existing-key refuses an UNREADABLE key with a typed code (the gate fails closed) and copies nothing (8.628792ms)
+✔ NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel on a mismatched confirmation, OpenSSL never invoked (10.644495ms)
+✔ a fork-disposition request built by the CLI, signed with the PO key, is accepted by the store's own verifier (278.813715ms)
+✔ the fork-disposition commands refuse every self-minting shortcut (238.181821ms)
+✔ approve-fork-disposition refuses a tampered approvalIntent before any signing side effect (F2) (155.719899ms)
+✔ prepare-critical keeps composing push/deploy/publication requests exactly as before (16.735828ms)
+✔ the -critical trio refuses the fork-disposition kind, so no operator route can build the unverifiable request or overwrite the correct one (218.310034ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 41110b12fc6b3c698ae3b5b2db51770725232708b2872b7aa79a7f6cb7ed4bfa
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 9a7f8428672049b8216c99896d5ef178cb382efd66b33739e381330d68d0ae93
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 2c062584a025e1270e2a508d7b67f645975d64e3496da53c4c791b4177599efc
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 1ef40774716517b5d52b9487dccae660c9c6032f533f13bdb472e7cd4bcdca0b
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: e7155f3d47a88fa4f380fd9f5605f80967b83bae7a6ba558c39f4e53ed6d8bef
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 0f8649d178cb1e41550cbb80768216fe3cdf14e87ffe63b2f39b16daf4be3d57
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays /tmp/po-sign-intent-external-LoTjPl; this setup used /tmp/po-sign-intent-external-fGTA9Y and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory /tmp/po-sign-intent-external-fGTA9Y --replace /tmp/po-sign-intent-external-LoTjPl
+PO-HUMAN-APPROVAL-NOTE: the machine-wide PO key directory stays /tmp/po-sign-intent-external-TYeWuB; this setup used /tmp/po-sign-intent-external-YAgQv1 and did not change it. To make it the default run: po-human-approval.mjs set-po-key-directory --directory /tmp/po-sign-intent-external-YAgQv1 --replace /tmp/po-sign-intent-external-TYeWuB
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 8df94c8ec0206bd587de684bf9e64f1736efd00b717aeaa2927df0ebb43287c0
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ po-approval-gate.mjs drives the public half of the fork-disposition ceremony, and only the public half (173.321531ms)
+✔ sign-intent cancels on an empty confirmation answer the same way as a mismatched one (16.738288ms)
+✔ setup's already-exists branch accepts a 3-key trust policy carrying humanName (14.517083ms)
+✔ setup's already-exists branch still fails closed on an unrelated extra field (not humanName) (10.657654ms)
+✔ sign-intent accepts a 3-key trust policy carrying humanName (43.273507ms)
+✔ sign-intent still fails closed on an unrelated extra field (not humanName) (40.615626ms)
+✔ approve-critical accepts a 3-key trust policy carrying humanName and the confirmation summary names the intent digest (fix 3) (22.296084ms)
+✔ parseHumanArgs accepts --kind feature-package-reconcile on the -critical commands (0.638209ms)
+✔ parseHumanArgs still refuses --kind governance-fork-disposition on the -critical commands (regression guard) (0.54167ms)
+✔ authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation (21.270608ms)
+✔ authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt (13.563828ms)
+✔ authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence (13.936456ms)
+✔ authorize-critical --subject refuses a --subject-sha256 that disagrees with the digest it recomputes, before any prompt or write (6.728123ms)
+✔ authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded (11.831822ms)
+✔ authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too (14.447013ms)
+✔ authorize-critical aborts on an input failure before the prompt and before any signing, writing neither artifact (28.659971ms)
+✔ authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one (17.771024ms)
+✔ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (28.650361ms)
+✔ authorize-critical fails closed before setup and prepares nothing when key material is absent (5.354633ms)
+✔ authorize-critical fails closed before setup and prepares nothing when key material is absent (fixtureDirs variant) (4.150183ms)
+✔ authorize-critical requires a feature id, exactly as prepare-critical does (5.013077ms)
+✔ authorize-critical requires a feature id, exactly as prepare-critical does (fixtureDirs variant) (5.387623ms)
+✔ the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (0.879203ms)
+✔ prepare-critical names the offending field instead of only saying the request is invalid (17.236555ms)
+✔ GF-080 Gap B: --expires-at accepts any parseable ISO-8601 timestamp and normalizes it to the exact Date#toISOString() form used everywhere downstream (8.808896ms)
+✔ the two-invocation prepare-critical + approve-critical flow is unchanged and still yields a verifiable proof (18.962273ms)
+✔ NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry (470.323258ms)
+✔ NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged (483.008735ms)
+✔ sign-intent states the reason, scope and expiry of the request recorded behind the digest (80.970202ms)
+✔ sign-intent says so plainly when no record resolves for the digest, and invents nothing (81.49316ms)
+✔ a tampered record cannot change what is signed: the summary disappears, the digest does not (94.534281ms)
+✔ the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt (83.676549ms)
+✔ an explicit --directory always wins and behaves exactly as before: the environment variable is not even read (0.238663ms)
+✔ PIPELINE_PO_APPROVAL_DIRECTORY resolves the directory when --directory is absent (14.602156ms)
+✔ a relative PIPELINE_PO_APPROVAL_DIRECTORY value fails the same absolute-path check as a relative --directory (18.983862ms)
+✔ NVA-SIGDISCLOSE-1 Finding 8: a bad --repo-root (e.g. '.') explains the problem and how to fix it, not only the bare usage dump (18.944461ms)
+✔ when neither --directory nor the machine plane nor PIPELINE_PO_APPROVAL_DIRECTORY is present, the usage error names all three routes and prints no path (19.499651ms)
+✔ an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused exactly like the same unsafe value passed via --directory, and the refusal names its own source without printing the path (21.559062ms)
+✔ PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory (75.038355ms)
+✔ AC-11: PIPELINE_PO_APPROVAL_DIRECTORY wins over the machine plane's poKeyDirectory when --directory is absent; the plane resolves the directory only when the variable is unset (78.599941ms)
+✔ AC-11/AC-13: an explicit --directory still wins over a present, valid machine plane (62.33539ms)
+✔ AC-12: an invalid machine plane fails closed, naming the plane as the cause, when no higher tier resolves; PIPELINE_PO_APPROVAL_DIRECTORY or --directory resolves without consulting it (88.968319ms)
+✔ AC-12: an unreadable machine plane (a directory at the leaf) is also reported as invalid, not silently absent (69.517581ms)
+✔ AC-11: a valid machine plane with no poKeyDirectory configured (null) falls through to the environment variable, exactly like an absent plane (66.89201ms)
+✔ AC-14: a plane-sourced directory runs through the identical unsafe-directory refusal as a flag- or environment-sourced one, naming the plane as its source and never printing the path (98.905172ms)
+✔ AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory (38.218188ms)
+✔ NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that no longer exists on disk IS replaced by a later call (179.668477ms)
+✔ NVA-V1-KEYDIRPTR: a recorded poKeyDirectory that DOES exist on disk is never replaced -- the property this change must not break (105.281401ms)
+✔ 2026-08-30-po-human-approval-setup-silently-swallows-writemachineplane-error: a writeMachinePlane() failure produces a visible warning and still does not throw (76.521579ms)
+✔ PO-KEYDIR-01(A): setup with an explicit --directory persists it into the MACHINE PLANE (decision AC), never the legacy REPO-SCOPED store or the repository; a later command resolves it without repeating --directory in the SAME repo and, the plane being machine-wide, in a DIFFERENT repo too (35.450896ms)
+✔ PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different MACHINE-WIDE poKeyDirectory, and never writes the legacy REPO-SCOPED store (decision AC) (3.970831ms)
+✔ PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory is never written back into the repo-scoped store either (nothing new to persist) (121.236507ms)
+✔ R7-6k: set-po-key-directory on a home with no machine plane creates a valid plane that holds the directory, with every other field not configured and nothing else written (decision AC) (1.368821ms)
+✔ R7-6k: set-po-key-directory replaces a different existing default only when --replace names the current value exactly: none and a wrong value are refused with the plane byte-identical, the exact value succeeds and changes only poKeyDirectory and updatedAt (decision AC, ruling 5) (1.582104ms)
+✔ R7-6k: set-po-key-directory refuses a relative path and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (0.65521ms)
+✔ R7-6k: set-po-key-directory refuses a path that is not a directory and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (0.558549ms)
+✔ R7-6k: set-po-key-directory refuses a path inside a repository and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (5.580237ms)
+✔ R7-6k: set-po-key-directory refuses a path inside .git and writes no plane; the identical command with a valid absolute directory succeeds (positive control) (decision AC) (5.83278ms)
+✔ R7-6k: set-po-key-directory reports an invalid machine plane and leaves it byte-identical, never repairing it; the same command on a valid home succeeds (positive control) (decision AC) (1.024246ms)
+✔ R7-6k: setup --directory on a home with no machine plane writes a new valid plane (poKeyDirectory and updatedAt set, every other field not configured) and nothing into the repository or the git-common-dir (decision AC, test-list 5) (2.5983ms)
+✔ R7-6k: setup --directory with a different existing default leaves the plane byte-identical and reports the current default plus the set-po-key-directory --replace repair command (decision AC, test-list 6) (3.615146ms)
+✔ R7-6k: the catalogue entry for set-po-key-directory is agent-runnable, with a non-null executable and an argv that names the command (decision AC, test-list 7) (0.158443ms)
+✔ PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value (0.724041ms)
+✔ PO-KEYDIR-01(A) / Spec 22.6 (R7-6-T3, D1): the machine-wide value resolves the directory when --directory is absent and wins over a present legacy repo-scoped value (83.493096ms)
+✔ R7-6-T3 (Spec 22.6, D1): poKeyDirectory resolves explicit argument, then machine-wide value, then the legacy per-repository value, and the legacy result is marked legacy (107.727078ms)
+✔ GF-104: setup fails loudly when an explicit --human-name differs from an existing named authority record (26.209984ms)
+✔ GF-104: setup fails loudly when an explicit --key-reference differs from an existing named authority record (25.413421ms)
+✔ GF-104: setup against an existing named authority record stays unchanged (idempotent) when supplied values match, or when none are supplied at all (106.377968ms)
+✔ GF-112: setup upgrades a legacy-shape (no humanName) authority record when --human-name is supplied (79.972651ms)
+✔ GF-112: setup still refuses a legacy-shape record when --human-name is supplied together with a conflicting --key-reference (25.472632ms)
+✔ GF-112: setup still fails with the original message for a legacy-shape record when no --human-name is supplied (27.569394ms)
+✔ PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both (26.003561ms)
+✔ GF-105: authorizeCriticalPushCommand omits the configured private directory and assembles the exact authorize-critical argv (4.476049ms)
+✔ GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory (0.592719ms)
+✔ GF-105: the copyCommand rendering is bounded on every shell, and the posix rendering round-trips through a real bash eval to the exact intended argv -- including a value with a space and a value with non-ASCII characters (15.061592ms)
+✔ NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before (37.839972ms)
+✔ NVA-BL-74: cancellation semantics are unchanged under the German prompt -- every non-token answer, including a plausible German translation of the token, cancels before OpenSSL and before any artifact exists (91.258415ms)
+✔ NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt (274.270924ms)
+✔ NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics (66.684627ms)
+✔ NVA-WINPATH-1: outside() classifies a same-drive external win32 path as outside, not as inside (0.327745ms)
+✔ NVA-WINPATH-1: outside() behavior on POSIX hosts is unchanged by the platform-selection fix (0.276834ms)
+✔ authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation (12.182164ms)
+✔ authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call (12.513776ms)
+✔ authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes) (14.909989ms)
+✔ authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (fixtureDirs variant) (5.363673ms)
+✔ R7-6a(i): with the machine-wide key directory set and no repository value, a second repository on the same machine resolves it with no --directory (17.733354ms)
+✔ R7-6a(ii): with the machine-wide and the repository value both unset the result is the typed SIGN-KEY-DIRECTORY-UNSET with the set-po-key-directory setup action (0.921654ms)
+✔ R7-6b(i): a spawn that cannot find openssl yields the typed openssl-not-on-path result before any prompt and no process receives a key path (7.730589ms)
+✔ R7-6b(i), real lookup: with a PATH holding no openssl at all the same typed openssl-not-on-path result ends sign-intent before any prompt (7.492715ms)
+✔ R7-6b(iii): an openssl that fails the Ed25519 round trip (non-zero exit on sign, a signature that fails verification, no raw-sign support) yields the typed openssl-no-ed25519 result before any prompt (28.57631ms)
+✔ R7-6c: a failing openssl stub yields a typed result carrying the exit code and the stub's first stderr line, bounded and without any host path (6.722254ms)
+✔ R7-6c: a failing signing spawn reports its exit code (7.544096ms)
+✔ R7-6d(iii) (sign-intent's own defence-in-depth probe): a probe spawn without any key path runs before the first prompt and before the signing spawn (9.641098ms)
+✔ R7-6e (static): no code path in po-human-approval.mjs hands the injectable spawn an executable other than the constant bare name openssl (13.272375ms)
+✔ R7-6e (dynamic): every spawn of sign-intent and its probe runs from an explicit working directory outside every repository, and the signing spawn from the PO key directory (11.098542ms)
+✔ R7-6e (dynamic, win32 dialect): every spawn carries NoDefaultCurrentDirectoryInExePath in its child environment and keeps the PATH of the signing terminal (11.520897ms)
+✔ R7-6e (dynamic): the signing flow only ever names the constant bare executable openssl (10.620124ms)
+✔ R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the PO key directory is never started when sign-intent runs from the repository root with the real lookup (40.103478ms)
+✔ R7-6f(i): a key directory whose public key matches the committed trust anchor yields ok: the probe passes and signing proceeds (13.070961ms)
+✔ R7-6f(i): a stored key directory value that names no directory yields the typed key-directory-missing result with the set-po-key-directory repair (1.30046ms)
+✔ R7-6f(i)/(ii): a key whose public key digest equals no committed trust anchor yields the typed key-anchor-mismatch result, opens no private key and starts no process with a key path (9.027859ms)
+✔ R7-6f(i): an unreadable key directory yields the typed key-directory-unreadable result; a host that cannot create the condition reports not-run, which FAILS the case (1.29798ms)
+✔ R7-6g(i) (F5): with NO committed trust anchor sign-intent reports key-anchor-mismatch without opening the private key file and without passing its path to any process (9.896423ms)
+✔ R7-6g(ii)-a (F6): the probe child's working directory is the OS user's home directory, never the OS temporary directory (2.588609ms)
+✔ R7-6g(ii)-b (F6): with no admissible working directory outside every repository the probe never falls back to the OS temporary directory and is not classified openssl-no-ed25519 (2.332515ms)
+✔ R7-6g(ii)-c (F6): a local I/O failure while preparing the throwaway material is not classified openssl-no-ed25519 (1.106457ms)
+✔ R7-6g(iii) (F8): an absolute host path that contains a space is fully redacted from the stderr-head detail of a failing probe (42.82054ms)
+✔ R7-6h: the key directory resolves --directory, then PIPELINE_PO_APPROVAL_DIRECTORY, then the machine-wide value, then the legacy per-repository value, reporting the tier, and finally the typed SIGN-KEY-DIRECTORY-UNSET (decision AC, test-list 1) (243.488906ms)
+✔ R7-6h: PIPELINE_PO_APPROVAL_DIRECTORY beats the machine-wide value and the legacy per-repository value, and an explicit --directory still beats it (decision AC, test-list 2) (207.913565ms)
+✔ R7-6h: an invalid machine-wide store is bypassed by --directory and by PIPELINE_PO_APPROVAL_DIRECTORY and is a reported failure otherwise, never absent and never a fall-through to the legacy value (decision AC, test-list 3) (365.716921ms)
+✔ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as --directory, and the machine-wide value is unchanged (decision AC, test-list 12) (20.253262ms)
+✔ R7-6h: person A whose machine-wide default is K1 signs with K2 when K2 is given as PIPELINE_PO_APPROVAL_DIRECTORY for one process, and the machine-wide value is unchanged (decision AC, test-list 12) (20.551477ms)
+✔ R7-6o: handed-over commands carry no --directory (decision AC, test-list 12) (26.467707ms)
+✔ R7-6i: with two committed trust anchors A and B, the key directories of A and of B each pass step (c) of the readiness probe and the key of B signs (decision AD, test-list 8) (13.436927ms)
+✔ R7-6i: a key C outside the committed anchor set fails key-anchor-mismatch at the probe and at sign-intent before its private key is read (decision AD, test-list 8) (12.176838ms)
+✔ R7-6i: pair matching at the readiness probe: the same public-key digest under a different keyReference is refused, as is a digest and a keyReference taken from two different anchors (decision AD, test-list 9) (5.79551ms)
+✔ R7-6i: pair matching at sign-intent's pre-prompt check: the same public-key digest under a different keyReference ends in key-anchor-mismatch before the private key is read, any prompt or any key-path spawn (decision AD, test-list 9) (37.337655ms)
+✔ the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant) (0.6657ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: ae11bb69f208a7d6a222cf18c2a2056f8b7a9256b853422a029649f1f3fd65ea
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T06:29:38.195Z
+  candidate commit: ac08cea57b762bd81e08d1b02b54c882a6a4b4a2
+  candidate tree: add971ea4a733337d55e41064af5cedd543dc101
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: e936b523f4589f7770749b5fdd8a544e0fe92722f1e946d72edf49c50b60c2e6
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T06:30:13.697Z
+  candidate commit: 92535016bf4db5aacfaa31073cab6becdc3c6469
+  candidate tree: 2d27cccf506cfa13193da0fd9d1d305024f8c37c
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from /tmp/signing-ceremony-external-decline-a8hj0I/po-private.pem
+40576D9138770000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../providers/implementations/ciphers/ciphercommon_block.c:107:
+40576D9138770000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: f5d809cf6f91107a6d7c3719ba566bef7dd58111a0040cc1d09307572c2c8ead
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T06:30:32.362Z
+  candidate commit: d23c034219a98b4ae667590de0294bae154af8f7
+  candidate tree: 60eb6ff4aebb3ecdf2d4ee2d0fdcb6e8979abee9
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (35506.916329ms)
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (18662.148237ms)
+✔ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (15256.944427ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.285935ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.375276ms)
+ℹ tests 175
+ℹ suites 0
+ℹ pass 174
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 72663.239227
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/po-human-approval.test.mjs:1128:1
+✖ NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path (28.352167ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /scratch mirror artifacts must be unlinked regular files/. Input:
+  
+  'Error: SIGN-READINESS-FAILED: key-anchor-mismatch: no trust anchor is committed for this repository; repair: point poKeyDirectory at the directory that holds the anchored key, or perform the one-time key setup (setup) in your own terminal.'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1144:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: SIGN-READINESS-FAILED: key-anchor-mismatch: no trust anchor is committed for this repository; repair: point poKeyDirectory at the directory that holds the anchored key, or perform the one-time key setup (setup) in your own terminal.
+        at readinessFailure (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:995:17)
+        at assertSigningReadyBeforePrompt (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:1167:33)
+        at executeHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:2139:5)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:1747:10)
+        at callWithLever (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:152:42)
+        at runHumanApproval (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:165:50)
+        at file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1145:13
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.test.mjs:1144:12),
+    expected: /scratch mirror artifacts must be unlinked regular files/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+--- stderr ---

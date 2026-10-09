@@ -1,0 +1,1024 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+label: preflight-native-before
+exitCode: 1
+head: 8bb83c3c18dd06851cccfcd4ec6d6b02ed84e0d1
+tree: 86bfd88ac0320ed4b3f560e43c8e705ab71224f0
+dirty: true
+--- stdout ---
+✖ preflight declares what its status ranges over, in every status (2.1685ms)
+✖ preflight gates mandatory local hooks and keeps pre-push advisory (0.2267ms)
+✖ all three runner bootstraps expose the same nonblocking decision digest (0.1885ms)
+✔ AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations (314.7233ms)
+✖ preflight reports exact identity and no-handoff without secret fields (0.6031ms)
+✖ normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness (0.2071ms)
+✖ a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal (0.1834ms)
+✖ a durable decision with a present physical map does not repeatedly propose adoption (0.1607ms)
+✖ normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted (0.1689ms)
+✖ Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity (0.3228ms)
+✖ all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume (0.2736ms)
+✖ NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape (0.1659ms)
+✖ a soft plugin refresh still exposes the not-ready project's onboarding action (0.172ms)
+✖ NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged (0.2649ms)
+✖ NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string (0.1374ms)
+✖ preflight declares the Claude runner when CLAUDECODE marks the session (0.0917ms)
+✖ preflight keeps the Codex runner default for any non-Claude-Code session (0.0984ms)
+✔ resolveActiveRunner: a genuine Codex session resolves codex even in a claude-default repository (0.0802ms)
+✔ resolveActiveRunner: a signal-less shell in a claude-default repository resolves claude (0.5171ms)
+✔ resolveActiveRunner: a signal-less shell in a repository declaring nothing resolves codex (0.1359ms)
+✔ resolveActiveRunner: an actual CLAUDECODE/Antigravity signal is never overridden by a declared default (0.0652ms)
+✔ a rendered PO-facing re-run command always carries --runner explicitly (0.2146ms)
+✔ normal bootstrap receipt retains exact envelope measurement and over-budget state (0.1746ms)
+✖ preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0 (0.1703ms)
+✖ PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary (0.1601ms)
+✔ preflight distinguishes complete and malformed handoff by presence only (29242.2796ms)
+✔ preflight turns a loaded/installed mismatch into a typed refresh handoff (7143.6435ms)
+✖ an exact registered local marketplace is a visible development source (7395.3076ms)
+✖ an attested local-development entry wins over a coexisting official entry (Codex, D5) (0.99ms)
+✔ the isolated development id is accepted only from its exact local marketplace root (0.1514ms)
+✔ unavailable registry remains non-blocking when the loaded identity is coherent (22916.7716ms)
+✔ installed version accepts only one exact enabled Agent-Pipeline entry (0.2144ms)
+✔ missing or malformed manifest fails identity closed (12473.4276ms)
+✖ a Claude session reads the Claude source manifest, never the Codex one (0.2339ms)
+✖ a non-Claude-Code session still reads the Codex source manifest, never the Claude one (0.1382ms)
+✖ Antigravity reads its own plugin manifest, never the Codex-shaped manifest (0.1491ms)
+✖ a Claude bare-array registry resolves an attested local-development installation (0.1854ms)
+✖ an attested local-development entry wins over a coexisting official entry (D1) (0.3883ms)
+✔ an unattested local-development entry does not win over a coexisting official entry (0.2153ms)
+✔ two eligible Claude local-development entries still collide as ambiguous (0.12ms)
+✖ a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity (0.1794ms)
+✖ a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry (0.1529ms)
+✖ two eligible Claude project-scope entries for the same id and cwd still collide as ambiguous (0.1642ms)
+✔ a malformed, non-array, or empty Claude registry yields no identity without crashing (83135.9841ms)
+✖ a Claude version mismatch between loaded and installed identity requires refresh (19744.2336ms)
+✔ the Claude local-development id is accepted only from an attested directory-source marketplace (0.2799ms)
+✖ Codex registry binding rejects equal manifest versions with stale cached installer bytes (59.4234ms)
+✖ Codex direct local registry binding supplies its verified content identity (15.4852ms)
+✔ a Gitless Codex local-development install is ready only with its installer-owned receipt (20226.5131ms)
+✔ Agy managed copy missing a receipt has an exact host recovery action from a Git source (2805.6963ms)
+✖ Codex attestation source selection binds only a verified checkout and retains sanitized observation codes (0.8028ms)
+✔ a non-local Claude installation id reports unknown source without touching the host marketplace registry (0.0959ms)
+✔ preflight calls observe self-referentially with the loaded plugin root on both sides (6716.0014ms)
+✖ an unattested origin keeps plugin refresh required and returns a non-executable advisory (7224.0469ms)
+✔ the second reviewed origin (SSH form) also attests as ready (7138.9237ms)
+✖ a rejected observation keeps plugin refresh required and returns a non-executable advisory (6885.7256ms)
+✔ a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation (3224.8555ms)
+✔ plugin-identity-unavailable keeps nextAction null even under a failing attestation (3195.0471ms)
+✔ F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout (6571.5053ms)
+✔ F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all (6913.8786ms)
+✔ F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub (6510.0941ms)
+✔ F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub (19096.7166ms)
+✖ F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub (7910.3778ms)
+✔ PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity (6784.5907ms)
+✔ PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate (7195.0076ms)
+✔ PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value (14438.3347ms)
+✖ PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change (12359.565ms)
+✖ PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning (7526.8282ms)
+✔ PHX-WP-AAC01-MULTISESSION: a repository root with no registered descriptors at all never warns and never throws (6644.0116ms)
+✖ PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws (0.3138ms)
+✔ observeDutyNotRuntimeLive reports in-force when roots are identical or match (4.0532ms)
+✖ observeDutyNotRuntimeLive recognizes two paths to one physical plugin root (1.07ms)
+✔ observeDutyNotRuntimeLive reports differing and lists differing files when modified (3.7602ms)
+✔ observeDutyNotRuntimeLive reports not-applicable when roots are missing or null (0.2314ms)
+✔ NVA-B8-11: gitless Claude recovery references survive a skill-only installation (20.6399ms)
+✔ AM-W-T2: pipeline-start-preflight.mjs imports observeAgyStartHint and calls it (structural stand-in) (0.8921ms)
+✔ AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output (0.0839ms) # missing seam: observePipelineStartPreflight() must accept an injectable observeAgyStartHint (or the workspace root, config root and loaded plugin root it reads) before this can be pinned against a fixture governed workspace whose loaded agy plugin root differs from the managed copy, without touching the real home or resolving the real agy CLI. The wiring slice must provide that seam; the case then asserts that the agy hint appears in the preflight output. The output field name is the wiring slice's to choose and is deliberately not pinned here.
+✔ AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output (0.0611ms) # missing seam: same injectable seam as the case above. The wiring slice must provide it; the case then asserts, for a governed workspace whose loaded agy plugin root is the managed copy and for an ungoverned workspace, that the preflight output carries no agy hint and is otherwise byte-identical to the output of a run without the agy observation.
+ℹ tests 78
+ℹ suites 0
+ℹ pass 37
+ℹ fail 39
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 342260.0731
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:94:1
+✖ preflight declares what its status ranges over, in every status (2.1685ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:108:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:120:1
+✖ preflight gates mandatory local hooks and keeps pre-push advisory (0.2267ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'hook-provisioning-required'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:130:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'hook-provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:223:1
+✖ all three runner bootstraps expose the same nonblocking decision digest (0.1885ms)
+  TypeError: Cannot read properties of undefined (reading 'projectionSha256')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:240:44)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:288:1
+✖ preflight reports exact identity and no-handoff without secret fields (0.6031ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   'governanceScope',
+  -   'architectureOrientation',
+  -   'bootstrapPayload',
+  -   'cloneProvisioning',
+  -   'concurrentSessionWarning',
+  -   'effectiveDecisions',
+  -   'executionBoundary',
+  -   'handoff',
+  -   'installedPluginAttestation',
+  -   'installedSource',
+  -   'installedVersion',
+  -   'mandatoryHookReadiness',
+      'nextAction',
+  +   'pipelineWorkPerformed',
+  -   'pluginRoot',
+  -   'rulesetSource',
+      'schema',
+      'status',
+      'statusScope',
+  -   'version'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:296:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'governanceScope', 'nextAction', 'pipelineWorkPerformed', 'schema', 'status', 'statusScope' ],
+    expected: [ 'architectureOrientation', 'bootstrapPayload', 'cloneProvisioning', 'concurrentSessionWarning', 'effectiveDecisions', 'executionBoundary', 'handoff', 'installedPluginAttestation', 'installedSource', 'installedVersion', 'mandatoryHookReadiness', 'nextAction', 'pluginRoot', 'rulesetSource', 'schema', 'status', 'statusScope', 'version' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:348:1
+✖ normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness (0.2071ms)
+  AssertionError [ERR_ASSERTION]: plugin identity status remains narrowly scoped
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:362:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:377:1
+✖ a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal (0.1834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:391:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:404:1
+✖ a durable decision with a present physical map does not repeatedly propose adoption (0.1607ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:417:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:421:1
+✖ normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted (0.1689ms)
+  TypeError: Cannot read properties of undefined (reading 'status')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:434:47)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:445:1
+✖ Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity (0.3228ms)
+  AssertionError [ERR_ASSERTION]: codex/fresh: orientation is read exactly once from the normal entry envelope
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:488:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:504:1
+✖ all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume (0.2736ms)
+  AssertionError [ERR_ASSERTION]: codex/fresh: decision readback must happen once
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:536:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:561:1
+✖ NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape (0.1659ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:576:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:596:1
+✖ a soft plugin refresh still exposes the not-ready project's onboarding action (0.172ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'plugin-refresh-required'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:606:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'plugin-refresh-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:611:1
+✖ NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged (0.2649ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + null
+  - {
+  -   argv: [
+  -     'undefined/scripts/project-onboarding-v3.mjs',
+  -     'inspect',
+  -     '--root',
+  -     '/projects/current',
+  -     '--intent',
+  -     'bootstrap',
+  -     '--runner',
+  -     'codex'
+  -   ],
+  -   executable: 'node',
+  -   executionBoundary: 'default',
+  -   expected: {
+  -     schema: 'pipeline.project-onboarding.v4'
+  -   },
+  -   kind: 'command',
+  -   mutation: false,
+  -   requiresConfirmation: false
+  - }
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:622:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: { kind: 'command', executable: 'node', argv: [ 'undefined/scripts/project-onboarding-v3.mjs', 'inspect', '--root', '/projects/current', '--intent', 'bootstrap', '--runner', 'codex' ], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.project-onboarding.v4' } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:650:1
+✖ NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string (0.1374ms)
+  TypeError: Cannot read properties of null (reading 'kind')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:666:36)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:673:1
+✖ preflight declares the Claude runner when CLAUDECODE marks the session (0.0917ms)
+  TypeError: Cannot read properties of null (reading 'argv')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:681:38)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:684:1
+✖ preflight keeps the Codex runner default for any non-Claude-Code session (0.0984ms)
+  TypeError: Cannot read properties of null (reading 'argv')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:692:40)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:783:1
+✖ preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0 (0.1703ms)
+  AssertionError [ERR_ASSERTION]: {"WSL_DISTRO_NAME":"Ubuntu"}
+  + actual - expected
+  
+  + undefined
+  - 'host-authorized-wsl'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:795:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'host-authorized-wsl',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:810:1
+✖ PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary (0.1601ms)
+  AssertionError [ERR_ASSERTION]: {"CLAUDECODE":"1","WSL_DISTRO_NAME":"Ubuntu"}
+  + actual - expected
+  
+  + undefined
+  - 'default'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:821:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'default',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:865:1
+✖ an exact registered local marketplace is a visible development source (7395.3076ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'local-development'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:873:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'local-development',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:885:1
+✖ an attested local-development entry wins over a coexisting official entry (Codex, D5) (0.99ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   ambiguous: true,
+  +   source: 'unknown',
+  +   version: null
+  -   source: 'local-development',
+  -   version: '0.4.5+test'
+    }
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:893:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { version: null, source: 'unknown', ambiguous: true },
+    expected: { version: '0.4.5+test', source: 'local-development' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:977:1
+✖ a Claude session reads the Claude source manifest, never the Codex one (0.2339ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - '0.5.2+claude.test'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:987:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '0.5.2+claude.test',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:990:1
+✖ a non-Claude-Code session still reads the Codex source manifest, never the Claude one (0.1382ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - '0.4.5+test'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1000:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '0.4.5+test',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1003:1
+✖ Antigravity reads its own plugin manifest, never the Codex-shaped manifest (0.1491ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '0.6.2+antigravity.test'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1010:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '0.6.2+antigravity.test',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1014:1
+✖ a Claude bare-array registry resolves an attested local-development installation (0.1854ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1022:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1037:1
+✖ an attested local-development entry wins over a coexisting official entry (D1) (0.3883ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   ambiguous: true,
+  +   source: 'unknown',
+  +   version: null
+  -   source: 'local-development',
+  -   version: '0.5.2+claude.test'
+    }
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1042:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { version: null, source: 'unknown', ambiguous: true },
+    expected: { version: '0.5.2+claude.test', source: 'local-development' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1103:1
+✖ a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity (0.1794ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1118:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1129:1
+✖ a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry (0.1529ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1142:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1150:1
+✖ two eligible Claude project-scope entries for the same id and cwd still collide as ambiguous (0.1642ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'plugin-refresh-required'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1171:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'plugin-refresh-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1197:1
+✖ a Claude version mismatch between loaded and installed identity requires refresh (19744.2336ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ready'
+  - 'plugin-refresh-required'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1204:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ready',
+    expected: 'plugin-refresh-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1230:1
+✖ Codex registry binding rejects equal manifest versions with stale cached installer bytes (59.4234ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1297:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1307:1
+✖ Codex direct local registry binding supplies its verified content identity (15.4852ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'pipeline-governance-unverifiable'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1336:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'pipeline-governance-unverifiable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1476:1
+✖ Codex attestation source selection binds only a verified checkout and retains sanitized observation codes (0.8028ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      reasonCodes: [],
+  +   sourcePluginRoot: '<host-path>',
+  -   sourcePluginRoot: '/project/plugins/pipeline-core',
+      status: 'checkout-source'
+    }
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1485:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'checkout-source', sourcePluginRoot: '<host-path>', reasonCodes: [] },
+    expected: { status: 'checkout-source', sourcePluginRoot: '/project/plugins/pipeline-core', reasonCodes: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1530:1
+✖ an unattested origin keeps plugin refresh required and returns a non-executable advisory (7224.0469ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   argv: [
+  +     '<host-path>',
+  +     '--root',
+  +     '<host-path>',
+  +     '--runner',
+  +     'codex'
+  +   ],
+  +   executable: 'node',
+  -   argv: [],
+  -   executable: null,
+      executionBoundary: 'default',
+      expected: {
+  +     schema: 'pipeline.onboarding-init.v1'
+  -     schema: 'pipeline.plugin-refresh-advisory.v1'
+      },
+  +   kind: 'command',
+  -   kind: 'advisory',
+      mutation: false,
+      requiresConfirmation: false
+    }
+  
+      at assertRefreshAdvisory (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:212:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1542:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'command', executable: 'node', argv: [ '<host-path>', '--root', '<host-path>', '--runner', 'codex' ], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.onboarding-init.v1' } },
+    expected: { kind: 'advisory', executable: null, argv: [], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.plugin-refresh-advisory.v1' } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1558:1
+✖ a rejected observation keeps plugin refresh required and returns a non-executable advisory (6885.7256ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   argv: [
+  +     '<host-path>',
+  +     '--root',
+  +     '<host-path>',
+  +     '--runner',
+  +     'codex'
+  +   ],
+  +   executable: 'node',
+  -   argv: [],
+  -   executable: null,
+      executionBoundary: 'default',
+      expected: {
+  +     schema: 'pipeline.onboarding-init.v1'
+  -     schema: 'pipeline.plugin-refresh-advisory.v1'
+      },
+  +   kind: 'command',
+  -   kind: 'advisory',
+      mutation: false,
+      requiresConfirmation: false
+    }
+  
+      at assertRefreshAdvisory (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:212:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1567:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'command', executable: 'node', argv: [ '<host-path>', '--root', '<host-path>', '--runner', 'codex' ], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.onboarding-init.v1' } },
+    expected: { kind: 'advisory', executable: null, argv: [], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.plugin-refresh-advisory.v1' } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1706:1
+✖ F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub (7910.3778ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   argv: [
+  +     '<host-path>',
+  +     '--root',
+  +     '<host-path>',
+  +     '--runner',
+  +     'codex'
+  +   ],
+  +   executable: 'node',
+  -   argv: [],
+  -   executable: null,
+      executionBoundary: 'default',
+      expected: {
+  +     schema: 'pipeline.onboarding-init.v1'
+  -     schema: 'pipeline.plugin-refresh-advisory.v1'
+      },
+  +   kind: 'command',
+  -   kind: 'advisory',
+      mutation: false,
+      requiresConfirmation: false
+    }
+  
+      at assertRefreshAdvisory (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:212:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1724:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'command', executable: 'node', argv: [ '<host-path>', '--root', '<host-path>', '--runner', 'codex' ], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.onboarding-init.v1' } },
+    expected: { kind: 'advisory', executable: null, argv: [], mutation: false, requiresConfirmation: false, executionBoundary: 'default', expected: { schema: 'pipeline.plugin-refresh-advisory.v1' } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1838:1
+✖ PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change (12359.565ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + null
+  - {
+  -   descriptorSha256: 'b73be6be60b878c6c4d8bcbf5f3d44b2a13cca9f56d9ae47187a7c2f362ed16a',
+  -   schema: 'pipeline.concurrent-session-warning.v1',
+  -   sessionId: 'session-another-live',
+  -   status: 'live'
+  - }
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1863:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: { schema: 'pipeline.concurrent-session-warning.v1', sessionId: 'session-another-live', descriptorSha256: 'b73be6be60b878c6c4d8bcbf5f3d44b2a13cca9f56d9ae47187a7c2f362ed16a', status: 'live' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1891:1
+✖ PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning (7526.8282ms)
+  TypeError: Cannot read properties of null (reading 'processStartId')
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1919:92)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:1970:1
+✖ PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws (0.3138ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - null
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:1977:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\pipeline-start-preflight.test.mjs:2000:1
+✖ observeDutyNotRuntimeLive recognizes two paths to one physical plugin root (1.07ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at symlinkSync (node:fs:1938:11)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:2006:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+--- stderr ---

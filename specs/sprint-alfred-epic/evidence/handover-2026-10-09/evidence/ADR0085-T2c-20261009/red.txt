@@ -1,0 +1,198 @@
+command: node --test plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: red
+exitCode: 1
+head: eae79f881a5335e1256961c745c5baba11cf651e
+tree: ea3b14c64d7191914d6e0ba1f64d1f44dd32f8af
+dirty: true
+--- stdout ---
+✔ R1 re-read: design-workflow-package.mjs exports the re-read function (42.0526ms)
+✔ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (13.4147ms)
+✔ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (10.915ms)
+✔ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (10.7145ms)
+✔ R5 re-read: package bytes changed after the approval are refused (item 1) (6.2403ms)
+✔ R6 re-read: a missing package file is a typed refusal (4.3084ms)
+✔ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (5.7224ms)
+✔ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (8.9679ms)
+✔ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (19.139ms)
+✔ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (17.1137ms)
+✔ R11 re-read: a package of another feature is refused (6.3481ms)
+✔ R12 re-read: malformed approval inputs are a typed input refusal (3.1387ms)
+✔ V0 v8: pipeline.plan-approval.v8 is the current approval schema (4.1279ms)
+✔ V1 v8: a signature-mode record with a proof is valid (0.3786ms)
+✔ V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid (0.1621ms)
+✔ V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid) (0.3177ms)
+✔ V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid) (0.2647ms)
+✔ V5 v8: the mode must be exactly signature or chat (0.2285ms)
+✔ V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid) (0.2477ms)
+✔ V7 v8: the plan approval carries designApproval and none of the four retired v7 fields (0.2095ms)
+✔ V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1 (0.2192ms)
+✔ V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO) (0.2178ms)
+✔ V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval (0.3091ms)
+✔ V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable) (0.1352ms)
+✔ L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception (2.819ms)
+✔ L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid (0.1406ms)
+✔ L3 classification: other or malformed records are unknown (0.0947ms)
+✔ L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent (0.2912ms)
+✖ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (8.5827ms)
+✖ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (3.1971ms)
+✖ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (3.3244ms)
+✖ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (3.5841ms)
+✖ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (3.3246ms)
+✖ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (3.8922ms)
+✖ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (3.3393ms)
+✖ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (3.1336ms)
+✔ S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today) (3.3448ms)
+✖ S10 stored verifier: a signature made with another key over the same intent is refused (3.1298ms)
+✖ S11 stored verifier: a proof whose key is not in the configured anchors is refused (3.1604ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 29
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 263.8906
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:750:1
+✖ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (8.5827ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at withStoredApproval.control (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:754:32)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:745:11
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:751:3)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:758:1
+✖ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (3.1971ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at withStoredApproval.control (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:761:32)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:745:11
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:759:3)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:765:1
+✖ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (3.3244ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:766:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:772:1
+✖ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (3.5841ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:773:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:783:1
+✖ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (3.3246ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:784:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:794:1
+✖ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (3.8922ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:795:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:809:1
+✖ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (3.3393ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:810:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:815:1
+✖ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (3.1336ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:816:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:840:1
+✖ S10 stored verifier: a signature made with another key over the same intent is refused (3.1298ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:841:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+test at plugins\pipeline-core\lib\design-approval-route.test.mjs:848:1
+✖ S11 stored verifier: a proof whose key is not in the configured anchors is refused (3.1604ms)
+  Error: the stored-signature verifier must not sample a live candidate
+      at readCandidate (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:737:13)
+      at readDesignWorkflowPackageFromRepository (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:573:27)
+      at readApprovedDesignWorkflowPackage (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-package.mjs:675:18)
+      at verifyStoredDesignWorkflowPackageSignature (file:///<repo-root>/plugins/pipeline-core/lib/design-workflow-approval.mjs:187:23)
+      at call (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:742:14)
+      at file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:744:45
+      at async withRepo (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withStoredApproval (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:731:3)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:849:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+
+--- stderr ---

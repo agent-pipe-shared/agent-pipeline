@@ -1,0 +1,52 @@
+{
+  "taskId": "ADR0085-F1b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh (requested; effective effort unknown, no direct evidence)",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing ADR0085-F1b-20261009)",
+  "outcome": "implementation-complete-critic-pending",
+  "commits": ["fad3b88e1"],
+  "log": [
+    {"phase": "opening: record created, route pre-check done (requested claude-sonnet-5-5 == observed claude-sonnet-5-5 from runtime prompt; effort unobserved); GUARD-BOOTSTRAP-RECEIPT-MISSING on first Write, preflight run from loaded plugin root (status ready), write retried", "toolUses": 4},
+    {"phase": "orientation + baseline wait: neighbours-before.txt was absent, predecessor capture still running; first edit deferred until it appeared", "toolUses": 24},
+    {"phase": "route probe: first Edit on plan-spec-state-v2.mjs line 16 ADMITTED in-tree; 8 planned edits applied; target capture after.txt", "toolUses": 27},
+    {"phase": "neighbours-after captured (background + waits), diffed, consumer-safe check 9/9", "toolUses": 50},
+    {"phase": "commit fad3b88e1 (exact pathspec); closing", "toolUses": 57}
+  ],
+  "report": {
+    "dodResults": {
+      "targetAfterCapture": "passed as expected: 28 tests, 16 pass, 12 fail; V0-V11 and L1-L4 green, R1-R12 red (F2a owns the missing export rereadApprovedDesignWorkflowPackage)",
+      "neighboursAfterAndEnumeration": "passed with a limit: no NEW red in the measured 16-file set (440 tests / 205 pass / 234 fail / 1 todo, identical before and after). Interim-red enumeration = [] . The predicted v7-consumer impact at pipeline-state.mjs:8941/:8999 is NOT observable from this neighbour set: it is masked by pre-existing reds, not disproven (see openItems).",
+      "consumerSafePaths": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9, exit 0",
+      "oneCommit": "passed: fad3b88e1 (module only, exact pathspec, scratch/commit-msg/ADR0085-F1.txt with trailers Dispatch: ADR0085-F1b-20261009 (goldfish) and AI-Assisted: true)",
+      "terminalRecord": "this file"
+    },
+    "route": "First Edit on plugins/pipeline-core/lib/plan-spec-state-v2.mjs:16 was ADMITTED in-tree, no refusal code. No patch route, no scratch copy, no README section.",
+    "evidence": [
+      {"path": "evidence/ADR0085-F1b-20261009/after.txt", "command": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-F1b-20261009/after.txt --label target-after -- node --test plugins/pipeline-core/lib/design-approval-route.test.mjs\"", "exitCode": 1, "result": "R1-R12 fail, V0-V11 pass, L1-L4 pass; 28/16/12 (expected exit 1: F2a cases)"},
+      {"path": "evidence/ADR0085-F1b-20261009/neighbours-after.txt", "command": "same capture-evidence wrapper, label neighbours-after, node --test over the 16 files of the baseline", "exitCode": 1, "result": "440 tests, 205 pass, 234 fail, 1 todo; baseline evidence/ADR0085-F1-20261009/neighbours-before.txt is 440/205/234/1 (exit 1)"},
+      {"path": "evidence/ADR0085-F1b-20261009/neighbours-diff.txt", "result": "Two diffs, both noise. (1) Status-line diff (checkmark/cross lines minus timings): identical, diff-exit=0. (2) PASS/FAIL-line diff of the harness-style output: PS54ah flipped FAIL->PASS (porcelain-status flake in the baseline, improvement direction); SECGATE-2 differs only by a random /tmp/secgate-installed-fixture-* directory name. FAIL count 26 before, 25 after. diff-exit=1 comes from these two entries."},
+      {"path": "n/a (console)", "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exitCode": 0},
+      {"path": "n/a (console)", "command": "node --check plugins/pipeline-core/lib/plan-spec-state-v2.mjs", "exitCode": 0}
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/plan-spec-state-v2.mjs (committed fad3b88e1): V7_CURRENT_APPROVAL_SCHEMA/KEYS added, exported CURRENT_APPROVAL_SCHEMA is v8, new v8 CURRENT_APPROVAL_KEYS, validDesignApproval, validCurrentPlanApproval on designApproval, v7 branch in validPreviousCurrentPlanApproval, currentApproval v8 branch plus v7 in the sealed list, approveSubmittedPlan still writes v7. +62/-12.",
+      "scratch/commit-msg/ADR0085-F1.txt (untracked scratch): trailer changed to ADR0085-F1b.",
+      "evidence/ADR0085-F1b-20261009/{after,neighbours-after,neighbours-diff}.txt and evidence/dispatch-record-ADR0085-F1b-20261009.json (repo-root evidence/, ignored)."
+    ],
+    "notChanged": "Tests (QG-04), pipeline-state.mjs (:8941, :8999), guard-devplan-policy.mjs (:103), the contract file, spec.md, hooks/, lib/guard/, harness/. The stray specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-F1-20261009.json is left for Ruling 110's cleanup batch.",
+    "deviations": [
+      "Briefing field 1 says 'FIRST tool action after bootstrap: attempt the Edit', and its Neighbours block says 'wait for the baseline BEFORE your first edit'. The baseline file was absent and the predecessor's capture (WSL pid 72662) was still running, so an admitted Edit would have corrupted it. I obeyed the second sentence: I read the module and test first, waited for the baseline file, then made the Edit that probed the route.",
+      "The mini-profile nullability (designApproval === null accepted in validCurrentPlanApproval; currentApproval requires null for mini and validDesignApproval otherwise) is my recorded assumption, as the briefing allowed. No test pins it; V7 only pins that a missing key is invalid.",
+      "I launched the first neighbour wait as a background task and later waits foreground; the foreground wait hit the 600 s Bash limit once and was re-issued. No effect on the result."
+    ],
+    "openItems": [
+      "Not observable from this neighbour set: Ruling 110 predicted interim reds where a v7 record meets validCurrentPlanApproval (pipeline-state.mjs priorApprovedBriefingBinding :8941, reconstructPlanApprovalBriefing :8999). None showed up, but the suites that would exercise them are already red upstream and abort before reaching them: harness/scripts/pipeline-state.test.mjs dies at its HL-2..HL-6 block (submit-plan PROFILE-AUTHORITY-INVALID, then a TypeError at :5092), plugins/pipeline-core/scripts/pipeline-state.test.mjs aborts at its :1656 assertion (2 !== 0), identically before and after. The enumeration is therefore [] ('no new red in the measured set'), NOT 'no consumer impact'. F5 and F3 must not read it as such; the v7-record consumers need their own measurement once those suites run past the pre-existing reds.",
+      "guard-devplan-policy.mjs:103 compares approval.schema with CURRENT_APPROVAL_SCHEMA and now stops matching v7 records; hooks tests are outside the DoD set, so unmeasured.",
+      "Independent Opus Critic over the F1-F3 chain is pending per briefing field 6. This is implementation complete, Critic review pending; it is not accepted work.",
+      "Stray specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-F1-20261009.json: drop in the cleanup batch (Ruling 110).",
+      "All background tasks launched by this run have ended."
+    ]
+  }
+}

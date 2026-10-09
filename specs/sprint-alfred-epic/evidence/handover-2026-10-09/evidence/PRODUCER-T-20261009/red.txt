@@ -1,0 +1,226 @@
+command: node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+label: native
+exitCode: 1
+head: d8b5d5a64676fba660705b625d49f2ecca04df80
+tree: 5f8f19721040669b964e437099a5b547a341a7ae
+dirty: true
+--- stdout ---
+✔ legacy Goldfish command flow renders separate exact-path argv without shell composition (4.7591ms)
+✔ legacy command flow refuses malformed paths, duplicate paths and unsafe message metadata (0.4381ms)
+✔ CLI maps repeated body/path flags exactly and never executes Git (3.3115ms)
+✔ CLI normalizes unsorted --path input to the sorted output and still refuses duplicates (2.7859ms)
+✔ generated commands create one exact-path Git commit with the required trailer block (242.5814ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (a) fixture sanity: the producer returns the stage and commit steps (0.5534ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.7527ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (c) RED by design: copyCommand.posix of each step contains no newline (0.4952ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.6463ms)
+✔ COMMITFLOW-T2 S1 (one existing path) (e) RED by design: copyCommand.powershell of each step contains no newline (0.6208ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (a) fixture sanity: the producer returns the stage and commit steps (0.7626ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (b) control: each plain command is one guard-admitted git command at linux and win32 (0.809ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (c) RED by design: copyCommand.posix of each step contains no newline (0.7389ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (0.7579ms)
+✔ COMMITFLOW-T2 S2 (several paths including a new untracked file) (e) RED by design: copyCommand.powershell of each step contains no newline (0.7164ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (a) fixture sanity: the producer returns the stage and commit steps (1.3012ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (b) control: each plain command is one guard-admitted git command at linux and win32 (1.1365ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (c) RED by design: copyCommand.posix of each step contains no newline (1.1415ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (d) RED by design: copyCommand.posix of each step is one guard-admitted git command at linux (1.4742ms)
+✔ COMMITFLOW-T2 S3 (apostrophe, double quote and dollar in summary and body) (e) RED by design: copyCommand.powershell of each step contains no newline (1.4178ms)
+✖ PRODUCER-T (a) RED by design: the library commit step is the message-file route and carries message and path (2.3873ms)
+✖ PRODUCER-T (b) RED by design: the in-process CLI returns the same message-file route as the library (1.271ms)
+✖ PRODUCER-T (c) RED by design: messagePath and message follow the task id and the input text (0.5723ms)
+✖ PRODUCER-T (d) RED by design: the producer names the message file but writes nothing (1.5951ms)
+✖ PRODUCER-T (e) RED by design: every commit command rendering parses to exactly the message-file argv (1.2248ms)
+✖ PRODUCER-T (f) RED by design: with the returned message written to messagePath, the two steps create the exact-path commit (67.0456ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 20
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 658.7291
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:253:1
+✖ PRODUCER-T (a) RED by design: the library commit step is the message-file route and carries message and path (2.3873ms)
+  AssertionError [ERR_ASSERTION]: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+  + [
+  +   '-m',
+  +   '-m',
+  +   '-m',
+  +   '--trailer',
+  +   '--trailer'
+  + ]
+  - []
+  
+      at assertMessageFileRoute (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:245:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:254:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '-m', '-m', '-m', '--trailer', '--trailer' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:257:1
+✖ PRODUCER-T (b) RED by design: the in-process CLI returns the same message-file route as the library (1.271ms)
+  AssertionError [ERR_ASSERTION]: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+  + [
+  +   '-m',
+  +   '-m',
+  +   '-m',
+  +   '--trailer',
+  +   '--trailer'
+  + ]
+  - []
+  
+      at assertMessageFileRoute (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:245:10)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:259:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '-m', '-m', '-m', '--trailer', '--trailer' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:263:1
+✖ PRODUCER-T (c) RED by design: messagePath and message follow the task id and the input text (0.5723ms)
+  AssertionError [ERR_ASSERTION]: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+    [
+      'commit',
+  +   '-m',
+  +   'test(core): pin one existing path',
+  +   '-m',
+  +   'A plain reason.',
+  +   '--trailer',
+  +   'Dispatch: GF-PRODUCER-T-9 (goldfish)',
+  +   '--trailer',
+  +   'AI-Assisted: true',
+  -   '-F',
+  -   'scratch/commit-msg/GF-PRODUCER-T-9.txt',
+      '--',
+      'src/regular.js'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:267:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'commit', '-m', 'test(core): pin one existing path', '-m', 'A plain reason.', '--trailer', 'Dispatch: GF-PRODUCER-T-9 (goldfish)', '--trailer', 'AI-Assisted: true', '--', 'src/regular.js' ],
+    expected: [ 'commit', '-F', 'scratch/commit-msg/GF-PRODUCER-T-9.txt', '--', 'src/regular.js' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:275:1
+✖ PRODUCER-T (d) RED by design: the producer names the message file but writes nothing (1.5951ms)
+  AssertionError [ERR_ASSERTION]: library: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+  + undefined
+  - 'scratch/commit-msg/GF-42.txt'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:281:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'scratch/commit-msg/GF-42.txt',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:287:1
+✖ PRODUCER-T (e) RED by design: every commit command rendering parses to exactly the message-file argv (1.2248ms)
+  AssertionError [ERR_ASSERTION]: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+    [
+      'commit',
+  +   '-m',
+  +   'fix(core): handle a quoted value',
+  +   '-m',
+  +   "Keep the user's literal $VALUE and don't expand it.",
+  +   '-m',
+  +   'A second reason stays separate.',
+  +   '--trailer',
+  +   'Dispatch: GF-42 (goldfish)',
+  +   '--trailer',
+  +   'AI-Assisted: true',
+  -   '-F',
+  -   'scratch/commit-msg/GF-42.txt',
+      '--',
+      'src/odd value.txt',
+      'src/regular.js'
+    ]
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:289:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'commit', '-m', 'fix(core): handle a quoted value', '-m', "Keep the user's literal $VALUE and don't expand it.", '-m', 'A second reason stays separate.', '--trailer', 'Dispatch: GF-42 (goldfish)', '--trailer', 'AI-Assisted: true', '--', 'src/odd value.txt', 'src/regular.js' ],
+    expected: [ 'commit', '-F', 'scratch/commit-msg/GF-42.txt', '--', 'src/odd value.txt', 'src/regular.js' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\scripts\goldfish-commit-command-flow.test.mjs:305:1
+✖ PRODUCER-T (f) RED by design: with the returned message written to messagePath, the two steps create the exact-path commit (67.0456ms)
+  AssertionError [ERR_ASSERTION]: Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` (guard-push refuses -m with a parenthesised --trailer)
+  + actual - expected
+  
+  + 'undefined'
+  - 'string'
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs:321:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'string',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

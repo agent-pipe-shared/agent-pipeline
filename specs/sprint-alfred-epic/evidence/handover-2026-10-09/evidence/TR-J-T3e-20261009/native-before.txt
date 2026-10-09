@@ -1,0 +1,88 @@
+command: node --test plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs
+label: native-before
+exitCode: 1
+head: 997356d7e8ab058935a0b3630fe2a4dab1b453fe
+tree: 616762af352ca70ec3705c518813bf77ca788670
+dirty: true
+--- stdout ---
+✔ RED F1 (a): current+install and refresh+install, in either order, read provisioning-required (today: blocked / HOOK-READINESS-STATE-UNSUPPORTED) (1.1915ms)
+✔ GREEN control F1 (b): the widening does not leak -- foreign, decline and unresolved entries still block or stay unresolved (0.3725ms)
+✔ RED F1 (c): a really installed pre-commit hook beside a missing commit-msg hook inspects as provisioning-required with the coordinator action (8116.2855ms)
+✔ RED F1 (d): apply installs ONLY the install entry (commit-msg); the current pre-commit hook and its marker stay byte-identical (15907.8063ms)
+✔ RED F1 (e): mirror -- a really installed commit-msg hook beside a missing pre-commit hook: only pre-commit is installed (14750.2544ms)
+✖ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (11409.0353ms)
+✖ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (11242.5878ms)
+✖ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (14189.3073ms)
+✔ CHR001 non-repository roots never trigger Git initialization or hook writes (43.5507ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 6
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75754.9743
+
+✖ failing tests:
+
+test at plugins\pipeline-core\scripts\clone-hook-readiness.partial.test.mjs:159:1
+✖ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (11409.0353ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:933:27)
+      at file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:160:16
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:159:154)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+test at plugins\pipeline-core\scripts\clone-hook-readiness.partial.test.mjs:190:1
+✖ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (11242.5878ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file:///<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file:///<repo-root>/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs:933:27)
+      at file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:191:16
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:190:128)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+test at plugins\pipeline-core\scripts\clone-hook-readiness.partial.test.mjs:222:1
+✖ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (14189.3073ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   'commit-msg-hook': 'refresh',
+  -   'commit-msg-hook': 'current',
+      'pre-commit-hook': 'refresh'
+    }
+  
+      at file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:227:10
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:222:175)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { 'pre-commit-hook': 'refresh', 'commit-msg-hook': 'refresh' },
+    expected: { 'pre-commit-hook': 'refresh', 'commit-msg-hook': 'current' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

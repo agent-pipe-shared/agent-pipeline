@@ -1,0 +1,41 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs
+label: lib-codex-onboarding-runtime
+exitCode: 0
+head: f06b434a2ae709ae34641f92856cd69aa907e47f
+tree: 7bf1b6176112a71f82c0a3867658cf425e7196df
+dirty: true
+--- stdout ---
+✔ COR001 the PATH resolver selects the first symlinked Codex entry and binds its physical executable (198.233386ms)
+✔ COR002 native Windows resolution admits only a physical codex.exe through controlled PATHEXT (1.084348ms)
+✔ COR003 Linux and macOS retain the direct physical extensionless executable contract (218.233072ms)
+✔ COR004 native Windows restart state consumes owner-DACL assurance instead of projected mode bits (174.126733ms)
+✔ COR005 unavailable or insecure Windows private-state assurance fails before barrier publication (282.329128ms)
+✔ COR006 the launch wrapper preserves the interactive Codex process contract without exposing its token (1327.075028ms)
+✔ COR007 a barrier permits only one live issued ticket while expired history remains non-blocking (483.133256ms)
+✔ COR008 failed initial barrier persistence restores the complete tree preimage at every write stage (928.348972ms)
+✔ COR009 failed persistence never removes an identity-drifted private directory and sanitizes rollback failure (127.795626ms)
+✔ COR010 duplicate, malformed, and unsafe ticket-set entries fail authentication and consumption without mutation (300.421692ms)
+✔ COR011 a runtime barrier is canonical, blocks same-process observation, and clears only through a fresh ticket receipt (553.639889ms)
+✔ COR012 readback publication refuses a concurrently replaced ticket or barrier without claiming ready (543.53224ms)
+✔ COR013 the strict host helper requires a bound executable, ticket, fresh generation, config origin, and agent postimages (527.977756ms)
+✔ COR014 native config/read admits exact Codex 0.145 config warnings and requires the remote-control status (15.549582ms)
+✔ COR015 the productive main performs native config/read without a config/evidence seam and clears a launch ticket (707.940798ms)
+✔ COR016 expired tickets and unchanged barrier replays fail closed (318.38547ms)
+✔ COR017 a stale launcher binding is replaced even when source and runtime targets are unchanged (185.527484ms)
+✔ COR018 wrong identity, origin, same-generation, timeout, oversize, and absent transport remain typed and do not consume (557.78281ms)
+✔ COR019 the barrier exemption is a closed membership test that fails closed for every unnamed runner (3.56266ms)
+✔ COR020 fingerprintIdentity folds a WSL default-mount path and the native Windows spelling of the same directory to one identity (0.328786ms)
+✔ COR021 repositoryFingerprint folds a WSL-mount-shaped real path the same way, and still differs for a genuinely different directory (0.314195ms)
+✔ COR022 selected worktree intake paths differ while restart barrier ownership is unchanged (0.744402ms)
+✔ COR023 selected intake rejects an aliased physical root before creating state (0.357716ms)
+✔ COR024 selected intake scope remains stable and creation never edits foreign scope bytes (1.311982ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7721.661859
+
+--- stderr ---

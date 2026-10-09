@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HARDEN-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations + context read, route pre-check passed (observed claude-sonnet-5-5), both preflights run (second after GUARD-BOOTSTRAP-RECEIPT-MISSING), record created and read back",
+      "toolUseCount": 21
+    },
+    {
+      "phase": "native before capture at HEAD: evidence/WIN-HARDEN-T2-20261009/before.txt, wrapped exit 0, 15 tests 15 pass",
+      "toolUseCount": 25
+    },
+    {
+      "phase": "pin WPS016 added to windows-private-state.test.mjs (count guard 15 to 16); native red capture: evidence/WIN-HARDEN-T2-20261009/red.txt, wrapped exit 1, 16 tests 15 pass 1 fail, WPS016 red with status unavailable, reason native Windows DACL hardening failed (exit 1, UnauthorizedAccessException)",
+      "toolUseCount": 33
+    },
+    {
+      "phase": "committed 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa (test file only), checkpointed; final report next",
+      "toolUseCount": 43
+    },
+    {
+      "phase": "final: outcome completed, report.text written, resultSha256 bound",
+      "toolUseCount": 47
+    }
+  ],
+  "resultSha256": "2e5f8667a9617fabdbf373e7c3874468983e53c42a1fa44d6a1fd8ed8c97bff7",
+  "report": {
+    "text": "WIN-HARDEN-T2-20261009 completion report (goldfish-deep). Implementation complete; independent review: pending (only the Elephant dispatches the Critic; criticRequired recorded, row T3); PO acceptance: pending. This is not 'done'.\n\nRoute pre-check: requested (field 6) agentType goldfish-deep, tool-layer model sonnet (Sonnet 5.5), effort xhigh, class S test-only. Observed in this dispatch's own runtime prompt: 'You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. Model matches, no contradiction. Effort: the prompt carries only a numeric reasoning-effort hint, not mappable to a named level, so the effective effort is unknown (disclosed, not a mismatch).\n\nCLOSING STATEMENTS (this run completed; it is not a closing-allowance handover)\n1. Committed: 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa, plugins/pipeline-core/lib/windows-private-state.test.mjs only (+50/-1): new case WPS016, the two imports it needs (spawnSync, observeWindowsPrivatePath), case-count guard 15 to 16.\n2. Verified green: before.txt at HEAD 127ead916 (pre-edit) 15/15 pass, wrapped exit 0. The red capture shows WPS001-WPS015 green (details in section 1).\n3. Remains undone: nothing in the brief. Not verifiable here: that WPS016 turns green once WIN-HARDEN-F2 lands (production edit forbidden). Left untracked by this dispatch: evidence/WIN-HARDEN-T2-20261009/before.txt and red.txt, this record; git-ignored: scratch/commit-msg/WIN-HARDEN-T2.txt, scratch/dispatch-wip/WIN-HARDEN-T2/.\n4. Next briefing: see section 6.\n\n1. DoD results\n- New pin red for the stated reason: passed. WPS016 fails on call 1 of 2 with status 'unavailable', reason 'native Windows DACL hardening failed (exit 1, UnauthorizedAccessException)'. skipped 0, so the in-test premise check ran and held (fixture child: owner is the current principal, ACL non-empty, no ACE names the current principal).\n- Every other case unchanged: passed. WPS001-WPS015 pass in before.txt (15 tests, 15 pass) and in red.txt (16 tests, 15 pass, 1 fail = WPS016, 0 skipped, 0 cancelled).\n- One commit with the DoD subject: passed. Subject verbatim; trailers AI-Assisted: true and Dispatch: WIN-HARDEN-T2-20261009 (goldfish); committed by exact pathspec.\n- Terminal record evidence/dispatch-record-WIN-HARDEN-T2-20261009.json: this file (v4, authored-commit, resultSha256 bound to this text).\n- Fixture cleanup: passed. A find for scratch/wps-harden-t2-* after the red run returned nothing.\n- Not verifiable: WPS016 going green after WIN-HARDEN-F2 (production file forbidden); the pin does not assert that the hardener fails, so it needs no change when F2 lands.\n\n2. Evidence\n- evidence/WIN-HARDEN-T2-20261009/red.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-HARDEN-T2-20261009/red.txt --label WIN-HARDEN-T2-red -- node --test plugins/pipeline-core/lib/windows-private-state.test.mjs ; wrapped exit 1 (the expected red).\n- evidence/WIN-HARDEN-T2-20261009/before.txt (extra, beyond the DoD): same command with --label WIN-HARDEN-T2-before at HEAD 127ead916 before the edit; wrapped exit 0.\n- Host: native Windows, ordinary (non-elevated) token, Node 24; this one file only, no suite, no WSL run.\n\n3. Changed files\n- plugins/pipeline-core/lib/windows-private-state.test.mjs: added WPS016 plus its imports and the 15-to-16 case-count guard.\n- Untracked evidence only: evidence/WIN-HARDEN-T2-20261009/before.txt, red.txt, evidence/dispatch-record-WIN-HARDEN-T2-20261009.json.\n\n4. Deliberately not changed\n- Production files (windows-private-state.mjs untouched), every other test file, the live .git/agent-pipeline.\n- The comment above WPS014/WPS015 ('these pins are red at call 2') is stale since commit 5a72c9b61; adjacent, left as is.\n- The owner-not-self branch stays unpinned (an ordinary token cannot build it; S5-D report section 6).\n- Foreign staged/uncommitted edits in the tree (pipeline-state.mjs, sanctioned-args-onboarding.mjs, harness pipeline-state.test.mjs, the dispatch-policy test, and others) untouched; the commit used an exact pathspec.\n- Evidence files and this record are not committed (sibling records stay untracked for the Elephant).\n\n5. Deviations from spec\n- Briefing item 1: 'confirm the premise inside the test (the shipped hardener must fail on it today)'. Read as: the test confirms the ACL premise (current principal owns the child, ACL non-empty, no ACE names the current principal) and the red capture proves the failure. The test does not assert that the hardener fails, because that would make the pin green today and red after the fix. A premise the host cannot build is a typed skip (reason text, no path).\n- The hardener surfaces the exception TYPE name only, never the HRESULT; 0x80070005 (E_ACCESSDENIED) is the same refusal as UnauthorizedAccessException, which the red output shows. The DoD's stated reason is met under that mapping.\n- Extras beyond the brief: the before.txt capture; a cleanup fallback (icacls /reset /T /C /Q then a second rmSync) in case the first rmSync is refused; the case-count guard edit 15 to 16 that the added case requires.\n\n6. Open items\n- independent review: pending; PO acceptance: pending.\n- WIN-HARDEN-F2 target: the unconditional SetOwner line of HARDEN_DIRECTORY_SCRIPT in plugins/pipeline-core/lib/windows-private-state.mjs (exact edits in the S5-D report section 6). WPS016 should then turn green with no test change; run it natively on the checkout volume to confirm.\n- Matrix coverage: native Windows with a non-elevated token on the checkout volume is the only measured cell. WSL, macOS, Linux: typed skip by construction, not run. Elevated token, ReFS or Dev Drive, laptop: unmeasured. Claude runner only.\n- Template/validator observation (not acted on): dispatch-record.mjs requires a terminal record to carry resultSha256 bound to report.text (record-result checks near lines 162 and 204); the interim committed-pending-report checkpoint carried resultSha256 null, so by that reading it would not validate until the final overwrite. I did not execute the validator on the interim state.\n- Record shape observation: validateDispatchRecord (dispatch-record.mjs) closes log entries over the key toolUseCount; the briefing text and the sibling WIN-AP-S5 record say toolUses, which that validator rejects (log[0] unknown=toolUses). This record's log was rewritten to toolUseCount in the final step; the Elephant may want the template wording and the validator aligned.\n- Tool budget: roughly 47 of 55 used; the 80 percent notice fired at call 44 while closing.\n\nRecord note (final step): validateDispatchRecord requires an authored-commit terminal record to carry candidateCommit equal to its final commits entry. candidateCommit was therefore rebound from the briefed base 127ead916baaf2c9ebd0875a0766a3b5c55c070c (the commit this work started from) to the delivered commit 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa. This differs from the briefing's 'candidate 127ead916' wording and from the stopped-without-commit sibling record, which binds the inspected base.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/windows-private-state.test.mjs"
+    ]
+  }
+}

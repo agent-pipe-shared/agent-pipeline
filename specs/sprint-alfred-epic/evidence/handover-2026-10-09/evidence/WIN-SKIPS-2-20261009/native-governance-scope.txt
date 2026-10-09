@@ -1,0 +1,66 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope.test.mjs
+label: WIN-SKIPS-2-native-gs
+exitCode: 1
+head: 4137c9bd5f388aa1eba4a96547a27b4754b4d37e
+tree: bb109461a7d84ca130d0d6548c9d46a487d70c16
+dirty: true
+--- stdout ---
+✔ RC14C001 documents, entry pointers and malformed arbitrary source never enroll; observation writes nothing (73.4997ms)
+✔ RC14C002 actual Git config stores a parseable root-bound decision and preserves unrelated bytes and mode (5608.396ms)
+✔ RC14C003 actual linked worktrees enroll independently; linked decline does not deactivate primary (4892.4122ms)
+✔ RC14C004 non-Git decline persists only in sealed fixture host store and restores explicit enrollment (7629.2308ms)
+✔ RC14C005 existing exact onboarding consent qualifies partial enrollment; corrupt marker alone cannot activate (165.4529ms)
+✔ RC14C006 canonical V3 owned projection qualifies existing enrollment without invented receipt; drift fails closed (6896.8239ms)
+✔ RC14C007 paired canonical legacy authority qualifies; malformed source paired with valid authority stays governed (72.6659ms)
+✔ RC14C008 fabricated/cloned/stale plans cannot mutate storage; consumed plan cannot replay (809.2244ms)
+✖ RC14C009 dedicated malformed record/mode/alias refuse authority; aliases do not cause outside content reads (3180.005ms)
+✔ RC14C010 root inode reuse invalidates bound record, oversized sparse record and hardlinks reject without adoption (2713.5983ms)
+✔ RC14C011 authenticated onboarding projection reuses enrollment and explicit activation reverses decline (56314.0843ms)
+✔ RC14C012 actual observations and absence errors satisfy closed published schema (3077.9961ms)
+✔ RC14C013 neutral V3 authority has precedence over retained runtime and no invented receipt is required (71.4946ms)
+﹣ RC14C014 broken physical Git control cannot be recast as non-Git enrollment (1.7195ms) # host limitation: file symlink creation is refused on this host (EPERM)
+✔ RC14C015 enrolled current Git root survives an unrelated removed registered worktree and can plan decline (2364.14ms)
+✔ RC14C016 declined current Git root survives an unrelated removed worktree without hints or enforcement and can re-enroll (2247.0237ms)
+✔ RC14C017 closest containing nested linked worktree keeps its own decision despite a stale sibling (2485.6317ms)
+﹣ RC14C018 path-component containment does not select a prefix sibling and selected alias paths cannot authorize decisions (2.3384ms) # host limitation: file symlink creation is refused on this host (EPERM)
+✔ RC14C019 removed relevant linked directory remains unavailable and cannot be used to plan a decision (2012.2259ms)
+✔ RC14C020 current Git root inode replacement retains record binding refusal rather than inactive admission (2167.082ms)
+﹣ RC14C021 owned Git config alias and hardlink refuse active authority and cannot become inactive admission (1.5951ms) # host limitation: file symlink creation is refused on this host (EPERM)
+﹣ RC14C022 broken relevant linked Git control and unreadable owned config remain fail-closed (1.3679ms) # host limitation: file symlink creation is refused on this host (EPERM)
+✔ RC14C023 Git common-directory inode replacement invalidates enrollment without changing its record bytes (2071.2745ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 105122.5718
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:220:5
+✖ RC14C009 dedicated malformed record/mode/alias refuse authority; aliases do not cause outside content reads (3180.005ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'active'
+  - 'unverifiable-active'
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope.test.mjs:69:255)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'active',
+    expected: 'unverifiable-active',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R5-F5b-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "410d0addf",
+  "outcome": "interim-handback",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "interim-handback" },
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening", "toolUses": 8 },
+    { "phase": "edit applied; answers-file test 4/4 pass; consumer-safe 9/9 pass; whole-file AFTER capture running in WSL background (task b1vgra3c0) past 600s", "toolUses": 25 }
+  ],
+  "report": {
+    "text": "Edit applied in lib/project-onboarding-v3.mjs: fileApplyAction sibling plus one guidance sentence; applyAction and input untouched. DONE: answers-file test file 4/4 pass (R5-12 both green, R5-14/15 still green); check-consumer-safe-paths.test.mjs 9/9 exit 0. BASELINE (evidence/R5-F5-20261008/before-onboarding-v3.log, HEAD 7e87535b7): the whole-file run ended exitCode 1 after ~1500 s with 82 PASS and 26 FAIL lines (file-level 'test failed'). REMAINING: whole lib/project-onboarding-v3.test.mjs AFTER capture was started under WSL via capture-evidence to evidence/R5-F5b-20261009/after-onboarding-v3.txt and exceeded the 600 s foreground limit (moved to background, task b1vgra3c0); not finished, so the no-new-failure comparison is NOT VERIFIED. independent review: pending; verify: pending.",
+    "changedFiles": ["plugins/pipeline-core/lib/project-onboarding-v3.mjs"]
+  }
+}

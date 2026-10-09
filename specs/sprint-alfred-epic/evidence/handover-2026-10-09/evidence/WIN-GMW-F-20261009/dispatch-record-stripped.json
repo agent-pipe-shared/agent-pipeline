@@ -1,0 +1,11 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "evidence/WIN-GMW-F-20261009/native.txt",
+      "evidence/WIN-GMW-F-20261009/wsl.txt"
+    ]
+  }
+}

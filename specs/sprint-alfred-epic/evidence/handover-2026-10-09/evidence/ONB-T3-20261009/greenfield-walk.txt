@@ -1,0 +1,70 @@
+command: node --test plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs
+label: onb-t3-greenfield-walk
+exitCode: 1
+head: 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa
+tree: 39b40977bbca9168496586b518c77e8713838f15
+dirty: true
+--- stdout ---
+✖ GFW001 greenfield walk F3: the claude consent existingFileApplyAction has one --runner with its value, one --activate and no --text-file (52134.439853ms)
+✖ GFW002 greenfield walk F4: every intake apply returns the nextAction a following inspect returns, and generate-plan carries --runner (61794.938433ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 118478.992377
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GFW001 greenfield walk F3: the claude consent existingFileApplyAction has one --runner with its value, one --activate and no --text-file (52134.439853ms)
+  AssertionError [ERR_ASSERTION]: doubled --runner: ["<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs","intake-consent-apply","--root","/tmp/project onboarding v3 matrix with spaces-iFmLrl","--granted","--git-author-name","<PO_INTAKE_GIT_AUTHOR_NAME>","--git-author-email","<PO_INTAKE_GIT_AUTHOR_EMAIL>","--language","<PO_INTAKE_LANGUAGE>","--profile","<PO_INTAKE_PROFILE>","--activate","--runner","--text-file","<existing-repository-file>","--text-file-sha256","<sha256-of-existing-file>","--activate","--runner","claude"]
+  
+  2 !== 1
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:45:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GFW002 greenfield walk F4: every intake apply returns the nextAction a following inspect returns, and generate-plan carries --runner (61794.938433ms)
+  AssertionError [ERR_ASSERTION]: these applies return a nextAction that differs from the following inspect; ALSO RED: the intake-generate-plan nextAction does not carry --runner codex: ["<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs","intake-generate-apply","--root","/tmp/project onboarding v3 matrix with spaces-bm47Xs","--plan-sha256","5270ff7a47c5da8a04c0d5d9165e4b4ecc9863c7b231386a0ecbf3bafbab392c","--activate"]
+  + actual - expected
+  
+  + [
+  +   'intake-consent-apply',
+  +   'intake-capture-apply',
+  +   'intake-design-questions-apply',
+  +   'intake-generate-apply'
+  + ]
+  - []
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:98:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'intake-consent-apply', 'intake-capture-apply', 'intake-design-questions-apply', 'intake-generate-apply' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,50 @@
+command: node --test "--test-name-pattern=ADOPT-SIGN-T|NVA-SIGNONCE-1: sign-intent skips|refuses ordinary apply" plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs
+label: adopt-sign-f-after
+exitCode: 0
+head: e59ac57506428e517cfa15205a09b05ac59dd39c
+tree: 11231d03e613f9319e4716d4c9eee7f3d514a196
+dirty: true
+--- stdout ---
+▶ Adoption authority anti-forgery and durable readback
+  ✔ refuses ordinary apply, then verifies a real detached signature and later legitimate commits (123.078793ms)
+✔ Adoption authority anti-forgery and durable readback (124.316833ms)
+▶ ADOPT-SIGN-T: adoption request file for the signing ceremony
+  ✔ ADOPT-SIGN-T: prepare --out writes the request JSON byte-identical to its stdout form (1088.718063ms)
+  ✔ ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing (1585.269289ms)
+✔ ADOPT-SIGN-T: adoption request file for the signing ceremony (2674.229617ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 3ca39fb9d75cfa444ec036ed70353a144eaa550188d3b7c906f29a43fd74ef00
+  action: record this architecture adoption decision for the repository identified below
+  decision: approved-scoped
+  decision ref: "ADOPT-SIGN-FIXTURE-1"
+  scope: "docs/adr/"
+  scope: "src/"
+  rationale: "Adoption signing fixture decision"
+  decided at: 2026-01-01T00:00:00.000Z
+  expires at: none
+  review date: none
+  candidate commit: 2c7fd5e175675e118e148b0e36df663a6ba1db62
+  repository fingerprint: a60f410a1ff2a5a988dc75f81ea334348543145275b0998839f272095cf500a1
+  request mode: signature
+  this signs the decision only; applying it, and any push or release, need their own approval
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 31595657b2c9b9d7e7d7a348b0f153697d23f06f46a12f736a7dd65b959e6e84
+  no recorded request resolves for this digest in this repository (HGO-RECORD-REPOSITORY-UNAVAILABLE): this command has no description of that action and will not invent one.
+  it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ ADOPT-SIGN-T: sign-intent --request signs an adoption request by its intent.sha256, discloses the adoption and writes the --intent-sha256 proof shape (47.787129ms)
+✔ ADOPT-SIGN-T: sign-intent --request refuses an adoption request whose intent.sha256 does not match, before any confirmation or signing (34.079325ms)
+✔ NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-protected private key, but still prints the disclosure (11.302725ms)
+ℹ tests 6
+ℹ suites 2
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3373.682273
+
+--- stderr ---

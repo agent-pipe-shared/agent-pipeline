@@ -1,0 +1,70 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "625ddd1f1",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "162bf1468"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing and obligations read, route pre-check (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5; match)",
+      "toolUses": 15
+    },
+    {
+      "phase": "orientation: manifests, guard-push refusal, GG-22 lists, git-cmd global-option list, TR-B-F method",
+      "toolUses": 37
+    },
+    {
+      "phase": "baseline: guard-git 250/253, guard-push 190/197 (wrapped exit 1); git-cmd-before exit 0",
+      "toolUses": 44
+    },
+    {
+      "phase": "edit git-cmd.mjs in place; build.mjs wrote both post-images and the load-hook harness",
+      "toolUses": 47
+    },
+    {
+      "phase": "green: guard-git 253/253, guard-push 195/197 (only PG-CHECKPOINT and PG-CHECKPOINT-WORKTREE), both REDIRECT lines; git-cmd-after exit 0",
+      "toolUses": 51
+    },
+    {
+      "phase": "manifest written, consumer-safe test exit 0 (9/9), commit 162bf1468",
+      "toolUses": 55
+    }
+  ],
+  "report": {
+    "text": "1. DoD results\n- Baseline capture (WSL, TR-C-T runnable copies against the unmodified live guards): passed. guard-git 250/253, guard-push 190/197, the same failing names as TR-C-MANIFEST.md (wrapped exit 1, as expected).\n- Green capture (WSL, through the load hook): passed. guard-git 253/253; guard-push 195/197 with only PG-CHECKPOINT and PG-CHECKPOINT-WORKTREE failing (pre-existing); both TRCF-REDIRECT-FIRED lines present (guard-git 238 loads, guard-push 198 loads). All 8 RED pins are GREEN, incl. GG22-T51f (GG-17 answers once the trailers are admitted; no rule reordered). No GREEN pin or pre-existing case changed state.\n- Manifest TR-C-F-MANIFEST.md: passed (targets, pre/post sha256, anchored edits, command, per-pin state, in-place file).\n- In-place lib file: passed. Native git-cmd.test.mjs before and after the edit, both wrapped exit 0 (case counts not read).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9.\n- One commit with the exact subject: passed, 162bf1468.\n- independent review: pending. PO acceptance and the post-image install ceremony: pending.\n\n2. Evidence\n- evidence/TR-C-F-20261009/baseline.txt: wsl.exe -e bash -lc \"cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-F-20261009/baseline.txt --label baseline -- node --test scratch/dispatch-wip/TR-C-T/guard-push.test.mjs scratch/dispatch-wip/TR-C-T/guard-git.test.mjs\"; wrapped exit 1.\n- evidence/TR-C-F-20261009/green.txt (497 lines, sha256 e123008b1b4de52c421719fe856ff1560df35387f678da7ae65d877e8fcb0a66): same wrapper with --label green and scratch/dispatch-wip/TR-C-F/guard-push.trc.test.mjs scratch/dispatch-wip/TR-C-F/guard-git.trc.test.mjs; wrapped exit 1 (the two pre-existing guard-push failures); node --test summary 2 files, 1 pass, 1 fail.\n- evidence/TR-C-F-20261009/git-cmd-before.txt and git-cmd-after.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <label> -- node --test plugins/pipeline-core/lib/git-cmd.test.mjs; wrapped exit 0 both.\n- check-consumer-safe-paths.test.mjs: exit 0 (stdout, 9 tests pass).\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs: post-image, refusal text gains the Why and Instead lines (git commit -F, use rg).\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs: post-image, --trailer and --trailer= join the GG-22 value-taking safe lists.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-F-MANIFEST.md: manifest.\n- plugins/pipeline-core/lib/git-cmd.mjs: in place, --version and --help join GIT_GLOBAL_OPT_FLAG (the git --version whitelist lives there).\n\n4. Deliberately not changed\n- Both test post-images, the tranche README, anything under plugins/pipeline-core/hooks/ or lib/guard/, every Ruling 81 marker rule. --trailer is NOT in PATHSPEC_VALUE_CONSUMING_FLAGS (a literal -- trailer value would be read as the separator: a false block, not a widening). --exec-path needed no change (already recognised). Foreign staged files and the other untracked dispatch records stayed out of the commit.\n\n5. Deviations from spec\n- Method deviation (named in the manifest): the guard tests spawn node <GUARD> children, so the load hook is registered through NODE_OPTIONS --import in the entry, and the hook reports through a sidecar file (stderr must stay empty for six ALLOW pins) instead of a stderr line.\n- The DISPATCH-BUDGET-CHECKPOINT notice arrived at call 48. I did not hand back at once: the WSL green capture was already running (a background job whose result I had to hold) and the remaining steps (wait, manifest, consumer-safe check, commit, record) needed no further edit and fit under the base cap of 60. I used 57 calls and no closing allowance.\n- The bootstrap line printed 'Calibration not named in the briefing': field 6 carries no calibration file. Observed effort tag read 30 against the requested xhigh; model identity matched (claude-sonnet-5-5), so no route stop.\n- The record sits in the repo-root evidence/ per the CONT17 header and goldfish-task field 6; the other untracked records of this session sit under specs/sprint-alfred-epic/evidence/.\n\n6. Open items\n- Not verified: the other callers of normalizeGlobalGitOptions, hooks/git-dangerous-policy.mjs and hooks/codex-pretool-guard.test.mjs, now see git --version and git --help as a bare git word (reasoning says this only makes a following dangerous subcommand more visible; not run). The Critic should run or read them.\n- Install of the two post-images over their targets is the ceremony's step (check git hash-object of each target against the pre-image digests in the manifest). If verify-suites pins case counts for the guard tests or git-cmd.test.mjs, it needs a refresh (not checked).\n- Independent Critic review pending (Opus Critic follows, per the briefing). T82 for the printed form with (goldfish) stays refused by design (Ruling 81); only the text relief landed.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-F-MANIFEST.md",
+      "plugins/pipeline-core/lib/git-cmd.mjs"
+    ]
+  },
+  "resultSha256": "92a96a0c3aeef7fca3f2b9246e06ebd47081052599f9abe48c855d1d8381fd06"
+}

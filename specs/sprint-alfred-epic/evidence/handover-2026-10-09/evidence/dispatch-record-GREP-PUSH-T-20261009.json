@@ -1,0 +1,18 @@
+{
+  "taskId": "GREP-PUSH-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-briefing-contradiction-no-commit",
+  "log": [
+    { "phase": "opening (orientation read, route pre-check passed, preflight run)", "toolUses": 12 },
+    { "phase": "probe of exported commandIsGitPush: cases b and c are already false; a and d true; e and f both true", "toolUses": 24 },
+    { "phase": "advisor consulted; confirmed stop path; accepted-false-positive pins located in git-cmd.test.mjs:960-967", "toolUses": 28 },
+    { "phase": "stopped, record finalized; no test file created, nothing committed", "toolUses": 30 }
+  ],
+  "changedFiles": [],
+  "evidence": [
+    "evidence/GREP-PUSH-T-20261009/stop-probe.txt (written by: node scratch/grep-push-probe.mjs, exit 0)"
+  ],
+  "report": "STOPPED, no test file created, nothing committed. Contradictions between the briefing and repo reality (stop condition 2) plus an unreachable assertion (field 5 stop 1). Route pre-check: requested claude-sonnet-5-5 / xhigh; observed from this dispatch's runtime prompt 'powered by the model named Sonnet 5.5, exact model ID claude-sonnet-5-5'; match. DoD: (a)-(d) RED capture = failed (not achievable as briefed): classifier commandIsGitPush returns true for (a) and (d) (RED) but false for (b) and (c) (already GREEN); (e) and (f) both true. Consumer-safe check = not run (no change). Commit = not made. F1: the trigger is the marker set ( ) { $ backtick, not the caret or --no-index: a plain caret pattern and a quoted pipe pattern are false; a parenthesised caret group is true; the real T91 trailer shape (Dispatch trailer holding (goldfish)) is true, not the AI-Assisted-only trailer of case (c). F2: (a) and (d) contradict the option-B accepted false positives, documented at lib/git-cmd.mjs:1188-1193 ('needs a new PO decision, not a test edit') and pinned on purpose at lib/git-cmd.test.mjs:960-967 (git commit -m with a dollar-paren date substitution is a candidate); the briefing cites no overriding PO decision. F3: (f) 'stays ambiguous' is decided by parsePushBinding at hooks/guard-push.mjs:381 (not exported, top-level hook script; refusal at 1796-1801); commandIsGitPush returns true for both (e) and (f), so the export needed is parsePushBinding (or its extraction into lib/). Open items for a corrected briefing: (i) a PO decision reference exempting ( and $' markers for non-push git subcommands, or re-target to guard-push.mjs post-candidate handling (hooks/, tranche); (ii) rewrite (b) and (c) with the actual triggering marker; (iii) for (f) export parsePushBinding or move the assertion to the hooks tranche; (iv) correct the A-live row 99 wording (caret is not a trigger). Full report was returned in the handback message."
+}

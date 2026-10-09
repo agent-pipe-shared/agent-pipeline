@@ -1,0 +1,26 @@
+command: node --test plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs
+label: after-descendant-final
+exitCode: 0
+head: 825ebd9981717be91191bbf00b3f1c72624c1063
+tree: 0b5b018159defcb138a4288359f68cd57e0ad381
+dirty: true
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (614.596688ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (690.938045ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (493.444883ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (381.581184ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (395.413826ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (375.430334ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (431.581608ms)
+✔ EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain) (748.723386ms)
+✔ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream) (485.021877ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6083.11043
+
+--- stderr ---

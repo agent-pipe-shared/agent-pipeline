@@ -1,0 +1,74 @@
+{
+  "taskId": "ADR0085-T0a-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh (requested; not observable by name from inside the dispatch)",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "complete-red-committed",
+  "commits": [
+    {
+      "sha": "635fb1885",
+      "subject": "test(design-approval): RED contract for ADR-0085 route 1",
+      "trailers": ["Dispatch: ADR0085-T0a-20261009 (goldfish)", "AI-Assisted: true"],
+      "paths": ["plugins/pipeline-core/lib/design-approval-route.test.mjs"]
+    }
+  ],
+  "routePrecheck": {
+    "requested": "goldfish-deep / claude-sonnet-5-5 / xhigh (field 6)",
+    "observed": "runtime prompt of this dispatch names 'Sonnet 5.5', exact model ID claude-sonnet-5-5",
+    "result": "model matches; effort tier not observable by name; no contradiction"
+  },
+  "log": [
+    {"phase": "orientation: briefing, note sections 0/1/2/3/4/5, contract, v7 validator, U3 classifiers, real package shape; guard events handled", "toolUses": 29},
+    {"phase": "advisor consulted before writing; commit-message file written, then test file written", "toolUses": 32},
+    {"phase": "native RED capture run (wrapped exit 1, expected); output inspected", "toolUses": 40},
+    {"phase": "consumer-safe check (pass), add by exact path, commit 635fb1885 by -F and pathspec", "toolUses": 44},
+    {"phase": "terminal record written once", "toolUses": 45}
+  ],
+  "report": {
+    "dod": {
+      "redCapture": "passed: 28 cases ran, 23 RED for the stated reason, 5 GREEN where behaviour exists; whole file did not crash",
+      "dynamicImports": "passed: every module and export is loaded per case; missing export fails only that case",
+      "consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9 pass, exit 0",
+      "oneCommit": "passed: 635fb1885 via git commit -F scratch/commit-msg/ADR0085-T0a.txt -- <new file>",
+      "terminalRecordOnce": "passed: this file, written once after the commit"
+    },
+    "redGreenMap": {
+      "RED, missing export rereadApprovedDesignWorkflowPackage in lib/design-workflow-package.mjs (slice F2a)": ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12"],
+      "RED, validCurrentPlanApproval rejects a well-formed pipeline.plan-approval.v8 record (control assertion fails; slice F1)": ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9"],
+      "RED, CURRENT_APPROVAL_SCHEMA is still pipeline.plan-approval.v7 (slice F1)": ["V0"],
+      "RED, v7 record not accepted by validPreviousCurrentPlanApproval (slice F1)": ["V10"],
+      "GREEN today (already implemented, pinned as regression guard)": ["V11 (v7 stays readable)", "L1 legacy record classification", "L2 new-schema record in both modes, hybrid invalid", "L3 unknown records", "L4 legacy intent classification"]
+    },
+    "evidence": {
+      "capture": "evidence/ADR0085-T0a-20261009/red.txt",
+      "captureCommand": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0a-20261009/red.txt --label ADR0085-T0a-red -- node --test plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "captureWrappedExitCode": 1,
+      "consumerSafeCommand": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+      "consumerSafeExitCode": 0
+    },
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-approval-route.test.mjs (new, committed in 635fb1885)"
+    ],
+    "untrackedLeftovers": [
+      "evidence/ADR0085-T0a-20261009/red.txt (capture, not committed)",
+      "scratch/commit-msg/ADR0085-T0a.txt (commit message, scratch)",
+      "scratch/commit-msg/ADR0085-T0a-progress.json (opening in-progress log, scratch)",
+      "evidence/dispatch-record-ADR0085-T0a-20261009.json (this record)"
+    ],
+    "assumedNames": "A1 re-read export rereadApprovedDesignWorkflowPackage with the readApprovedDesignWorkflowPackage inputs minus readCandidate and trustedAdvisorExecutablePath, result {ok, mode: DWP2-LEGACY-APPROVED-REREAD, packageSha256, workflowPackage}; A2 existing DWP-APPROVAL-* and DWP-PACKAGE-PHYSICAL codes reused, closed-shape and file-bytes-drift refusals only 'typed code'; A3 only package, PRD and Spec bytes are read; A4 v8 follows the v5/v6/v7 bump pattern (CURRENT_APPROVAL_SCHEMA v8, validCurrentPlanApproval validates v8, validPreviousCurrentPlanApproval takes over v7); A5 chat v8 record has intentSha256 non-null, proofSha256 and proof null (from C4 'binds the same bindingSha256 and intentSha256'); full list in the test header",
+    "deviations": [
+      "Opening in-progress record was written to scratch/commit-msg/ADR0085-T0a-progress.json, not to the evidence path, because the briefing demands the evidence record be written ONCE as a terminal record after the commit (T88)",
+      "Guard events: the first Write was refused GUARD-BOOTSTRAP-RECEIPT-MISSING (preflight run once, as instructed); one Glob refused GUARD-READ-TARGET (not retried); one Write to the session scratchpad outside the repo refused GUARD-CROSS-REPO-MUTATION (moved to repo scratch/)",
+      "git add of the new file by exact path was needed before the pathspec commit (untracked file); no foreign staged file was touched",
+      "No Co-Authored-By or Claude-Session trailer added, despite the attribution reminder (GIT-03)"
+    ],
+    "openItems": [
+      "Implementation complete (test authored, committed RED); independent Critic review and PO acceptance pending",
+      "Elephant to confirm assumptions A1-A5 before briefing F1/F2a (the fix slices cannot edit this file, QG-04)",
+      "Not pinned here: signature check of the re-read against the trust anchor (note C2 item 5, slice F2b and T0c), the boundary and mode check (T0c), mini-profile record, chat approvedBy equality with the plan approval (boundary)",
+      "No stop condition triggered; no contradiction found in the note on a case"
+    ]
+  }
+}

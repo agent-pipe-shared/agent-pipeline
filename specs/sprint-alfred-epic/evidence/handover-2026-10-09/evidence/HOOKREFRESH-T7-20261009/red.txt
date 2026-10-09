@@ -1,0 +1,54 @@
+command: node --test plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs
+label: HOOKREFRESH-T7-red
+exitCode: 1
+head: 4137c9bd5f388aa1eba4a96547a27b4754b4d37e
+tree: bb109461a7d84ca130d0d6548c9d46a487d70c16
+dirty: true
+--- stdout ---
+✔ CHRB001 second install throws: pre-commit is removed again and the typed error names commit-msg and the rollback (13811.225172ms)
+✔ CHRB002 rollback refused by the installer (hook modified meanwhile): both hooks named, original cause kept, modified hook left alone (13772.743915ms)
+✔ CHRB003 rollback itself throws: both hooks named, original cause preserved, rollback error reachable (55.711755ms)
+✔ CHRB004 both installs succeed: default behaviour is unchanged (ready, two installed results, no rollback) (54054.589512ms)
+✔ CHRB005 both injected installs return: the readback verdict is unchanged and the removal seam is never used (59.148997ms)
+✔ CHRB006 a foreign pre-commit hook that existed before the call is never touched or removed (66.880961ms)
+✖ CHRB007 re-pointed by HOOKREFRESH-T7, Ruling 84: an already-installed pre-commit hook of ours is never touched or removed when the missing commit-msg install fails (29246.94104ms)
+✔ CHRB008 pre-commit was not installed by this call: a failing second install triggers no removal at all (94.977924ms)
+✔ CHRB009 second install RETURNS a refusal instead of throwing: it rolls back exactly like a throw, with the refusal as cause (29368.798559ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140886.422255
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ CHRB007 re-pointed by HOOKREFRESH-T7, Ruling 84: an already-installed pre-commit hook of ours is never touched or removed when the missing commit-msg install fails (29246.94104ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84: current+install is provisioning-required, not refused/blocked
+  + actual - expected
+  
+  + 'blocked'
+  - 'provisioning-required'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs:171:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs:38:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs:165:171)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

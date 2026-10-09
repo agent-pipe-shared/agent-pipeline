@@ -1,0 +1,147 @@
+command: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs plugins/pipeline-core/lib/governance-event-store.win-fsync.test.mjs plugins/pipeline-core/scripts/signing-ceremony.test.mjs
+label: wsl-before
+exitCode: 0
+head: 0f8c297c7372f91bca756bb63ca6438b00e43d7a
+tree: e35ebfb38894c0bfa92a5b852d332d6356d1c5c6
+dirty: true
+--- stdout ---
+✔ portable append publishes canonical bytes, readback checkpoint, and source-last head (60.94724ms)
+✔ ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality (202.834997ms)
+✔ ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused (101.692144ms)
+✔ exact idempotency is a zero-write replay while a conflicting key fails closed (69.632265ms)
+✔ D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe (23.374734ms)
+✔ agent journal payloads persist only as candidate-bound, closed observational events (40.104482ms)
+✔ portable admission requires the exact effective policy and closed safe payload (33.512658ms)
+✔ A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can (56.503024ms)
+✔ A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out (31.151752ms)
+✔ verification is checkpoint-aware and queries return only validated chain records (81.51948ms)
+✔ tampering, non-canonical bytes, and forks fail before projection or query (79.674755ms)
+✔ K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query (55.21226ms)
+✔ inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present (128.946973ms)
+✔ K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery (65.540937ms)
+✔ K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record (93.212113ms)
+✔ inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere (40.202279ms)
+✔ inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences (41.031894ms)
+✔ K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file (181.958505ms)
+✔ K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept (89.841541ms)
+✔ K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK (127.689815ms)
+✔ K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths (96.994634ms)
+✔ ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members (0.103632ms)
+✔ ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable (67.217871ms)
+✔ ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged (171.091083ms)
+✔ ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim (103.563866ms)
+✔ ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature (103.911824ms)
+✔ ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode (94.436796ms)
+✔ ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork (107.349796ms)
+✔ ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature (84.479581ms)
+✔ ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now (116.733781ms)
+✔ ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too (56.114113ms)
+✔ K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception (134.770898ms)
+✔ K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL (93.435108ms)
+✔ K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream (93.136003ms)
+✔ K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection (62.774428ms)
+✔ symlink, cross-repository, and writer-owned intent fields are rejected (40.395231ms)
+✔ NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect) (47.770558ms)
+✔ NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY) (56.37746ms)
+✔ NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused (72.349805ms)
+✔ NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths (52.277252ms)
+✔ projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events (90.719934ms)
+✔ writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer (77.960575ms)
+✔ competing dead-lock recovery cannot delete a newly acquired writer lock (69.184747ms)
+✔ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (111.729639ms)
+✔ K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened (139.535147ms)
+✔ PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed (18.402321ms)
+✔ PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened (20.622344ms)
+✔ PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed (18.532294ms)
+✔ PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) (17.053777ms)
+✔ PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch (18.658727ms)
+✔ existing repository identity: missing identity refuses without creating namespace or binding (8.454777ms)
+✔ existing repository identity: legacy identity refuses without migration or changed bytes (16.008958ms)
+✔ existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes (33.885119ms)
+✔ existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding (123.556868ms)
+✔ existing repository identity: file/root aliases, multiple links and writable binding refuse (20.3264ms)
+✔ existing repository identity: oversized binding is rejected while preserving exact synthetic bytes (9.908084ms)
+✔ existing repository identity: linked worktree observes same common identity; bare repository remains unsupported (33.390791ms)
+✔ win32: a directory fsync refused with EPERM does not fail the atomic write (9.169384ms)
+✔ win32: opening the directory refused with EPERM does not fail the atomic write (2.465157ms)
+✔ win32: a directory fsync refused with EISDIR does not fail the atomic write (2.082531ms)
+✔ win32: opening the directory refused with EISDIR does not fail the atomic write (2.193601ms)
+✔ win32: any other directory error (EIO on fsync) still fails the write (2.006618ms)
+✔ win32: any other directory error (EIO on open) still fails the write (1.959057ms)
+✔ win32: any other directory error (EACCES on fsync) still fails the write (2.012359ms)
+✔ win32: any other directory error (EACCES on open) still fails the write (1.847374ms)
+✔ win32: any other directory error (EINVAL on fsync) still fails the write (1.876116ms)
+✔ win32: any other directory error (EINVAL on open) still fails the write (2.821824ms)
+✔ win32: any other directory error (ENOSPC on fsync) still fails the write (1.910966ms)
+✔ win32: any other directory error (ENOSPC on open) still fails the write (1.865906ms)
+✔ linux: a directory fsync EPERM is NOT tolerated (behaviour unchanged off win32) (1.947657ms)
+✔ linux: a directory open EPERM is NOT tolerated (behaviour unchanged off win32) (1.903306ms)
+✔ linux: a directory fsync EISDIR is NOT tolerated (behaviour unchanged off win32) (1.711113ms)
+✔ linux: a directory open EISDIR is NOT tolerated (behaviour unchanged off win32) (1.890796ms)
+✔ linux: the happy path flushes the file and then the directory exactly once (2.189002ms)
+✔ darwin: a directory fsync EPERM is NOT tolerated (behaviour unchanged off win32) (1.58711ms)
+✔ darwin: a directory open EPERM is NOT tolerated (behaviour unchanged off win32) (1.644321ms)
+✔ darwin: a directory fsync EISDIR is NOT tolerated (behaviour unchanged off win32) (1.791654ms)
+✔ darwin: a directory open EISDIR is NOT tolerated (behaviour unchanged off win32) (1.54516ms)
+✔ darwin: the happy path flushes the file and then the directory exactly once (1.730654ms)
+✔ freebsd: a directory fsync EPERM is NOT tolerated (behaviour unchanged off win32) (2.730481ms)
+✔ freebsd: a directory open EPERM is NOT tolerated (behaviour unchanged off win32) (1.710053ms)
+✔ freebsd: a directory fsync EISDIR is NOT tolerated (behaviour unchanged off win32) (1.666672ms)
+✔ freebsd: a directory open EISDIR is NOT tolerated (behaviour unchanged off win32) (1.64457ms)
+✔ freebsd: the happy path flushes the file and then the directory exactly once (1.856495ms)
+✔ win32: the happy path is unchanged -- the directory flush is attempted, not skipped (1.550031ms)
+✔ win32: a refused FILE fsync is never tolerated and publishes nothing (1.428377ms)
+✔ linux: a refused FILE fsync is never tolerated and publishes nothing (1.189632ms)
+✔ host file system: first-use repository binding (the real writeAtomic path) succeeds and is stable (25.7869ms)
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: c8ac32e50cdf2d7bd67e3520d0c93190845dfac4ac85433c3da2850892d40465
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "signing-ceremony orchestrator end-to-end test"
+  window expires at (signed, absolute): 2026-10-09T03:06:28.383Z
+  candidate commit: 744cb2109247e092b175bfac09d4ed7821926e92
+  candidate tree: 519a348dd85093d36b3d9d875d82e762fe10a51c
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: c0e19039b1258d9779da263effd5e1115fce8e2765b05daae357d0a309391258
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "decline path"
+  window expires at (signed, absolute): 2026-10-09T03:06:45.950Z
+  candidate commit: 3b44219e5c35a25b0adc8d51fefa0a6289c987d7
+  candidate tree: 914e353423e18aa5f3d71b41ada533e095a2c4a0
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+Could not find private key from /tmp/signing-ceremony-external-decline-nIXYiH/po-private.pem
+40A7C93C28740000:error:1C800064:Provider routines:ossl_cipher_unpadblock:bad decrypt:../providers/implementations/ciphers/ciphercommon_block.c:107:
+40A7C93C28740000:error:11800074:PKCS12 routines:PKCS12_pbe_crypt_ex:pkcs12 cipherfinal error:../crypto/pkcs12/p12_decr.c:94:maybe wrong password
+pkeyutl: Error loading key
+PO APPROVAL CONFIRMATION -- read before you enter your passphrase:
+  intent sha256: 55e4d87d622f878d6f1d92cd3a83acc3500fc939a10e803475901857d885357f
+  recorded request: pipeline.guard-maintenance-window-request.v1 (kind guard-lift, feature sprint-nova-epic)
+  guard rules this lifts: GS-6
+  reason recorded with the request: "drift path"
+  window expires at (signed, absolute): 2026-10-09T03:06:56.113Z
+  candidate commit: 815ffcd7edbbe7472473b53f20b30c55efbe266a
+  candidate tree: 307e06f15a740db7e90d27f62461215b3a3cb23f
+  note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope
+  this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.
+This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.
+✔ maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active (17568.486817ms)
+✔ maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed (10154.603175ms)
+✔ maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install (9407.263384ms)
+✔ parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag (0.210014ms)
+✔ runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message (0.242655ms)
+ℹ tests 93
+ℹ suites 0
+ℹ pass 93
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38460.732231
+
+--- stderr ---

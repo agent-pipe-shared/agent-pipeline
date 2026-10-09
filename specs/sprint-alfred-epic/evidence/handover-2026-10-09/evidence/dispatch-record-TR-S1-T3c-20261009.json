@@ -1,0 +1,62 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-T3c-20261009",
+  "agentType": "goldfish-deep",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "Elephant (Alfred sprint)",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": ["b3a263d22"],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "orientation done (obligations, CONT17 header, record template, Ruling 124/78, production regions, test file); GUARD-BOOTSTRAP-RECEIPT-MISSING cured by preflight (status ready)", "toolUses": 21 },
+    { "phase": "advisor consulted once; implementation: Edits to signing-ceremony.test.mjs (encrypted fixture key, passphraseSigning seam, three Ruling 124 re-points)", "toolUses": 35 },
+    { "phase": "WSL signing-ceremony alone: 5 tests, 5 pass, 0 fail, 0 skipped, exit 0 -> evidence/TR-S1-T3c-20261009/wsl-signing-ceremony-only.txt; the combined wsl.txt run (with onboarding-init) exceeded the 600 s Bash timeout and was moved to background", "toolUses": 39 },
+    { "phase": "native signing-ceremony: 5 tests, 2 pass, 3 fail (GES-LOCKED x2 at install, status readback pathname) -> evidence/TR-S1-T3c-20261009/native.txt; consumer-safe 9/9 exit 0; two Greps refused GUARD-READ-TARGET (not retried)", "toolUses": 43 },
+    { "phase": "committed b3a263d22 (signing-ceremony.test.mjs only); checkpoint", "toolUses": 46 },
+    { "phase": "wsl.txt absent at hand-back (Read refused GUARD-READ-TARGET-MISSING); budget checkpoint fired at call 40; final record", "toolUses": 49 }
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["b3a263d22: signing-ceremony.test.mjs only (encrypted fixture key, passphraseSigning seam, three Ruling 124 re-points)"],
+    "verifiedGreen": [
+      { "check": "signing-ceremony.test.mjs under WSL, 5 of 5 pass, 0 skipped", "command": "wsl.exe -e bash -lc cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-T3c-20261009/wsl-signing-ceremony-only.txt --label wsl-signing-ceremony-only -- node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs", "exitCode": 0, "artifact": "evidence/TR-S1-T3c-20261009/wsl-signing-ceremony-only.txt" },
+      { "check": "consumer-safe paths, 9 of 9 pass", "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exitCode": 0, "artifact": "none (stdout only)" }
+    ],
+    "remainsUndone": [
+      "DoD 1 combined WSL capture evidence/TR-S1-T3c-20261009/wsl.txt (signing-ceremony plus onboarding-init.test.mjs) does not exist: the run exceeded the 600000 ms Bash timeout and was moved to background task b9p4i5op8; onboarding-init reds are not verifiable from this dispatch",
+      "native signing-ceremony run is red 3 of 5 for reasons other than the key format (see report), unfixed",
+      "independent review: pending (criticRequired T3)"
+    ],
+    "nextBriefingAdjustments": [
+      "run the onboarding-init half of DoD 1 as its own dispatch or an Elephant-run command with run_in_background and a longer wait; it did not finish inside 600 s",
+      "state whether native reds of the three cases bind stop condition 1; if they do, a Windows follow-up is needed for GES-LOCKED at install and for the new URL pathname readback in the decline case"
+    ]
+  },
+  "report": {
+    "text": "CLOSING HANDOVER (budget checkpoint fired at call 40 of 50; this is a hand-back with a commit, not a completed run). Route pre-check: class is test authorship, not A/G/S; requested claude-sonnet-5-5/xhigh, observed model identity claude-sonnet-5-5 (runtime prompt), effort not observable.\n\n1. DoD results\n- DoD 1 (WSL): PARTIAL. signing-ceremony.test.mjs alone under WSL: 5 tests, 5 pass, 0 fail, 0 skipped, exit 0; the three cases RAN (openssl present). The combined capture with onboarding-init.test.mjs exceeded the 600000 ms Bash timeout and was moved to background (task b9p4i5op8); evidence/TR-S1-T3c-20261009/wsl.txt did not exist at hand-back. onboarding-init reds: not verifiable.\n- DoD 2 (native, signing-ceremony alone): 5 tests, 2 pass, 3 fail, 0 skipped (openssl 3.5.7 present, so no typed skip). Reds: end-to-end and drift both throw GovernanceEventStoreError code GES-LOCKED at governance-event-store.mjs:721, at the install step, i.e. after the encrypted signing spawn succeeded; decline fails at test line 323 with 1 !== 0, which I take to be the unchanged status readback assert (it spawns node on new URL(...).pathname, a leading-slash drive path on Windows); this identification is inferred from the message and position, not re-read. All new decline assertions run before it.\n- DoD 3: passed (exit 0, 9 of 9).\n- DoD 4: committed b3a263d22, signing-ceremony.test.mjs only, trailers Dispatch: TR-S1-T3c-20261009 (goldfish) and AI-Assisted: true.\n- DoD 5: this record.\n\n2. Evidence\n- evidence/TR-S1-T3c-20261009/wsl-signing-ceremony-only.txt: wsl.exe -e bash -lc cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... --label wsl-signing-ceremony-only -- node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs ; wrapped exit 0.\n- evidence/TR-S1-T3c-20261009/native.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... --label native -- node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs ; wrapped exit 1.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 0.\n\n3. Changed files\n- plugins/pipeline-core/scripts/signing-ceremony.test.mjs: fixture key is now PKCS#8 encrypted (aes-256-cbc, FIXTURE_PASSPHRASE); new passphraseSigning() seam returns signDependencies {isTTY: true, spawn, readConfirmation recorder}, signingSpawns, prompts; the spawn delegates everything to spawnSync and appends -passin pass:<passphrase> only to the pkeyutl -sign whose -inkey ends po-private.pem (the toolchain probe signs with its own probe-private.pem and is excluded). End to end: prompts 0, signingSpawns 1 with -passin and status 0, other assertions unchanged. Decline: REQUIRES_OPENSSL gate, wrong passphrase through the real openssl, rejects on the openssl-failed message, prompts 0, one signing spawn with non-zero status, status absent unchanged. Drift: only signDependencies changed, GMW-CANDIDATE-COMMIT-MISMATCH unchanged. Header and fixture comments updated.\n\n4. Deliberately not changed\n- Every production file. signing-ceremony.mjs lines 101-105 now state something false on the encrypted path (requireExplicitConfirmation still runs unconditionally); production, out of scope, named for the dispatcher.\n- The pre-existing new URL pathname readback in the decline case; onboarding-init :919 and :1066 baseline reds; foreign staged and dirty files.\n\n5. Deviations from spec\n- The titles of the end-to-end and decline cases were reworded to the new semantics.\n- The decline case signs through the real openssl with a wrong passphrase instead of a spawn stub (a stub would still need real openssl for the readiness probe).\n- An extra WSL run of signing-ceremony alone was added because the combined run did not finish.\n- Stop condition 1 reading: I committed because the required gate (WSL) is green for all three cases and DoD 2 asks only to report native. The native reds are in unchanged code downstream of the re-pointed signing step, but I could not measure a native baseline (the working-tree production gate refuses the old unencrypted key). If the dispatcher reads stop condition 1 as binding native too, the commit is local and unpushed and can be dropped by the dispatcher.\n\n6. Open items\n- wsl.txt missing; onboarding-init half of DoD 1 unverified; check or stop background task b9p4i5op8.\n- Native reds: GES-LOCKED (governance-event-store.mjs:721) and the pathname readback; a Windows follow-up if native matters.\n- Two Grep calls on evidence and backlog paths were refused with GUARD-READ-TARGET and not retried; one Read of the absent wsl.txt was refused GUARD-READ-TARGET-MISSING.\n- independent review: pending (criticRequired T3). Implementation committed; WSL gate green for the file; DoD 1 combined capture and PO/Critic acceptance outstanding.",
+    "changedFiles": ["plugins/pipeline-core/scripts/signing-ceremony.test.mjs"]
+  }
+}

@@ -1,0 +1,927 @@
+command: node plugins/pipeline-core/scripts/architecture-adoption.mjs propose --json
+label: adopt-d-propose
+exitCode: 0
+head: 434a01bb172b4fd7179543bf20c2362893f0c228
+tree: a609d5a3eac154688b08096f549fb5661b734440
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.adoption-proposal.v1",
+  "generatedAt": "2026-10-09T05:42:19.720Z",
+  "coverageClass": "evaluated",
+  "confidence": "estimated",
+  "inventorySummary": {
+    "moduleCount": 5,
+    "candidateModules": [
+      "backlog",
+      "governance",
+      "harness",
+      "pipeline-core",
+      "schemas"
+    ],
+    "uncoveredPaths": [],
+    "coverageGaps": [],
+    "unknownCoverageShare": 0
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "name": "Navigation map bundle (map first, #109 §5)",
+      "description": "Deploy machine-readable OKF v0.1 navigation map bundle: AGENTS.md entry pointer, architecture/map/index.md root index, and governed module concept files.",
+      "primaryDeliverables": [
+        "AGENTS.md",
+        "architecture/map/index.md",
+        "architecture/map/<module>.md"
+      ],
+      "effort": {
+        "units": 5,
+        "status": "measured"
+      },
+      "coverageClass": "evaluated",
+      "confidence": "measured"
+    },
+    {
+      "stage": 2,
+      "name": "Core contracts by traversal frequency / priority",
+      "description": "Formalize public interface contracts for hottest modules by traversal frequency and preflight authority dependency.",
+      "primaryDeliverables": [
+        "backlog/transitions.ndjson",
+        "backlog/items/**",
+        "docs/operating-model.md",
+        "policies/model-policy.md",
+        "roles/elephant.md",
+        "roles/goldfish.md",
+        "guardrails/token-budget.md",
+        "harness/scripts/verify.mjs",
+        "harness/scripts/check-verify-suite-registration.mjs",
+        "harness/scripts/check-verify-suite-append.mjs",
+        "harness/scripts/verify-case-completion-augmentation.mjs",
+        "harness/config/verify-case-completion-augmentations.v1.json",
+        "harness/verify-suites.json",
+        "plugins/pipeline-core/lib/passive-read-policy.mjs",
+        "plugins/pipeline-core/lib/intake-material-reference.mjs",
+        "plugins/pipeline-core/lib/po-key-directory.mjs",
+        "plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "plugins/pipeline-core/lib/design-advisor-course-store.mjs",
+        "plugins/pipeline-core/lib/design-advisory-coordinator-v2.mjs",
+        "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+        "plugins/pipeline-core/lib/native-initial-advisor-execution.mjs",
+        "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+        "plugins/pipeline-core/lib/runner-readiness-request.mjs",
+        "plugins/pipeline-core/lib/project-uninstall-workspace.mjs",
+        "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+        "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+        "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+        "plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json",
+        "plugins/pipeline-core/lib/security-scanner-diagnostics-publication.mjs",
+        "plugins/pipeline-core/lib/security-scanner-diagnostics.mjs",
+        "plugins/pipeline-core/install-agy.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "plugins/pipeline-core/scripts/check-private-identifiers.mjs",
+        "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
+        "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+        "plugins/pipeline-core/scripts/onboarding-init.mjs",
+        "plugins/pipeline-core/hooks/guard-push.mjs",
+        "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
+        "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+        "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "plugins/pipeline-core/scripts/enforcement-conformance-cli.mjs",
+        "plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs",
+        "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+        "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/scripts/module-inventory.mjs",
+        "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+        "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+        "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+        "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+        "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+        "plugins/pipeline-core/scripts/check-protected-delta.mjs",
+        "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+        "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+        "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+        "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+        "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+        "plugins/pipeline-core/scripts/architecture-inherited-sources.mjs",
+        "plugins/pipeline-core/scripts/architecture-effective-decisions.mjs",
+        "plugins/pipeline-core/scripts/finish-feature.mjs",
+        "plugins/pipeline-core/lib/execution-plane-contract.mjs",
+        "plugins/pipeline-core/scripts/execution-plane-launch.mjs",
+        "plugins/pipeline-core/lib/critic-course-admission.mjs",
+        "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+        "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+        "plugins/pipeline-core/lib/critic-session-model-route.mjs",
+        "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+        "plugins/pipeline-core/scripts/check-critic-bound-verify.mjs",
+        "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+        "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+        "plugins/pipeline-core/scripts/close-coordinator.mjs",
+        "plugins/pipeline-core/scripts/design-advisory-admission.mjs",
+        "plugins/pipeline-core/scripts/design-advisory-coordinator.mjs",
+        "plugins/pipeline-core/lib/design-advisory-transaction.mjs",
+        "plugins/pipeline-core/lib/design-workflow-package.mjs",
+        "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+        "plugins/pipeline-core/lib/model-role-session.mjs",
+        "plugins/pipeline-core/lib/model-role-route-source.mjs",
+        "plugins/pipeline-core/lib/model-role-host-session.mjs",
+        "plugins/pipeline-core/lib/model-role-host-observations.mjs",
+        "plugins/pipeline-core/lib/model-role-host-identity.mjs",
+        "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+        "plugins/pipeline-core/lib/model-role-v3-baseline.mjs",
+        "plugins/pipeline-core/lib/verify-suite-append-policy.mjs",
+        "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+        "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs",
+        "plugins/pipeline-core/lib/model-role-host-store.mjs",
+        "plugins/pipeline-core/lib/model-role-dispatch.mjs",
+        "plugins/pipeline-core/lib/dispatch-record.mjs",
+        "plugins/pipeline-core/lib/critic-disposition-addendum.mjs",
+        "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+        "plugins/pipeline-core/lib/pipeline-commit.mjs",
+        "plugins/pipeline-core/scripts/pipeline-commit.mjs",
+        "plugins/pipeline-core/lib/main-session-route.mjs",
+        "plugins/pipeline-core/lib/agy-final-return.mjs",
+        "plugins/pipeline-core/lib/agy-host-observed-receipt.mjs",
+        "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs",
+        "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs",
+        "plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs",
+        "plugins/pipeline-core/lib/portable-critic-export.mjs",
+        "plugins/pipeline-core/scripts/portable-critic-export.mjs",
+        "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+        "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+        "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+        "plugins/pipeline-core/scripts/agy-undelivered-record.mjs",
+        "plugins/pipeline-core/scripts/agy-host-observed-finalize.mjs",
+        "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.mjs",
+        "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.mjs",
+        "plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs",
+        "plugins/pipeline-core/lib/governance-scope.mjs",
+        "plugins/pipeline-core/scripts/project-activation.mjs",
+        "plugins/pipeline-core/lib/project-uninstall-contract.mjs",
+        "plugins/pipeline-core/lib/project-uninstall.mjs",
+        "plugins/pipeline-core/lib/runtime-projection-removal.mjs",
+        "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+        "schemas/pipeline.security-scanner-diagnostics.v1.json",
+        "schemas/pipeline.architecture-profile.v1.json",
+        "schemas/pipeline.module-inventory.v1.json",
+        "schemas/pipeline.module-interaction-receipt.v1.json",
+        "schemas/pipeline.architecture-decision.v1.json",
+        "schemas/pipeline.architecture-decision.v2.json",
+        "schemas/pipeline.fitness-evidence.v1.json",
+        "schemas/pipeline.architecture-baseline.v1.json",
+        "schemas/pipeline.adoption-state.v1.json",
+        "schemas/pipeline.adoption-proposal.v1.json",
+        "schemas/pipeline.design-readiness-receipt.v1.json",
+        "schemas/pipeline.design-workflow-package.v1.json"
+      ],
+      "effort": {
+        "units": 8,
+        "status": "estimated"
+      },
+      "coverageClass": "evaluated",
+      "confidence": "estimated",
+      "contracts": [
+        {
+          "path": "backlog/transitions.ndjson",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "backlog/items/**",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "docs/operating-model.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "policies/model-policy.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "roles/elephant.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "roles/goldfish.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "guardrails/token-budget.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/scripts/verify.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/scripts/check-verify-suite-registration.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/scripts/check-verify-suite-append.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/scripts/verify-case-completion-augmentation.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/config/verify-case-completion-augmentations.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "harness/verify-suites.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/passive-read-policy.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/intake-material-reference.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/po-key-directory.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-advisor-course-store.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-advisory-coordinator-v2.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-initial-advisor-execution.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/runner-readiness-request.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-uninstall-workspace.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/security-scanner-diagnostics-publication.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/security-scanner-diagnostics.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/install-agy.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/check-private-identifiers.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/onboarding-init.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/enforcement-conformance-cli.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/module-inventory.mjs",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/check-protected-delta.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-inherited-sources.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/architecture-effective-decisions.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/finish-feature.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/execution-plane-contract.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/execution-plane-launch.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-session-model-route.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/check-critic-bound-verify.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-verify-readiness.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/close-coordinator.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/design-advisory-admission.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/design-advisory-coordinator.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-advisory-transaction.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-session.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-host-session.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-host-observations.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-host-identity.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-v3-baseline.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/verify-suite-append-policy.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-host-store.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/model-role-dispatch.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/dispatch-record.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-disposition-addendum.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/pipeline-commit.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-commit.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/main-session-route.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-final-return.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-host-observed-receipt.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/portable-critic-export.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/portable-critic-export.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/agy-host-commit-execution.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/goldfish-commit-command-flow.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/agy-undelivered-record.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/agy-host-observed-finalize.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/elephant-implementation-dispatch.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/project-activation.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-uninstall-contract.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/project-uninstall.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/runtime-projection-removal.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.security-scanner-diagnostics.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.architecture-profile.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.module-inventory.v1.json",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.module-interaction-receipt.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.architecture-decision.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.architecture-decision.v2.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.fitness-evidence.v1.json",
+          "priority": "high",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.architecture-baseline.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.adoption-state.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.adoption-proposal.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.design-readiness-receipt.v1.json",
+          "priority": "normal",
+          "status": "available"
+        },
+        {
+          "path": "schemas/pipeline.design-workflow-package.v1.json",
+          "priority": "normal",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "stage": 3,
+      "name": "Fitness model and baseline ratchet",
+      "description": "Establish architecture fitness model and baseline ratchet store inventorying accepted debt without retroactive fabrication.",
+      "primaryDeliverables": [
+        "architecture/fitness-model.json",
+        "architecture/baseline.json"
+      ],
+      "effort": {
+        "units": 5,
+        "status": "measured"
+      },
+      "coverageClass": "evaluated",
+      "confidence": "measured"
+    },
+    {
+      "stage": 4,
+      "name": "Continuous enforcement and receipts",
+      "description": "Enforce architecture properties at planning, candidate, push, and CI boundaries, recording module interaction receipts.",
+      "primaryDeliverables": [
+        "hooks/guard-push.mjs",
+        ".github/workflows/verify.yml",
+        "schemas/pipeline.module-interaction-receipt.v1.json"
+      ],
+      "effort": {
+        "units": 6,
+        "status": "estimated"
+      },
+      "coverageClass": "evaluated",
+      "confidence": "estimated"
+    }
+  ],
+  "whatIsNotProposed": [
+    "No architectural restructuring",
+    "No all-at-once migration",
+    "No retroactive ADR mass backfill",
+    "No prompt-based pass claims",
+    "No repeat adoption decision: retain the existing durable disposition"
+  ],
+  "estimatedTotalEffort": {
+    "units": 24,
+    "status": "estimated"
+  },
+  "decisionOptions": [],
+  "deterministicPassSafe": true
+}
+
+--- stderr ---

@@ -1,0 +1,82 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CSW-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "862db7a68",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "b0d1ff11d"
+  ],
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["b0d1ff11d: win32 boot-minute owner runtime + opt-in probable liveness + preflight probable marker (2 production files)"],
+    "verifiedGreen": [
+      {"check": "native worktree-lifecycle.test.mjs, 68/68, CSW-T pin PASS", "command": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/native.txt --label native -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs", "exit": 0, "artifact": "evidence/CSW-F-20261009/native.txt"},
+      {"check": "WSL worktree-lifecycle.test.mjs", "command": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/wsl.txt --label wsl -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs\"", "exit": 0, "artifact": "evidence/CSW-F-20261009/wsl.txt"},
+      {"check": "native pipeline-start-preflight.test.mjs (after only)", "command": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/preflight-native.txt --label preflight-native -- node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs", "exit": 0, "artifact": "evidence/CSW-F-20261009/preflight-native.txt"}
+    ],
+    "remainsUndone": [
+      "consumer-safe-paths exits 1 (3 findings in plugins/pipeline-core/docs/adr/0014-critic-contract.md, not in this diff); needs an owner",
+      "no separate before-run for the preflight test (premise stale: the MULTISESSION cases are typed skips natively)",
+      "observeConcurrentSessionWarning docstring still mentions only live",
+      "resultSha256 not computed (guard-dispatch-budget admitted only record writes, git add and git commit once the cap was reached); re-bind as sha256 of the UTF-8 bytes of report.text"
+    ],
+    "nextBriefingAdjustments": [
+      "orientation consumed 41 of 55 calls and the hook tally ran ahead of the agent's own count (the advisor call counted): shorten the context list",
+      "tell the Goldfish the finalizer must run BEFORE the cap, because the budget guard blocks node and Write on scratch afterwards",
+      "state that the MULTISESSION preflight cases are typed skips natively and that D0 test :819 pins unavailable off Linux (forces the opt-in design)"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT18/CONT33 headers + CSW-F section + goldfish-task 455-481 read; preflight run; record created",
+      "toolUses": 11
+    },
+    {
+      "phase": "orientation: lifecycle, preflight, rulings, tests read; advisor consulted; finalizer script written (prepare mode tested)",
+      "toolUses": 43
+    },
+    {
+      "phase": "implement: five edits in two production files; verify: native, WSL, preflight, consumer-safe; diff reviewed; commit b0d1ff11d",
+      "toolUses": 56
+    },
+    {
+      "phase": "finalize: terminal record written directly (finalizer blocked by budget guard); resultSha256 not computed",
+      "toolUses": 58
+    }
+  ],
+  "resultSha256": "not-computed",
+  "report": {
+    "text": "CSW-F-20261009: implementation complete (committed b0d1ff11d), one DoD check red for a reason outside this change. independent review: pending. Closing-allowance handover (budget reached at the commit; no stop condition triggered).\n\nRoute pre-check: class production, not A/G/S, so MP-07 does not apply. Requested goldfish-deep (Sonnet 5.5 / xhigh); observed from this dispatch's runtime prompt: 'Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. No contradiction.\n\n1. DoD results\n- native.txt, CSW-T pin green, nothing else changes: passed. Wrapped exit 0, '68/68 checks passed'; both CSW-T checks print PASS (native.txt lines 39-40). CSW-T's own red run (67/68, only the pin red) is the baseline; no separate before-run made.\n- wsl.txt unchanged: passed (wrapped exit 0); not byte-compared against CSW-T's wsl.txt.\n- Two native PHX-WP-AAC01-MULTISESSION reds before/after: not verifiable as stated. The premise is stale: pipeline-start-preflight.test.mjs lines 1892 and 1947 are typed skips keyed on process.platform !== 'linux', so natively they are skips, not reds. Only an after-run exists: preflight-native.txt, wrapped exit 0. No before-run captured (budget).\n- consumer-safe-paths exits 0: FAILED, exit 1 (8/9). Three findings, all in plugins/pipeline-core/docs/adr/0014-critic-contract.md lines 68/70/90 (names 'harness/'). That file is not in this diff and was unmodified at dispatch start, so this is a HEAD-state defect (hypothesis: the ADR-0014 amendment d7926f82c); not verified by a before-run. CSW-T saw exit 0 at an earlier commit.\n- One commit with the exact subject: passed, b0d1ff11d.\n\n2. Evidence\n- node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/native.txt --label native -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs ; wrapped exit 0.\n- wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/wsl.txt --label wsl -- node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs\" ; wrapped exit 0.\n- node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CSW-F-20261009/preflight-native.txt --label preflight-native -- node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs ; wrapped exit 0.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs ; exit 1 (stdout only).\n\n3. Changed files (commit b0d1ff11d, 65 insertions, 8 deletions)\n- plugins/pipeline-core/lib/worktree-lifecycle.mjs: win32 boot-minute owner runtime, probableOwnerStatus, seams platform/nowMs/uptimeSeconds.\n- plugins/pipeline-core/scripts/pipeline-start-preflight.mjs: observeConcurrentSessionWarning opts in and adds probable/message in the probable case only.\n- Untracked, git-ignored evidence: evidence/CSW-F-20261009/native.txt, wsl.txt, preflight-native.txt.\n\n4. Deliberately not changed\n- All tests (forbidden), including D0 worktree-lifecycle.test.mjs:819, which pins 'unavailable' off Linux.\n- The observeConcurrentSessionWarning docstring still says only 'live' (budget).\n- macOS: any non-Linux, non-win32 host stays 'unavailable'.\n- A Linux-written descriptor read natively still takes the existing kill-then-unavailable path (pid namespaces differ across WSL and native; pre-existing).\n\n5. Deviations from spec\n- Opt-in. The default inspectSessionOwnerRuntime still answers 'unavailable' off Linux; only a caller passing probableLiveness: true gets status 'live' with probable: true (or 'reused' after a reboot). Reason: test :819 pins 'unavailable' off Linux and the DoD says nothing else changes, so a default flip would turn it red natively. It also keeps retirement and orphan-archive decisions off a probable status.\n- Storage: the boot minute (now minus os.uptime, floored to the minute, Ruling 111) is stored in the existing processStartId slot, so descriptor validation and fixtures are unchanged. Adjacent minutes (tolerance 1, as the audit-lock owner) count as the same boot. On win32 a runtime is recorded only if the pid exists at registration (mirrors Linux null).\n- 'Says probably': the warning is a structured object with no prose. Added probable: true plus a message containing 'probably live', only in the probable case; the Linux warning keeps its exact four keys.\n- Per-commit record checkpoint skipped; one terminal write, as briefed. resultSha256 is the string 'not-computed': once the cap was reached guard-dispatch-budget admitted only record writes, git add and git commit, so the finalizer (scratch/csw-f-finalize.mjs, prepare mode tested, finalize mode untested) could not run. Re-bind as sha256 of the UTF-8 bytes of this text.\n\n6. Open items\n- Behaviour shift (Linux parity, not a defect): a win32 descriptor registered after this commit whose owner pid is later dead now reads 'not-live' by default (was 'unavailable'), so retirement reads 'retirable' and the orphan-archive tier refuses it as observable.\n- Un-skipping the first MULTISESSION test on win32 would see extra probable/message keys at its deepEqual (:1918); the owning test slice must expect them.\n- Unverified: whether os.uptime() on Windows counts sleep. If it does not, the boot minute drifts after each sleep and a live session reads 'reused' (a quiet miss).\n- No test exercises the hermetic win32 seams on a non-win32 host (tests forbidden here). Follow-up test slice: platform/nowMs/uptimeSeconds seams on Linux; boot mismatch gives 'reused'; ESRCH gives 'not-live'; the +-1 minute edge; opt-in versus default.\n- consumer-safe-paths red (above) needs an owner.\n- Closing handover: committed = b0d1ff11d; verified green = native lifecycle 68/68, WSL lifecycle, native preflight test; remains undone = the unowned consumer-safe finding, the before-run, the docstring, resultSha256; next briefing: orientation cost 41 of 55 calls and the hook tally ran ahead of mine (the advisor call counted), so brief fewer context files and run the finalizer before the cap.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "evidence/CSW-F-20261009/native.txt",
+      "evidence/CSW-F-20261009/wsl.txt",
+      "evidence/CSW-F-20261009/preflight-native.txt"
+    ]
+  }
+}

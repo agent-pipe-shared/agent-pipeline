@@ -1,0 +1,349 @@
+command: node --test --test-reporter=spec plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs plugins/pipeline-core/scripts/refresh-mandatory-hooks.test.mjs plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
+label: hookrefresh-t6-red
+exitCode: 1
+head: 5031d4dc474cdeab4f533d14b8bd0f5292d44352
+tree: 801823c0ddb41a10182bd6caf5838bc057af038c
+dirty: true
+--- stdout ---
+✖ RED F1 (a): current+install and refresh+install, in either order, read provisioning-required (today: blocked / HOOK-READINESS-STATE-UNSUPPORTED) (1.176832ms)
+✔ GREEN control F1 (b): the widening does not leak -- foreign, decline and unresolved entries still block or stay unresolved (0.259025ms)
+✖ RED F1 (c): a really installed pre-commit hook beside a missing commit-msg hook inspects as provisioning-required with the coordinator action (15565.357422ms)
+✖ RED F1 (d): apply installs ONLY the install entry (commit-msg); the current pre-commit hook and its marker stay byte-identical (14657.519278ms)
+✖ RED F1 (e): mirror -- a really installed commit-msg hook beside a missing pre-commit hook: only pre-commit is installed (14292.566169ms)
+✖ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (16228.021665ms)
+✖ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (8399.72139ms)
+✔ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (59958.30247ms)
+✔ GREEN precondition: WITHOUT readOnly, a later session with an unchanged mapping is admitted and persisted (this is the write the readback must not make) (10.032337ms)
+✖ RED F2 (a): readOnly never calls store.persist, even where the session would otherwise be admitted (7.349767ms)
+✖ RED F2 (b): readOnly where it would admit returns admission-pending with its own code (7.036032ms)
+✔ GREEN control F2 (c): readOnly leaves a REUSED (present) session ready and writes nothing (7.135394ms)
+✔ GREEN control F2 (d): readOnly on a fresh session that needs a human confirmation stays `confirmation-required` and writes nothing (2.993306ms)
+✖ RED F2 (e): the preflight's PROCESS-ENTRY readback call site passes readOnly: true (source-level pin; see header) (3.71472ms)
+✔ ENFORCEMENT: Elephant, all three hooks stale -> non-ready, ONE action refreshes all of them (18.551577ms)
+✔ ENFORCEMENT: Elephant, one mandatory hook stale next to a current one -> action covers exactly the stale one (15.016931ms)
+✖ ENFORCEMENT [T0 case re-pointed by HOOKREFRESH-T6, Ruling 84 F1]: Elephant, a stale hook next to a MISSING one goes provisioning first, then refresh, then ready (15.492208ms)
+✖ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-HUMAN-CONFIRMATION-REQUIRED as its own status, not `unavailable` (7.96655ms)
+✖ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED as its own status, not `unavailable` (7.974209ms)
+✖ RED F4 (Ruling 84): the field carries `admission-pending` / MODEL-ROLE-BOOTSTRAP-ADMISSION-PENDING as its own status, not `unavailable` (7.942088ms)
+✔ GREEN control F4: genuinely unavailable results, unknown statuses and a null result still read `unavailable` (20.415051ms)
+✖ RED F2 (Ruling 84, ASSUMED NAME R5): the preflight's readback call carries readOnly: true in its argument bag (seam spy) (7.99977ms)
+✔ ENFORCEMENT: an absent role is the Elephant (strict default) -> stale mandatory hook is non-ready (14.113813ms)
+✔ CONTROL: goldfish readback is unaffected by stale hooks (they never install) (14.024192ms)
+✔ CONTROL: critic readback is unaffected by stale hooks (they never install) (14.584173ms)
+✔ CONTROL: Elephant, only the ADVISORY pre-push hook stale -> still ready (assumption: pre-push is not mandatory) (14.108983ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: absent) (7.443149ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: elephant) (7.211715ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: goldfish) (8.237974ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: critic) (7.384708ms)
+✔ ENFORCEMENT: a ready model-role bootstrap is passed through as its own status and code (7.253685ms)
+✔ ENFORCEMENT: `unavailable` with its code is a legal value and does not downgrade the envelope (6.877128ms)
+✔ ENFORCEMENT: a bootstrap that throws is still a present field (`unavailable`), never an absent one (6.888748ms)
+✔ TODO: plugin update under an onboarded project -> one typed refresh nextAction, not a two-step repair (0.107282ms) # not expressible at the preflight seam: the preflight only distinguishes ProjectOnboardingReadyError code PORG-NOT-READY (never onboarded, projection drift and cleanup residue all fold into it) and answers with the guided-driver / inspect action; projection drift after a plugin update is classified inside project-onboarding-v3, and no 'refresh' action or command exists in any contract yet (backlog item pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair: 'Not designed here'; pipeline.typed-plugin-update-next-action has no design). Pin it in the project-onboarding-v3 suite once the refresh action's identity is decided.
+✔ GREEN (existing behaviour): only ready-to-upgrade AND updateRequired === true is applied (1.106641ms)
+✔ GREEN (existing behaviour): an installer `installed` result also counts as refreshed (0.126593ms)
+✔ GREEN (existing behaviour): `ready` (absent), `declined`, foreign and every other plan status is skipped and its apply is never called (0.435458ms)
+✔ GREEN (existing behaviour): one throwing apply never aborts the others; the result status is `failed` (0.217924ms)
+✔ GREEN (existing behaviour): a refused or unrecognisable apply result is a failure, not a silent success (0.194244ms)
+✔ GREEN (existing behaviour): the result status is `ready` only when nothing failed AND the mandatory readback is ready, else `pending` (0.210394ms)
+✔ GREEN (existing behaviour): the CLI rejects unknown arguments, prints one JSON line, and exits 0 only when ready (0.455219ms)
+✔ GREEN (existing behaviour): real-fixture load -- the module imports and, in a repository with no hooks, applies nothing (28.38683ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 27
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 129335.297366
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:87:1
+✖ RED F1 (a): current+install and refresh+install, in either order, read provisioning-required (today: blocked / HOOK-READINESS-STATE-UNSUPPORTED) (1.176832ms)
+  AssertionError [ERR_ASSERTION]: current+install: Ruling 84 F1 -- a partly provisioned pair with no foreign/decline/unresolved entry is provisioning-required, not a dead end
+  + actual - expected
+  
+  + 'blocked'
+  - 'provisioning-required'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:91:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:121:1
+✖ RED F1 (c): a really installed pre-commit hook beside a missing commit-msg hook inspects as provisioning-required with the coordinator action (15565.357422ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: current+install must offer provisioning, not block
+  + actual - expected
+  
+  + 'blocked'
+  - 'provisioning-required'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:125:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:121:157)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:133:1
+✖ RED F1 (d): apply installs ONLY the install entry (commit-msg); the current pre-commit hook and its marker stay byte-identical (14657.519278ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: today the coordinator refuses (HOOK-READINESS-PLAN-DRIFT / not provisioning-required) and installs nothing
+  
+  'refused' !== 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:142:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:133:142)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'refused',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:150:1
+✖ RED F1 (e): mirror -- a really installed commit-msg hook beside a missing pre-commit hook: only pre-commit is installed (14292.566169ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: today the coordinator refuses and installs nothing
+  
+  'refused' !== 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:154:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:150:135)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'refused',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:159:1
+✖ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (16228.021665ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: today the coordinator returns "refused" without ever trying the missing commit-msg install
+  
+  0 !== 1
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:176:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:159:154)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:190:1
+✖ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (8399.72139ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: the stale+missing mix is provisioning-required (today blocked / HOOK-READINESS-STATE-UNSUPPORTED)
+  + actual - expected
+  
+  + 'blocked'
+  - 'provisioning-required'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:198:10
+      at withRepository (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:56:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs:190:128)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:98:1
+✖ RED F2 (a): readOnly never calls store.persist, even where the session would otherwise be admitted (7.349767ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F2: a read-only readback admitted session-2 and wrote it to the host store (Ruling 70 R3: stop on a write)
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:102:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:108:1
+✖ RED F2 (b): readOnly where it would admit returns admission-pending with its own code (7.036032ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F2: the result of a read-only readback is not an admission
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:112:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:137:1
+✖ RED F2 (e): the preflight's PROCESS-ENTRY readback call site passes readOnly: true (source-level pin; see header) (3.71472ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F2: the entry readback calls runModelRoleBootstrap without readOnly: true, so a preflight run can write a model-role admission
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs:144:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'async function observeModelRoleBootstrapReadback() {\n  try {\n    if (observeGovernanceScope({ rootDir: process.cwd() })?.state !== "active") return undefined;\n    const { runModelRoleBootstrap } = await import("./model-role-bootstrap.mjs");\n    return await runModelRoleBootstrap({\n      rootDir: process.cwd(),\n      runner: resolveActiveRunner({ env: process.env, read: readFileSync }),\n      env: process.env,\n    });\n  } catch {\n    return { ok: false, code: MODEL_ROLE_BOOTSTRAP_UNAVAILABLE_CODE, status: "unavailable" };\n  }\n}\n\nif (',
+    expected: /readOnly:\s*true/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:212:1
+✖ ENFORCEMENT [T0 case re-pointed by HOOKREFRESH-T6, Ruling 84 F1]: Elephant, a stale hook next to a MISSING one goes provisioning first, then refresh, then ready (15.492208ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F1: the stale+missing mix is provisioning-required first (today hook-provisioning-blocked with the removed staleMissingMix refresh action)
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'hook-provisioning-required'
+                       ^
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:225:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'hook-provisioning-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-HUMAN-CONFIRMATION-REQUIRED as its own status, not `unavailable` (7.96655ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F4: modelRoleBootstrapField folds everything but `ready` into `unavailable`, hiding that a human confirmation or an admission is merely pending
+  + actual - expected
+  
+  + 'unavailable'
+  - 'confirmation-required'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:261:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'confirmation-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED as its own status, not `unavailable` (7.974209ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F4: modelRoleBootstrapField folds everything but `ready` into `unavailable`, hiding that a human confirmation or an admission is merely pending
+  + actual - expected
+  
+  + 'unavailable'
+  - 'confirmation-required'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:261:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'confirmation-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:257:3
+✖ RED F4 (Ruling 84): the field carries `admission-pending` / MODEL-ROLE-BOOTSTRAP-ADMISSION-PENDING as its own status, not `unavailable` (7.942088ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F4: modelRoleBootstrapField folds everything but `ready` into `unavailable`, hiding that a human confirmation or an admission is merely pending
+  + actual - expected
+  
+  + 'unavailable'
+  - 'admission-pending'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:261:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'admission-pending',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:280:1
+✖ RED F2 (Ruling 84, ASSUMED NAME R5): the preflight's readback call carries readOnly: true in its argument bag (seam spy) (7.99977ms)
+  AssertionError [ERR_ASSERTION]: Ruling 84 F2: the preflight's model-role readback must be read-only (the process-entry call site is pinned in model-role-bootstrap.readonly.test.mjs)
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs:284:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

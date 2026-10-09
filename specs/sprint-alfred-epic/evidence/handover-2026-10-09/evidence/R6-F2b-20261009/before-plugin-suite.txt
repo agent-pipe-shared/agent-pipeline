@@ -1,0 +1,851 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs
+label: before-plugin-suite
+exitCode: 1
+head: 37644457a687be4a0636107efdab0a856c028299
+tree: 78f515c8bc978e34244ae7237e10596e35238532
+dirty: true
+--- stdout ---
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit ccb84d69e715798e57ee945563b6959d57580403 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit 9a1789756451257c3144a74564074b481c4ccbff (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit 37ba83a39a3463ed2bffbf3846271368d9c012e6 (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "PO" for commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (2026-08-08T18:40:00.000Z).
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md(32ae22050f77...)+specs/stagingbolt-ordinary/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission b427bdcd19d9....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "stagingbolt-ordinary",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/stagingbolt-ordinary/design-input.md",
+      "sha256": "e84d24535c64f851f2208098d4e08c767ec97d5815158cd5a182b7a855ca193f",
+      "content": "Original request for stagingbolt-ordinary.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md",
+      "sha256": "32ae22050f772b55496ddad26fea07549e97963950e511d6c15dfe992244f8aa",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nstagingbolt-ordinary\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/stagingbolt-ordinary/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/stagingbolt-ordinary/design.md",
+      "sha256": "ecd07148dfec47243fc2e8ba49c140ae6996a3ddbf3ff5058ecf814947171837",
+      "content": "Revised design for stagingbolt-ordinary.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/stagingbolt-ordinary/traceability.md",
+      "sha256": "cdcc7bb0288dc5d90e027e34051cdf6ca0f03b5fd32d15b806e0667a7b9318a6",
+      "content": "Every requirement for stagingbolt-ordinary is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/stagingbolt-ordinary/evidence/advisor.json",
+      "sha256": "179330b4e18f6a70010299d6620108cd1336f7e930f0b7d2200cb6ef7a64a249",
+      "dispatchId": "advisor-stagingbolt-ordinary",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/stagingbolt-ordinary/evidence/readiness.json",
+    "sha256": "a8c9bc3701440bc97b1888fafedfdcdf5a87e611c7ad11b54d30e9857e7ef9ff",
+    "dispatchId": "readiness-stagingbolt-ordinary",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7c8c20883e759852f722a18b557e0b580961dea636aece4f866988bb6c82f23a",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10.json (package sha256 e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-e90cfb074dbb2a610f7bb4969416c8f0cf115d73ea64233b5865321df1e20b10.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T10:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/stagingbolt-ordinary/prd_stagingbolt-ordinary.md(32ae22050f77...)+specs/stagingbolt-ordinary/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/global-chat-plan-approval/prd_global-chat-plan-approval.md(fcfef1996ea9...)+specs/global-chat-plan-approval/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 117c81c7354b....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "global-chat-plan-approval",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/global-chat-plan-approval/design-input.md",
+      "sha256": "808416e03083b29ad2ccb423a9388d1efd1cc2acf0d27f5bee8382e408852887",
+      "content": "Original request for global-chat-plan-approval.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/global-chat-plan-approval/prd_global-chat-plan-approval.md",
+      "sha256": "fcfef1996ea9bbe8757a6f4fb0db1f09495862fefe855d7d3062e19c610e4311",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nglobal-chat-plan-approval\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/global-chat-plan-approval/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/global-chat-plan-approval/design.md",
+      "sha256": "bb581ce9b38d3d5debb1cd22d7f16f4c3beea2b6df5231fa2ad5be7b08a30fd0",
+      "content": "Revised design for global-chat-plan-approval.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/global-chat-plan-approval/traceability.md",
+      "sha256": "a7373ab3688da057f29da059622dfe04ea282bc9cc5e570a878ff1351fb620ab",
+      "content": "Every requirement for global-chat-plan-approval is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/global-chat-plan-approval/evidence/advisor.json",
+      "sha256": "1d4f71c5678e702bcf8945a571931abfd687ba990be0be175afd99c24ea567cc",
+      "dispatchId": "advisor-global-chat-plan-approval",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/global-chat-plan-approval/evidence/readiness.json",
+    "sha256": "890090292edc12d685125525b9e078542070b1f38e2e46f5c7edb13f9b906366",
+    "dispatchId": "readiness-global-chat-plan-approval",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "f7741225d21709bdd49eebbebe8139b8fd2674beb3de9ced884eb97e41e4796c",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547.json (package sha256 5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-5c3c3501386d2242691201b34d3e58fb4bbd50f4f794613e94676a1c7073c547.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "PO" on 2026-08-27T10:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/global-chat-plan-approval/prd_global-chat-plan-approval.md(fcfef1996ea9...)+specs/global-chat-plan-approval/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 7c5073ef1444....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T11:00:00.000Z; bound to submission 36083e40d674....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T11:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/prdframing-success/prd_prdframing-success.md(ecca622cacee...)+specs/prdframing-success/spec.md(1b355baa3076...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-no-presentation/prd_planshown-no-presentation.md(a3fd44d67654...)+specs/planshown-no-presentation/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 7c5073ef1444....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Design reopened by "po-test" on 2026-08-27T10:00:00.000Z; lifecycle="draft".
+Plan submitted by "coordinator" on 2026-08-27T11:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T11:00:00.000Z; bound to submission 36083e40d674....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "planshown-resubmission-invalidates",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/planshown-resubmission-invalidates/design-input.md",
+      "sha256": "bc4d6fe4c31865b78a1d7db2e5a0d2f659aa44cd0c394ba75f082afc965d4c2d",
+      "content": "Original request for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md",
+      "sha256": "1bef470623612d309d15aa2c72aa3276837023f05151e5181ce4f4cb5026bf1b",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nplanshown-resubmission-invalidates\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/planshown-resubmission-invalidates/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/planshown-resubmission-invalidates/design.md",
+      "sha256": "318361d57a1faa5e4de4b231cc72aa2a0f3fae77a751d40474c89cbcf250d4c8",
+      "content": "Revised design for planshown-resubmission-invalidates.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/planshown-resubmission-invalidates/traceability.md",
+      "sha256": "c12e0b30b5d31b43ebe7e45c77c378f39cf5bd70c7c156d1bec2c8650379c200",
+      "content": "Every requirement for planshown-resubmission-invalidates is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/planshown-resubmission-invalidates/evidence/advisor.json",
+      "sha256": "074158f6b25313eaaa39709de12b8b5541dba06d2f1eb4babd5ef407673de1f4",
+      "dispatchId": "advisor-planshown-resubmission-invalidates",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the revised design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/planshown-resubmission-invalidates/evidence/readiness.json",
+    "sha256": "c173ba7813d3747440ea38f062862e3edf3e9da3a4fd8661d6184ed8e5af4fda",
+    "dispatchId": "readiness-planshown-resubmission-invalidates",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "7b3896e4b675c394a5fc5573dd250229f2d8e7a29fee0e99354ea270a00242cb",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json (package sha256 4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-4e56985cd1e1756e7fbaa02b2593b63d20029e21f151665a054d197c2e71de0a.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T11:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/planshown-resubmission-invalidates/prd_planshown-resubmission-invalidates.md(1bef47062361...)+specs/planshown-resubmission-invalidates/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/advisor-early-refusal/prd.md(d19c20cdbc32...)+specs/advisor-early-refusal/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 4e1ae01654be....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "advisor-early-refusal",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "dbef390855144f77878f268308ae19e6350b1c21ae23598c086780f83d8e1277",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/advisor-early-refusal/design-input.md",
+      "sha256": "0b916a0db0844a3f626196af11d53eec741fb5e21c5c14ae6b38d971e0b22ea1",
+      "content": "Original request for advisor-early-refusal.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/advisor-early-refusal/prd.md",
+      "sha256": "d19c20cdbc325a04ab4046df4cbeb0d07d79346566089133473de5b5da619247",
+      "content": "<!-- po-language: en -->\n<!-- technical-spec-sha256: 69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea -->\n# PRD\nadvisor-early-refusal\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/advisor-early-refusal/spec.md",
+      "sha256": "69413e2c4c0e1990499852634ad5b1a0411c2a49a82c357d46d4495e53a6b4ea",
+      "content": "# Technical Spec\nOrdinary fixture authority.\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/advisor-early-refusal/design.md",
+      "sha256": "ad5e424a455d4c13dac41bd0bc0b327bf77056ee229199c7d7cb70fe594e2b9b",
+      "content": "Revised design for advisor-early-refusal.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/advisor-early-refusal/traceability.md",
+      "sha256": "8df8e4f23137d7e6101c132991f177b5394d221bc7218cf93e57987d5cb394d3",
+      "content": "Every requirement for advisor-early-refusal is mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "unavailable",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/advisor-early-refusal/evidence/advisor.json",
+      "sha256": "55e96e596a393836227897a8905d8b417072c9c72cc0a6dedc44c3b36212f403",
+      "dispatchId": "advisor-advisor-early-refusal",
+      "adapter": "consult",
+      "observedStatus": "unavailable",
+      "observedIdentity": null
+    },
+    "attempts": [
+      {
+        "adapter": "consult",
+        "kind": "consult",
+        "runner": "codex",
+        "status": "unavailable"
+      }
+    ],
+    "routeSelection": null,
+    "disposition": null,
+    "exception": {
+      "status": "proposed",
+      "failureCode": "capacity-unavailable",
+      "rationale": "The Advisor route was attempted and recorded as unavailable; independent design readiness is complete for the PO's one final review."
+    }
+  },
+  "readiness": {
+    "path": "specs/advisor-early-refusal/evidence/readiness.json",
+    "sha256": "1b015474df2b9051c257abcd78b8d5cad497a8f66f59e6e2699957ceb1c8be74",
+    "dispatchId": "readiness-advisor-early-refusal",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "c8c3cfb016a0b7411c20a2030ed38a638588f073f4b3f94e26efbd86a5275430",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The exact input, PRD and Spec are covered by the revised design.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "Traceability is complete."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-dbef390855144f77878f268308ae19e6350b1c21ae23598c086780f83d8e1277.json (package sha256 dbef390855144f77878f268308ae19e6350b1c21ae23598c086780f83d8e1277).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-dbef390855144f77878f268308ae19e6350b1c21ae23598c086780f83d8e1277.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:plan-authority-fixture-key" on 2026-08-27T10:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/advisor-early-refusal/prd.md(d19c20cdbc32...)+specs/advisor-early-refusal/spec.md(69413e2c4c0e...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/mini-advisor-unavailable/prd.md(2cbecd2b881b...)+specs/mini-advisor-unavailable/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 08b277cb65ad....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan submitted by "coordinator" on 2026-08-28T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/widget-approvereach/prd.md(e2d4c0f85186...)+specs/widget-approvereach/spec.md(69413e2c4c0e...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-28T12:00:00.000Z; bound to submission 398815858112....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: the returned approve-plan argv must reach its own gate logic; status=2, stderr=Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+
+    at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state.test.mjs:1843:10 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/scripts/pipeline-state.test.mjs (10110.647486ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10121.308377
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-state.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/pipeline-state.test.mjs (10110.647486ms)
+  'test failed'
+
+--- stderr ---

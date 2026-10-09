@@ -1,0 +1,53 @@
+command: node --test plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+label: R7-3-T2e-before
+exitCode: 1
+head: 9d2c4b27fd85bb3db6e03f5237cd53ad0dd94222
+tree: 274fb2427f2e55568cd179572793f2e41c77f04f
+dirty: true
+--- stdout ---
+✔ fresh and existing roots advance through portable seed and runtime initialization (128310.84489ms)
+✔ read-only host-control paths receive portable host-managed onboarding (2306.970123ms)
+✔ an existing linked Git worktree is adopted without replacing its .git pointer (50765.221212ms)
+✔ ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs (153380.882078ms)
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (225091.345086ms)
+ℹ codex: verified original intake {"sha256":"7f20392cdcb17ff87149ff7de331b483a8e53d81a1bead1da97c1b9f156165f4","byteLength":67,"consentGranted":true,"captureRoute":"returned-consent-with-explicit-description","nativeReference":false}
+ℹ codex: real hooked bootstrap candidate {"commit":"51dcf2b6b41fe3d766c1a1df91467989b67e0a3f","tree":"d5c50134127b3038da3628953da7763e4f8ceb06"}
+ℹ codex: real hooked five-source design candidate {"commit":"eed5720ed9a51f18759d7ab1b9cb4fe01551b6e5","tree":"b33517a9e1e9fa6c82f1b3fed894fff2220b4ae4"}
+ℹ codex: exact requested readiness route {"authoringRunner":"codex","requestedRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"eed5720ed9a51f18759d7ab1b9cb4fe01551b6e5"},"registeredCell":{"state":"default","selector":{"kind":"alias","value":"sonnet"},"effort":"high","unavailable":"defer","evidence":"dispatch-receipt"},"registrySha256":"c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac","reasonFieldPresent":false,"explanation":"The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider."}
+ℹ codex: assigned local readiness host {"authoringRunner":"codex","reviewRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"eed5720ed9a51f18759d7ab1b9cb4fe01551b6e5"},"assignment":"existing-v1-local-host","nativeProviderAvailabilityClaim":false}
+ℹ codex: canonical fixture readiness {"reviewRunner":"claude","candidate":{"commit":"eed5720ed9a51f18759d7ab1b9cb4fe01551b6e5","tree":"b33517a9e1e9fa6c82f1b3fed894fff2220b4ae4"},"selectionId":"drh_78507be8fe7e008faa797402212f1d14","assurance":"host-observed-local","providerAttestation":false}
+﹣ legacy helper-driven intake-to-implementation path (superseded by the driver-only E2E above) (0.393697ms) # SKIP
+ℹ tests 6
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 564383.619636
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:780:1
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (225091.345086ms)
+  AssertionError [ERR_ASSERTION]: Error: present-plan requires one complete, current design-workflow package (DWP-BOUND-PATH-UNTRACKED); no presentation or approval lock was recorded.
+  
+  2 !== 0
+  
+      at freshDriver (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1036:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1453:27)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

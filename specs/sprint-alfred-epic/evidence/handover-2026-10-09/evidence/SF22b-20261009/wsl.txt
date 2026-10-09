@@ -1,0 +1,43 @@
+command: node --test scratch/dispatch-wip/SF22b/stop-fanout.test.mjs
+label: wsl
+exitCode: 0
+head: f78a54747f22ed13f2846eee35fa84fe2cdcd8fc
+tree: 3416a5c43dc8284091af0aaee4fb7c12142269de
+dirty: true
+--- stdout ---
+✔ SF01 shadow mode: an orchestrator Stop is silent, exits 0 and records one stop-eval (no block event) (4331.705477ms)
+✔ SF02 the default mode (no mode in the config) is shadow: silent (4053.945843ms)
+✔ SF03 enforce mode with ready slices and free slots: exit 0, block JSON with <plugin-root> substituted, stop-eval and block recorded (4138.458188ms)
+✔ SF04 stop_hook_active: true right after our own block is governed by the loop rule (no output, defied recorded) (8096.627897ms)
+✔ SF05 stop_hook_active: true with no block of ours is not our loop: it still blocks (4000.805667ms)
+✔ SF06 a subagent payload (agent_id present) gets no output and no ledger line (7960.60826ms)
+✔ SF07 advisory mode emits the governor's advisory text as systemMessage/additionalContext (never a block decision, no block event) (4069.593209ms)
+✔ SF08 no queue configured: the governor gets 'no queue', the hook is silent (3980.296996ms)
+✔ SF09 consumer opt-out (requiresEnforcement false) is silent and never blocks (4157.898115ms)
+✔ SF10 fail-open: malformed, empty or non-object stdin exits 0 with no stdout (23468.938511ms)
+✔ SF11 fail-open: a missing queue file exits 0 with no stdout (3870.995071ms)
+✔ SF12 fail-open: a malformed config, a missing session id or an unusable common dir exits 0 with no stdout (12037.925019ms)
+✔ SF13 fail-open: an unreadable ledger (the ledger path is a directory) exits 0 with no stdout, even in enforce mode (3872.276776ms)
+✔ SF14 fail-open: a governor that throws (PIPELINE_FANOUT_TEST_THROW=1 test seam) exits 0 with no stdout (7869.734642ms)
+✔ SF15 a launch event after the block resets the loop: the next Stop with stop_hook_active blocks again (8061.250764ms)
+✔ SF16 shadow and off stay silent even when the governor would block (advisory text is an advisory/enforce channel only) (16548.317326ms)
+✔ SF17 FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent queue while implementing, invalid queue) as advisory output, never a block (23032.69136ms)
+✔ SF18 implementationPhaseActive is derived from the feature state (design 3.10): implementing with no queue -> the NO-QUEUE line, any other phase or unreadable state -> silent (30337.93879ms)
+✔ SF19 a block is emitted only after its block event was durably appended: a refused append, or a result without a block event, fails open (6.390739ms)
+✔ SF20 no config or no queuePath returns silently having spawned nothing; a configured queue with an absolute commonDir flows through without a spawn (3805.850589ms)
+✔ SF21 a queuePath without an absolute commonDir fails open silently: nothing spawned, the governor and the ledger are never reached (11246.113775ms)
+✔ SF22 an absolute commonDir is the only source of the git common dir: no git spawn, none outside the ledger chain, and the win32 ledger-side PowerShell spawns are a pinned known deviation from design 8 (bound 4, must drop to 0) (3471.742665ms)
+ℹ ledger-side spawns pinned (0, bound 0 on linux): []
+✔ SF22b steady state: a second Stop against the same common dir spawns no child process at all, with the same block decision and a real ledger append (the first Stop's one-time directory creation is SF22's) (6733.310491ms)
+ℹ first Stop: 0 spawn(s), second Stop: 0 on linux; first Stop spawns: []
+✔ SF23 the spawn tripwire is live: a control module that spawns through an ESM named import is recorded (31.453197ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 203792.669711
+
+--- stderr ---

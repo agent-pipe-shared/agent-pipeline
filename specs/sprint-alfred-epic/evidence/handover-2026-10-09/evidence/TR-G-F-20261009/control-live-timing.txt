@@ -1,0 +1,41 @@
+command: node --test --test-reporter=spec --test-name-pattern=preflight-bound --test-name-pattern=R7-11a scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs
+label: TR-G-F-control-live
+exitCode: 1
+head: 2e8f289796a895fc31af7ab1e465d46b61b9de32
+tree: 173462197db7c032dd11725b5010accef661427d
+dirty: true
+--- stdout ---
+✖ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (10016.047522ms)
+✔ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (5936.021312ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32911.350445
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:568:1
+✖ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (10016.047522ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs:575:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

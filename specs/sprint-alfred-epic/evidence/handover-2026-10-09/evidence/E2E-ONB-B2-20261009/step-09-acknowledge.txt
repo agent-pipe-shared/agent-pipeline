@@ -1,0 +1,60 @@
+09a  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs bootstrap-acknowledge-plan --root <temp-repo> --activate --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.bootstrap-plan-acknowledgement-plan.v1",
+  "status": "signature-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intentSha256": "1eb196d2c03743a445b71e64c37759b366996969b1d2a73afaa520079c184cef",
+  "prd": {
+    "path": "specs/onboarding-31416e711b2c/prd_onboarding-31416e711b2c.md",
+    "sha256": "d7d0a9a6cb29729b35d8c438dd5a99be090f586195a658ea85f8b0ffe20e65e7"
+  },
+  "spec": {
+    "path": "specs/onboarding-31416e711b2c/spec.md",
+    "sha256": "df7d8e68b9ced95140962a72347f1d63ca0103a4561f6ef9fa7d981fbc1bd9b5"
+  },
+  "requestPath": "scratch/bootstrap-plan-acknowledgement-request-1eb196d2c03743a445b71e64c37759b366996969b1d2a73afaa520079c184cef.json",
+  "proofPath": "scratch/bootstrap-plan-acknowledgement-proof-1eb196d2c03743a445b71e64c37759b366996969b1d2a73afaa520079c184cef.json",
+  "requestWritten": true,
+  "nextAction": {
+    "kind": "external-operator",
+    "executionBoundary": "attended-external-tool",
+    "invocation": "user-copy-only",
+    "mutation": true,
+    "requiresConfirmation": true,
+    "executable": "<wsl-node>",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sign-intent",
+      "--repo-root",
+      "<temp-repo>",
+      "--request",
+      "scratch/bootstrap-plan-acknowledgement-request-1eb196d2c03743a445b71e64c37759b366996969b1d2a73afaa520079c184cef.json"
+    ],
+    "expected": {
+      "schema": "pipeline.po-approval-proof.v1",
+      "intentSha256": "1eb196d2c03743a445b71e64c37759b366996969b1d2a73afaa520079c184cef"
+    }
+  }
+}
+
+  --- end ---
+
+09b-policy  grep -rn -E human_approval|push_approval|pushApprovalPreference --include=*.yaml --include=*.yml --include=*.json .
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+./.claude/pipeline.yaml:20:  # How a human clears it is one setting, gates.push_approval in pipeline.user.yaml:
+./.git/agent-pipeline/pre-commit-hook/runtime-e15bd720bb6da908764ca8f4f4778c928e07958b363198297f01c46074b1be10/scripts/pipeline-user-v3.schema.json:29:    "gates": { "type": "object", "required": ["dev_plan", "push", "security", "claude_md_max_lines"], "additionalProperties": false, "properties": { "dev_plan": { "enum": ["blocking", "warn", "off"] }, "push": { "enum": ["blocking", "warn", "off"] }, "push_approval": { "enum": ["signature", "chat"] }, "push_external_ledger": { "enum": ["required", "off"] }, "security": { "enum": ["blocking", "warn", "off"] }, "claude_md_max_lines": { "type": "integer", "minimum": 1 } } },
+./.git/agent-pipeline/commit-msg-hook/runtime-e15bd720bb6da908764ca8f4f4778c928e07958b363198297f01c46074b1be10/scripts/pipeline-user-v3.schema.json:29:    "gates": { "type": "object", "required": ["dev_plan", "push", "security", "claude_md_max_lines"], "additionalProperties": false, "properties": { "dev_plan": { "enum": ["blocking", "warn", "off"] }, "push": { "enum": ["blocking", "warn", "off"] }, "push_approval": { "enum": ["signature", "chat"] }, "push_external_ledger": { "enum": ["required", "off"] }, "security": { "enum": ["blocking", "warn", "off"] }, "claude_md_max_lines": { "type": "integer", "minimum": 1 } } },
+./.git/agent-pipeline/pre-push-hook/runtime-e15bd720bb6da908764ca8f4f4778c928e07958b363198297f01c46074b1be10/scripts/pipeline-user-v3.schema.json:29:    "gates": { "type": "object", "required": ["dev_plan", "push", "security", "claude_md_max_lines"], "additionalProperties": false, "properties": { "dev_plan": { "enum": ["blocking", "warn", "off"] }, "push": { "enum": ["blocking", "warn", "off"] }, "push_approval": { "enum": ["signature", "chat"] }, "push_external_ledger": { "enum": ["required", "off"] }, "security": { "enum": ["blocking", "warn", "off"] }, "claude_md_max_lines": { "type": "integer", "minimum": 1 } } },
+./.git/agent-pipeline/onboarding-initial-answers.json:5:  "pushApprovalPreference": "chat",
+./project/pipeline.yaml:20:  # How a human clears it is one setting, gates.push_approval in pipeline.user.yaml:
+./pipeline.user.yaml:39:  human_approval: "chat"
+./pipeline.user.yaml:41:  push_approval: "chat"
+
+  --- end ---
+

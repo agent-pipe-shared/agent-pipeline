@@ -1,0 +1,60 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-RULE-2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "e7db47331",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "034e848fcefd3e88ca5cd7c8befa0e16843678f7df177f30939ed0ce6de3a5b9",
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER at the 80 % checkpoint (call 44 of 55). Edits are applied and UNCOMMITTED; vendored mirrors are NOT yet regenerated. independent review: pending.\n\nRoute pre-check: field 6 names class canon/docs (no A/G/S class) and a tier only (\"goldfish-deep, Sonnet 5.5 / xhigh\"). Observed from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5 ... claude-sonnet-5-5\". No contradiction.\n\n1. DoD results\n- Sweep before/after (own sweep script, A/G/S x higher-capability co-occurrence, DE halves excluded): passed. Lines carrying the OLD per-diff canonical quote: 5 before, 0 after. Remaining co-occurrence lines were reviewed and are either the new batched wording, the MP-07 text itself, or unrelated Design-phase text.\n- check-adr-consistency.mjs: passed (exit 0 before and after).\n- check-critic-contract-citations.mjs and its test: passed (exit 0 before and after; PHX-CITE-1 identity holds across the five places).\n- check-critic-fail-closed, check-doc-contracts, check-language-canon, check-reference-paths, check-section-citations, generate-elephant-role-prohibitions.test: passed (exit 0 before and after).\n- Vendored mirrors: FAILED / open. generate-vendored-canon.test.mjs exit 1 before and after; check-vendored-template-sync.mjs and its test exit 1 before and after. After my edits the stale mirrors are exactly: plugins/pipeline-core/docs/adr/0003-role-implementation-subagents.md, plugins/pipeline-core/docs/adr/0014-critic-contract.md, plugins/pipeline-core/roles/critic.md, plugins/pipeline-core/roles/elephant.md, plugins/pipeline-core/templates/prompts/critic-review.md (the last one already lagged the CRITIC-RULE batch-scope line at baseline). The regeneration step is runnable: node harness/scripts/generate-vendored-canon.mjs (--check verifies). Not run: the 80 % hook stopped new work, and committing now would add four newly stale mirrors (a known-red regression).\n- Backlog Triage names b90402938 and the slice ID; the commit SHA is the literal SHA_PLACEHOLDER until the second tiny commit: not done.\n- One commit: not done (nothing committed).\n\n2. Evidence (all machine-written by scratch/dispatch-wip/CRITIC-RULE-2b/apply.mjs, run as: node scratch/dispatch-wip/CRITIC-RULE-2b/apply.mjs before edit after, exit 0)\n- evidence/CRITIC-RULE-2b-20261009/sweep.txt (before and after blocks)\n- evidence/CRITIC-RULE-2b-20261009/checks-before.json and checks-after.json (command, exit, output tail per check)\n- evidence/CRITIC-RULE-2b-20261009/edits.json (per-file edit results: all 13 files written, every replacement ok)\n- Full vendored-canon test output was seen in the live run (command: node harness/scripts/generate-vendored-canon.test.mjs, exit 1) but was not saved to a file.\n\n3. Changed files (13, all uncommitted)\n- docs/adr/0014-critic-contract.md: Status note, risk-policy paragraph, new canonical quote, dated amendment section (Ruling 156).\n- docs/adr/0003-role-implementation-subagents.md: new canonical quote, route wording, dated pointer amendment.\n- harness/review-protocol.md: T1-T4 and T6 rows, non-blocking paragraph, canonical quote, metadata item with batch scope, section 2.3 rows.\n- roles/critic.md: critical-stage route, canonical quote, MP-07 staffing lines (CR-09), batch-scope duty.\n- roles/elephant.md: EL-08 rule and its trigger sentence.\n- plugins/pipeline-core/skills/critic-review/SKILL.md: stage gate route, assurance clause, canonical quote.\n- templates/prompts/critic-review.md and plugins/pipeline-core/templates/prompts/critic-review.md (identical edits): item 2 tiering, item 4, criticality example, route pre-check scope sentence.\n- templates/prompts/goldfish-task.md and plugins/pipeline-core/templates/prompts/goldfish-task.md (identical edit, in sync per check): explicit-override line.\n- policies/model-policy.md: speed-profile sentence, \"Open alignment\" bullet turned into a closed-alignment bullet.\n- docs/state.md: one decision-register paragraph above the Current line.\n- backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: Triage update (SHA_PLACEHOLDER).\n\n4. Deliberately not changed\n- docs/operating-model.md line 267: \"guardrail/security/architecture-classified (MP-07)\" is a classification term for the collection-block rule, not a per-diff Opus claim; the sweep does not flag it.\n- templates/prompts/critic-review.md heading \"Route pre-check ... (MUST; A/G/S dispatches)\" and the matching route pre-check in plugins/pipeline-core/agents/*.md: the agent definitions are the plugin route (forbidden here) and over-triggering is harmless (requested route Sonnet cannot contradict). Only the sentence naming the three classes in the template body was narrowed.\n- harness/review-protocol.md \"Why staggered\" rationale paragraph (A/G/S weaker-checker blind spots): rationale for a mandatory Critic, not a tier rule.\n- templates/retro.md (briefed as not needing a change), German halves below DE markers, plugin Critic route/budget check and test pin.\n- evidence/CRITIC-RULE-20261009/sweep.txt (other slice, git-ignored): my first orientation run of the old sweep.mjs without a label appended a block headed \"=== undefined ===\" there; harmless, not cleaned up.\n\n5. Deviations from spec\n- capture-evidence was not used; I ran the checks through my own script (child processes, exit codes and tails written to JSON by the script). Same commands, my own wrapper.\n- Canon edits were applied by one reviewed node script with exact-match assertions instead of 20+ Edit calls, to fit the tool budget; no guard refused anything (no guard-protected file was worked around).\n- The dispatch record was not read back after creation (the Write result confirmed creation; budget).\n- Per-file git diff review before commit was not done because nothing was committed.\n- No advisor call (budget).\n\n6. Open items / next briefing\n- Triggered: the 80 % checkpoint (call 44 of 55, parallel calls counted separately). No stop condition 1-5 fired; the mirror regeneration step is runnable.\n- Committed: nothing committed. Remains undone: (a) run node harness/scripts/generate-vendored-canon.mjs (expected to rewrite exactly the five stale mirrors above, incl. plugins/pipeline-core/templates/prompts/critic-review.md); (b) re-run apply.mjs with the arguments \"after\" only, or the individual checks, and confirm generate-vendored-canon.test, check-vendored-template-sync and its test are now exit 0; (c) git diff -- the 13 paths plus the 5 mirrors, confirm every hunk, commit with scratch/commit-msg/CRITIC-RULE-2b-20261009.txt (subject: docs(adr-0014): amend the Critic tier trigger to one batched Opus review for critical architecture and security; trailers Dispatch: CRITIC-RULE-2b-20261009 (goldfish) and AI-Assisted: true); (d) second tiny commit replacing SHA_PLACEHOLDER in the backlog item with the SHA taken from the commit output; (e) record checkpoint and final write via scratch/dispatch-wip/CRITIC-RULE-2b/finalize.mjs.\n- Next briefing should say: do not re-apply the edits (apply.mjs is idempotent and the tree already holds them); budget about 12 calls; the 13 files are modified in the shared tree and the index holds foreign staged files, so stage by exact pathspec only.\n- Files left modified and uncommitted: the 13 files in section 3.\n",
+    "changedFiles": [
+      "harness/review-protocol.md",
+      "roles/critic.md",
+      "roles/elephant.md",
+      "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "docs/adr/0003-role-implementation-subagents.md",
+      "docs/adr/0014-critic-contract.md",
+      "templates/prompts/critic-review.md",
+      "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "templates/prompts/goldfish-task.md",
+      "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "policies/model-policy.md",
+      "docs/state.md",
+      "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md"
+    ]
+  },
+  "log": [
+    {
+      "phase": "opening: record created after preflight (GUARD-BOOTSTRAP-RECEIPT-MISSING cured once)",
+      "toolUses": 9
+    },
+    {
+      "phase": "final: outcome stopped-without-commit",
+      "toolUses": 47
+    }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

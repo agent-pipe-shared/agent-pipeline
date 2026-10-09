@@ -1,0 +1,66 @@
+command: node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs
+label: native
+exitCode: 1
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+✔ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (1264.0642ms)
+✖ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (355.111ms)
+✖ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (361.0415ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (855.0821ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (1916.7115ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 3
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5036.9389
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\agent-pipeline-root-creation.test.mjs:107:1
+✖ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (355.111ms)
+  AssertionError [ERR_ASSERTION]: pin (b): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)
+      at assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+      at file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:118:5
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:108:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\agent-pipeline-root-creation.test.mjs:122:1
+✖ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (361.0415ms)
+  AssertionError [ERR_ASSERTION]: pin (c): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)
+      at assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+      at file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:132:5
+      at withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:123:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

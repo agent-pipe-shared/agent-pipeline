@@ -1,0 +1,144 @@
+command: node --test plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs
+label: R7-3-F1c2-after
+exitCode: 1
+head: f929da250b594f4b7b9dcc3b9d151b1b882ccfa1
+tree: b163048ddaabb55582057df76f14147b508c5207
+dirty: true
+--- stdout ---
+✖ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (607.77427ms)
+✔ CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate (615.538375ms)
+✖ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (579.402657ms)
+✔ CANDBINDX-d (diagnostic) the Codex branch's re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts (472.235272ms)
+✔ CANDBIND-a implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (684.360143ms)
+✔ CANDBIND-b the default (strict) read of the same package still refuses a HEAD that moved past the candidate (620.642871ms)
+✔ CANDBIND-c the host verifier's supplemental Advisor re-read stays strict by default once HEAD moved past the candidate (552.692295ms)
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (697.260517ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (821.327347ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (522.210398ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (397.160466ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (394.964871ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (393.120035ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (413.085262ms)
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (159388.278131ms)
+✖ R7-3a present-plan validation refuses a git-ignored bound path with DWP-BOUND-PATH-IGNORED and the tracked-prefix repair (450.299762ms)
+✖ R7-3a present-plan validation refuses an untracked bound path with DWP-BOUND-PATH-UNTRACKED and the stage-and-commit repair (22.570383ms)
+✖ R7-3a present-plan validation refuses a bound path modified against HEAD with DWP-BOUND-PATH-MODIFIED and the stage-and-commit repair (22.307397ms)
+✔ R7-3a present-plan validation does not refuse a tracked, clean bound path as a bound-path violation (26.7405ms)
+✔ R7-3c close check lists every State bound path with its status and fails on an ignored one (39.016387ms)
+✔ R7-3c close check fails on one untracked bound path and lists the others as tracked (28.057578ms)
+✔ R7-3c close check reports a bound path modified against HEAD with its own status and code (27.029836ms)
+✔ R7-3c close check passes when every bound path is tracked and clean (26.254493ms)
+✔ R7-3c handover output names the device-local artifacts as device-local (31.396468ms)
+✔ R7-3d ratchet walker finds every path-naming field of the fixture State (non-vacuity guard) (0.324377ms)
+✔ R7-3d every State field that names a bound path has a classification (2.432075ms)
+✔ R7-3d every path-naming field of the repository's live State has a classification (7.886929ms)
+✔ R7-3d private-store references classify as device-local by value (0.180854ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 23
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161044.215456
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:54:30
+✖ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (607.77427ms)
+  AssertionError [ERR_ASSERTION]: with requireCurrentCandidate:false a HEAD descended from the candidate must verify on the Codex tool-free route too, got refused:DWP-READINESS-HOST-RECEIPT-MISMATCH
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:140:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:54:30
+✖ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (579.402657ms)
+  AssertionError [ERR_ASSERTION]: requireCurrentCandidate:false must reach the Codex branch's Advisor re-read, got refused:DWP-READINESS-HOST-RECEIPT-MISMATCH
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:163:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:145:1
+✖ R7-3a present-plan validation refuses a git-ignored bound path with DWP-BOUND-PATH-IGNORED and the tracked-prefix repair (450.299762ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-IGNORED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:148:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-IGNORED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:151:1
+✖ R7-3a present-plan validation refuses an untracked bound path with DWP-BOUND-PATH-UNTRACKED and the stage-and-commit repair (22.570383ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-UNTRACKED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:154:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-UNTRACKED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:157:1
+✖ R7-3a present-plan validation refuses a bound path modified against HEAD with DWP-BOUND-PATH-MODIFIED and the stage-and-commit repair (22.307397ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-MODIFIED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:160:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-MODIFIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

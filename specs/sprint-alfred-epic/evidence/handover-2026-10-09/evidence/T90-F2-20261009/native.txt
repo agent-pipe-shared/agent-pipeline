@@ -1,0 +1,37 @@
+command: node --test --test-name-pattern T90 plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs
+label: native
+exitCode: 0
+head: 0dfe853cc01f6ad3478766f922168814fbebadc2
+tree: 6076bf9069384b1863fcff08433d478c301721b6
+dirty: true
+--- stdout ---
+✔ T90-T2 (v): a well-formed audit-lock recovery renders ONE extra line naming the lock, an attended delete and its precondition (1.924ms)
+✔ T90-T2 (v): the host default (no platform argument) renders the same one-line recovery (0.1559ms)
+✔ T90-T2 (v): a malformed recovery.files renders NO recovery line, exactly today's two lines (0.5631ms)
+✔ T90-T2 (v): a recovery on any other code renders no recovery line (0.0995ms)
+✔ T90-T2 (v): a hostile recovery.command is never echoed (0.3849ms)
+✔ T90-T2 (v): a hostile recovery.command changes nothing: the line is rebuilt from the validated files (0.1443ms)
+✔ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (5269.3316ms)
+✔ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (3134.5078ms)
+✔ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (5257.1848ms)
+✔ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (5308.6502ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (1705.1068ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (1722.5967ms)
+✔ T90-T2 (ii): the win32 boot-minute tolerance boundary: one minute apart is ambiguous, two minutes apart is dead (13316.8181ms)
+✔ T90-T2 (iii): a malformed injected host seam is refused with HGO-AUDIT-LOCK-MALFORMED before any lock is touched (4814.3995ms)
+✔ T90-T2 (seam): an injected host decides the owner the lock records (2972.8116ms)
+✔ T90-T2 (real host): on native win32 the default host classifies a gone pid dead and a live pid with the local boot time ambiguous (15104.3897ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (3676.5298ms)
+✔ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (3146.9451ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.0484ms) # Linux control: needs /proc on a Linux host
+✔ repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin) (17439.0065ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 65711.3911
+
+--- stderr ---

@@ -1,0 +1,57 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-CKPT-T3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "902fe1b74859a53fb0f736ccf8c46aedad0bcbc2",
+  "resultSha256": "b98b9b28586e0c69dade444ec03ad61a05d00aac4b75bc4e663fa64ca732782a",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "83563e149c246f1b63dab52e74c6d16a61897bb1"
+  ],
+  "log": [
+    {
+      "phase": "opening done, T3 block appended, scratch set built",
+      "toolUses": 27
+    },
+    {
+      "phase": "first WSL run: 15 tests, 6 pass, 9 fail, 241 s; T3 (f) split per call so both calls show red; rebuilt",
+      "toolUses": 30
+    },
+    {
+      "phase": "terminal record written (commit, report, resultSha256 in one write)",
+      "toolUses": 43
+    }
+  ],
+  "report": {
+    "text": "CRITIC-CKPT-T3-20261009 completion report. Implementation complete: RED pins committed as 83563e149. Independent review: pending. PO acceptance: pending.\n\nBootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded; Project agent-pipeline; Calibration not named in the briefing (self-application, ADR-0015); State briefing CRITIC-CKPT-T3-20261009; Role Goldfish.\nROUTE PRE-CHECK: requested (field 6) = goldfish-deep, tool-layer model sonnet (Sonnet 5.5, effort xhigh). Observed, quoted from this dispatch's runtime prompt: \"powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". No contradiction. Effort is not observable from the prompt (unknown).\n\n1. DoD results\n- evidence/CRITIC-CKPT-T3-20261009/red.txt (WSL, --test-name-pattern 'CRITIC-CKPT-T[23]', T2 block plus T3 block): passed. 16 tests, 6 pass, 10 fail, 0 skipped, 212.6 s. The six T3 pre-cap refusal cases (b) Write@1, (c) Write@20, (d) Edit@1, (e) Edit@20, (f)@1, (f)@20 are red for the stated reason: every one of the 26 refused write/edit calls is ADMITTED today (exit 0; red.txt lines 123/145/167/189/211/233 list each path and call number; \"6 !== 0\", \"2 !== 0\"). The admitted case (a) (Write and Edit of scratch/dispatch/critic-abc/critic-notes.md at call 1 and 20) and the control (g) (goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1) are green. The T2 block is unchanged: (a) (b) (c) (d4) red, (d1) (d2) (d3) (d5) green.\n- Stop condition \"a planned refusal is already refused today\": not triggered; in this harness the budget guard admits all of them before the cap, so no guard refuses any planned refusal.\n- CRITIC-CKPT-MANIFEST.md T3 section (new sha256/bytes/lines, block range, design, pin table, commands, results): passed.\n- One commit with the briefed subject: passed, 83563e149.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed (9 tests, exit 0).\n- Terminal record evidence/dispatch-record-CRITIC-CKPT-T3-20261009.json: written by the finalizer after the commit.\n\n2. Evidence\n- evidence/CRITIC-CKPT-T3-20261009/red.txt, final body, WSL, wrapped exit code 1 (expected: red). Command in CRITIC-CKPT-MANIFEST.md (capture-evidence ... node --test --test-reporter=spec --test-name-pattern='CRITIC-CKPT-T[23]' scratch/dispatch-wip/CRITIC-CKPT-T3/guard-dispatch-budget.ckpt3.test.mjs). Sidecar CKPT3-REDIRECT-FIRED (20 runner-child loads served from the tranche-2 guard post-image).\n- Test post-image sha256 006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb (150645 bytes, 2349 lines); the text before the block equals the T2 post-image 1447a996... (144278 bytes), so no earlier line changed.\n\n3. Changed files\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs: +84 lines appended after CRITIC-CKPT-T2 (d5): path table, five small helpers, eight cases CRITIC-CKPT-T3 (a) to (g, control).\n- specs/sprint-alfred-epic/signed-package/tranche-2/CRITIC-CKPT-MANIFEST.md: T3 section appended; the T2 section is untouched.\n\n4. Deliberately not changed\n- Guard post-images and live guards, agents/critic.md, TR-G-MANIFEST.md and every other manifest (forbidden); the T2 block bytes.\n- The T2 manifest sentence \"Pre-confinement ... is the tools frontmatter plus the post-cap lane\" stays as history; the T3 section states it is overruled.\n- Foreign uncommitted edits (pipeline-state.mjs, po-human-approval.mjs, sanctioned-args-onboarding.mjs, pipeline-state.test.mjs) and the foreign staged files: untouched; the commit is by exact pathspec.\n\n5. Deviations from spec\n- Design latitude, needs the Elephant's confirmation before CRITIC-CKPT-F: \"refused with a typed code\" is pinned as a SHAPE, not a name: exit 2, stderr has \"BLOCKED (guard-dispatch-budget\", matches DISPATCH-BUDGET-[A-Z-]+, and is neither DISPATCH-BUDGET-EXHAUSTED nor the exhausted-allowance text (the cap is not reached). The concrete code is F's choice within that family, and the refusing guard must be the budget guard because the harness loads only that one.\n- Batching: the six refused paths of cases (b) to (e) run as one scenario each, so only the first is exactly call 1 or 20 and the rest are the calls right after it (all below the cap, today 35); in (f) the Write is call N and the Edit call N+1. All 26 calls were measured admitted, so the batching did not hide any refusal.\n- The first WSL run (15 tests, 6 pass, 9 fail, 241 s) had (f) as one case looping both calls, so only call 1 was reported. I split (f) per call, rebuilt and re-ran; red.txt is the final-body run.\n- No whole-file run (about 530 s plus the new cases would exceed the 600 s foreground limit); the targeted run is the briefed evidence. The 106 earlier cases were not re-run.\n- First opening-record write was refused (GUARD-BOOTSTRAP-RECEIPT-MISSING); I ran exactly the preflight path the refusal named, then retried.\n- criticRequired in the record is the conservative T3 decision from the briefing template; the guard-class decision for the review is the Elephant's.\n- Advisor consulted once, before substantive work; its plan was followed.\n\n6. Open items\n- CRITIC-CKPT-F: pre-cap confinement of the Critic's Write/Edit to scratch/dispatch/critic-<id>/critic-notes.md (new DISPATCH-BUDGET-* code), plus the T2 items (maxTurns 65 for cap 50, critic-prefixed subdirectory in CRITIC_NOTES_PATTERN, notice repeat pattern on calls 33-35 unpinned). If Ruling 157's \"a guard\" is another guard, the T3 pins need re-homing.\n- Independent Critic review pending; PO acceptance pending.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/CRITIC-CKPT-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

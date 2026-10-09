@@ -1,0 +1,18 @@
+command: node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs
+label: native-win32
+exitCode: 0
+head: ddf1d5b6f63e9e81d0efd726a8540df8eb6f7a02
+tree: d4b8bca4b7997c2338cd014905716f130edf6427
+dirty: true
+--- stdout ---
+﹣ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (1.2636ms) # win32: readinessFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT); run via WSL: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 307.7763
+
+--- stderr ---

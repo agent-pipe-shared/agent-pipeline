@@ -1,0 +1,61 @@
+{
+  "taskId": "RC14C009-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "complete-pending-critic",
+  "commits": ["f274a59984197ee9b6260b0cb578d83f9d62f890"],
+  "log": [
+    {"phase": "opening: interim record created; preflight (loaded plugin root) ran first, status ready, as the bootstrap receipt guard required", "toolUses": 6},
+    {"phase": "edit done (probe modeBitHostLimitation + RC14C009 as three subtests of the unchanged case id, failures rethrown); node --check clean", "toolUses": 25},
+    {"phase": "native capture exit 0 (tests 26, pass 20, fail 0, skipped 6; step 1 and step 3 skip with typed reasons, step 2 pass); WSL capture exit 0 (tests 26, pass 26, skipped 0); scratch experiment on subtest-failure propagation (files removed); consumer-safe check 9/9", "toolUses": 36},
+    {"phase": "commit attempt refused by index.lock (stop condition: retry after other work); retried after the log write and succeeded", "toolUses": 40},
+    {"phase": "committed f274a5998; terminal record written", "toolUses": 44}
+  ],
+  "report": {
+    "bootstrap": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded · Project Agent-Pipeline · Calibration the resolved calibration tier (briefing names no file) · State briefing RC14C009-T-20261009 · Role Goldfish",
+    "route": "Field 6 declares no ARCHITECTURE/GUARDRAIL/SECURITY class (test authorship). Requested: goldfish-deep, claude-sonnet-5-5, xhigh. Observed from this dispatch's runtime prompt: 'powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. No contradiction.",
+    "status": "Implementation complete, committed (f274a5998). Independent Critic review and PO acceptance pending; not 'done'.",
+    "verdict": "Step 2 passed natively, so Ruling 95 verdict H (test-host limitation) holds. The ruling does NOT reopen as D.",
+    "dod": [
+      "native capture: passed. tests 26, pass 20, fail 0, skipped 6. RC14C009 step 1 skips with 'host limitation: POSIX mode bits are not honoured on this host', step 2 passes, step 3 skips with 'host limitation: file symlink creation is refused on this host (EPERM)'. Baseline was 1 fail (RC14C009).",
+      "WSL capture: passed. tests 26, pass 26, fail 0, skipped 0 (all three steps pass).",
+      "other cases keep their state: passed. Native RC14C014/018/021/022 still skip exactly as in the baseline, every other case passes. WSL has no skips.",
+      "count change is intended: the spec reporter counts the three subtests, so 23 -> 26 tests. The completion case set is unchanged at 23 (RC14C001..023, the :188 pin and harness/verify-suites.json caseIds).",
+      "consumer-safe check: passed (9/9, exit 0)",
+      "one commit of the test file only, message via file, type test(governance-scope), trailers Dispatch + AI-Assisted: done (f274a59984197ee9b6260b0cb578d83f9d62f890)",
+      "terminal record: this file"
+    ],
+    "evidence": [
+      "evidence/RC14C009-T-20261009/native.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/RC14C009-T-20261009/native.txt --label RC14C009-T-native -- node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope.test.mjs; wrapped exit 0",
+      "evidence/RC14C009-T-20261009/wsl.txt: wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/RC14C009-T-20261009/wsl.txt --label RC14C009-T-wsl -- node --test --test-reporter=spec plugins/pipeline-core/lib/governance-scope.test.mjs'; wrapped exit 0",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0, 9 pass",
+      "node --check plugins/pipeline-core/lib/governance-scope.test.mjs: exit 0",
+      "Captures were taken against the UNCOMMITTED edit (both record dirty: true, with HEADs 8fad54b6 and d0fdf3c9 that predate f274a5998, because parallel dispatches moved HEAD). No edit was made between the captures and the commit, so the committed file is the one that ran.",
+      "Scratch experiment (file removed): a failed t.test() does not reject, so without the rethrow guard the completion recorder disposed the parent case as pass while the reporter said fail; with the guard it disposed fail. This justifies the guard lines and the commit message sentence 'A failing step still fails the case'."
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-scope.test.mjs: statSync import; new modeBitHostLimitation probe next to linkHostLimitation; RC14C009 rewritten as three subtests (step 1 behind the mode-bit probe, step 2 unconditional, step 3 behind the existing linkHostLimitation); +13/-2 lines, assertion expected values byte-identical",
+      "evidence/dispatch-record-RC14C009-T-20261009.json: this record",
+      "uncommitted by design: evidence/RC14C009-T-20261009/native.txt and wsl.txt, scratch/commit-msg/RC14C009-T.txt"
+    ],
+    "notChanged": [
+      "harness/verify-suites.json caseIds (RC14C001..023) and the completionCases.length !== 23 pin: this is why the split is subtests under the one id and not RC14C009a/b/c cases, which would break both",
+      "plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs (its :15 comment references RC14C009) and WINACL-T work generally",
+      "plugins/pipeline-core/lib/governance-scope.mjs privatePath (read-only, production)",
+      "the pre-existing 'chmod(000) actual EACCES: true' info line in the WSL output (from RC14C022)",
+      "foreign staged and dirty files in the shared tree (commit was by exact pathspec)"
+    ],
+    "deviations": [
+      "The mode-bit probe checks BOTH 0o600 and 0o644 (loop), where the briefing specified 0o600 only. It is a strict superset: the case relies on 0o644 being applied and distinguishable, and the reason string is exactly the briefed one. Native win32 reads back 0o666 for either mode, so the briefed outcome is unchanged.",
+      "Added an unbriefed failure-propagation guard (failures array rethrown as an AggregateError after the last step), justified by the scratch experiment above. Without it a failing subtest would be recorded as pass on the Verify completion channel.",
+      "Briefing line references were slightly off (RC14C009 sits at :69 before this edit, not :60-90 with the chmod at :67) because WIN-SKIPS-2b shifted lines; no content conflict."
+    ],
+    "openItems": [
+      "Independent Critic review pending; PO acceptance pending.",
+      "Completion-channel semantics for partial skips: the parent RC14C009 is disposed pass when steps 1 and 3 skip natively (subtest skips do not reach the proxy that only intercepts the parent's t.skip). The skipped steps are visible in the spec reporter and in the node skipped count (6), not in the completion record. The alternative, calling the parent t.skip, would be the whole-case skip Ruling 95(a) rejects. Flagging for the dispatcher in case the completion record should carry partial skips.",
+      "One transient index.lock refusal at the first commit attempt (stop condition: retry after other work); the retry succeeded, no lock handling by me.",
+      "Evidence artifacts under evidence/RC14C009-T-20261009/ and scratch/commit-msg/RC14C009-T.txt are untracked."
+    ]
+  }
+}

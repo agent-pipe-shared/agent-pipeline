@@ -1,0 +1,27 @@
+{
+  "taskId": "GS-RETRY-T2-20261009",
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "agent": "goldfish-mechanic",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-handback-budget-checkpoint",
+  "candidate": "feat/sprint-alfred @ 16af5328e",
+  "log": [
+    "opening: record stated; preflight blocked by GUARD-BOOTSTRAP-RECEIPT-MISSING (toolUse ~3)",
+    "ran preflight from loaded plugin root named by refusal (status ready) (toolUse ~9)",
+    "line numbers 13-18 and 51-55 matched by content (toolUse ~9)",
+    "edits applied to header comments only, uncommitted (toolUse 12 of 15)",
+    "budget checkpoint hit: WSL run and commit NOT performed (toolUse 13)"
+  ],
+  "changedFiles": [
+    "plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs (uncommitted, comment-only: lines 13-18 and 51-55 past tense; bd0dea586 reference)"
+  ],
+  "dodResults": {
+    "gitDiffCommentOnly": "not verified (diff not yet inspected by tool)",
+    "wslCapture19of19": "not run",
+    "commit": "not made",
+    "terminalRecordAfterCommit": "interim record only"
+  },
+  "report": "INTERIM. Header comment edits applied to plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs (working tree, uncommitted). Not committed: WSL test run (expected 19/19) not executed, so no green state exists to commit. Remaining: (1) git diff check that only comment lines changed; (2) WSL capture-evidence.mjs writing evidence/GS-RETRY-T2-20261009/after.txt, expect 19 tests / 19 pass, Bash timeout 600000; (3) if 19/19, git add -- <path> then git commit -F scratch/commit-msg/GS-RETRY-T2.txt -- <path>; (4) overwrite this record as terminal after commit. Note: the dispatch record was opened as an interim record at the briefed terminal path, so the 'written once' rule is bent; flagged for the dispatcher."
+}

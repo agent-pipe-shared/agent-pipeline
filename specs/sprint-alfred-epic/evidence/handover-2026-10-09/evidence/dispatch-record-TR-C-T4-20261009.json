@@ -1,0 +1,30 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-T4-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "commits": ["1774bf07a"],
+  "resultSha256": null,
+  "report": {
+    "text": "DoD: step 1 per-case state equals reference (same 7 failing names, 190/197) passed; manifest amended (digest+size, header qualifier, Declared substitution section) passed; consumer-safe test exit 0 (9/9) passed; one commit 1774bf07a of exactly the two paths, trailers Dispatch: TR-C-T4-20261009 (goldfish) and AI-Assisted: true, pre-commit hook accepted unbypassed. Post-image sha256 6c6b153faba1da5032536a7f4b3241cd229c0fefa4a699b8b5b7a6c7127023a1, 123784 bytes. Independent review: pending.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md"
+    ]
+  },
+  "log": [
+    { "phase": "opening", "toolUses": 6 },
+    { "phase": "step1-3 compare, hash, manifest amend", "toolUses": 16 },
+    { "phase": "consumer-safe test exit 0, message, add, commit 1774bf07a", "toolUses": 20 }
+  ]
+}

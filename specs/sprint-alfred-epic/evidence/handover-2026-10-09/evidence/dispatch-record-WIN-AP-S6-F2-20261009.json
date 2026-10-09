@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S6-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-implementor",
+  "effort": "medium",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "dd25190e3ec0a97f7d14fe54b6f8ef0019d43d11",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [],
+  "log": [
+    { "phase": "opening: briefing read, preflight run, record created", "toolUses": 5 },
+    { "phase": "orientation: runner, S4 manifest, S6-F record read; caller test located", "toolUses": 14 },
+    { "phase": "WSL run of release-version-plan.test.mjs done (26/26, exit 0, hook NOT-FIRED); budget notice at call 28 of 35: stopped, interim handover", "toolUses": 29 }
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "CLOSING-ALLOWANCE HANDOVER (budget notice at call 28 of 35; parallel calls counted separately). Implementation incomplete; independent review: pending; PO acceptance pending.\n\n1. DoD: caller check partly done (release-version-plan only); wsl-callers.txt NOT produced; manifest NOT written; consumer-safe-paths NOT run; commit NOT made.\n2. Evidence: evidence/WIN-AP-S6-F2-20261009/wsl-callers-rvp.txt. Command: wsl.exe -e bash -lc 'cd <repo-root-in-wsl> && export CLAUDECODE=1 && timeout 570 node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/WIN-AP-S6-F2-20261009/wsl-callers-rvp.txt --label WINAPS6F2-wsl-rvp -- node scratch/dispatch-wip/WIN-AP-S6-F/run-callers.mjs plugins/pipeline-core/scripts/release-version-plan.test.mjs'; wrapped exit 0, 26/26 cases passed. FINDING: the hook line says WINAPS6-REDIRECT-NOT-FIRED for both modules (0 loads), so that run did NOT exercise the post-images. release-version-plan.test.mjs contains no storage( call and only a comment naming ensurePrivateDirectory; whether release-version-plan.mjs (lib) reaches private-boundary.mjs in-process is unchecked (my Grep on that lib file was refused by GUARD-READ-TARGET). Treat that file as 'green but not through the redirect' until proven otherwise; not a caller finding, not a new red.\n3. Changed files (uncommitted, git-ignored or evidence): scratch/dispatch-wip/WIN-AP-S6-F/run-callers.mjs (new runner: file argv[2], optional --test-name-pattern argv[3]); evidence/WIN-AP-S6-F2-20261009/wsl-callers-rvp.txt; this record. Post-images untouched.\n4. Deliberately not changed: post-images, live lib/, tests, foreign edits.\n5. Deviations: none. Note the briefing says release-version-plan.test.mjs calls storage( ; it does not (0 matches); human-guard-override.test.mjs has only 2 textual storage( hits (comments, lines 5732, 6281), the real storage() calls are inside production code reached by many tests.\n6. Open items / remains undone (pipeline.dispatch-closing-allowance.v1): Committed: nothing committed. Verified green: release-version-plan 26/26 WSL exit 0 (not through the redirect). Remains undone, in order: (a) find which tests reach the redirected modules in human-guard-override.test.mjs: run the whole file in WSL via the same command with run-callers.mjs and timeout 570, e.g. capture to evidence/WIN-AP-S6-F2-20261009/wsl-callers-hgo.txt; if it times out split by --test-name-pattern (argv[3]) into <=9-minute chunks; require FIRED lines and no 'not ok'. (b) Concatenate the parts into evidence/WIN-AP-S6-F2-20261009/wsl-callers.txt (the DoD name; write via Node). Report any new red as caller finding (caller, case, first error line). (c) Write specs/sprint-alfred-epic/signed-package/tranche-2/WIN-AP-S6-MANIFEST.md modelled on WIN-AP-S4-MANIFEST.md (already read: sections Targets table, anchored edits, Behaviour changes, Verification with commands and result table, Installing). Take base blobs/sha256s/bytes from the S6-F record report.text section 2 (private-boundary.mjs base 66ba190e... / 86989b37... / 7617, post cad86c48... / 9258; human-guard-override.mjs base 3fb4bf77... / 19d225ec... / 244117, post 34aa1bd5... / 245178; use the full values from that record), the five anchored edits from node --no-index style diff: git diff --no-index <base> <post-image> (base via git show HEAD:plugins/pipeline-core/lib/<name>), behaviour notes from the S6-F record section 6. (d) node harness/scripts/check-consumer-safe-paths.mjs, exit 0. (e) message file scratch/commit-msg/WIN-AP-S6-F2-20261009.txt, subject fix(private-boundary,human-guard-override): route the agent-pipeline segment through the hardened entry point (tranche-2), trailers Dispatch: WIN-AP-S6-F2-20261009 (goldfish) and AI-Assisted: true; git add -- the two post-image paths + manifest; git commit -F that file -- those three paths. (f) checkpoint then finalize this record.\nnextBriefingAdjustments: (1) budget 35 is too small once orientation is counted; each parallel call counts separately, so avoid parallel batches; give 30 for steps (a)-(f) only, no re-orientation; (2) state that release-version-plan.test.mjs has no storage( and does not fire the redirect, so the caller of interest is human-guard-override.test.mjs; (3) allow Grep on lib/release-version-plan.mjs by exact path (it was refused as GUARD-READ-TARGET) or drop that file from the caller list.",
+    "changedFiles": []
+  }
+}

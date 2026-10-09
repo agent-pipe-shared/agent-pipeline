@@ -1,0 +1,52 @@
+{
+  "taskId": "TR-S2-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete; Critic review and PO acceptance pending",
+  "commits": ["63ba0c32cb3e6cf960b0ea9a615c5081c1fb2c72"],
+  "log": [
+    { "phase": "opening (in-progress record at the briefed repo-root path)", "toolUses": 16 },
+    { "phase": "implemented, 131/131 native, consumer-safe green, committed, terminal record", "toolUses": 31 }
+  ],
+  "report": {
+    "changedFiles": ["plugins/pipeline-core/lib/execution-lane-credential.mjs"],
+    "routePreCheck": "requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed model identity from this dispatch's runtime prompt: claude-sonnet-5-5 (match); effort not directly observable, disclosed, work proceeded",
+    "sections": {
+      "1_dodResults": {
+        "131 of 131 cases green (native)": "passed",
+        "consumer-safe check exit 0": "passed",
+        "one commit of the new module only via -F": "passed (63ba0c32c, git show --stat HEAD lists exactly one file, 575 insertions; the two pre-staged foreign files stayed staged)",
+        "terminal record written once after the commit": "not met as worded: an in-progress record was written first (see deviations)",
+        "pure / synchronous / never throws / depth 3 / null readScript refuses": "passed (PURE-1 green; ad-hoc probe: depth 3 admitted, depth 4 ELC-DEPTH; null, undefined and non-string reader results ELC-SCRIPT-UNREADABLE; throwing reader, bad input, bad targets all refuse, nothing throws)"
+      },
+      "2_evidence": [
+        "evidence/TR-S2-F-20261009/after.txt -- `node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S2-F-20261009/after.txt --label after -- node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs` -- artifact records exitCode 0; tests 131, pass 131, fail 0, skipped 0, todo 0",
+        "evidence/TR-S2-F-20261009/consumer-safe.txt -- same capture tool, label consumer-safe, `node --test harness/scripts/check-consumer-safe-paths.test.mjs` -- tool reported wrapped exit code 0 (I did not re-read the artifact body; 9 of 9 tests were seen on stdout in the preceding direct run)",
+        "scratch/tr-s2-f-probe.mjs -- ad-hoc edge probe, stdout only (no artifact): depth bound, reader null, case folding, dot-dot, spaces in home, missing WSL home, oversize input, bad tool/command"
+      ],
+      "3_changedFiles": [
+        "plugins/pipeline-core/lib/execution-lane-credential.mjs (new, committed): pure classifyExecutionLaneCredential, 575 lines",
+        "uncommitted, untracked or ignored by design: evidence/TR-S2-F-20261009/{after,consumer-safe}.txt, evidence/dispatch-record-TR-S2-F-20261009.json, scratch/commit-msg/TR-S2-F.txt, scratch/tr-s2-f-probe.mjs, specs/sprint-alfred-epic/evidence/dispatch-record-TR-S2-F-20261009.json (stub, see open items)"
+      ],
+      "4_deliberatelyNotChanged": [
+        "the test file, evaluate.mjs (no wiring), hooks/, lib/guard/, harness/",
+        "pre-existing staged and dirty foreign files (pipeline-state.test.mjs, sanctioned-args-onboarding.mjs, pipeline-state.mjs, design-approval-route.e2e.test.mjs): untouched, not staged by me"
+      ],
+      "5_deviations": [
+        "Record written twice (in-progress opening per the Goldfish contract, terminal now) instead of once; both at the briefed repo-root path.",
+        "An earlier opening stub was created under specs/sprint-alfred-epic/evidence/ before the CONT15 record-path rule was read; overwritten with outcome 'superseded' but not deletable under the admitted shell grammar.",
+        "A probe script written to the session scratchpad was refused by the guard (GUARD-CROSS-REPO-MUTATION); it was written to repo scratch/ instead. A first write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING; the named preflight was run once (status ready).",
+        "Judgments the tests do not pin: (a) depth counting: an inline string or a script's content that is scanned again costs one level, a wsl argv pass-through costs none; bound 3 inclusive, refuse beyond; (b) targets carry no repo root, so every carrier's first script operand is read and an unreadable one refuses; (c) bash.exe outside a WSL carrier is scanned in both native and WSL home contexts (refuse-side over-approximation, not in the note); (d) '~' or $HOME inside a WSL carrier with no homes.wsl refuses (ELC-HOME-UNRESOLVED), as does a '~' with no native home; (e) node and python inline sources and scripts are path-scanned but do not recurse into further carriers; (f) comparison is case-insensitive everywhere and dot-dot is resolved lexically; (g) the /mnt/<d>, cygdrive and MSYS single-letter mapping is applied identically to roots and candidates, so on POSIX hosts a top-level directory with a one-letter name would widen refusals only; (h) the reader receives the absolute native spelling when the operand names one."
+      ],
+      "6_openItems": [
+        "Independent Critic review (class GUARDRAIL + SECURITY) and PO acceptance are pending; nothing is 'done'.",
+        "Wiring into evaluate.mjs and its WSL-only hook pins belong to the signed tranche (Ruling 72(c)).",
+        "Wiring consequence to decide there: because script content is scanned, `node --test <file>` on a test file whose text literally names a secret basename with a directory component (this classifier's own test file does) would be refused under real targets.",
+        "Residuals stated in the module header: dynamic constructs (variables, command substitution, globs in a directory component), direct-path script execution, carriers hidden in string arguments of non-carrier executables, nested carriers inside node or python sources.",
+        "PO/Elephant: delete the untracked stub specs/sprint-alfred-epic/evidence/dispatch-record-TR-S2-F-20261009.json.",
+        "Platform matrix: verified on Windows native only (pure library, no platform calls); not run under WSL or on macOS; runner dimension (Claude, Codex, agy) not applicable to a pure library, not exercised."
+      ]
+    }
+  }
+}

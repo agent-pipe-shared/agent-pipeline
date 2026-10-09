@@ -1,0 +1,10 @@
+command: node harness/scripts/check-consumer-safe-paths.mjs
+label: adopt-sign-t2-csp
+exitCode: 0
+head: d916a54594ab35d78a8874773539ffb2c358d26a
+tree: 014f1ca54df06fd5e2d4121e754ce7e6a2a970a2
+dirty: true
+--- stdout ---
+Consumer-safe-path check passed: 1769 tracked file(s) under plugins/pipeline-core/, 152 allowlist entries (all used).
+
+--- stderr ---

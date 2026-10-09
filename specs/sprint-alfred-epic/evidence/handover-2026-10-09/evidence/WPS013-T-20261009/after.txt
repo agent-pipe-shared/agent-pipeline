@@ -1,0 +1,30 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: native-after
+exitCode: 0
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.7022ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.1099ms)
+✔ WPS003 rejects owner drift and reparse points (0.0901ms)
+✔ WPS004 keeps malformed observations unavailable (0.0794ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.5497ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.1439ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.3406ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.134ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.1371ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.1891ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.2983ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.1353ms)
+✔ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1468.433ms)
+✔ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (1732.2421ms)
+✔ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (1583.1148ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4844.4539
+
+--- stderr ---
+

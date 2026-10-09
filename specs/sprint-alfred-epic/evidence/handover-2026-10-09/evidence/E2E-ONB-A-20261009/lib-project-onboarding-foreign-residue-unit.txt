@@ -1,0 +1,20 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs
+label: lib-project-onboarding-foreign-residue-unit
+exitCode: 0
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ PFRU01 foreign descriptors (incident shapes, with and without resources) are a warning, never a lock (223.880708ms)
+✔ PFRU02 the requester's own descriptor (matching owner nonce) keeps today's blocking behaviour (140.789676ms)
+✔ PFRU03 no descriptor at all, or an unreadable inventory, yields no warning (fail closed) (10.773673ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2250.22721
+
+--- stderr ---

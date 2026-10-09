@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-M2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "d8b5d5a64",
+  "outcome": "read-only-completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "read-only"
+  },
+  "commits": [],
+  "resultSha256": "b831967395f8301ee4bf367beb126a473e2c86a7bf8bf2af2367bdaa8a3824fb",
+  "report": {
+    "text": "Read-only measurement ADR0085-M2 at d8b5d5a64 (dirty tree). Both probes ran; no commit, no tracked change. independent review: pending.\nplanApproval.schema: pipeline.plan-approval.v7\nprobe1 rereadApprovedDesignWorkflowPackage: ok=true code=undefined mode=signature\nprobe2 designAdvisoryAdmission: ok=true code=undefined mode=approved-workflow-package-signature\nEvidence: evidence/ADR0085-F3a-20261009/m2.txt via capture-evidence.mjs, wrapped exit code 0.",
+    "changedFiles": []
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening",
+      "toolUses": 10
+    },
+    {
+      "phase": "closed",
+      "toolUses": 22
+    }
+  ]
+}

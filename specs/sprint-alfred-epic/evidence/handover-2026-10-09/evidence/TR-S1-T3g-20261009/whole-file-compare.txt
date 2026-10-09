@@ -1,0 +1,114 @@
+command: node scratch/t3g-compare.mjs
+label: whole-file-compare
+exitCode: 0
+head: 588b845521d579a3df4e70850239f987286641fc
+tree: 5744ad184b05606d6dc7ab43368e6e53f9b595f8
+dirty: true
+--- stdout ---
+baseline tests: 57 (pass 54, fail 3)
+whole-1: 24 tests (pass 24, fail 0)
+whole-2: 23 tests (pass 22, fail 1)
+whole-3: 10 tests (pass 7, fail 3)
+union of splits: 55 distinct tests; ran in more than one split: 2
+
+PER-NAME (baseline -> now) for every baseline test:
+pass -> pass  [whole-2]  recovery plan is bound to the public preimage and refuses an in-repository key directory
+pass -> pass  [whole-2]  recovery requires exact digest and explicit attended confirmation before bounded setup
+pass -> pass  [whole-2]  recovery CLI rejects non-TTY activation without invoking setup
+pass -> pass  [whole-2]  recovery reports source complete if audit fails, without pretending the setup rolled back
+pass -> pass  [whole-2]  successful attended recovery writes a bounded, replay-safe private audit receipt
+pass -> pass  [whole-2,whole-3]  a failed first-anchor action returns an attended digest-bound recovery command
+pass -> pass  [whole-1]  driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh no-key/valid-key homes without ambient drift or repeated answered asks
+pass -> pass  [whole-2]  initial answer CLI refuses absent or invalid language before any source or receipt write
+pass -> pass  [whole-2]  an earlier intake language cannot be mislabeled as a later override
+pass -> pass  [whole-2]  a later explicit intake language override is reported by the real CLI
+pass -> pass  [whole-2]  host-managed initial answers publish privately and never write reserved Git or Codex controls
+pass -> pass  [whole-2]  host-managed first stop asks identity, approval and language before intake consent
+FAIL -> FAIL  [whole-2]  host-managed consent CLI routes its later explicit language into private intake state
+pass -> pass  [whole-2]  later intake language projection resumes after each target publication
+pass -> pass  [whole-2]  public re-entry repairs consent recorded before language projection
+pass -> pass  [whole-2]  later-language recovery refuses foreign edits without publishing an audit
+pass -> pass  [whole-2]  later-language projection completes a prior three-target journal after plugin upgrade
+pass -> pass  [whole-2]  host-managed first answers recover after every publication boundary
+pass -> pass  [whole-2]  host-managed first answers complete a prior three-target journal after plugin upgrade
+pass -> pass  [whole-2]  host-managed recovery refuses changed answers and foreign post-interruption bytes
+FAIL -> FAIL  [whole-3]  public onboarding driver keeps chat keyless and reaches a separate signature-anchor action
+pass -> pass  [whole-3]  a failed separate signature-anchor action preserves the completed initial chat-free transaction
+pass -> pass  [whole-3]  new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup
+FAIL -> FAIL  [whole-3]  signature anchor reuses a key already at the canonical directory path without importing or replacing it
+pass -> pass  [whole-3]  first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary
+pass -> pass  [whole-2,whole-3]  a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice
+pass -> pass  [whole-2]  new-key recovery refuses malformed or foreign authority receipts before setup
+pass -> pass  [whole-1]  driveOnboardingInit: stops at the first published ask (pendingAsks or collect-input) without inventing any of its values
+pass -> pass  [whole-1]  driveOnboardingInit: executes a run of consecutive command actions before it has to stop
+pass -> pass  [whole-1]  driveOnboardingInit: is re-entrant -- a second run never repeats the already-executed command that published the ask
+pass -> pass  [whole-1]  driveOnboardingInit: the step cap fires on a chain that never converges
+pass -> pass  [whole-1]  driveOnboardingInit: failed portable seed stops at its first unexpected mutation outcome
+pass -> pass  [whole-2]  portable lifecycle apply returns its rollback instead of replanning the same seed
+pass -> pass  [whole-1]  driveOnboardingInit: re-anchors after an executed step settles with no nextAction, and completes
+pass -> pass  [whole-1]  driveOnboardingInit: re-anchors after a published command succeeds with plain human-facing output
+pass -> pass  [whole-1]  driveOnboardingInit: binds a returned root-less project action to the Driver root
+pass -> pass  [whole-1]  driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status
+pass -> pass  [whole-1]  driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results remain closed
+pass -> pass  [whole-1]  driveOnboardingInit: a blocked published runner-permission repair retains its exact diagnostic action
+pass -> pass  [whole-1]  driveOnboardingInit: plain or malformed anchor output, JSON-shaped malformed command output, and nonzero command output remain errors
+pass -> pass  [whole-1]  driveOnboardingInit: a nextAction-less result from the anchoring inspect itself does not re-anchor again
+pass -> pass  [whole-1]  driveOnboardingInit: a genuinely non-converging chain stops with its own outcome, not the step cap
+pass -> pass  [whole-1]  driveOnboardingInit: collect-input, external-operator, ready, unsupported-next-action and error outcomes reached directly are typed
+pass -> pass  [whole-1]  driveOnboardingInit: a command nextAction carrying pendingAsks stops and surfaces them instead of executing straight past them
+pass -> pass  [whole-1]  driveOnboardingInit: a command nextAction with no pendingAsks (absent or empty) is unaffected
+pass -> pass  [whole-1]  driveOnboardingInit: a collect-input nextAction that also carries pendingAsks surfaces both, neither lost
+pass -> pass  [whole-1]  driveOnboardingInit: malformed pendingAsks does not crash the driver and is not silently swallowed
+pass -> pass  [whole-1]  driveOnboardingInit: walks migration plan -> apply --activate -> re-anchor inspect -> ready without premature termination
+pass -> pass  [whole-1]  driveOnboardingInit: a migration-ready V4 response keeps required asks while optional handover commands remain terminal
+pass -> pass  [whole-1]  driveOnboardingInit: a greenfield V4-ready command nextAction executes before reaching PO input
+pass -> pass  [whole-1]  driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready
+pass -> pass  [whole-2]  DEFAULT_STEP_CAP is a small, positive constant
+
+ADDED (3):
+pass  [whole-3]  setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor
+FAIL  [whole-3]  setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory
+pass  [whole-3]  the in-process setup step writes the machine plane into the injected home and never into the ambient home
+
+MISSING from the splits (5):
+maintenance-window ceremony runs prepare, present+sign, install, verify end to end with exactly one human decision (the passphrase entry, no typed confirmation), and the installed window reads back active
+maintenance-window ceremony aborts before install when the human declines the passphrase entry (the signing spawn exits non-zero): no window is installed
+maintenance-window ceremony surfaces GMW-CANDIDATE-COMMIT-MISMATCH plainly when an unrelated commit lands between prepare and install
+parseSigningCeremonyArgs rejects a missing required flag, an unknown flag and a duplicate flag
+runSigningCeremony rejects an unknown command and an incomplete argument set with the usage message
+
+CHANGED STATE (0):
+
+OVERLAP (2):
+whole-2,whole-3  a failed first-anchor action returns an attended digest-bound recovery command
+whole-2,whole-3  a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice
+
+REAL MACHINE PLANE AFTER THE SPLIT RUNS (compare with machine-plane-before.txt):
+{
+  "directoryPresent": true,
+  "entries": [
+    {
+      "path": "~/.agent-pipeline/machine.json",
+      "kind": "file",
+      "sizeBytes": 287,
+      "mtimeMs": 1791027147588,
+      "sha256": "998a38d7e92a987aca3c53158f90fbf75093daa63d9d6eba08000c26bd34cf7a"
+    },
+    {
+      "path": "~/.agent-pipeline/po-keys",
+      "kind": "directory",
+      "sizeBytes": 4096,
+      "mtimeMs": 1787066689484,
+      "sha256": null
+    },
+    {
+      "path": "~/.agent-pipeline/po-keys-andre",
+      "kind": "directory",
+      "sizeBytes": 4096,
+      "mtimeMs": 1787072101309,
+      "sha256": null
+    }
+  ]
+}
+
+--- stderr ---

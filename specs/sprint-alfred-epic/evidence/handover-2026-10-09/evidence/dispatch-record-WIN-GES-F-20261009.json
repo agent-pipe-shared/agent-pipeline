@@ -1,0 +1,65 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-F-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "5e19c84c58dd3232851fba721098b98c2389b5ab",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "fa03705df202ebf27a6a5adcc109592b6a53e01013b9e5d504deb66e49b84af1",
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: record created, route pre-check matched, preflight run once after GUARD-BOOTSTRAP-RECEIPT-MISSING",
+      "toolUses": 8
+    },
+    {
+      "phase": "baselines landed: native-before 0/3 (exit 1), wsl-before 145/145 (exit 0), native-store-before 13/57 pass (44 GES-LOCKED, pre-existing)",
+      "toolUses": 22
+    },
+    {
+      "phase": "edit done: ensureHardenedPrivateDirectory(gitCommonDir, directory) in bindLocalRepositoryFingerprint; :220/:263/:272 are outside the repository (storeRoot), :367 is repo-public, none converted",
+      "toolUses": 28
+    },
+    {
+      "phase": "native-after RED: same PB-WINDOWS-ASSURANCE for agent-pipeline from applyInstall (pre-commit-hook-install.mjs:932); diagnosis: real creator is guard-maintenance-window.mjs:808 via storagePaths :855 / :1187; governance-event-store is not on the GMW path; STOP (other creator, scope burst, briefing contradiction)",
+      "toolUses": 34
+    },
+    {
+      "phase": "evidence for the uncommitted edit: wsl-after exit 0, native-store-after 57/13/44 identical to before",
+      "toolUses": 37
+    },
+    {
+      "phase": "closing: terminal record and report written, nothing committed",
+      "toolUses": 40
+    }
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.mjs"
+    ],
+    "text": "Bootstrap check passed: ruleset 0.7.0+claude.20261008194106.da20519d loaded, Project agent-pipeline, Calibration not supplied by the briefing (Profile: standard), State briefing WIN-GES-F-20261009, Role Goldfish.\nRoute: requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed claude-sonnet-5-5 from this dispatch's own runtime prompt; match (effort has no direct evidence, disclosed as unknown). STOPPED ON A STOP CONDITION (not a budget handover): nothing committed. independent review: pending (nothing to review; no commit exists).\n\n1. DoD results.\n- Native before-capture of the three signed-GMW cases: done, exit 1, 0 pass / 3 fail (PB-WINDOWS-ASSURANCE).\n- WSL before-capture (event-store, win-fsync, pre-commit-hook-install): done, exit 0, 145/145.\n- Native store before-capture: done, exit 1, 57 tests / 13 pass / 44 fail. The 30 sampled code lines were all GES-LOCKED (class A1 of the diagnosis note), i.e. pre-existing and not this slice's cause.\n- Native after-capture, the three signed-GMW cases: FAILED, exit 1, still 0/3, identical PB-WINDOWS-ASSURANCE for agent-pipeline thrown from applyInstall (pre-commit-hook-install.mjs:932). The briefed fix does not turn them green.\n- WSL after-capture, with the edit left uncommitted in the tree: passed, wrapped exit 0 (totals line not separately read; before was 145/145).\n- Native store after-capture: 57 tests / 13 pass / 44 fail, totals identical to before; the first sampled code lines were GES-LOCKED, no PB- code seen in them (not an exhaustive enumeration).\n- check-consumer-safe-paths test: not run (stopped). Commit: not made.\n\n2. Evidence (all machine-written by capture-evidence.mjs, wrapped exit code in each header). evidence/WIN-GES-F-20261009/native-before.txt (exit 1; header HEAD 5e19c84c58dd3232851fba721098b98c2389b5ab, dirty tree), native-after.txt (exit 1), wsl-before.txt (exit 0), wsl-after.txt (exit 0), native-store-before.txt (exit 1), native-store-after.txt (exit 1). Commands: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <label> -- node --test [--test-name-pattern signed GMW] <test files>; WSL ones through wsl.exe -e bash -lc.\n\n3. Changed files. plugins/pipeline-core/lib/governance-event-store.mjs, UNCOMMITTED AND INCOMPLETE as a fix: adds the import of ensureHardenedPrivateDirectory and replaces the recursive 0o755 mkdir in bindLocalRepositoryFingerprint (was :155) with ensureHardenedPrivateDirectory(gitCommonDir, directory), plus a short comment. Same anchor (git common dir) and segment semantics the installer uses; POSIX mode becomes 0o700 (stricter; reason: the binding holds a random local identity no other user needs to read, and the installer already creates every sibling segment 0o700). Untracked outputs: the six evidence files, this record, scratch/win-ges-f-finalize.mjs.\n\n4. Deliberately not changed. governance-event-store.mjs :220, :263, :272: these create directories under storeRoot, which assertAbsoluteOutsideRepository guarantees is outside the repository (not under the git common dir); the :228-233 win32 branch hardens the restricted root and records/auxiliary are its children. :367 ensureSafeDirectory creates repo-public governance/events/<stream> directories under the worktree (tracked content), not private state. plugins/pipeline-core/lib/guard-maintenance-window.mjs (the real creator, below): another production file, forbidden by field 4.\n\n5. Deviations and briefing defects. The diagnosis note's chain is contradicted by the repo: guard-maintenance-window.mjs neither imports nor calls readLocalRepositoryFingerprint (no occurrence in the file) and does not import governance-event-store (line 281 only lists its path as a string); it fingerprints through its own repoFingerprint(repo) (:918). So bindLocalRepositoryFingerprint is not on the GMW path, which is why before and after are identical. The creator that does sit on the path is guard-maintenance-window.mjs:808 (secureDirectory: mkdirSync(path, { recursive: true, mode: 0o700 })), reached via storagePaths (:853-855) from prepareGuardMaintenanceWindowRequest (:1187); it makes <common>/agent-pipeline with an inherited DACL and hardens only the leaf guard-maintenance-window (:812). The installer then assesses agent-pipeline and refuses. Same helper is used at :1643, :1686, :1935. Basis: code reading plus the identical before/after failure; I did not probe the DACL natively. Stop conditions triggered: another creator of .git/agent-pipeline keeps the cases red (named above), scope burst (the correct fix is outside the briefed file), briefing-versus-repo contradiction.\n\n6. Open items and next briefing. Committed: nothing. Verified green: WSL before and after (exit 0). Remains undone: the three native cases, the commit, check-consumer-safe-paths, and the uncommitted edit above (decide keep or drop; it is safe on WSL and neutral on the native store suite). Next briefing must say: the fix lives in guard-maintenance-window.mjs secureDirectory/storagePaths (create agent-pipeline through ensureHardenedPrivateDirectory anchored at the common dir, keep the assess-if-existing leaf semantics). Two facts the implementor will otherwise rediscover: secureDirectory receives only the path, so the fix must be threaded from storagePaths (:853), which holds common; and secureDirectory's POSIX branch (:815) repairs an existing non-private directory via chmodSync, a semantic ensureHardenedPrivateDirectory deliberately lacks (it refuses an existing insecure segment and never re-hardens), so the briefing must pick which contract wins for the leaf. The governance-event-store edit is still worth keeping so either creator order yields a hardened directory; write the RED pin first in a test-only dispatch (QG-04, the existing guard-maintenance-window tests inject platform/harden/assess seams); correct step 4 of the diagnosis note. Disclosure for the kept edit: two processes binding one fresh checkout concurrently now behave like the installer (the loser of the create race assesses a possibly unhardened segment and refuses) where the old recursive mkdir tolerated it. Tool use: about 40 of 45, no closing allowance spent beyond the record."
+  }
+}

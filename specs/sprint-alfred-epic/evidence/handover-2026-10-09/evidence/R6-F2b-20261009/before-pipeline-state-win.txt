@@ -1,0 +1,87 @@
+command: node --test harness/scripts/pipeline-state.test.mjs
+label: R6-F2b-before-win
+exitCode: 1
+head: 410d0addf8da0a970d6a6d3c8e0f7b2031ba04b2
+tree: 9ebd0bc69f7c5b8ce9bfc7a961330d13852a7def
+dirty: true
+--- stdout ---
+[capability: symlink unavailable] skipping symlink-specific checks
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+PASS  PS01a approve-plan without --by refused (exit 2)
+PASS  PS01b nothing written (state file absent)
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+PASS  PS02 approve-plan with empty --by refused (exit 2)
+Error: revoke-plan requires --by <name> (non-empty) -- an unattributed revocation is refused.
+PASS  PS03 revoke-plan without --by refused (exit 2)
+Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof. The three proof flags are demanded because gates.push_approval is "signature" (its default, and this project's configured value). The PO's actual part in producing them is ONE command and ONE passphrase: run `node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical ...` (docs/push-release-flow.md, Layers 2+3) and the PO types `approve`, then their passphrase, at the prompt -- that is the whole human ceremony. Every other value in that command (the subject hash, the candidate binding, the expiry, the --proof-request/--proof-authority/--proof paths it produces) is pure digest computation this agent performs itself first, needing no key at all. Follow docs/push-release-flow.md end to end. There is no other route: an agent must never propose switching the gates.push_approval mode, and must never suggest the PO complete the push without this ceremony -- the signature is the one control in this model that is real protection rather than ceremony, and only the PO may change their own gate configuration.
+PASS  PS04 approve-push without --by refused (exit 2)
+Error: existing state file is invalid (invalid JSON (Expected property name or '}' in JSON at position 2 (line 1 column 3))) -- aborting WITHOUT changes.
+File: <home-path>
+Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.
+PASS  PS05a malformed existing file -> exit 2
+PASS  PS05b file left byte-identical (no silent overwrite)
+Feature "ap1-pipeline-tuning" set. Plan path: .claude/plans/x.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Error: submit-plan refused (PROFILE-AUTHORITY-INVALID); persisted profile sources must agree. Zero authority mutation.
+Error: present-plan requires an exact current submitted plan (PLAN-LIFECYCLE-CURRENT); run submit-plan first.
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+PASS  PS06a-1 continuity-init exit 0
+FAIL  PS06a0 submit-plan exit 0 -- got 2
+FAIL  PS06a0-1 present-plan exit 0 -- got 2
+FAIL  PS06a approve-plan exit 0 -- got 2
+PASS  PS06b schema field correct
+FAIL  PS06c planApproved true
+FAIL  PS06d planApproval is exact v7 and binds the submitted Plan, Spec, profile authority, and an empty audit seal
+PASS  PS06e activeFeature preserved from set-feature
+Feature "f1" set. Plan path: p1.md. planApproved=false, phase="design".
+Feature "f2" set. Plan path: p2.md. planApproved=false, phase="design".
+PASS  PS07a new feature resets planApproved=false
+PASS  PS07b phase reset to design (inside activeFeature, F1 fix)
+PASS  PS07c prior planApproval cleared
+PASS  PS07d activeFeature reflects the NEW feature
+Feature "f1" set. Plan path: p1.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Error: submit-plan refused (PROFILE-AUTHORITY-INVALID); persisted profile sources must agree. Zero authority mutation.
+Error: present-plan requires an exact current submitted plan (PLAN-LIFECYCLE-CURRENT); run submit-plan first.
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+Design reopened by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="draft".
+PASS  PS08a reopen-design exit 0
+PASS  PS08b planApproved false after reopen
+PASS  PS08c exact invalidation recorded
+Design is already open; zero-write replay accepted.
+PASS  PS08d reopen replay accepts the stored timestamp after an ambiguous response
+PASS  PS08e reopen replay leaves state byte-identical
+Feature "approval-audit-seal" set. Plan path: specs/seal/prd_seal.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Error: submit-plan refused (PROFILE-AUTHORITY-INVALID); persisted profile sources must agree. Zero authority mutation.
+Error: present-plan requires an exact current submitted plan (PLAN-LIFECYCLE-CURRENT); run submit-plan first.
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+Design reopened by "po-test" on 2026-07-07T21:00:00.000Z; lifecycle="draft".
+Error: submit-plan refused (PROFILE-AUTHORITY-INVALID); persisted profile sources must agree. Zero authority mutation.
+Error: present-plan requires an exact current submitted plan (PLAN-LIFECYCLE-CURRENT); run submit-plan first.
+Error: approve-plan refused (PROFILE-AUTHORITY-INVALID); approval of a plan cannot retroactively authorize a different selected profile.
+file:///<repo-root>/harness/scripts/pipeline-state.test.mjs:1221
+    priorInvalidationSha256: _ignored,
+                             ^
+
+TypeError: Cannot destructure property 'priorInvalidationSha256' of 'legacy.planApproval' as it is undefined.
+    at file:///<repo-root>/harness/scripts/pipeline-state.test.mjs:1221:30
+
+Node.js v24.20.0
+✖ harness\scripts\pipeline-state.test.mjs (934.3568ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 939.5197
+
+✖ failing tests:
+
+test at harness\scripts\pipeline-state.test.mjs:1:1
+✖ harness\scripts\pipeline-state.test.mjs (934.3568ms)
+  'test failed'
+
+--- stderr ---

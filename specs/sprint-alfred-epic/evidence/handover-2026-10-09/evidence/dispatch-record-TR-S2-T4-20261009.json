@@ -1,0 +1,92 @@
+{
+  "taskId": "TR-S2-T4-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-as-intended-NOT-COMMITTED-blocked-on-index-lock",
+  "supersedes": "the in-progress opening and interim records written at the start of this dispatch",
+  "commits": [],
+  "staged": {
+    "path": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+    "numstat": "126 added, 0 deleted",
+    "commitMessageFile": "scratch/commit-msg/TR-S2-T4.txt",
+    "commitCommand": "git commit -F scratch/commit-msg/TR-S2-T4.txt -- plugins/pipeline-core/lib/execution-lane-credential.test.mjs"
+  },
+  "log": [
+    { "phase": "opening: briefing, CONT17/CONT15 headers, Rulings 97/106 and T3 record read; preflight ready (exit 0); route pre-check matched (no A/G/S class named)", "toolUses": 17 },
+    { "phase": "advisor consulted once; header assumption 15 and groups F4R (8 rows) / F4A (4 rows) inserted; node --check ok; numstat 126 added, 0 deleted; module last commit 63ba0c32c, clean (F2 NOT landed)", "toolUses": 35 },
+    { "phase": "native capture exit 1 (expected), head f78a54747, 322 tests / 199 pass / 123 fail; consumer-safe 9/9 exit 0; test file staged", "toolUses": 41 },
+    { "phase": "git commit hit index.lock; retried once after other work; hit it again; stop condition 'index.lock' fired; budget checkpoint at call 48 of 60", "toolUses": 48 }
+  ],
+  "report": {
+    "route": "requested goldfish-deep / claude-sonnet-5-5 / xhigh; observed runtime identity claude-sonnet-5-5 (match, quoted from this dispatch's runtime prompt). No A/G/S class named in field 6, so disclosure only. The dispatch carried a reasoning_effort tag of 30 against the requested xhigh.",
+    "dodResults": {
+      "nativeCapture": "passed (artifact written; wrapped exit 1 is the expected red state, F2 not landed)",
+      "consumerSafe": "passed (exit 0, 9 pass, 0 fail)",
+      "commit": "NOT DONE - blocked: git commit failed twice with 'Unable to create .git/index.lock: File exists' (exit 128); the briefed stop condition (retry once after other work, then stop) fired. The file IS staged by exact pathspec and the message file is ready.",
+      "terminalRecord": "passed (this file)"
+    },
+    "evidence": {
+      "capture": "evidence/TR-S2-T4-20261009/after.txt",
+      "captureCommand": "node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S2-T4-20261009/after.txt --label after -- node --test plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "captureExit": 1,
+      "captureHead": "f78a54747f22ed13f2846eee35fa84fe2cdcd8fc",
+      "captureNote": "native win32; dirty true (the test file was uncommitted at capture; staged content is identical). Module state at capture: last commit touching execution-lane-credential.mjs is 63ba0c32c and the working tree copy was clean, so TR-S2-F2 had NOT landed. HEAD kept moving during the dispatch (d0fdf3c9c, then e0f7328b1 at the last read); the module was not re-checked after the capture.",
+      "totals": { "tests": 322, "pass": 199, "fail": 123, "skipped": 0, "todo": 0 },
+      "delta": "298/191/107 (T3, ecf4bad93) -> 322/199/123: +24 tests, +8 green, +16 red; no previously green case changed state",
+      "consumerSafe": { "command": "node --test harness/scripts/check-consumer-safe-paths.test.mjs", "exit": 0, "pass": 9, "fail": 0 },
+      "syntaxCheck": "node --check on the test file: exit 0",
+      "pureInsertion": "git diff --numstat on the test file: 126 added, 0 deleted (also identical in --cached)"
+    },
+    "perCase": {
+      "redAtCaptureHead_allGotNull": [
+        "F4R-1a rg -e foo <key>.pem (bash, powershell)  [briefed]",
+        "F4R-1b grep -e foo <key>.pem (bash, powershell)  [other-tool counterpart]",
+        "F4R-2a grep --regexp=foo docs/<pattern-only>.pem (bash, powershell)  [briefed]",
+        "F4R-2b rg --regexp=foo docs/<pattern-only>.pem (bash, powershell)  [counterpart]",
+        "F4R-3a rg -f <key>.pem docs/ (bash, powershell)  [briefed]",
+        "F4R-3b grep -f <key>.pem docs/ (bash, powershell)  [counterpart]",
+        "F4R-4a grep --file=<key>.pem docs (bash, powershell)  [briefed]",
+        "F4R-4b rg --file=<key>.pem docs (bash, powershell)  [counterpart]"
+      ],
+      "greenAtCaptureHead_admitted": [
+        "F4A-1a rg -e <key>.pem docs/ (bash, powershell)  [briefed; byte-identical command to F3P-3]",
+        "F4A-1b grep -e <key>.pem docs/ (bash, powershell)  [counterpart]",
+        "F4A-2a grep --regexp <key>.pem docs (bash, powershell)  [briefed]",
+        "F4A-2b rg --regexp <key>.pem docs (bash, powershell)  [counterpart]"
+      ],
+      "reason": "the refusals are red because the module admits a bare secret-pattern name in a file-operand position and ignores the -f/--file values and the post-option positionals; the failure text on F4R-1a is 'expected a refusal object for [bash] rg -e foo po-private.pem, got null'. The admissions are green today and must stay green after TR-S2-F2. Expected end state after F2 lands: all 24 new tests green."
+    },
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs", "why": "Ruling 106 pins: header assumption 15 (new lines inserted after assumption 14), group F4R (8 refusal rows) and group F4A (4 admission rows), all with tools BOTH and the F3 production-pattern fixture; names built from the existing POLICY_KEY_NAME and PATTERN_ONLY_NAME parts (no new secret spelling); 126 insertions, 0 deletions; STAGED, not committed" },
+      { "path": "scratch/commit-msg/TR-S2-T4.txt", "why": "commit message file (two trailers only: Dispatch and AI-Assisted)" },
+      { "path": "evidence/TR-S2-T4-20261009/after.txt", "why": "native capture, written by capture-evidence.mjs" },
+      { "path": "evidence/dispatch-record-TR-S2-T4-20261009.json", "why": "this terminal record" }
+    ],
+    "deliberatelyNotChanged": [
+      "Header assumption 14's last sentence ('Not pinned: whether the first positional is a file operand once -e or --regexp supplies the pattern ... which the ruling leaves open') is now stale: Ruling 106 settles it and the new assumption 15 says so. It was left byte-for-byte as briefed (pure insertion only). A later cleanup may reword it.",
+      "F3P-3 and every other existing case and line (0 deletions); F3O-3 and F3O-6 untouched.",
+      "The module, evaluate.mjs, hooks/, lib/guard/, harness/ (read-only).",
+      "No admitted control for a NON-secret -f value (e.g. rg -f <plain>.txt docs/) was added; it is outside the briefed list. It would catch a lazy blanket-refuse-on-any--f implementation.",
+      "The index.lock and the foreign staged files were not touched."
+    ],
+    "deviations": [
+      "EXTRA ROWS: every briefed shape also runs with the other tool (the '1b/2b/3b/4b' rows: 4 refusal and 2 admission extras, 12 tests). Reason: the briefing's 'each under both tools unless stated' is ambiguous between rg-and-grep and bash-and-powershell; covering both readings costs 12 tests and closes a per-tool-hole in F2. Every row also runs in both carriers (tools BOTH). If the Elephant reads 'both tools' as the carriers only, the b rows are removable without affecting the briefed ones.",
+      "DUPLICATE: the briefed admission 'rg -e <key>.pem docs/' (F4A-1a) is byte-identical to the existing F3P-3 command. It is kept as a distinct pin of the other half of Ruling 106 (docs/ is a file operand and a clean one), with its title saying so.",
+      "HEADER: a NEW assumption 15 was inserted (6 physical lines) instead of rewording 14, as a pure insertion; it names Ruling 106 and TR-S2-T4.",
+      "COMMIT NOT MADE (see open items).",
+      "RECORD PLACEMENT: an opening record was first written under specs/sprint-alfred-epic/evidence/ before the CONT17 header's 'repo-root evidence/ only' rule was read; it was removed with rm before any commit, and the canonical record is this repo-root file. No tracked file was affected.",
+      "PREFLIGHT: the lifecycle hook refused the first Write with GUARD-BOOTSTRAP-RECEIPT-MISSING; the named preflight was run (exit 0, status ready) and the identical write retried.",
+      "TRAILERS: the harness attribution reminder asks for Co-Authored-By and Claude-Session lines; the briefing forbids them (GIT-03) and the message file carries only Dispatch and AI-Assisted."
+    ],
+    "openItems": [
+      "COMMIT PENDING (stop condition: index.lock). The test file is staged and verified. Run when the lock is gone: git commit -F scratch/commit-msg/TR-S2-T4.txt -- plugins/pipeline-core/lib/execution-lane-credential.test.mjs . HEAD moved at least twice during this dispatch (parallel slices committing), which is the likely lock holder; I could not inspect the lock file's age because 'stat' with flags was refused by the shell grammar. Check git diff --cached --numstat first (expect 126 0) if other slices ran git add in the meantime.",
+      "Not pinned (named in header assumption 15): attached short forms (-efoo, -fNAMES), clustered short options (-ne), a pattern-supplying option placed after the positionals.",
+      "After TR-S2-F2 lands, re-capture at HEAD; expected end state is all 24 new tests green.",
+      "No Critic review and no PO acceptance yet: implementation complete, RED as intended, commit pending, review pending.",
+      "Budget: the budget hook fired its checkpoint at counted call 48 of 60, about 8 calls were spent on hook-grammar refusals (Glob, pipes, stat flags) and the wrongly placed first record."
+    ]
+  }
+}

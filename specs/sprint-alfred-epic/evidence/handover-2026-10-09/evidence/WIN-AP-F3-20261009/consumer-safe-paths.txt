@@ -1,0 +1,100 @@
+# command: node --test --test-reporter=tap harness/scripts/check-consumer-safe-paths.test.mjs
+# host: platform=win32 node=v24.20.0
+# captured: 2026-10-09T05:50:19.944Z
+TAP version 13
+# check-consumer-safe-paths: fixture and repository checks passed
+# Subtest: a fixture naming a source-only path fails
+ok 1 - a fixture naming a source-only path fails
+  ---
+  duration_ms: 0.86
+  type: 'test'
+  ...
+# Subtest: a clean fixture passes
+ok 2 - a clean fixture passes
+  ---
+  duration_ms: 0.5651
+  type: 'test'
+  ...
+# Subtest: an allowlisted occurrence passes
+ok 3 - an allowlisted occurrence passes
+  ---
+  duration_ms: 0.2813
+  type: 'test'
+  ...
+# Subtest: a stale allowlist entry (never matches) is itself reported
+ok 4 - a stale allowlist entry (never matches) is itself reported
+  ---
+  duration_ms: 0.2455
+  type: 'test'
+  ...
+# Subtest: multiple prefix hits on one line each produce a finding
+ok 5 - multiple prefix hits on one line each produce a finding
+  ---
+  duration_ms: 0.107
+  type: 'test'
+  ...
+# Subtest: SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+ok 6 - SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+  ---
+  duration_ms: 0.1359
+  type: 'test'
+  ...
+# Subtest: every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+ok 7 - every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+  ---
+  duration_ms: 0.7216
+  type: 'test'
+  ...
+# Subtest: current repository passes with the real ALLOWLIST (AC-11)
+not ok 8 - current repository passes with the real ALLOWLIST (AC-11)
+  ---
+  duration_ms: 250.1022
+  type: 'test'
+  location: '<repo-root>\\harness\\scripts\\check-consumer-safe-paths.test.mjs:107:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    [
+      "plugins/pipeline-core/docs/adr/0014-critic-contract.md:68: names source-only path prefix \"harness/\" -- canonical wording quoted above replaces it word-identically in `harness/review-protocol.md` §2.1,",
+      "plugins/pipeline-core/docs/adr/0014-critic-contract.md:70: names source-only path prefix \"harness/\" -- Operative detail: `policies/model-policy.md` MP-07 and `harness/review-protocol.md` §2.1. Backlog",
+      "plugins/pipeline-core/docs/adr/0014-critic-contract.md:90: names source-only path prefix \"harness/\" -- `harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`,"
+    ]
+    + actual - expected
+    
+    + [
+    +   'plugins/pipeline-core/docs/adr/0014-critic-contract.md:68: names source-only path prefix "harness/" -- canonical wording quoted above replaces it word-identically in `harness/review-protocol.md` §2.1,',
+    +   'plugins/pipeline-core/docs/adr/0014-critic-contract.md:70: names source-only path prefix "harness/" -- Operative detail: `policies/model-policy.md` MP-07 and `harness/review-protocol.md` §2.1. Backlog',
+    +   'plugins/pipeline-core/docs/adr/0014-critic-contract.md:90: names source-only path prefix "harness/" -- `harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`,'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'plugins/pipeline-core/docs/adr/0014-critic-contract.md:68: names source-only path prefix "harness/" -- canonical wording quoted above replaces it word-identically in `harness/review-protocol.md` §2.1,'
+    1: 'plugins/pipeline-core/docs/adr/0014-critic-contract.md:70: names source-only path prefix "harness/" -- Operative detail: `policies/model-policy.md` MP-07 and `harness/review-protocol.md` §2.1. Backlog'
+    2: 'plugins/pipeline-core/docs/adr/0014-critic-contract.md:90: names source-only path prefix "harness/" -- `harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`,'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///<repo-root>/harness/scripts/check-consumer-safe-paths.test.mjs:109:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1397:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+  ...
+# Subtest: real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+ok 9 - real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+  ---
+  duration_ms: 13.9058
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 8
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 327.4522
+
+# exit code: 1

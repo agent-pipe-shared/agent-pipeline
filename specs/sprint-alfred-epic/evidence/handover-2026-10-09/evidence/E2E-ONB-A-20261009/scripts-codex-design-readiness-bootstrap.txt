@@ -1,0 +1,23 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs
+label: scripts-codex-design-readiness-bootstrap
+exitCode: 0
+head: 05c17ddb830d9e357c75e3c1102b326f578c48e3
+tree: b5e8568e4713c70c247bc954f1a90b09360b8f68
+dirty: true
+--- stdout ---
+✔ Codex readiness bootstrap dispatches exact committed sources and publishes one exclusive receipt (17.383568ms)
+✔ the bootstrap receipt is consumable by the physical final-package reader without changing its host binding (31.055698ms)
+✔ Codex readiness bootstrap refuses a physical source change before model execution (6.113074ms)
+✔ Codex readiness bootstrap discards output when the candidate changes during review (6.09885ms)
+✔ Codex readiness bootstrap rejects duplicate source roles and flags before resolving a model (3.611809ms)
+✔ Codex readiness bootstrap honors an explicitly declined advisor export before resolving or invoking a provider (3.933901ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2097.296235
+
+--- stderr ---

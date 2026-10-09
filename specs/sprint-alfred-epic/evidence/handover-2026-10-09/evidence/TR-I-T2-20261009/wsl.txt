@@ -1,0 +1,107 @@
+command: node --test plugins/pipeline-core/lib/test-case-completion.test.mjs
+label: wsl
+exitCode: 1
+head: 667b043369b280468d1aeb3b2763aee3bfba3183
+tree: 02db5dc9f7bba929f4c0222da53c0255ea315c92
+dirty: true
+--- stdout ---
+✔ rejects duplicate, unstable, and invalid declared ids before emitting bytes (1.373357ms)
+✔ rejects unknown and duplicate disposal without forging extra records (1.234223ms)
+✔ fails closed when the explicitly configured inherited descriptor is missing (0.364146ms)
+✔ retries short descriptor writes with exact offsets and rejects zero progress (0.279315ms)
+✔ one early failure stays red while later siblings dispose and terminal remains complete (70.773283ms)
+✔ dual runtime skip and todo remains red and is disposed as fail (65.703008ms)
+✖ outside Verify a completion suite runs as a plain single file and reports its cases (37.931179ms)
+✔ inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE (39.274274ms)
+✖ outside Verify a descriptor 3 nobody announced receives no completion bytes (50.417062ms)
+✔ inside Verify a writable descriptor 3 receives the complete declared-to-terminal stream (47.870254ms)
+✔ preflights the complete bounded stream before declaration and emits within the accepted cap (0.703533ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 9
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 391.801953
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.test.mjs:227:3
+✖ outside Verify a completion suite runs as a plain single file and reports its cases (37.931179ms)
+  AssertionError [ERR_ASSERTION]: registration must not throw without the Verify signal: file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79
+      const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                      ^
+  
+  Error: completion descriptor is missing or unwritable
+      at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:79:21)
+      at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+      ... 5 lines matching cause stack trace ...
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+    code: 'TCC-FD-WRITE',
+    [cause]: Error: EINVAL: invalid argument, write
+        at writeSync (node:fs:917:3)
+        at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:71:23)
+        at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:139:23)
+        at buildRecorder (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:149:3)
+        at registerTestCaseCompletion (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:215:20)
+        at file:///tmp/pipeline-tcc-VyvdZx/plain-suite.mjs:5:3
+        at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+        at async node:internal/modules/esm/loader:639:26
+        at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+      errno: -22,
+      syscall: 'write',
+      code: 'EINVAL'
+    }
+  }
+  
+  Node.js v24.15.0
+  
+  + actual - expected
+  
+  + 'TCC-FD-WRITE'
+  - null
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.test.mjs:229:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'TCC-FD-WRITE',
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.test.mjs:251:3
+✖ outside Verify a descriptor 3 nobody announced receives no completion bytes (50.417062ms)
+  AssertionError [ERR_ASSERTION]: without the Verify signal the recorder must leave an unannounced descriptor 3 untouched
+  + actual - expected
+  
+  + '{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["PR01","PR02","PR03"],"caseCount":3,"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR01","ordinal":0,"disposition":"pass"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR02","ordinal":1,"disposition":"skip"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR03","ordinal":2,"disposition":"pass"}\n' +
+  +   '{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["PR01","PR02","PR03"],"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824","dispositionsSha256":"d3749d8b383eb391cff5c90dcf7e4dd8dff61266157827c26f34d2413ff8c72f","counts":{"pass":2,"fail":0,"skip":1,"todo":0}}\n'
+  - ''
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.test.mjs:260:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["PR01","PR02","PR03"],"caseCount":3,"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR01","ordinal":0,"disposition":"pass"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR02","ordinal":1,"disposition":"skip"}\n{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"PR03","ordinal":2,"disposition":"pass"}\n{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":3,"disposedCount":3,"caseIds":["PR01","PR02","PR03"],"caseSetSha256":"5abe84191d68376829ab44bdfd3149b2842db032b68bba49d0d52daa4824b824","dispositionsSha256":"d3749d8b383eb391cff5c90dcf7e4dd8dff61266157827c26f34d2413ff8c72f","counts":{"pass":2,"fail":0,"skip":1,"todo":0}}\n',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

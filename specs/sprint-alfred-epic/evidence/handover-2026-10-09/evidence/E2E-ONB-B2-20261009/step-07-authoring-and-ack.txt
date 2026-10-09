@@ -1,0 +1,96 @@
+07a  node <repo-root-in-wsl>/evidence/E2E-ONB-B2-20261009/walk-author.mjs
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "featureId": "onboarding-31416e711b2c",
+  "prdPath": "specs/onboarding-31416e711b2c/prd_onboarding-31416e711b2c.md",
+  "specPath": "specs/onboarding-31416e711b2c/spec.md",
+  "specSha256": "df7d8e68b9ced95140962a72347f1d63ca0103a4561f6ef9fa7d981fbc1bd9b5",
+  "prdSha256": "d7d0a9a6cb29729b35d8c438dd5a99be090f586195a658ea85f8b0ffe20e65e7",
+  "prdBytes": 3544,
+  "specBytes": 1664
+}
+
+  --- end ---
+
+07b  node <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.project-onboarding.v4",
+  "status": "bootstrap-binding-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intent": "onboarding",
+  "repository": {
+    "status": "local-valid-writable",
+    "mode": "local",
+    "gitVersion": "2.53.0",
+    "initializesGit": false,
+    "rootWritable": "passed",
+    "sessionCapability": "not-required",
+    "worktreeCapability": "not-required"
+  },
+  "runtime": {
+    "status": "readback-not-applicable",
+    "sourceSha256": "4b91f3cdb947706e7677a91607b24fa4ebcb850fd9a93dec13e2ab3e555bc831",
+    "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+    "barrierSha256": null,
+    "readbackSha256": null
+  },
+  "continuity": {
+    "status": "absent-pristine",
+    "stateSha256": null,
+    "handoverSha256": null,
+    "historySha256": null
+  },
+  "appServer": {
+    "required": false,
+    "status": "not-applicable",
+    "code": null
+  },
+  "runnerPermissions": {
+    "target": ".claude/settings.local.json",
+    "status": "pending-runtime-initialization",
+    "lanes": [
+      "Bash",
+      "PowerShell"
+    ],
+    "exactEntries": []
+  },
+  "nextAction": {
+    "kind": "command",
+    "executable": "node",
+    "argv": [
+      "<repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "bootstrap-acknowledge-plan",
+      "--root",
+      "<temp-repo>",
+      "--activate",
+      "--runner",
+      "claude"
+    ],
+    "mutation": true,
+    "requiresConfirmation": false,
+    "expected": {
+      "schema": "pipeline.bootstrap-plan-acknowledgement-plan.v1",
+      "statuses": [
+        "signature-required"
+      ]
+    },
+    "guidance": "Do not create the signature request until the agent has completed and internally reviewed the full design package: author the staging PRD (specs/onboarding-31416e711b2c/prd_onboarding-31416e711b2c.md) and specification (specs/onboarding-31416e711b2c/spec.md) from their generated drafts, keep design-input immutable, and reconcile their exact cross-reference digest. Then present that completed package together as the one PO decision. The resulting detached signature binds those exact PRD/spec bytes and is also the sole approval for the later design-to-implementation transition; it is not a request to sign an unfinished scaffold, a remote push, or a later scope change."
+  },
+  "diagnostics": [
+    {
+      "path": "$.continuity",
+      "code": "bootstrap_binding_required",
+      "message": "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD",
+      "guidance": "ask the PO to review the staging PRD and specification, then follow the exact detached-signature acknowledgement action; do not edit an acknowledgement marker manually"
+    }
+  ]
+}
+
+  --- end ---
+

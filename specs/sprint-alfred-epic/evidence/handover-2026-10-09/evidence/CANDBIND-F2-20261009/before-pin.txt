@@ -1,0 +1,57 @@
+command: wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs"
+label: CANDBIND-F2-before-pin
+exitCode: 1
+head: 6259c35cc394d51b7c5de5f765433f00c867303a
+tree: 2cf82d39fd54e9d1753669d013dc124af0077707
+dirty: true
+--- stdout ---
+✖ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (567.523394ms)
+✔ CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate (502.138593ms)
+✖ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (440.050223ms)
+✔ CANDBINDX-d (diagnostic) the Codex branch's re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts (434.291237ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3507.570681
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:54:30
+✖ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (567.523394ms)
+  AssertionError [ERR_ASSERTION]: with requireCurrentCandidate:false a HEAD descended from the candidate must verify on the Codex tool-free route too, got refused:DWP-READINESS-HOST-RECEIPT-MISMATCH
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root-in-wsl>/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:140:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:54:30
+✖ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (440.050223ms)
+  AssertionError [ERR_ASSERTION]: requireCurrentCandidate:false must reach the Codex branch's Advisor re-read, got refused:DWP-READINESS-HOST-RECEIPT-MISMATCH
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root-in-wsl>/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:163:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

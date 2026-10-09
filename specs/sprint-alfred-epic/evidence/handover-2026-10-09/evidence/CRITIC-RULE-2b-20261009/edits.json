@@ -1,0 +1,124 @@
+[
+  {
+    "file": "harness/review-protocol.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "roles/critic.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "docs/adr/0003-role-implementation-subagents.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "docs/adr/0014-critic-contract.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "roles/elephant.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "templates/prompts/critic-review.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "plugins/pipeline-core/templates/prompts/critic-review.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok",
+      "ok",
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "templates/prompts/goldfish-task.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "policies/model-policy.md",
+    "written": true,
+    "results": [
+      "ok",
+      "ok"
+    ]
+  },
+  {
+    "file": "docs/state.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  },
+  {
+    "file": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+    "written": true,
+    "results": [
+      "ok"
+    ]
+  }
+]

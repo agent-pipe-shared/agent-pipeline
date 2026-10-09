@@ -1,0 +1,31 @@
+command: node --test plugins/pipeline-core/lib/architecture-design.test.mjs
+label: arch-after
+exitCode: 0
+head: b6d29f4718b84a0ee482e6e3b9aba242ffb4ac43
+tree: 0ae9010cafca6986b9102837c2371c64a72ccd9b
+dirty: true
+--- stdout ---
+✔ architecture package explicitly carries bounded modules and renders only design artifacts (8.6882ms)
+✔ closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input (0.9594ms)
+✔ compact greenfield package derives redundant fitness rows and zero baseline (0.3524ms)
+ℹ architecture design authoring bytes: 1149 -> 766
+✔ field-local diagnostics identify the single invalid architecture input (0.3653ms)
+✔ brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval (3.6513ms)
+✔ materialization transaction restores exact scaffold after a partial staged write (11.1368ms)
+✔ materialization transaction preserves a target raced by another writer and restores earlier outputs (12.6787ms)
+✔ authority CAS change after first publication rolls back and a changed lock refuses all writes (14.4516ms)
+✔ hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry (16.0401ms)
+✔ hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check (11.1487ms)
+✔ hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted (20.7657ms)
+✔ hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed) (22.706ms)
+✔ hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository (8.2323ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249.5681
+
+--- stderr ---

@@ -1,0 +1,28 @@
+command: node --test "--test-name-pattern=an authenticated killed genesis writer" "--test-name-pattern=SIGKILL during ordinary lock publication" "--test-name-pattern=SIGKILL after create-only publication" "--test-name-pattern=SIGKILL during recovery-guard publication" "--test-name-pattern=SIGKILL after recovery-guard publication" "--test-name-pattern=a real killed audit writer is reclaimed" "--test-name-pattern=repair-audit uses the same killed-owner reclamation" "--test-name-pattern=a writer recovers when the prior dead-owner reclaimer" "--test-name-pattern=legacy, malformed, unauthenticated and cross-host audit locks" "--test-name-pattern=a recovery guard excludes a second reclaimer" "--test-name-pattern=failed repair or ordinary append never removes" plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: WIN-HGO-S-wsl-chunk-1
+exitCode: 0
+head: fa4365b7d04644928b6a325ce4d1fc2a64088d3d
+tree: 159199c534e2856c2d95fa3143ef2eeb12c0e7b3
+dirty: true
+--- stdout ---
+✔ an authenticated killed genesis writer can finish the first audit entry (1589.108505ms)
+✔ SIGKILL during ordinary lock publication never exposes an empty canonical lock and reacquisition succeeds (1520.129372ms)
+✔ SIGKILL after create-only publication finalizes the authenticated ordinary lock before reclamation (1449.90555ms)
+✔ SIGKILL during recovery-guard publication leaves no canonical recovery lock and reclamation retries safely (2942.650069ms)
+✔ SIGKILL after recovery-guard publication finalizes its authenticated twin and safely retries reclamation (2870.102534ms)
+✔ a real killed audit writer is reclaimed by the next ordinary append without rewriting prior bytes (1781.697362ms)
+✔ repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes (1544.544661ms)
+✔ a writer recovers when the prior dead-owner reclaimer was itself killed (2979.699ms)
+✔ legacy, malformed, unauthenticated and cross-host audit locks remain typed fail-closed (3943.050226ms)
+✔ a recovery guard excludes a second reclaimer and a raced replacement is never unlinked (3209.26165ms)
+✔ a failed repair or ordinary append never removes the active repair writer's lock (283.232484ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25653.781576
+
+--- stderr ---

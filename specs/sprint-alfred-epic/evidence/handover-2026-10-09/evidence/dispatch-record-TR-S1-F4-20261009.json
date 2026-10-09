@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-F4-20261009",
+  "model": "sonnet",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "5cd3c2f8750830042ef25d15aa4c527166f018f2",
+  "outcome": "completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["ef1ba84de"],
+  "resultSha256": null,
+  "log": [
+    { "phase": "record-opened", "toolUses": 4 },
+    { "phase": "edit+verify", "toolUses": 24 },
+    { "phase": "commit+record", "toolUses": 35 }
+  ],
+  "report": {
+    "text": "independent review: pending. Implementation complete, not PO-accepted. Commit ef1ba84de (2 files; short SHA, HEAD moved by foreign commits so the full SHA was not read). setup --existing-key now derives and validates the public key from the original path, copies the private key afterwards, and removes private/public/authority files on any later failure. signing-ceremony.mjs comment corrected. DoD: key-copy pin green (evidence/TR-S1-F4-20261009/after.txt, WSL, wrapped exit 0, pattern 'existing-key' on onboarding-init.test.mjs only); po-human-approval.test.mjs + signing-ceremony.test.mjs (after-approval.txt, WSL, 175 tests, 174 pass, 1 fail = the known NVA-SWEEP-F2f-REWORK symlink red); check-consumer-safe-paths exit 0, 9/9 (native). before.txt points at evidence/TR-S1-T3g-20261009/new-pins.txt (no fresh pre-edit run). Not run: the full onboarding-init file split; the T3g approval-cell and reuse cases (RED pending TR-S1-F3) were not re-measured. Not changed: tests, onboarding-continuity.mjs, foreign dirty files. Deviation: derivation reads the original path instead of the copy; the public key is also removed on failure. Open: commits holds the short SHA; dispatcher may normalise to full 40-hex.",
+    "changedFiles": ["plugins/pipeline-core/scripts/po-human-approval.mjs", "plugins/pipeline-core/scripts/signing-ceremony.mjs"]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  }
+}

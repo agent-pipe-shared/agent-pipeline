@@ -1,0 +1,32 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/design-workflow-package-route.test.mjs
+label: lib-design-workflow-package-route
+exitCode: 0
+head: 143dab8dee3e219de4b5773e8d5644d9a7e69703
+tree: 90e4e734889be2253c75a20802c33c1f275a0e71
+dirty: true
+--- stdout ---
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (12.467823ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (6.019803ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (5.415802ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (5.599845ms)
+✔ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (15.233149ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (5.599014ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (1.903533ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (5.768228ms)
+✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (5.431532ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (6.073343ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (6.169315ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (5.636086ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (6.325087ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (5.986493ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (7.546118ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 692.325089
+
+--- stderr ---

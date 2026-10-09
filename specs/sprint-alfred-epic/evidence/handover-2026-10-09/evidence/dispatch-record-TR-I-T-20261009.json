@@ -1,0 +1,52 @@
+{
+  "taskId": "TR-I-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "commits": ["8fad54b6d"],
+  "log": [
+    { "phase": "opening", "toolUses": 5 },
+    { "phase": "orientation-done", "toolUses": 33 },
+    { "phase": "T32+T60 pins written and RED capture run (red.txt)", "toolUses": 39 },
+    { "phase": "T33 reproduced on WSL (t33-measurement.txt); budget checkpoint 48/60 fired; consumer-safe exit 0; commit 8fad54b6d", "toolUses": 53 }
+  ],
+  "report": {
+    "state": "INTERIM, budget checkpoint at 48 of 60 hook-counted calls. T32 and T60 are committed. The T33 pin is NOT written.",
+    "dodResults": {
+      "wslCaptureWithPerPinList": "passed (red.txt written; per-pin list below)",
+      "consumerSafePaths": "passed (exit 0)",
+      "oneTestOnlyCommit": "passed (8fad54b6d, two test files)",
+      "terminalRecord": "not done: this record stays in-progress because the T33 pin is outstanding"
+    },
+    "perPin": {
+      "control: clean tree, default mode (security-scan-snapshot.test.mjs)": "GREEN, fixture validity",
+      "T32 pin 1a (snapshot mode, committed MIT, dirty GPL-3.0)": "RED: actual exit 2 and scanner ERROR, expected exit 0 and PASS; no snapshot mode exists, scanMode is not read, the dirty tree is refused",
+      "T32 pin 1b (snapshot mode, committed GPL-3.0, dirty MIT)": "RED: actual scanner ERROR (candidate_snapshot refusal), expected FINDINGS with findingCount 1",
+      "T32 pin 2 (scanMode shared-tree on dirty tree still refuses)": "GREEN today because the key is not read and falls through to the default refusal; guards the kept behaviour",
+      "T60 characterisation pin (capture-evidence.test.mjs)": "GREEN, header carries head, tree, dirty together and in order; overlaps the EVID-T single-field cases on purpose",
+      "T33": "NOT PINNED, see openItems"
+    },
+    "evidence": [
+      "evidence/TR-I-T-20261009/red.txt: wsl capture-evidence of node --test on security-scan-snapshot.test.mjs, capture-evidence.test.mjs, lib/model-family-route-source.test.mjs; wrapped exit 1; 52 tests, 49 pass, 3 fail = pin 1a, pin 1b, and the route-source file dying with TCC-FD-WRITE (a measurement, not a pin)",
+      "evidence/TR-I-T-20261009/t33-measurement.txt: wsl capture-evidence of node --test plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs; wrapped exit 1; TCC-FD-WRITE with cause EINVAL",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0, 9/9"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs (new): T32 pins, 4 cases, assumptions in header",
+      "plugins/pipeline-core/scripts/capture-evidence.test.mjs: appended one T60 characterisation case"
+    ],
+    "openItems": [
+      "T33 pin outstanding. Premise REPRODUCES on WSL: a fixed-fd-3 suite dies with TCC-FD-WRITE (cause EINVAL) under both node --test and plain node <file>. Fix 2f0c00932 tolerates EBADF only, which is why native Windows passes (measured 5/5 on model-family-route-source.test.mjs). Hypothesis, not verified: fd 3 is a descriptor Node itself owns on Linux. Planned follow-up pin: new plugins/pipeline-core/scripts/run-single-suite.test.mjs, assumed runner path plugins/pipeline-core/scripts/run-single-suite.mjs, CLI node run-single-suite.mjs <suite-file>; registered suite plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs (verify.mjs:578, cases BPM001-BPM005); RED: runner file exists; RED: exit 0, no TCC-FD-WRITE in output, BPM001-BPM005 visible; GREEN control: suite hard-codes fd: 3.",
+      "Elephant decision: the ruled T33 resolution is a runner; widening the fallback in lib/test-case-completion.mjs to EINVAL would be a production alternative. Not mine to choose.",
+      "The new security-scan-snapshot.test.mjs is not registered in harness/scripts/verify.mjs (harness/ forbidden). Register it with the TR-I-S fix, not before, since two cases are RED.",
+      "How snapshot-mode evidence is admitted by consumers (security-completeness-gate, guard-push) and what candidate.status it carries is the implementer's design; recommend Critic attention (SEC-06). The pins deliberately assert neither snapshot.method nor verifiedBeforeAfter.",
+      "No baseline run of the unmodified security-scan.test.mjs (advisor suggested one); skipped because that file is untouched and not in the capture.",
+      "red.txt and t33-measurement.txt are untracked by design (commit holds only test files)."
+    ],
+    "deviations": [
+      "T33 pin not delivered: stopped at the DISPATCH-BUDGET-CHECKPOINT hook instruction (hand back at 48 of 60).",
+      "Dispatch record written to repo-root evidence/ per the CONT17 header; sibling Alfred records live untracked under specs/sprint-alfred-epic/evidence/."
+    ]
+  }
+}

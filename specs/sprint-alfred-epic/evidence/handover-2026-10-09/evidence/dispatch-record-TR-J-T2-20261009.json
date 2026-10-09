@@ -1,0 +1,81 @@
+{
+  "taskId": "TR-J-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete (fixture-root group fixed; 19 native reds remain, classified; Critic review and PO acceptance pending)",
+  "log": [
+    { "phase": "opening (record created; briefing, interim TR-J-T record and CONT17 header read; preflight run from loaded plugin root, status ready)", "toolUses": 9 },
+    { "phase": "orientation: read every hit of the seven literals; Ruling 105 read", "toolUses": 15 },
+    { "phase": "step 1 done: seven replace_all edits applied; the replace_all also rewrote the constants block (self-hit) and the line-39 comment, both restored; Grep confirms only lines 39, 44-50 and the /repo/./x/.. row keep a literal", "toolUses": 27 },
+    { "phase": "native-after captured, 19 failing tests (was 39)", "toolUses": 31 },
+    { "phase": "WSL-after captured, 78/76/0/2 identical to the before reference", "toolUses": 34 },
+    { "phase": "classification (19 reds), subset check against the before list, consumer-safe check, commit 8aaff2820", "toolUses": 58 },
+    { "phase": "terminal record written", "toolUses": 59 }
+  ],
+  "commits": [
+    { "sha": "8aaff2820", "subject": "test(preflight): use platform-native fixture roots in the start-preflight suite", "paths": ["plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs"], "trailers": ["Dispatch: TR-J-T2-20261009 (goldfish)", "AI-Assisted: true"] }
+  ],
+  "touchedAssertionOperands": [
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:240 assert.equal(rootDir, ROOT_CURRENT)  (was \"/projects/current\"; the fixture at :253/:261 passes the same constant as cwd)",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:811 assert.equal(result.nextAction.argv[3], ROOT_WSL)  (was \"/projects/wsl\"; the fixture at :807 passes the same constant as cwd)",
+    "No other converted occurrence sits inside an assertion. Fixture inputs converted (not assertions): ROOT_CURRENT at :90 :109 :135 :253 :261 :303 :363 :392 :420 :425 :436 :460 :519 :576 :613 :626 :666 :688 :704 :999 :1012 :1034 :1339; ROOT_REPO at :94 (default parameter) :720 :726 :735 :746 :752 :761 :766 :776 :782 :1227; ROOT_WSL at :807 :833; ROOT_MINE at :1109 :1144 :1168 :1172 :1175; ROOT_OTHER at :1113; ROOT_THIRD at :1120; ROOT_NOT_A_REPOSITORY at :1989.",
+    "Rows left as literals: the \"/repo/./x/..\" normalisation row at :1229 (the quote-closed match does not touch it; the case is green in the after-run, so no follow-up needed)."
+  ],
+  "report": {
+    "dod": {
+      "native-after capture": "passed (captured): wrapped exit 1, tests 78, pass 57, fail 19, todo 2. Failures fell from 39 to 19 (20 fixed); all 19 remaining failures are members of the 39-failure before set (no new red).",
+      "WSL-after capture": "passed: wrapped exit 0, tests 78, pass 76, fail 0, todo 2 - exactly the required 78/76/0/2",
+      "consumer-safe check": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9 tests, 9 pass, exit 0",
+      "commit": "passed: 8aaff2820, one file, exact pathspec, two trailers only (Dispatch: TR-J-T2-20261009 (goldfish), AI-Assisted: true)",
+      "terminal record with operand list and red classification": "passed (this file)"
+    },
+    "evidence": [
+      "evidence/TR-J-T-20261009/preflight-native-after.txt: command `node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-J-T-20261009/preflight-native-after.txt --label preflight-native-after -- node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`, wrapped exit 1; ℹ tests 78 / pass 57 / fail 19 / todo 2; 410 s",
+      "evidence/TR-J-T-20261009/preflight-wsl-after.txt: same wrapped by wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; ...', wrapped exit 0; ℹ tests 78 / pass 76 / fail 0 / todo 2; 370 s",
+      "evidence/TR-J-T-20261009/preflight-native-before.txt and preflight-wsl-before.txt: the references (39 failing / 0 failing)",
+      "node --check on the edited file: exit 0 (before the captures)"
+    ],
+    "nativeRedClassification": {
+      "summary": "19 remaining native reds = 3 fixture-root (missed) + 2 symlink EPERM (host limitation) + 14 other. The 20 cases that went green are the fixture-root group (roots echoed through resolve(root)===root).",
+      "fixture-root (missed)": [
+        ":879 'an exact registered local marketplace is a visible development source': assert.equal(result.installedSource) observed 'unknown', expected 'local-development'. Inputs come from pluginList(version,'local') (lines 68, 69, 72): POSIX-rooted literals '/local/agent-pipeline', '/local/agent-pipeline/plugins/pipeline-core', '/cache/agent-pipeline/plugins/pipeline-core' are not among the briefed seven. Classified by source inspection; production code not read to confirm.",
+        ":899 'an attested local-development entry wins over a coexisting official entry (Codex, D5)': deepEqual(installedPipelineIdentity(both)) observed { version: null, source: 'unknown', ambiguous: true }, expected { version: '0.4.5+test', source: 'local-development' }. Same pluginList(..., 'local') fixture roots as :879.",
+        ":1490 'Codex attestation source selection binds only a verified checkout...': deepEqual observed sourcePluginRoot <host-path> (a drive-qualified native path), expected the literal '/project/plugins/pipeline-core'. The fixture cwd is '/project' (line 1496), also unbriefed; the expected operand is a derived POSIX literal, so the fix needs both the root constant and a join()."
+      ],
+      "symlink EPERM (host limitation)": [
+        ":1244 'Codex registry binding rejects equal manifest versions with stale cached installer bytes': EPERM, operation not permitted, symlinkSync at line 1311 (alias of the marketplace plugin dir).",
+        ":2014 'observeDutyNotRuntimeLive recognizes two paths to one physical plugin root': EPERM, symlinkSync at line 2020."
+      ],
+      "other (not fixed)": [
+        "Separator in expected argv[0], six cases: expected is built as `${result.pluginRoot}/scripts/<script>.mjs` (a template with '/'), production emits join(pluginRoot,'scripts',...) with native separators. deepEqual/equal fails on the first argv element; capture redacts both sides to <host-path>, the cause is read from the source. Cases: :302 'preflight reports exact identity and no-handoff without secret fields' (expected line 344, project-onboarding-v3.mjs); :362 'normal bootstrap surfaces brownfield architecture adoption...' (expected near line 380, architecture-adoption.mjs); :391 'a durable deferral with a missing physical map...' (expected line 410, architecture-adoption.mjs); :575 'NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver...' (expected line 595, onboarding-init.mjs); :610 'a soft plugin refresh still exposes the not-ready project's onboarding action' (assert.equal at line 622); :625 'NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action' (expected line 640). assertGuidedOnboardingAction (line 218) already uses join() and is green.",
+        "Separator in a read stub, three cases: :991 'a Claude session reads the Claude source manifest, never the Codex one' (observed version null, expected '0.5.2+claude.test'; the read stub tests endsWith('.claude-plugin/plugin.json') and throws for the native '\\' form); :1004 'a non-Claude-Code session still reads the Codex source manifest...' (observed null, expected '0.4.5+test'; same stub shape with '.codex-plugin/plugin.json'); :1017 'Antigravity reads its own plugin manifest...' (observed null, expected '0.6.2+antigravity.test'; stub endsWith('/plugin.json') and expected path list ['/plugins/pipeline-core/plugin.json']).",
+        "Onboarding gate on the live cwd, three cases: :1544 'an unattested origin keeps plugin refresh required...', :1572 'a rejected observation keeps plugin refresh required...', :1720 'F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path...'. All three fail inside assertRefreshAdvisory (line 226): observed nextAction {kind:'command', executable:'node', argv:[<pluginRoot>\\scripts\\onboarding-init.mjs,'--root',<cwd>,'--runner','codex'], expected:{schema:'pipeline.onboarding-init.v1'}}, expected the advisory {kind:'advisory', executable:null, argv:[], expected:{schema:'pipeline.plugin-refresh-advisory.v1'}}. They pass no cwd and no requireProjectOnboardingReadyFn, so the real onboarding gate runs on the live repo; on WSL it is ready. Cause of the native difference not diagnosed (budget).",
+        "Owner runtime unavailable on win32, two cases: :1852 'PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning...' (assert.deepEqual at line 1877: observed concurrentSessionWarning null, expected {schema:'pipeline.concurrent-session-warning.v1', sessionId:'session-another-live', status:'live', descriptorSha256:...}); :1905 'PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning' (TypeError at line 1933: reusedDescriptor.ownerRuntime is null, so startSessionDescriptor recorded no owner runtime / processStartId natively). Probably a host limitation of the process-start-id observation; not confirmed against the production module."
+      ],
+      "turned green by the fixture-root fix (20)": "Every case that sat in the before-list and is absent from the after-list, among them the 17-case pipeline-governance-unverifiable group, the Claude project-scope and bare-array registry cases, 'a Claude version mismatch between loaded and installed identity requires refresh' (it was only red because of the '/repo' marketplace root) and 'PHX-WP-AAC01-MULTISESSION: an unresolvable cwd...'."
+    },
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs: seven resolve() constants (kept from the interim edit) are now used in place of every exact quoted POSIX root literal; two assertion operands (:240, :811) use the same constant as their fixture. Committed in 8aaff2820.",
+      "scratch/commit-msg/TR-J-T.txt: commit message body extended by two lines and Dispatch trailer changed to TR-J-T2-20261009 (goldfish); not tracked content.",
+      "evidence/TR-J-T-20261009/preflight-native-after.txt, preflight-wsl-after.txt: machine-written captures.",
+      "evidence/dispatch-record-TR-J-T2-20261009.json: this record."
+    ],
+    "deliberatelyNotChanged": [
+      "The '/repo/./x/..' normalisation row at :1229 (green in the after-run).",
+      "The 19 remaining native reds: no unbriefed literal ('/local/agent-pipeline', '/cache/...', '/project', '/plugins/pipeline-core'), no template-string separator and no stub endsWith was touched.",
+      "No production file, other test, hooks/, lib/guard/ or harness/ file. The T44/T58 candidates (commit-msg-hook-install.test.mjs, toolchain-preflight.test.mjs) belong to TR-J-T3 per Ruling 105.",
+      "The pre-existing staged and unstaged foreign files in the shared tree (not staged by this slice; the commit was by exact pathspec)."
+    ],
+    "deviationsFromSpec": [
+      "The briefed seven replace_all edits also hit the seven constant definitions and the line-39 comment (each contains its own quoted literal). Detected before any run; the constants block and the comment were restored with two Edits; Grep confirmed lines 39, 44-50 read as intended. No effect on the committed result.",
+      "The DISPATCH-BUDGET-CHECKPOINT hook announced 65 counted calls (not the briefed 75) at call 52; I kept classification to evidence already in the captures and the source regions already read, and did not read the production code for the 3 'fixture-root (missed)' and the 2 'owner runtime' cases. Those labels are by source inspection, flagged above."
+    ],
+    "openItems": [
+      "Implementation complete; Critic review and PO acceptance pending (not 'done').",
+      "A follow-up test-only slice can convert the 3 fixture-root (missed) cases ('/local/agent-pipeline' family in pluginList, '/project' in the :1490 case) and the 9 separator cases (join() in the expected argv[0], native-separator-agnostic read stubs) - Ruling 105's operand rule would cover the same-constant operands, but the expected-value rewrites for separators are assertion-operand edits that need a ruling.",
+      "Three onboarding-gate reds (:1544, :1572, :1720) and two owner-runtime reds (:1852, :1905) need a diagnosis against the production modules before anyone edits a test; they may be real native product issues.",
+      "Two EPERM symlink cases need a typed win32 skip or a privilege-aware test design (host limitation)."
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+command: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
+label: wsl
+exitCode: 0
+head: 393b8c8a27c3f85adb3696ccd28e270050dcd80d
+tree: 7178e0117bdedc767e058158434a83ed96f1cf70
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-hYclVq
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (80.607756ms)
+✔ installed pre-commit hook rejects a staged local private pattern before Git commits (3415.257418ms)
+✔ stagedPaths: lists a newly staged file relative to HEAD (2412.643869ms)
+✔ stagedPaths: falls back to the empty-tree comparison before any commit exists (2429.033752ms)
+✔ stagedPaths: nothing staged yields an empty array, not null (2571.848972ms)
+✔ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (2380.730318ms)
+✔ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (2634.214162ms)
+✔ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (2436.04847ms)
+✔ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (3456.943889ms)
+✔ installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK (35.712006ms)
+✔ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (3643.359756ms)
+✔ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (3674.608333ms)
+✔ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (3494.554074ms)
+✔ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (3738.526806ms)
+✔ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (3622.525553ms)
+✔ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (3898.281528ms)
+✔ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (3677.939042ms)
+✔ installed hook: refuses a late verify rewrite when it also stages lifecycle state (3753.939225ms)
+✔ installed hook: refuses late verify recovery when committed plan approval is stale (3626.933278ms)
+✔ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (3551.902035ms)
+✔ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (3575.733056ms)
+✔ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (3480.841336ms)
+✔ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (3387.472765ms)
+✔ installed hook: admits one complete proof-bound quality package, never a widened index (4055.719198ms)
+✔ installed hook: matching signed GMW permits a non-kernel TP rewrite (3545.273901ms)
+✔ installed hook: wrong-scope signed GMW does not permit a TP rewrite (4165.430779ms)
+✔ installed hook: matching signed GMW never permits hooks.json kernel rewrite (3636.51225ms)
+✔ installed hook: staged NON-protected path is unaffected -> commit succeeds (3378.155411ms)
+✔ installed hook: nothing staged (--allow-empty) -> commit succeeds (3167.842292ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (2138.424392ms)
+✔ applyInstall then applyRemoval: removes exactly what was installed (2091.930325ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (2564.371455ms)
+✔ applyRemoval: nothing-to-remove when never installed (2159.06989ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (3173.064011ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.292626ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.183414ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (2668.769432ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (6.331749ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (2054.709363ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (2429.123366ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (2380.080029ms)
+✔ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (2290.980382ms)
+✔ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (2277.063752ms)
+✔ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (2207.499732ms)
+✔ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (2164.238483ms)
+✔ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (2121.207114ms)
+✔ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (3158.38932ms)
+✔ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (2929.917617ms)
+✔ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (3237.941747ms)
+✔ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (3084.36454ms)
+✔ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (3108.112253ms)
+✔ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (2976.913904ms)
+✔ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (1983.424844ms)
+✔ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (1880.093077ms)
+✔ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (2075.294308ms)
+✔ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (2985.346135ms)
+✔ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (2911.612941ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 57
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 163806.088734
+
+--- stderr ---

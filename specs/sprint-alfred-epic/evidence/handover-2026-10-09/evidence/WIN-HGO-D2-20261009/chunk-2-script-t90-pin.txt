@@ -1,0 +1,18 @@
+command: node --test "--test-name-pattern=repair-audit prints the typed audit-lock recovery" plugins/pipeline-core/scripts/guard-human-override.test.mjs
+label: WIN-HGO-D2 chunk 2: script-test T90 pin (934)
+exitCode: 0
+head: 4fedcd69e4b58b62d8b8088e00550db7815f8d1a
+tree: f5f8624f07a80fe8195d90fb8b97be05b6673869
+dirty: true
+--- stdout ---
+✔ repair-audit prints the typed audit-lock recovery on stderr, from the same helper as the shared renderer (T90-T2 RED pin) (17478.3533ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17751.4253
+
+--- stderr ---

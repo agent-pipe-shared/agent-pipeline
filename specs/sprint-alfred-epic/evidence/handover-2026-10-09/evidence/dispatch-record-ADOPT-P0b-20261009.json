@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-P0b-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "agentType": "goldfish-implementor",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "00e62f8b4e31e7022ca6d56af0ed3668a62e6162",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "commits": ["94704e2ee"],
+  "resultSha256": null,
+  "report": {
+    "text": "PARTIAL closing-allowance handover. Committed: one docs commit appending ADOPT-P0b section to specs/sprint-alfred-epic/evidence/adopt-p0-measure-2026-10-09.md. Verified green: module-inventory.mjs --check --root . exit 0 (5 governed modules; contract shape only, not currency). Remains undone: item 3b map currency (architecture-fitness.mjs --check --json --mode candidate --root .), item 5 fitness-model/baseline validity (needs a scratch Node helper importing inspectArchitectureEntryReadiness; architecture-baseline.mjs is NOT a baseline validator and --compile-summary writes), item 6 push-currency trace and phase field. P1 map refresh undecided. Next briefing: budget 45+ via deep tier or split items 3b/5/6 into one slice, give exact argv from the report. Independent review: pending.",
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/adopt-p0-measure-2026-10-09.md", "evidence/dispatch-record-ADOPT-P0b-20261009.json"]
+  },
+  "log": [{ "phase": "opening", "toolUses": 8 }, { "phase": "closing: report appended, committing", "toolUses": 32 }]
+}

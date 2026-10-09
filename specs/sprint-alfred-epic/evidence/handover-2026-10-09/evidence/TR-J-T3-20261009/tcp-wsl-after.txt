@@ -1,0 +1,185 @@
+command: bash -c "node plugins/pipeline-core/scripts/toolchain-preflight.test.mjs 3>/dev/null"
+label: tcp-wsl-after
+exitCode: 1
+head: 32ebb854b180e7176d0928fd16f055acbe19c7b9
+tree: ab8e5b967163a0a51c8a50a187398ed6d30c9722
+dirty: true
+--- stdout ---
+PASS TCP01 browser evidence preflight distinguishes available local browser capability without running a test
+PASS TCP02 browser evidence preflight accepts a consumer that provides only the playwright package
+PASS TCP03 browser evidence preflight reports unavailable browser separately from a test failure
+PASS TCP04 browser evidence preflight never probes when a weaker evidence class is explicitly declared
+PASS TCP05 browser evidence preflight CLI grammar rejects duplicate and malformed declarations
+PASS TCP06 browser evidence preflight rejects an absent required evidence class fail-closed
+PASS TCP07 invalid manifest blocks before every identity or capability probe
+PASS TCP08 absent manifest requires only compatible Node and Git
+PASS TCP09 enabled scanners are probed under warn and carry exact prepared handles
+PASS TCP10 warn/off change only failure severity and never skip enabled probing
+PASS TCP11 unknown enabled scanner is never executed and blocks under blocking mode
+PASS TCP12 execution environment outranks missing, timeout, probe and compatibility failures
+PASS TCP13 Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure
+PASS TCP14 a missing configured prerequisite names the blocked claim and a copyable command without installing
+PASS TCP15 a rejected Windows path stays untrusted and blocks without probing or install guidance
+PASS TCP16 standard per-user pipx and Go bin locations are discovered without trusting arbitrary PATH order
+PASS TCP17 missing installer prerequisites are embedded in copyable Ubuntu chains while npm-only hosts get no unsafe command
+PASS TCP18 Semgrep probes use bounded temporary settings instead of writing the user home
+PASS TCP19 capability-completeness: tool-to-capability-root mapping matches the CYB-1F frozen assignment
+PASS TCP20 capability-completeness: a required capability with a ready tool reports "required"
+PASS TCP21 capability-completeness: a required capability with a known-but-not-ready tool reports "missing"
+PASS TCP22 capability-completeness: a required capability whose tool was never enabled (not_required) also reports "missing"
+PASS TCP23 capability-completeness: a required capability with no mapped tool reports "unsupported"
+PASS TCP24 capability-completeness: a not-required capability whose tool is ready reports "available"
+PASS TCP25 capability-completeness: a not-required capability whose tool is known but not ready reports "optional"
+PASS TCP26 capability-completeness: a not-required capability whose tool was never enabled is omitted entirely
+PASS TCP27 capability-completeness: a not-required capability with no mapped tool at all is omitted entirely
+PASS TCP28 capability-completeness: node and git are excluded from the capability-level report entirely
+PASS TCP29 capability-completeness: license-check is never a cap.* verdict, only an informative field
+PASS TCP30 capability-completeness: licenseControl is null when license-check is absent from the preflight results
+PASS TCP31 capability-completeness: rejects a non-array requiredCapabilities and a preflightResult without a results array
+PASS TCP32 capability-completeness: derives directly from a real runToolchainPreflight() result
+PASS TCP33 R7-7a: the matrix checker itself fails a non-ok finding without its typed repair (validator self-check, passes today by construction)
+PASS TCP34 R7-7a: a fixture matrix puts each of the eight finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted
+PASS TCP35 R7-7a: a finding cause is bounded
+PASS TCP36 R7-7b: a stub git --version equal to the known-bad table entry yields git-version attended naming the fixed version
+PASS TCP37 R7-7b: a stub git --version that matches no table entry yields git-version ok
+PASS TCP38 R7-7e: a missing pre-push hook yields git-hooks repairable; running the typed repair installs it with no PO confirmation
+PASS TCP39 R7-7e: a foreign pre-push hook yields git-hooks attended and is left unchanged
+R7-6j row 1 (env set + plane set + legacy set -> environment) oracle=resolvePoKeyDirectory: GREEN
+R7-6j row 2 (env unset, plane set, legacy set -> machine plane) oracle=resolvePoKeyDirectory: GREEN
+R7-6j row 3 (env unset, plane absent, legacy set -> legacy (reported legacy)) oracle=resolvePoKeyDirectory: GREEN
+R7-6j row 4 (env unset, plane absent, legacy absent -> unset) oracle=resolvePoKeyDirectory: GREEN
+R7-6j row 5 (env unset, plane invalid (legacy set) -> failure, not absent) oracle=resolvePoKeyDirectory: GREEN
+R7-6j row 6 (env set, plane invalid (legacy set) -> environment) oracle=resolvePoKeyDirectory: GREEN
+PASS TCP40 R7-6j: the po-key-directory finding resolves the key directory exactly like the shared resolver (env > machine plane > legacy; an invalid store is a failure, never absent)
+PASS TCP41 R7-6m: a relative key directory from the environment is a usage error, never "unset"
+PASS TCP42 R7-6n: an invalid legacy per-repository store is a failure, never absent
+42/44 checks passed.
+✔ TCP001 browser evidence preflight distinguishes available local browser capability without running a test (2.154861ms)
+✔ TCP002 browser evidence preflight accepts a consumer that provides only the playwright package (26.023508ms)
+✔ TCP003 browser evidence preflight reports unavailable browser separately from a test failure (0.500549ms)
+✔ TCP004 browser evidence preflight never probes when a weaker evidence class is explicitly declared (0.269425ms)
+✔ TCP005 browser evidence preflight CLI grammar rejects duplicate and malformed declarations (0.432358ms)
+✔ TCP006 browser evidence preflight rejects an absent required evidence class fail-closed (0.317526ms)
+✔ TCP007 invalid manifest blocks before every identity or capability probe (8.02896ms)
+✔ TCP008 absent manifest requires only compatible Node and Git (7.696614ms)
+✔ TCP009 enabled scanners are probed under warn and carry exact prepared handles (7.661114ms)
+✔ TCP010 warn/off change only failure severity and never skip enabled probing (14.591352ms)
+✔ TCP011 unknown enabled scanner is never executed and blocks under blocking mode (7.919109ms)
+✔ TCP012 execution environment outranks missing, timeout, probe and compatibility failures (7.533141ms)
+✔ TCP013 Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure (6.051073ms)
+✔ TCP014 a missing configured prerequisite names the blocked claim and a copyable command without installing (8.947147ms)
+✔ TCP015 a rejected Windows path stays untrusted and blocks without probing or install guidance (8.789604ms)
+✔ TCP016 standard per-user pipx and Go bin locations are discovered without trusting arbitrary PATH order (0.727914ms)
+✔ TCP017 missing installer prerequisites are embedded in copyable Ubuntu chains while npm-only hosts get no unsafe command (15.769057ms)
+✔ TCP018 Semgrep probes use bounded temporary settings instead of writing the user home (0.967678ms)
+✔ TCP019 capability-completeness: tool-to-capability-root mapping matches the CYB-1F frozen assignment (0.214244ms)
+✔ TCP020 capability-completeness: a required capability with a ready tool reports "required" (0.278465ms)
+✔ TCP021 capability-completeness: a required capability with a known-but-not-ready tool reports "missing" (0.159343ms)
+✔ TCP022 capability-completeness: a required capability whose tool was never enabled (not_required) also reports "missing" (0.194904ms)
+✔ TCP023 capability-completeness: a required capability with no mapped tool reports "unsupported" (0.151023ms)
+✔ TCP024 capability-completeness: a not-required capability whose tool is ready reports "available" (0.145123ms)
+✔ TCP025 capability-completeness: a not-required capability whose tool is known but not ready reports "optional" (0.147633ms)
+✔ TCP026 capability-completeness: a not-required capability whose tool was never enabled is omitted entirely (0.156553ms)
+✔ TCP027 capability-completeness: a not-required capability with no mapped tool at all is omitted entirely (0.133462ms)
+✔ TCP028 capability-completeness: node and git are excluded from the capability-level report entirely (0.162393ms)
+✔ TCP029 capability-completeness: license-check is never a cap.* verdict, only an informative field (0.198564ms)
+✔ TCP030 capability-completeness: licenseControl is null when license-check is absent from the preflight results (0.271265ms)
+✔ TCP031 capability-completeness: rejects a non-array requiredCapabilities and a preflightResult without a results array (0.354407ms)
+✔ TCP032 capability-completeness: derives directly from a real runToolchainPreflight() result (7.618143ms)
+✖ TCP033 capability-completeness: performs zero filesystem/git mutation (repo status is byte-identical before and after) (71248.806251ms)
+✔ TCP034 R7-7a: the matrix checker itself fails a non-ok finding without its typed repair (validator self-check, passes today by construction) (1.08152ms)
+✔ TCP035 R7-7a: a fixture matrix puts each of the eight finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted (10.446364ms)
+✔ TCP036 R7-7a: a finding cause is bounded (4.101406ms)
+✔ TCP037 R7-7b: a stub git --version equal to the known-bad table entry yields git-version attended naming the fixed version (4.843521ms)
+✔ TCP038 R7-7b: a stub git --version that matches no table entry yields git-version ok (4.467174ms)
+✖ TCP039 R7-7c: bootstrap and prepare-for-signature produce the same report content as the report itself; a non-ok finding hands over no command and starts no window (25233.994074ms)
+✔ TCP040 R7-7e: a missing pre-push hook yields git-hooks repairable; running the typed repair installs it with no PO confirmation (46444.686075ms)
+✔ TCP041 R7-7e: a foreign pre-push hook yields git-hooks attended and is left unchanged (38.659022ms)
+✔ TCP042 R7-6j: the po-key-directory finding resolves the key directory exactly like the shared resolver (env > machine plane > legacy; an invalid store is a failure, never absent) (12.524195ms)
+✔ TCP043 R7-6m: a relative key directory from the environment is a usage error, never "unset" (2.370624ms)
+✔ TCP044 R7-6n: an invalid legacy per-repository store is a failure, never absent (1.903755ms)
+ℹ tests 44
+ℹ suites 0
+ℹ pass 42
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143153.043819
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ TCP033 capability-completeness: performs zero filesystem/git mutation (repo status is byte-identical before and after) (71248.806251ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  ... Skipped lines
+  
+    'M  harness/scripts/pipeline-state.test.mjs\n' +
+      ' M plugins/pipeline-core/lib/design-workflow-package.mjs\n' +
+      'M  plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs\n' +
+      ' M plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs\n' +
+      ' M plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs\n' +
+  ...
+      ' M plugins/pipeline-core/scripts/toolchain-preflight.test.mjs\n' +
+  -   'MM specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md\n' +
+      '?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-D3-20261009.json\n' +
+      '?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-D3b-20261009.json\n' +
+      '?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-F1-20261009.json\n' +
+      '?? specs/sprint-alfred-epic/evidence/dispatch-record-BACKLOG-CLOSE-FANOUT-20261009.json\n' +
+      '?? specs/sprint-alfred-epic/evidence/dispatch-record-CLOSURE-ALL-T-20261009.json\n' +
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:390:10
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:31:127)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'M  harness/scripts/pipeline-state.test.mjs\n M plugins/pipeline-core/lib/design-workflow-package.mjs\nM  plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs\n M plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs\n M plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs\n M plugins/pipeline-core/scripts/pipeline-state.mjs\n M plugins/pipeline-core/scripts/po-human-approval.mjs\n M plugins/pipeline-core/scripts/toolchain-preflight.test.mjs\n?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-D3-20261009.json\n?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-D3b-20261009.json\n...',
+    expected: 'M  harness/scripts/pipeline-state.test.mjs\n M plugins/pipeline-core/lib/design-workflow-package.mjs\nM  plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs\n M plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs\n M plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs\n M plugins/pipeline-core/scripts/pipeline-state.mjs\n M plugins/pipeline-core/scripts/po-human-approval.mjs\n M plugins/pipeline-core/scripts/toolchain-preflight.test.mjs\nMM specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md\n?? specs/sprint-alfred-epic/evidence/dispatch-record-ADR0085-D3-20261009.json\n...',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:220:5
+✖ TCP039 R7-7c: bootstrap and prepare-for-signature produce the same report content as the report itself; a non-ok finding hands over no command and starts no window (25233.994074ms)
+  AssertionError [ERR_ASSERTION]: bootstrap must carry the same findings as the report
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      {
+        cause: 'git 2.53.0 matches no known-bad entry',
+        findingId: 'git-version',
+        repair: null,
+  ...
+            '--root',
+  +         '<fixture>',
+  -         '/tmp/r77-readiness-QXKABF/repo',
+            '--repair',
+            'git-hooks'
+          ],
+          executable: '<home-path>',
+          expected: {
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:580:12
+      at async r77WithFixtureRepo (file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:476:12)
+      at async file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:574:3
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs:31:121)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:238:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,28 @@
+command: node --test plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs
+label: wsl-after
+exitCode: 0
+head: c050c41160e11f21d58b6a3227639daa75851b9e
+tree: bee02fdbdf4870cf947072a701dd7299fb45d46e
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: clone-hook-readiness-plugin-XlT0Xt
+✔ RED F1 (a): current+install and refresh+install, in either order, read provisioning-required (today: blocked / HOOK-READINESS-STATE-UNSUPPORTED) (1.07379ms)
+✔ GREEN control F1 (b): the widening does not leak -- foreign, decline and unresolved entries still block or stay unresolved (0.236814ms)
+✔ RED F1 (c): a really installed pre-commit hook beside a missing commit-msg hook inspects as provisioning-required with the coordinator action (414.456908ms)
+✔ RED F1 (d): apply installs ONLY the install entry (commit-msg); the current pre-commit hook and its marker stay byte-identical (888.942999ms)
+✔ RED F1 (e): mirror -- a really installed commit-msg hook beside a missing pre-commit hook: only pre-commit is installed (778.102226ms)
+✔ RED F1 (f): rollback removes only what THIS call installed -- a pre-existing current pre-commit hook survives a failing commit-msg install (511.554983ms)
+✔ RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, then refresh hop, each `expected` reached (1546.894179ms)
+✔ GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready (1591.245365ms)
+# frozen plugin copy in use: clone-hook-readiness-plugin-7vrtTs
+✔ CHR001 non-repository roots never trigger Git initialization or hook writes (6.136234ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8542.555387
+
+--- stderr ---

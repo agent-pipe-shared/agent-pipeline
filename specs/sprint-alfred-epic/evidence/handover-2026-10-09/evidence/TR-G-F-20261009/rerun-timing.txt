@@ -1,0 +1,59 @@
+command: node --test --test-reporter=spec --test-name-pattern=preflight-bound --test-name-pattern=R7-11a scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs
+label: TR-G-F-rerun
+exitCode: 1
+head: 03f32e3393f8eab2e018169ce44d0816dc89d295
+tree: 275adf21358c816aa29b2d6969eb4b9e3560f79d
+dirty: true
+--- stdout ---
+✖ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (10018.429678ms)
+✖ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (6156.178162ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32747.689144
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs:568:1
+✖ a preflight-bound base cap of 20 denies the twenty-first authenticated child work call (10018.429678ms)
+  AssertionError [ERR_ASSERTION]: runner child exited null (expected 0) -- stderr: 
+  
+  null !== 0
+  
+      at run (file://<repo-root>/scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs:204:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs:575:23)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs:1225:1
+✖ R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted and the counter advances by exactly N (6156.178162ms)
+  AssertionError [ERR_ASSERTION]: the holder released its exact lock inode
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/TR-G-F/guard-dispatch-budget.test.mjs:1236:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

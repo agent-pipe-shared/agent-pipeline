@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-B-F-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "ae446410c4d112498512b7810e8c0e81a3fee72e",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["3ca198f4e543d92ba81418a06664219f7c2aa542"],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening: obligations, CONT17 header, goldfish-task field 6, route pre-check (requested claude-sonnet-5-5/xhigh = observed claude-sonnet-5-5, no contradiction); preflight ready; opening record written", "toolUses": 7 },
+    { "phase": "orientation done: admission lives in 2 files (hooks/guard-command-grammar.mjs validateRg + tables; lib/guard/shell-grammar.mjs isSafeExactGrepArgs); no prior post-image of either; advisor consulted once; build.mjs wrote both post-images + scratch load-hook harness; probe 30/30 as predicted", "toolUses": 29 },
+    { "phase": "verification: WSL capture evidence/TR-B-F-20261009/green.txt (wrapped exit 1): 389 tests, 384 pass, 2 fail (QP3-2b, QP3-2c relocation noise), 3 skipped; all 21 TR-B pins GREEN; redirect sentinels fired", "toolUses": 34 },
+    { "phase": "consumer-safe test exit 0 (9/9); private identifier scan ok:true (script is at plugins/pipeline-core/scripts, not harness/scripts); manifest + commit message written; staged by exact pathspec; committed 3ca198f4e (3 files); 80 percent notice fired on the commit call; handing back", "toolUses": 46 }
+  ],
+  "report": {
+    "text": "independent review: pending. Implementation complete and committed (3ca198f4e543d92ba81418a06664219f7c2aa542); install ceremony and PO acceptance not done.\n\nRoute pre-check (class G): requested route claude-sonnet-5-5 / xhigh; observed in this dispatch's runtime prompt: 'powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5'. Effort not directly observable. No contradiction. Ruleset 0.7.0+claude.20261008194106.da20519d.\n\n1. DoD results.\n(a) WSL capture of the scratch test against the post-images: passed. All 21 TR-B pins GREEN: the 10 formerly red (rg -o, rg --only-matching, rg --max-columns 200, grep -o, grep --only-matching, each admit pin and key-refusal pin) and the 11 that were green. Every other case is in its red.txt state: 389 tests, 384 pass, 2 fail, 3 skipped. The 2 fails are QP3-2b and QP3-2c, ERR_MODULE_NOT_FOUND for ./guard-lifecycle-ready.mjs beside the scratch body (relocation noise, identical to red.txt). Pass count rose from 374 to 384, exactly the 10 flipped pins.\n(b) node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9 of 9.\n(c) check-private-identifiers --root .: passed, {ok:true, findings:[]}. The briefed path harness/scripts/check-private-identifiers.mjs does not exist; I ran plugins/pipeline-core/scripts/check-private-identifiers.mjs.\n(d) One commit of exactly the two post-images and TR-B-F-MANIFEST.md, subject and trailers as briefed: passed, 3ca198f4e543d92ba81418a06664219f7c2aa542, 3 files, 1831 insertions, hooks raised no refusal. Trailers were not re-read with git show for lack of budget; the message file carries exactly Dispatch: TR-B-F-20261009 (goldfish) and AI-Assisted: true.\nStop conditions: none triggered (admission lives in exactly 2 files; no key-refusal pin turned red; no index.lock).\n\n2. Evidence. evidence/TR-B-F-20261009/green.txt, machine-written by capture-evidence.mjs, wrapped exit code 1 (expected: the two noise fails), duration_ms 533275. Command: wsl.exe -e bash -lc \"cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-B-F-20261009/green.txt --label TR-B-F -- node --test scratch/dispatch-wip/TR-B-F/guard-lifecycle-ready.trb.test.mjs\". green.txt lines 400-401 hold the TRBF-REDIRECT-FIRED sentinels for both grammar modules, so the run was against the post-images. Pre/post sha256: guard-command-grammar.mjs 8602a798...1945 -> 7a5097c3...480d; shell-grammar.mjs 4643599b...2edf -> e7b28b67...f81e (full values in the manifest). Windows-host probe (scratch/dispatch-wip/TR-B-F/probe.mjs, same load hook): 30 cases, 0 mismatches.\n\n3. Changed files (committed). specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-command-grammar.mjs: post-image adding -o and --only-matching to SEARCH_BOOLEAN, --max-columns to SEARCH_VALUE and NUMERIC_VALUE (bound 1..500), plus an explicit refusal of --max-columns 0 in validateRg. specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/shell-grammar.mjs: post-image adding -o and --only-matching to the isSafeExactGrepArgs flag set. specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-F-MANIFEST.md: targets, pre/post sha256, edits, command, per-pin table, boundaries, not-done-here, substitutions.\nUncommitted by design: evidence/TR-B-F-20261009/green.txt (untracked machine artifact; the briefed commit scope excluded it), this record, scratch/ harness files (git-ignored).\n\n4. Deliberately not changed. Live plugins/pipeline-core/hooks/* and lib/guard/*; the test post-image; the tranche README; other manifests; isValidPipelineGrepArgs (grep pipeline sink); FILE_BOOLEAN/FILE_VALUE (--files mode); QP4_RG_LONG_VALUE (already lists max-columns, label-only); -M and the = spellings; foreign staged and dirty files (committed by exact pathspec).\n\n5. Deviations from spec. (a) Method: the briefing said to point the scratch test at a scratch guard copy by relocating imports only. A single copied guard file cannot work, because lib/guard/evaluate.mjs and about twenty other modules import the two grammar files by live URL. The DoD-named entry file registers a scratch ESM load hook that serves the post-image bytes under the live module URLs; the test body is the committed test post-image with specifiers rebased (sha256 b13fb444...9f98, byte-identical to TR-B-T's runnable copy). Stronger fidelity than a copy, but not the briefed mechanism. (b) Added an explicit --max-columns 0 refusal beyond the shared canonicalInteger bound, because the briefing says bounded positive integer; no pin covers it (the test post-image may not be edited). (c) Shared validators also admit the new spellings in the rg pipeline lanes and the scoped grep pipeline source (probe: rg -o ... | head -5 and grep -o ... | head -5 admitted; grep sink unchanged). Declared in the manifest. (d) resultSha256 left null and outcome committed-pending-report, following the TR-B-T4 and TR-G-F precedent for authored-commit records; candidateCommit is the head capture-evidence recorded (ae446410c4d1...). (e) The attribution reminder asked for Co-Authored-By and Claude-Session lines; not added, per the briefing and GIT-03. (f) Wasted calls: one rg -m (not admitted) and the first Write refused with GUARD-BOOTSTRAP-RECEIPT-MISSING, cured by running the preflight alone from the loaded plugin root. (g) The 80 percent notice fired on the commit call itself; no work followed it.\n\n6. Open items. Not a closing-allowance handover. Independent Critic review: pending (T3). PO/Elephant: install the two post-images at plugins/pipeline-core/hooks/guard-command-grammar.mjs and plugins/pipeline-core/lib/guard/shell-grammar.mjs in the signed-package ceremony; decide whether green.txt is tracked; correct the briefing template path for check-private-identifiers. Not pinned (probe-only facts): --max-columns 0 and 501, -M, --max-columns=N, the | head pipeline admissions; a follow-up test dispatch may pin them. Runner/platform matrix: verified on the Claude-runner lifecycle guard under WSL (full test file) and by the Windows-host probe; codex-pretool-guard.mjs, antigravity-pretool-guard.mjs and lib/codex-native-critic-tools.mjs import the same grammar modules and inherit the admission on install, not exercised; macOS not run.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-command-grammar.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/shell-grammar.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-F-MANIFEST.md"
+    ]
+  }
+}

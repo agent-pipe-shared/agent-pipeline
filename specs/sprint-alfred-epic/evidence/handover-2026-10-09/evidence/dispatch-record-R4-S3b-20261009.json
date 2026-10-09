@@ -1,0 +1,36 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R4-S3b-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing R4-S3b-20261009)",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "stopped-without-commit" },
+  "candidateCommit": "70b03bfaeae7f25012ba1319af10975746400f98",
+  "commits": [],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "log": [
+    { "phase": "opening: preflight ran (status ready), record created", "toolUses": 5 },
+    { "phase": "orientation: briefing, validator, route test, approval and v2 callers read", "toolUses": 25 },
+    { "phase": "BEFORE capture (WSL, head 6259c35cc): 44 tests, 43 pass, 1 fail = case 8 only", "toolUses": 27 },
+    { "phase": "edits: enforcement check, reader parameters, approval pass-through (7 edits)", "toolUses": 35 },
+    { "phase": "AFTER capture (WSL, head 70b03bfae): case 8 green, DWP08 red -> stop condition", "toolUses": 36 },
+    { "phase": "diagnosis: DWP08 swaps the attempt trail but keeps the old generated rationale", "toolUses": 39 },
+    { "phase": "consumer-safe exit 0, uncommitted diff preserved, record finalised", "toolUses": 44 }
+  ],
+  "resultSha256": "62b7bc98d3ce5d938a5bbc26e6f272c4f6fbe43b4acb208cf4cbee1da7e3eff3",
+  "report": {
+    "text": "STOPPED (stop condition: a green DWP case turned red). Two production files edited and left UNCOMMITTED, nothing committed. design-workflow-package.mjs: one enforcement check after DWP-ADVISOR-FAILURE-CODE (rationale differing from designWorkflowAdvisorExceptionRationale refused with DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED) plus roleRoutePreflight and evidenceBindings added to readDesignWorkflowPackageFromRepository and forwarded to the validator. design-workflow-approval.mjs: the same two optional parameters forwarded through createDesignWorkflowPackageApprovalRequest, validateDesignWorkflowPackageApprovalRequest and verifyDesignWorkflowPackageApproval; v2 reader untouched (it does not call the validator). WSL four-file run (route, package, package-v2, evidence-descendant): BEFORE head 6259c35cc 44 tests 43 pass 1 fail (case 8 only); AFTER head 70b03bfae 44 tests 43 pass 1 fail: case 8 now GREEN, but DWP08 (no-child Codex route selection, design-workflow-package.test.mjs lines 418-436) turned RED with DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED. Cause: DWP08 swaps fixture.attemptTrail to a route selection and changes failureCode but keeps the rationale generated from the original consult trail, so the stale rationale differs from the one generated for the new trail; R4-T0b converted the base fixture only. Fix is test-side (out of scope, no test file allowed): in DWP08 regenerate fixture.workflowPackage.advisor.exception.rationale from fixture.advisorReceipt and fixture.attemptTrail before packageBytes is re-serialized at line 431. Consumer-safe check exit 0. Not verifiable: the wiring-only state was not run separately. Open: verify pending; independent review pending; PO acceptance open. Evidence: evidence/R4-S3b-20261009/before.txt, after.txt, consumer-safe.txt, uncommitted-production.diff.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+      "plugins/pipeline-core/lib/design-workflow-package.mjs"
+    ]
+  }
+}

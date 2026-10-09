@@ -1,0 +1,15 @@
+command: node scratch/dispatch-wip/f3a-m2.mjs
+label: m2-recheck
+exitCode: 0
+head: 602376a488ef123bc9117ddeba271766b5024bd3
+tree: b39241da3d3ae6cb0ce5334cc6a8c7dd9e932770
+dirty: true
+--- stdout ---
+planApproval.schema: pipeline.plan-approval.v7
+planPath: specs/sprint-alfred-epic/prd_sprint-alfred-epic.md (0fe6c0777857)
+specPath: specs/sprint-alfred-epic/spec.md (141b8a696c97)
+packageSha256: 539629da3e32
+probe1 rereadApprovedDesignWorkflowPackage: ok=true code=undefined mode=signature
+probe2 designAdvisoryAdmission: ok=true code=undefined mode=approved-workflow-package-signature
+
+--- stderr ---

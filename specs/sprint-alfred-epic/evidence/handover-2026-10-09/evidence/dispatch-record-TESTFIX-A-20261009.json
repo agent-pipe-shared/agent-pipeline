@@ -1,0 +1,45 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TESTFIX-A-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "report": {
+    "changedFiles": [
+      "harness/scripts/pipeline-state.test.mjs"
+    ],
+    "text": "PARTIAL, closing at the 80 percent checkpoint (counted call 40 of 50). (1) Hypothesis CONFIRMED with one refinement: pipeline-state.mjs:3819 readOnboardingIntakeCheckpoint -> onboarding-continuity.mjs:6162/6135 resolveOnboardingIntakeScope, which is defined in codex-onboarding-runtime.mjs:920 and calls readGitCommonDirectory at :927; :224 throws on a non-zero git rev-parse; the catch at pipeline-state.mjs:3823 returns PROFILE-AUTHORITY-INVALID. Before-evidence: evidence/R6-F2b-20261009/before-pipeline-state.txt lines 24-66. (2) Two regions attempted in one PARALLEL Edit batch. Region A (new helper initFixtureGitRepoForSubmitPlan placed before submitAndApprove, called as the first statement of submitAndApprove) was ADMITTED by guard-testpath with no override armed (unexpected for TP-5; cause not determined, see open items). Region B (call of the helper right after freshDir approve-shape in PS06) was REFUSED, and again on a serial retry, both times: guard-testpath TP-5, 'planning the route failed with code=HGO-AUDIT-LOCK-AMBIGUOUS'. The refusal text contains NO request sha256 (planning failed before one was produced). I stopped retrying B after two refusals. (3) WSL run of the whole file with region A only: evidence/TESTFIX-A-20261009/after.txt, exit 1, head 6259c35cc, tree dirty. The original abort (TypeError at the PS08a destructure, before line 1221) is GONE: PS08/PS08a/PS09 now proceed. The file STILL does not run to completion: a second abort, TypeError 'Cannot convert undefined or null to object' at test line 5092 (Object.keys(briefing), HL block), because submit-plan still exits 2 there. ℹ summary: tests 1, pass 0, fail 1 (file-level abort). In-file FAIL lines before the abort: PS06a0, PS06a0-1, PS06a, PS06c, PS06d (region B missing); AR03h-setup, AR03h-setup-1, AR03h, AR03i (direct submit-plan at original line 3838, non-repo dir); HL-2, HL-3, HL-3a, HL-4, HL-5, HL-6 (direct submit-plan at original line 5063, non-repo dir). Same cause class for all three: a directory reaching submit-plan is not a Git repository. Original-numbering lines; the file is now 14 lines longer after line 848. (4) The briefed held-patch JSON could NOT be written: Write of specs/sprint-alfred-epic/evidence/held-patches/TESTFIX-A-edits.json was refused by guard-lifecycle-ready GUARD-EVIDENCE-HOST-PATH (windows-drive-letter at offset 24) because the briefed file_path is an absolute host path; the briefing requires that very path and the ceremony replay needs the byte-exact spelling. Briefing-vs-repo contradiction, not worked around. The byte-exact array was written to scratch/testfix-a/TESTFIX-A-edits.json (uncommitted, scratch is swept) and its content is: one element, file_path = the absolute path of harness/scripts/pipeline-state.test.mjs as the dispatcher spells it, old_string 'const dir = freshDir(\"approve-shape\");', new_string the same text + newline + two spaces + 'initFixtureGitRepoForSubmitPlan(dir);'. (5) Committed: test(pipeline-state) commit of region A only, exact pathspec harness/scripts/pipeline-state.test.mjs. Not committed: after.txt (contains host paths), the scratch JSON. Open: verify partial (suite does not complete), independent review pending, PO acceptance open."
+  },
+  "log": [
+    { "phase": "opening: record created after preflight and template/record-shape reads", "toolUses": 9 },
+    { "phase": "orientation: three ranges + test ranges read, hypothesis confirmed (with the codex-onboarding-runtime.mjs:920/927 refinement)", "toolUses": 29 },
+    { "phase": "edits: region A admitted, region B refused twice (HGO-AUDIT-LOCK-AMBIGUOUS, no request sha256)", "toolUses": 33 },
+    { "phase": "WSL capture after.txt (exit 1; second abort at test line 5092, HL block); held JSON write refused by GUARD-EVIDENCE-HOST-PATH", "toolUses": 43 },
+    { "phase": "closing: terminal record, commit of region A", "toolUses": 47 }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

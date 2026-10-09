@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR58-CORR-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "4b79b33a0",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "602376a48"
+  ],
+  "resultSha256": "3769f68dbe7ab2033675d035f961c609c9a0283b6c66b5500347864ce99a9e6c",
+  "log": [
+    {
+      "phase": "opening record",
+      "toolUses": 9
+    },
+    {
+      "phase": "probe scripts, ADR edit, commit",
+      "toolUses": 30
+    },
+    {
+      "phase": "Elephant digest bind (Ruling 156): resultSha256 computed over the unchanged report.text",
+      "toolUses": null
+    }
+  ],
+  "report": {
+    "changedFiles": [
+      "docs/adr/0058-guard-maintenance-window.md"
+    ],
+    "text": "Implementation complete, consumer-safe-paths NOT run, independent review: pending. Commit 602376a48 adds one dated 2026-10-09 correction to ADR-0058 naming the live NEVER_LIFTABLE_KERNEL_PATHS entries by adding commit (git log -S) with reasons. Coverage probe (scratch/adr58-corr-probe.mjs): 373 entries, 18 reported unmatched, all schema mirror duplicates (9 schema names listed without the schemas/ prefix). Not run: consumer-safe-paths check (file not located, budget), ADR index lint. resultSha256 not computed (no budget)."
+  }
+}

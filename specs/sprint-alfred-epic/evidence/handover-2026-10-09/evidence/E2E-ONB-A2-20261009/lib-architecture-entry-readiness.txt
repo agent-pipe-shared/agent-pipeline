@@ -1,0 +1,145 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+label: lib-architecture-entry-readiness
+exitCode: 1
+head: e59ac57506428e517cfa15205a09b05ac59dd39c
+tree: 11231d03e613f9319e4716d4c9eee7f3d514a196
+dirty: true
+--- stdout ---
+✔ missing physical map blocks before any readiness claim and offers only the read-only proposal (5.142925ms)
+✔ malformed physical map blocks even with an authorized adoption disposition (0.877395ms)
+✔ approved design materialization action wins before an invalid scaffold-map diagnostic (0.656831ms)
+✔ missing design block preserves its exact PRD action before scaffold-map validation (0.542859ms)
+✔ a materialized map without a project-owned AGENTS pointer has an actionable typed refusal (46.514009ms)
+✖ a PO-deferred adoption reports complete fitness observations without enforcing them (28452.380321ms)
+✔ checkpoint map debt blocks the next planning boundary even during adoption deferral (1492.562621ms)
+✔ a descendant map repair consumes checkpoint debt only after class-7 passes (5122.538127ms)
+✔ unreadable checkpoint debt fails closed with a typed repair route (1937.080909ms)
+✖ approved greenfield design defers missing physical surfaces without fabricating fitness pass (35651.047946ms)
+✖ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (30428.652037ms)
+✖ malformed or incomplete fitness outcomes fail closed (35906.725085ms)
+✔ real signed approved-scoped adoption reaches the physical readiness gate (9312.988043ms)
+✔ symlinked physical fitness artifacts fail closed (61.701797ms)
+✔ unresolved adoption authority remains blocked even when the physical bundle is current (2657.358418ms)
+✔ planning decisions are projected only for owned task modules (43.338246ms)
+✖ a deferred architecture decision remains visible without changing lifecycle readiness (34369.832943ms)
+✔ an unavailable optional decision clock remains diagnostic (0.152433ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 13
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186000.484586
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:110:1
+✖ a PO-deferred adoption reports complete fitness observations without enforcing them (28452.380321ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.architecture-entry-readiness.v1","status":"blocked","root":"<repo-root>","code":"ARCHITECTURE-CHECKPOINT-DEBT-OPEN","message":"checkpoint architecture-map staleness debt remains unresolved at the next planning boundary","artifacts":{"map":{"status":"current","indexFileExists":true,"indexValid":true,"moduleCount":5,"errors":[]},"reentryPointer":{"status":"current","code":null,"path":"AGENTS.md"},"fitnessModel":{"status":"current","path":"<repo-root>/architecture/fitness-model.json","schema":"pipeline.fitness-model.v1"},"baseline":{"status":"current","path":"<repo-root>/architecture/baseline.json","schema":"pipeline.architecture-baseline.v1"},"adoption":{"state":"deferred","coverageClass":"evaluated","confidence":"measured"},"checkpointDebt":{"status":"open","openCount":144,"targets":["architecture/map/harness.md","architecture/map/pipeline-core.md"]}},"disposition":{"ok":true,"disposition":"deferred","scope":["architecture/map/"],"expiresAt":"2099-01-01"},"fitness":null,"nextAction":{"kind":"repair-required","code":"ARCHITECTURE-CHECKPOINT-DEBT-REPAIR","path":"architecture/map/","guidance":"Update the affected architecture concept file or map index in a descendant commit, ensure the touched contract is represented, and re-run planning readiness. A checkpoint push never grants implementation authority over unresolved map debt."}}
+  
+  'blocked' !== 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:169:1
+✖ approved greenfield design defers missing physical surfaces without fabricating fitness pass (35651.047946ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.architecture-entry-readiness.v1","status":"blocked","root":"<repo-root>","code":"ARCHITECTURE-CHECKPOINT-DEBT-OPEN","message":"checkpoint architecture-map staleness debt remains unresolved at the next planning boundary","artifacts":{"map":{"status":"current","indexFileExists":true,"indexValid":true,"moduleCount":5,"errors":[]},"reentryPointer":{"status":"current","code":null,"path":"AGENTS.md"},"fitnessModel":{"status":"current","path":"<repo-root>/architecture/fitness-model.json","schema":"pipeline.fitness-model.v1"},"baseline":{"status":"current","path":"<repo-root>/architecture/baseline.json","schema":"pipeline.architecture-baseline.v1"},"adoption":{"state":"deferred","coverageClass":"evaluated","confidence":"measured"},"checkpointDebt":{"status":"open","openCount":144,"targets":["architecture/map/harness.md","architecture/map/pipeline-core.md"]}},"disposition":{"ok":true,"disposition":"approved-scoped","scope":["plugins/","architecture/"],"authority":"approved-design-package"},"fitness":null,"nextAction":{"kind":"repair-required","code":"ARCHITECTURE-CHECKPOINT-DEBT-REPAIR","path":"architecture/map/","guidance":"Update the affected architecture concept file or map index in a descendant commit, ensure the touched contract is represented, and re-run planning readiness. A checkpoint push never grants implementation authority over unresolved map debt."}}
+  
+  'blocked' !== 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:180:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:192:1
+✖ calibration-unavailable class 10 is preserved as report-only while other classes decide entry (30428.652037ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.architecture-entry-readiness.v1","status":"blocked","root":"<repo-root>","code":"ARCHITECTURE-CHECKPOINT-DEBT-OPEN","message":"checkpoint architecture-map staleness debt remains unresolved at the next planning boundary","artifacts":{"map":{"status":"current","indexFileExists":true,"indexValid":true,"moduleCount":5,"errors":[]},"reentryPointer":{"status":"current","code":null,"path":"AGENTS.md"},"fitnessModel":{"status":"current","path":"<repo-root>/architecture/fitness-model.json","schema":"pipeline.fitness-model.v1"},"baseline":{"status":"current","path":"<repo-root>/architecture/baseline.json","schema":"pipeline.architecture-baseline.v1"},"adoption":{"state":"deferred","coverageClass":"evaluated","confidence":"measured"},"checkpointDebt":{"status":"open","openCount":144,"targets":["architecture/map/harness.md","architecture/map/pipeline-core.md"]}},"disposition":{"ok":true,"disposition":"approved-scoped","scope":["architecture/map/"],"expiresAt":"2099-01-01"},"fitness":null,"nextAction":{"kind":"repair-required","code":"ARCHITECTURE-CHECKPOINT-DEBT-REPAIR","path":"architecture/map/","guidance":"Update the affected architecture concept file or map index in a descendant commit, ensure the touched contract is represented, and re-run planning readiness. A checkpoint push never grants implementation authority over unresolved map debt."}}
+  
+  'blocked' !== 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:208:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:214:1
+✖ malformed or incomplete fitness outcomes fail closed (35906.725085ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'ARCHITECTURE-CHECKPOINT-DEBT-OPEN'
+  - 'ARCHITECTURE-FITNESS-UNAVAILABLE'
+                  ^
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:224:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ARCHITECTURE-CHECKPOINT-DEBT-OPEN',
+    expected: 'ARCHITECTURE-FITNESS-UNAVAILABLE',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:303:1
+✖ a deferred architecture decision remains visible without changing lifecycle readiness (34369.832943ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.architecture-entry-readiness.v1","status":"blocked","root":"<repo-root>","code":"ARCHITECTURE-CHECKPOINT-DEBT-OPEN","message":"checkpoint architecture-map staleness debt remains unresolved at the next planning boundary","artifacts":{"map":{"status":"current","indexFileExists":true,"indexValid":true,"moduleCount":5,"errors":[]},"reentryPointer":{"status":"current","code":null,"path":"AGENTS.md"},"fitnessModel":{"status":"current","path":"<repo-root>/architecture/fitness-model.json","schema":"pipeline.fitness-model.v1"},"baseline":{"status":"current","path":"<repo-root>/architecture/baseline.json","schema":"pipeline.architecture-baseline.v1"},"adoption":{"state":"deferred","coverageClass":"evaluated","confidence":"measured"},"checkpointDebt":{"status":"open","openCount":144,"targets":["architecture/map/harness.md","architecture/map/pipeline-core.md"]}},"disposition":{"ok":true,"disposition":"deferred","scope":["architecture/map/"],"expiresAt":"2099-01-01"},"fitness":null,"nextAction":{"kind":"repair-required","code":"ARCHITECTURE-CHECKPOINT-DEBT-REPAIR","path":"architecture/map/","guidance":"Update the affected architecture concept file or map index in a descendant commit, ensure the touched contract is represented, and re-run planning readiness. A checkpoint push never grants implementation authority over unresolved map debt."}}
+  
+  'blocked' !== 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs:315:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

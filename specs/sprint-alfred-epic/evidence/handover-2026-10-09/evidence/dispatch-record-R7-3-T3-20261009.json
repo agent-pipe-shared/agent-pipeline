@@ -1,0 +1,45 @@
+{
+  "taskId": "R7-3-T3-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-budget-handback",
+  "commits": [],
+  "log": [
+    {"phase": "opening (preflight run first, hook-required); record first written under specs/sprint-alfred-epic/evidence/ by mistake, relocated to repo-root evidence/ and the stray copy removed", "toolUses": 24},
+    {"phase": "design settled; header comment + dirname import edited in the test file; budget checkpoint fired at call 32 of 40 before the helper edit, the two cases, the WSL capture and the commit", "toolUses": 32}
+  ],
+  "report": {
+    "status": "INTERIM: nothing verified, nothing committed. Implementation NOT complete.",
+    "dod": [
+      "WSL capture into evidence/R7-3-T3-20261009/red.txt: not run (not verifiable at this point)",
+      "consumer-safe check: not run",
+      "commit of the test file: not made (no known-green state exists; the cases are not written yet)",
+      "terminal record: not written (this is the interim record)"
+    ],
+    "evidence": ["preflight: node plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, exit 0, status ready (hook-required before the first Write)"],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs (UNCOMMITTED, PARTIAL: header cases list gained H and I, assumption 5 reworded, new assumption 8 added, import changed to { dirname, join }; NO test case and NO helper change yet, so the header currently describes cases that do not exist)",
+      "evidence/dispatch-record-R7-3-T3-20261009.json (this record)"
+    ],
+    "notChanged": [
+      "production files, never staged: design-workflow-package.mjs, design-workflow-approval.mjs, design-workflow-package-v2.mjs",
+      "lib/test-design-workflow-fixture.mjs: it builds v1 packages with a fake candidate and is not imported by this suite, so the briefed extension point does not apply",
+      "foreign staged index entries (harness/scripts/pipeline-state.test.mjs, lib/execution-lane-credential.test.mjs which appeared as A during the run, lib/guard/sanctioned-args-onboarding.mjs): commit by pathspec only"
+    ],
+    "deviations": [
+      "Briefing path gap: evidence/ means the repo-root evidence/ directory (R4-T0c capture and prior dispatch records live there), not specs/sprint-alfred-epic/evidence/. I wrote the first record in the wrong place, relocated it and removed the stray copy.",
+      "Briefing-vs-repo gap: the fixture extension the briefing offers (lib/test-design-workflow-fixture.mjs) does not fit the v2 suite. The suite carries its own copy of the v2 builder, unavailableAdvisorPackage, inside the test file. The planned extension therefore lives in that helper (in scope: same file).",
+      "Advisor consult said EVDESC-i is not constructible (no path can be both in the candidate tree and in the bound set). I found a construction it did not consider and did not yet test it (see openItems 2). The first WSL run is the tie-breaker; if it fails, report i as not constructible without touching the fixture module.",
+      "Budget: 24 tool uses went to the hook-required preflight, orientation reads, the path discovery and the record relocation before the first edit."
+    ],
+    "openItems": [
+      "1. EVDESC-h (append after EVDESC-g). Build the fixture with the unchanged helper. Make a real second tree without moving HEAD: git add -- boundPaths, git write-tree, git reset -q. Assert HEAD commit equals fixture.candidate.commit, observed tree equals fixture.candidate.tree, the other tree differs and git cat-file -t says tree. Read evidence/package.json, replace ONLY candidate.tree, rewrite with canonicalJson. Assert attempt(fixture) deepEquals { reader: REFUSED, approval: REFUSED } so the failure message prints the actual pair. Predicted today: admitted at design-workflow-package-v2.mjs:135 (empty diff, :61-68) and then refused downstream with a different code (probably DAC-FINAL-ENDPOINT) or split between reader and approval. STOP condition: if the pair is exactly REFUSED/REFUSED, h is green, do not commit, report.",
+      "2. EVDESC-i construction. Change the helper to unavailableAdvisorPackage(t, { trackedAtCandidate = {} } = {}). Right after advisorHostFixture: if the map is non-empty, write each file (mkdirSync(dirname, { recursive: true })), git add -- those paths, git commit -q --amend --no-edit (the fixture repo has user config; case D already amends), then candidate = observeAdvisorCandidate(root); build dispatch as { ...failed.args.dispatch, candidateCommit: candidate.commit, candidateTree: candidate.tree } and use candidate.commit in advisorRoute.candidateCommit. The helper otherwise only uses failed.root, failed.sources, failed.args.dispatch and failed.candidate.commit, and coordinateInitialDesignAdvisory compares HEAD with dispatch (design-advisory-coordinator-v2.mjs:19-20), so amending BEFORE the course is created binds everything to the amended commit. Change mkdirSync(join(root, 'evidence')) to { recursive: true }. The case: tracked file evidence/readiness.json with stale content at the candidate; commit boundPaths (readiness becomes an M entry; assert diff-tree --name-status shows M for it; control: attempt() must be ok/ok); then git rm it and commit (assert D entry, HEAD~2 is the candidate, candidate is an ancestor); assert attempt() deepEquals REFUSED/REFUSED. Expected green today because :67 returns false for D.",
+      "3. Run (foreground, Bash timeout 600000): wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/R7-3-T3-20261009/red.txt --label R7-3-T3-red -- node --test --test-reporter=spec plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs plugins/pipeline-core/lib/po-gate-authority.test.mjs plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs\". Expect the 9 old cases green, h red, i real state, callers no new red.",
+      "4. node --test harness/scripts/check-consumer-safe-paths.test.mjs must exit 0.",
+      "5. Commit: message file under scratch/ with Dispatch: R7-3-T3-20261009 (goldfish), AI-Assisted: true, Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>, Claude-Session: https://claude.ai/code/session_011cx2m4ARdi3kGdy5LpfPc7; then git commit -F scratch/<file> -- plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs (pathspec form; the index holds foreign staged files). Only this one file changes, so one commit. Then write the terminal record once with commits and report.changedFiles.",
+      "Estimated remaining cost: about 10 tool calls (helper edit, cases edit, capture, read capture, consumer-safe, message write, commit, log -1, terminal record, plus one fix-up run if h's preconditions need tightening). The dispatcher must grant more budget or hand this slice to a continuation."
+    ]
+  }
+}

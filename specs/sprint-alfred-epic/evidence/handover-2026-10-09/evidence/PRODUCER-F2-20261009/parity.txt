@@ -1,0 +1,10 @@
+command: node harness/scripts/generate-vendored-canon.mjs --check
+label: parity
+exitCode: 0
+head: c28ea5619debf2845a6011245f1b8c1c61ac7746
+tree: 8b9aafd3deb0846444edaabb83068edb9e5b791e
+dirty: true
+--- stdout ---
+Vendored-canon check passed: all vendored files match their repo-root originals.
+
+--- stderr ---

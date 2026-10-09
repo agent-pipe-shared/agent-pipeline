@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "E2E-ONB-B-20261009",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "24a27a1c9cf231e87f585f9396c08065fe0e49f0",
+  "outcome": "completed",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit"},
+  "commits": ["24a27a1c9cf231e87f585f9396c08065fe0e49f0"],
+  "log": [
+    {"phase": "opening: briefing read, preflight run, record created", "toolUses": 14},
+    {"phase": "orientation done (SKILL, intake-generate-design, design-course read); first WSL preflight", "toolUses": 20},
+    {"phase": "walk steps 01c to 07c executed in a fresh WSL temp repo; stopped at the first PO signature boundary (sign-intent)", "toolUses": 41},
+    {"phase": "temp dir deleted, step logs 01-07 and walk report written", "toolUses": 46},
+    {"phase": "commit 24a27a1c9 of the report; record finalized inside the closing allowance (hook counts 55 at the commit SHA read)", "toolUses": 55}
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": false, "guardrails": false, "security": false}
+    },
+    "appliedRow": "T3"
+  },
+  "resultSha256": null,
+  "report": {
+    "text": "1. DoD results. Step logs evidence/E2E-ONB-B-20261009/step-01..07-*.txt (command, exit code, status/code, next action; steps grouped into 7 logical stages): passed. Report specs/sprint-alfred-epic/evidence/e2e-onb-b-walk-2026-10-09.md with step table, first blocker, frictions F1-F11 and one proposed slice each: passed. One commit of the report, subject 'docs(alfred): greenfield onboarding and design-chain walk (E2E-ONB-B)': passed (24a27a1c9cf231e87f585f9396c08065fe0e49f0). Temp directory deleted: passed (ls exit 2, no such file). Terminal record: passed (this file). Walk reached the briefing's alternative endpoint, the first point needing a real PO signature (po-human-approval.mjs sign-intent, attended, user-copy-only); submit-plan was NOT reached; nothing was signed. independent review: pending.\n\n2. Evidence. Commands were wsl.exe -e bash -lc '...' with CLAUDECODE=1 and PIPELINE_PLUGIN_ROOT set to the source plugin; every exit code from step 01c on is a measured WSL status (single-quoted outer): steps 01c, 02a, 02b, 03a, 03b, 04a, 04b, 05a, 05b, 05c, 06b, 07a, 07b, 07c exit 0; 06a bootstrap-bind-plan exit 2 with code KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING. Artifacts: evidence/E2E-ONB-B-20261009/ (root evidence/ is not tracked) and the committed report. Working-tree check: git status --short before the commit showed only foreign edits plus my report.\n\n3. Changed files. specs/sprint-alfred-epic/evidence/e2e-onb-b-walk-2026-10-09.md (committed report). Uncommitted artifacts by design: evidence/E2E-ONB-B-20261009/step-01..07 logs, this record, scratch/commit-msg/E2E-ONB-B-20261009.txt.\n\n4. Deliberately not changed. All production and test files; the foreign uncommitted edits in the tree (pipeline-state, po-human-approval, sanctioned-args-onboarding, onboarding-continuity and others) were never staged. design-course.md steps 1-5 were not executed. resultSha256 left null (read-only/authored-commit binding by commit only).\n\n5. Deviations from spec. (a) Step 07a sed authoring of the architecture block was not a returned action and ran inside WSL outside the host guard; whether the host guard admits that edit at bootstrap-binding-required is unmeasured (report F8). (b) intake-generate-plan and bootstrap-bind-plan were taken from the intake-generate-design.md command table because the preceding applies returned no nextAction (F4). (c) 01a EXIT value is unmeasured (double-quoted outer); 01b accidentally ran the read-only preflight with cwd = the source checkout after the WSL /tmp directory vanished; git status --short showed no change from it. (d) The walk used the CLAUDECODE=1 marker because wsl.exe does not forward it and the unmarked preflight returns codex actions (F1). (e) Budget: the hook counted more calls than my own tally and fired its 80 percent notice at call 44; the step-06 retry write and the report were already in flight and finished within the working cap; the record write is in the closing allowance. This is NOT a closing-allowance handover: the deliverable is complete. (f) Route: requested goldfish-deep / sonnet xhigh; observed identity claude-sonnet-5-5 from the runtime prompt; class research/report so no A/G/S pre-check applies; no contradiction.\n\n6. Open items. First blocker: ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE (architecture-design.mjs:62), reached via the misleading bind refusal at onboarding-continuity.mjs:5186; after a placeholder edit the walk stopped at the signature boundary. Frictions F1-F11 (runner misdetection over wsl.exe, WSL call-shape pitfalls, language re-ask and malformed existingFileApplyAction, applies without nextAction, native turn reference, empty design-question round, bind message ordering, banner conflict, signature request over an unfinished spec, host Write guard refusing the acknowledgement marker literal, git init and author identity not exercised) each have a proposed slice in the report. Exact remaining edits and the chat-approval option for a next walk are in the report section 'Not reached'. Remaining manual work for the PO: none for this slice; independent Critic review pending (Elephant dispatches it)."
+,
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/e2e-onb-b-walk-2026-10-09.md"]
+  }
+}

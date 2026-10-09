@@ -1,0 +1,67 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R7-3-T2e-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["ebd4db3d53714f40db8fe11cdefd38fc7dce71bb"],
+  "resultSha256": null,
+  "report": {
+    "text": "Status: implementation complete (commit ebd4db3d5); independent review: pending (criticRequired T3); PO acceptance pending. The driver case is STILL RED, at a new fix-induced location (see 6-FIRST). Route pre-check: not an A/G/S class; requested goldfish-deep claude-sonnet-5-5/xhigh; observed model claude-sonnet-5-5 (runtime prompt); effort not directly observable (disclosed, not a contradiction).\n\n6-FIRST. OPEN ITEM / ELEPHANT DECISION (stop condition 5, judgment call outside this briefing): after the fix, freshDriver passes present-plan, signing and approve-plan, and the case stops at project-onboarding-e2e.test.mjs:1470 (pre-edit :1464; my 6 inserted lines shift it by 6): AssertionError 'codex: final approval remains bound to the committed five-source candidate', operator deepStrictEqual, actual HEAD 61abda3e... vs expected designCandidate bb3274a3... (no DWP-/DAA- code; it is a plain assertion). Cause: that assertion demands candidateAtHead(path) == designCandidate after approval. The bound-path gate requires the package to be tracked and clean at HEAD, and the package embeds the design candidate's SHA, so the package can never live inside the commit it references; HEAD MUST move past designCandidate once the package is committed. No in-freshDriver variant avoids this. The only repairs are changing what the assertion checks (forbidden by field 4 of this briefing) or a production change. A next slice must be briefed to re-express the assertion, e.g. HEAD^ equals designCandidate.commit and the approval/presentation's package candidate equals designCandidate (the intent is 'approval stays bound to the five-source candidate', not 'no later commit'). Expect further assertions after :1470 in the same case that assume HEAD == designCandidate; they were not reached and are unknown. This is distinct from the briefing's anticipated downstream red (:1607 DAA-PUBLIC-UNAVAILABLE, DAPU-D's): my AFTER run never reached :1607, so DAPU-D's red is neither confirmed nor cleared here. Only the codex runner iteration ran in both captures; the claude and antigravity iterations were not reached.\n\n1. DoD results: (1) BEFORE capture under WSL, taken first, before any edit: passed (6 tests / 4 pass / 1 fail / 1 skipped, 564 s, wrapped exit 1; the one red is the driver case at freshDriver :1036 via :1453, DWP-BOUND-PATH-UNTRACKED). (2) AFTER: the driver case no longer fails with DWP-BOUND-PATH-UNTRACKED: passed; it now stops at :1470 as in 6-FIRST. (3) node --test harness/scripts/check-consumer-safe-paths.test.mjs under WSL: passed, 9/9, exit 0. (4) one commit of the test file only with the briefed subject and exactly the two trailers Dispatch: R7-3-T2e-20261009 (goldfish) and AI-Assisted: true: passed (ebd4db3d5, 1 file, 6 insertions; git add then git commit -F separately, no guard refusal, no index.lock). (5) 'No other case changes state': established BY CONSTRUCTION, not by a full-file AFTER run. The full-file BEFORE took 564 s against the 600 s tool timeout, so AFTER used --test-name-pattern 'in-process driver follows' (as the briefing permits). The edit is confined to freshDriver, whose only caller is the driver case; the other four non-skipped cases were green in BEFORE and were not re-run.\n\n2. Evidence: evidence/R7-3-T2e-20261009/before.txt and after.txt, written by capture-evidence.mjs. Commands: wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/R7-3-T2e-20261009/before.txt --label R7-3-T2e-before -- node --test plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs' (wrapped exit 1) and the same to after.txt with label R7-3-T2e-after and --test-name-pattern='in-process driver follows' (wrapped exit 1). Consumer-safe: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0. HEAD moved between the two captures (before.txt head 9d2c4b27, after.txt head 312424d8) through foreign concurrent commits, not mine; both files record head/tree/dirty. Platform scope: WSL/Linux only; Windows-native, macOS and non-Claude runners were not run (the change reuses the case's own commitFixturePaths git helper, no platform-specific code).\n\n3. Changed files: plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs (6 lines in freshDriver right after bindFixtureReadiness: read the rewritten package, then commitFixturePaths(cwd, [packagePath, advisor receipt path, readiness path], 'test: commit the design workflow package', 'stage-0')). The commit goes AFTER bindFixtureReadiness because that helper asserts HEAD == package candidate and rewrites both readiness and package; the committed set equals the fixture helper's commitPackage set. Uncommitted by design (briefing: test file only): evidence/R7-3-T2e-20261009/{before,after}.txt, evidence/dispatch-record-R7-3-T2e-20261009.json, scratch/commit-msg/R7-3-T2e.txt.\n\n4. Deliberately not changed: the assertion at :1464/:1470 (forbidden, see 6-FIRST); lib/test-design-workflow-fixture.mjs (commitPackage unusable here for the ordering reason above); every production file; hooks/, lib/guard/, harness/; foreign staged files and the foreign dirty po-human-approval.mjs / pipeline-state.mjs (exact pathspec only). The preflight DUTY-NOT-RUNTIME-LIVE diagnostic lists 5 differing plugin files (agents/critic.md, two references, two templates): not mine, not touched.\n\n5. Deviations from spec: none. Note: used git commit -F <msgfile> as the CONT17 header directs; templates/prompts/agent-obligations.md prefers -m plus --trailer for one-line bodies, both are admitted.\n\n6. Open items / handover (the 80 % budget notice fired at call 32 of 40 and was answered with the closing sequence; used about 37 of 40, no closing allowance spent on work). Committed: ebd4db3d5, the freshDriver package commit. Verified green: consumer-safe 9/9 exit 0; the fix itself proven by after.txt (present-plan/approve-plan pass). Remains undone: the driver case is red at :1470; the re-expression of that assertion; whatever follows it in the case; DAPU-D's :1607 remains unconfirmed. Next briefing must say: authorize changing exactly that assertion (HEAD^ == designCandidate plus package-candidate binding), allow the full case to run to its end, and provide a per-runner AFTER (codex, claude, antigravity) since only codex was reached. independent review: pending."
+    ,
+    "changedFiles": ["plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs"]
+  },
+  "log": [
+    {
+      "phase": "opening-record-written",
+      "toolUses": 8,
+      "note": "route pre-check: not an A/G/S class; requested goldfish-deep claude-sonnet-5-5/xhigh; observed model claude-sonnet-5-5 from the runtime prompt; effort not directly observable (disclosed, not a contradiction); preflight ran ready after GUARD-BOOTSTRAP-RECEIPT-MISSING"
+    },
+    {
+      "phase": "BEFORE capture done (WSL, full e2e file)",
+      "toolUses": 22,
+      "evidence": "evidence/R7-3-T2e-20261009/before.txt (wrapped exit 1)",
+      "note": "6 tests / 4 pass / 1 fail / 1 skipped, 564 s. Red: in-process driver case at freshDriver :1036 (DWP-BOUND-PATH-UNTRACKED) via :1453, codex runner iteration"
+    },
+    {
+      "phase": "edit applied (6 lines after bindFixtureReadiness in freshDriver) and AFTER capture done (WSL, --test-name-pattern 'in-process driver follows' because the full file took 564 s against the 600 s tool timeout)",
+      "toolUses": 29,
+      "evidence": "evidence/R7-3-T2e-20261009/after.txt (wrapped exit 1)",
+      "note": "present-plan, signing and approve-plan now pass. Case stops at :1470 post-edit (:1464 pre-edit): AssertionError 'codex: final approval remains bound to the committed five-source candidate' (deepStrictEqual, actual HEAD 61abda3e vs expected design candidate bb3274a3). No DWP-/DAA- code; :1607 was not reached"
+    },
+    {
+      "phase": "consumer-safe check + commit",
+      "toolUses": 35,
+      "evidence": "node --test harness/scripts/check-consumer-safe-paths.test.mjs under WSL: 9/9 exit 0 (stdout in the dispatch conversation, no capture file)",
+      "note": "commit ebd4db3d5, one file, 6 insertions, trailers Dispatch: R7-3-T2e-20261009 (goldfish) + AI-Assisted: true"
+    },
+    {
+      "phase": "final report written",
+      "toolUses": 37,
+      "note": "outcome completed; driver case still red at :1470 (fix-induced assertion, Elephant decision); independent review: pending"
+    }
+  ]
+}

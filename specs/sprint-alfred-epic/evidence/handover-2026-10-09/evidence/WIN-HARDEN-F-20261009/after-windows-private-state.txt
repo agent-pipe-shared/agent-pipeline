@@ -1,0 +1,61 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: native
+exitCode: 1
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.7049ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.1086ms)
+✔ WPS003 rejects owner drift and reparse points (0.0869ms)
+✔ WPS004 keeps malformed observations unavailable (0.0804ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.5446ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.1392ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.3152ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.1307ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.1255ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.1899ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.2947ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.1229ms)
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (961.6294ms)
+✔ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (1609.6005ms)
+✔ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (1555.6149ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4188.5337
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (961.6294ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'secure',
+  +   'insecure'
+  -   'secure'
+    ]
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:142:12)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'secure', 'insecure' ],
+    expected: [ 'secure', 'secure' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

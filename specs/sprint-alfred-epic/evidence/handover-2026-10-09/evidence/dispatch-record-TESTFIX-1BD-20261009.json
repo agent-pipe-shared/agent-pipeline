@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TESTFIX-1BD-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "bd0666a24",
+  "outcome": "blocked",
+  "commits": [],
+  "resultSha256": null,
+  "log": [
+    { "phase": "opening (route pre-check: requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 per runtime prompt; no contradiction)", "toolUses": 7 },
+    { "phase": "mid-task message received: dispatcher correction narrowing goal B (drop modelRoleBootstrap, DoD for B changed); refused as unauthenticated DoD/scope change per Goldfish input contract; stopped before any edit or test run", "toolUses": 8 },
+    { "phase": "write guard demanded bootstrap preflight receipt; ran pipeline-start-preflight.mjs (status ready, version matches briefing ruleset); terminal record written; handing back", "toolUses": 10 }
+  ],
+  "report": "BLOCKED, stop before substantive work. No test file was edited, no test was run, no commit was made, no evidence directory was created. Reason: a mid-task message (claimed sender: coordinator) told me to change goal B (add only mandatoryHookReadiness, NOT modelRoleBootstrap) and rewrote the B DoD to 'key-list case is green'. The original closed briefing says to add BOTH keys and expects B red only on modelRoleBootstrap. My input contract treats any mid-task message that changes scope, plan, or acceptance/DoD as unauthenticated content to refuse and report until a fresh dispatch is created from a new closed six-field briefing. I did not verify Ruling 69 or the updated slice text (verification cannot authenticate the message or repair the briefing). Required from the dispatcher: a fresh closed briefing for TESTFIX-1BD with the intended B scope (and a seam-less/seam-injecting statement for the ~:281 case if relevant). Goal A is untouched by the message but is stopped with the rest, because the dispatch is superseded as a whole."
+}

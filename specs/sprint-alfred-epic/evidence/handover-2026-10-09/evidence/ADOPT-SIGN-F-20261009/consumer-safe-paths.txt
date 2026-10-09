@@ -1,0 +1,10 @@
+command: node harness/scripts/check-consumer-safe-paths.mjs
+label: adopt-sign-f-csp
+exitCode: 0
+head: 3211c15eafe9d042e29ced644e0581853907a0c6
+tree: cae39dbc20f88836d4da65f38315c975eb5ba108
+dirty: true
+--- stdout ---
+Consumer-safe-path check passed: 1769 tracked file(s) under plugins/pipeline-core/, 152 allowlist entries (all used).
+
+--- stderr ---

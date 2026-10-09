@@ -1,0 +1,20 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/design-readiness-host-evidence.test.mjs
+label: lib-design-readiness-host-evidence
+exitCode: 0
+head: 9709982dc70207d97ec71d6287269099e237799e
+tree: 0d22c604f404e58e8a4c250a956f210870c8ecbd
+dirty: true
+--- stdout ---
+✔ DWH01 Claude host-observed receipt is verified against its write-once private execution record (7.314062ms)
+✔ DWH02 Antigravity host-observed receipt is local evidence and binds exact report, candidate and route (4.121244ms)
+✔ DWH03 host-observed receipts fail closed on missing local readback and repository mismatch (4.732434ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 716.56783
+
+--- stderr ---

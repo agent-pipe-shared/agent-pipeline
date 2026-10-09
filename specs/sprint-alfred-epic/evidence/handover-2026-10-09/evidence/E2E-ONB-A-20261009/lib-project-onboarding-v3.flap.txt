@@ -1,0 +1,32 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/project-onboarding-v3.flap.test.mjs
+label: lib-project-onboarding-v3.flap
+exitCode: 0
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ a transient descriptor error followed by success is not a partial (1.412184ms)
+✔ a descriptor retired between listing and loading (WT-SESSION-MISSING) is retried until it converges (0.150692ms)
+✔ a raw EBUSY error followed by success is not a partial (0.175153ms)
+✔ a raw EPERM error followed by success is not a partial (0.083182ms)
+✔ a raw EACCES error followed by success is not a partial (0.133192ms)
+✔ a raw ENOENT error followed by success is not a partial (0.131912ms)
+✔ a raw EAGAIN error followed by success is not a partial (0.154353ms)
+✔ a persistent transient error exhausts exactly three attempts and stays the strict partial, naming its cause (0.280165ms)
+✔ a persistent raw EBUSY exhausts the budget and reports the raw code as its cause (0.307285ms)
+✔ a typed error outside the transient set is not retried and stays the strict partial (0.266294ms)
+✔ a plain Error is not retried and stays the strict partial, naming its error name (0.148403ms)
+✔ only the error's own code is retried; a transient code that sits only on its cause is not (0.177913ms)
+✔ a transient error followed by a cleanup-required plan still blocks exactly as it does today (0.114772ms)
+✔ outside strict mode a persistent transient error still infers no cleanup authority (null) (0.115972ms)
+✔ an apply failure after a successful re-observation is never retried (0.172133ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2436.025755
+
+--- stderr ---

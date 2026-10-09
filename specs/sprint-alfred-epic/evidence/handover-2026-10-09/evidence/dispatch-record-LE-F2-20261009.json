@@ -1,0 +1,16 @@
+{
+  "taskId": "LE-F2-20261009",
+  "model": "sonnet (Sonnet 5.5, effort medium)",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-handback",
+  "log": [
+    {"phase": "opening", "toolUses": 3},
+    {"phase": "edit applied in lib/onboarding-continuity.mjs (gate on plan.repositoryCapability === local); after-run in WSL started", "toolUses": 22},
+    {"phase": "budget checkpoint at call 28 of 35; background after-run ended exit 15 (no verified result); interim handback, uncommitted edit", "toolUses": 30}
+  ],
+  "report": {
+    "changedFiles": [],
+    "text": "INTERIM HANDBACK (budget checkpoint). independent review: pending. DONE: production edit applied (UNCOMMITTED, UNVERIFIED) in plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeGenerate: lineEndingApplied is now `plan.repositoryCapability !== \"local\" ? { ok: true, skipped: true } : <previous expression unchanged>`, plus a 4-line comment. Caller audit: bound-design-line-endings.mjs has exactly one production caller (this function), so no change there. plan.repositoryCapability exists (plan binding near line 6928). Commit message ready: scratch/commit-msg/LE-F2.txt. NOT DONE: the foreground after-run (the WSL capture auto-backgrounded after 600 s) ended with exit 15 and left no verified result; treat evidence/LE-F2-20261009/after.txt as absent or incomplete. REMAINING: (1) rerun the after capture; the full pattern run takes about 10 minutes, so run only the language case first if time is short. (2) before.txt: temporarily restore the old 7-line expression, capture with label before, then reapply the gate. (3) WSL run of lib/*line-endings*.test.mjs and lib/onboarding-continuity*.test.mjs. (4) node harness/scripts/check-consumer-safe-paths.mjs. (5) git add -- plugins/pipeline-core/lib/onboarding-continuity.mjs evidence/LE-F2-20261009/before.txt evidence/LE-F2-20261009/after.txt as its own call, then git commit -F scratch/commit-msg/LE-F2.txt -- the same paths, then rewrite this record terminal with report.changedFiles. COMMAND NOTE: native `node capture-evidence.mjs -- wsl.exe ...` is refused by GUARD-DEVPLAN-SHELL; the form that starts is `wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <l> -- node --test <patterns> plugins/pipeline-core/scripts/onboarding-init.test.mjs\"` with the pattern set from line 1 of evidence/TR-S1-T6-20261009/with-fix.txt. DEVIATIONS: a stray in-progress record exists at specs/sprint-alfred-epic/evidence/dispatch-record-LE-F2-20261009.json (written before I applied the repo-root rule); the dispatcher should delete it. One rg touched CONT34 (no hit, nothing read)."
+  }
+}

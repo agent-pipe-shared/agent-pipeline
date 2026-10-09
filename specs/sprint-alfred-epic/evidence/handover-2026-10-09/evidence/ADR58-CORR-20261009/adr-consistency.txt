@@ -1,0 +1,11 @@
+command: node harness/scripts/check-adr-consistency.mjs
+label: adr
+exitCode: 2
+head: 602376a488ef123bc9117ddeba271766b5024bd3
+tree: b39241da3d3ae6cb0ce5334cc6a8c7dd9e932770
+dirty: true
+--- stdout ---
+
+--- stderr ---
+INDEX-DISAGREEMENT docs\adr\README.md:13 -- 0085-one-review-one-signature-design-approval.md has no row in the English index table
+ADR consistency check failed: 1 finding(s).

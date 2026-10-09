@@ -1,0 +1,26 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/onboarding-first-restart-intake.test.mjs
+label: lib-onboarding-first-restart-intake
+exitCode: 0
+head: 143dab8dee3e219de4b5773e8d5644d9a7e69703
+tree: 90e4e734889be2253c75a20802c33c1f275a0e71
+dirty: true
+--- stdout ---
+{"scenario":"precondition-prevents-first-barrier","inputByteLength":14110,"inputSha256":"b54ca24b8c1eb2683881b2059ca1461c187602ad047b34c6b77149f8cd8364e1","checkpointBeforeBarrier":"absent","nativeCodexRestart":false}
+{"scenario":"existing-storage-and-sessionstart-proven","inputByteLength":14110,"inputSha256":"b54ca24b8c1eb2683881b2059ca1461c187602ad047b34c6b77149f8cd8364e1","chunkCount":1,"nativeCodexRestart":false}
+✔ RC17C001 proposed first runtime restart withholds plan and direct apply until explicit original-input capture (46833.337933ms)
+✔ RC17C002 explicit existing consent capture preserves exact original bytes before barrier and after ticket consumption (44982.793982ms)
+✔ RC17C003 proposed first restart reuses recorded consent while requiring existing original material (39542.809561ms)
+✔ RC17C004 proposed first restart refuses checkpoint or material changes after planning and before publication (79261.391404ms)
+✔ RC17C005 proposed first restart refuses corrupt evidence and unavailable continuity without publishing (51049.378787ms)
+✔ RC17C006 proposed first-intake observations remain valid closed envelopes at the actual readiness gate (43386.389173ms)
+✔ RC17C007 manual kickoff plan and direct apply cannot bypass missing first-restart material (29184.383063ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 338278.068454
+
+--- stderr ---

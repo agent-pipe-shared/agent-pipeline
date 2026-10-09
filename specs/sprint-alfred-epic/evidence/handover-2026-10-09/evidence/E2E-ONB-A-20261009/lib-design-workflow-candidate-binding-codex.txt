@@ -1,0 +1,21 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs
+label: lib-design-workflow-candidate-binding-codex
+exitCode: 0
+head: 9709982dc70207d97ec71d6287269099e237799e
+tree: 0d22c604f404e58e8a4c250a956f210870c8ecbd
+dirty: true
+--- stdout ---
+✔ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (643.072525ms)
+✔ CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate (456.707366ms)
+✔ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (471.892875ms)
+✔ CANDBINDX-d (diagnostic) the Codex branch's re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts (382.792006ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5094.868251
+
+--- stderr ---

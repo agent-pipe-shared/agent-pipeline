@@ -1,0 +1,637 @@
+command: node --test plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs plugins/pipeline-core/lib/design-workflow-package.test.mjs plugins/pipeline-core/lib/design-workflow-package-route.test.mjs plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs plugins/pipeline-core/lib/po-gate-authority.test.mjs plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+label: before
+exitCode: 1
+head: 88ff139b3da9f9c3c7d1d366b6acc1717befbadf
+tree: 7db07e1ae88a2756b412685e13273aaa48c8de01
+dirty: true
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (748.100213ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (790.680895ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (562.957217ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (451.010711ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (412.009552ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (418.860959ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (411.534842ms)
+✔ EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain) (749.147863ms)
+✔ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream) (527.806114ms)
+✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (534.592005ms)
+✔ EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control) (773.438156ms)
+✔ EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader (121.092564ms)
+✔ EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (83.49146ms)
+✔ EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (100.395796ms)
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (12.577815ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (10.377855ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (9.318263ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (9.530179ms)
+✔ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (31.726514ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (12.146247ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (2.979915ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (11.428315ms)
+✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (9.784683ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (10.093447ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (11.253731ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (10.104048ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (11.142048ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (11.406434ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (11.428274ms)
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (171537.084309ms)
+✔ DWP01 admits a complete pre-approval package without granting implementation authority (13.446122ms)
+✔ DWP02 requires fresh independent readiness over the exact source set and candidate (39.55691ms)
+✔ DWP03 rejects source-byte drift, substituted readiness bytes, and candidate mismatch (18.77704ms)
+✔ DWP04 rejects duplicate JSON keys, aliased source paths, and oversized source bytes (10.546737ms)
+✔ DWP05 rejects noncanonical separators and repository path aliases before reading evidence (10.039588ms)
+✔ DWP06 a completed Advisor result requires a bound disposition and forbids an exception (19.664797ms)
+✔ DWP07 an unavailable Advisor route requires an exact attempt trail and proposed narrow exception (41.523777ms)
+✔ DWP08 no-child Codex route selection is a narrow PO exception input, never an invented attempt (20.27856ms)
+✔ DWP09 rejects package fields that could masquerade as an embedded approval (3.697709ms)
+✔ DWP10 ships plugin-local validation schemas byte-equivalent to the canonical root schemas (17.100498ms)
+✔ DWP11 reads and validates every package artifact from the physical repository files (29.232136ms)
+✔ DWP12 implementation readback requires the exact approved digest, feature, PRD and Spec (140.296252ms)
+✔ DWP13 rejects changed source bytes and symlinked or missing source files (5.83833ms)
+✔ DWP14 rechecks Git candidate identity after reading the package (13.215436ms)
+✔ DWP15 re-reads the same immutable package after unrelated commits without changing its provenance (25.841193ms)
+✔ DWP16 returns a complete human-review projection without converting evidence into approval (9.224072ms)
+✔ DWP17 labels unavailable Advisor evidence as a proposed exception in the same pending review (10.753161ms)
+✔ DWP18 detaches and deeply freezes the bounded PO review from validator inputs (11.047527ms)
+✔ DWP19 one final PO proof binds the exact complete package, feature, PRD, Spec and original candidate (50.615026ms)
+✔ DWP20 implementation re-verifies the stored signature against the immutable package after unrelated commits (121.316478ms)
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (70.850882ms)
+ok 1 - closed profile receipt and canonical serialization bind the validated projection
+ok 2 - narrow PO-language projection ignores runner schema while requiring an exact language pair
+ok 3 - profile-only readback validates the receipt without pipeline-state, PRD or Spec inputs
+ok 4 - profile-only readback rejects missing, stale and non-0600 receipts
+ok 5 - profile-only readback rejects symlinked receipt, source and runtime inputs
+ok 6 - profile-only readback follows the existing registered linked-worktree authority
+ok 7 - profile-only failures and evidence never expose machine-local paths or raw profile bytes
+ok 8 - source, runtime, common receipt and one marked PRD form one valid authority
+ok 9 - pipeline-start can validate the shared profile when no feature is active
+ok 10 - a mixed project authority (neutral manifest present without neutral State while legacy State remains) fails the state authority closed instead of silently reading the legacy State
+ok 11 - a missing project authority (no legacy or neutral manifest at the current checkout) fails the state authority closed
+ok 12 - validatePoGateAuthorityForRepository propagates the fail-closed state authority code for a mixed project authority
+ok 13 - an internally consistent legacy linked-worktree language cannot override the primary receipt
+ok 14 - a stale primary projection invalidates the common receipt
+ok 15 - missing, non-0600 and noncanonical receipts all fail closed with repair guidance
+ok 16 - symlinked receipt leaves and parents fail before receipt content is trusted
+ok 17 - a relocated primary root or mismatched repository fingerprint makes the receipt stale
+ok 18 - zero and multiple child PRDs fail exact active-directory cardinality
+ok 19 - spec, design and SDP artifacts do not affect PRD cardinality
+ok 20 - a wrong planPath and a traversal path cannot become PRD authority
+ok 21 - an unregistered current checkout cannot borrow the primary authority
+ok 22 - symlinked feature directories and PRD leaves fail physical-path validation
+ok 23 - missing, duplicate and wrong-language markers fail before approval
+ok 24 - a documentLanguage marker admits a non-de/en PRD without moving the operator-facing profile
+ok 25 - without a documentLanguage marker, the PRD language must still equal the operator-facing profile
+ok 26 - the technical Spec marker has closed single-line lowercase grammar
+ok 27 - the PO plan acknowledgement marker must be present exactly once
+ok 28 - a PRD carrying the language marker, the Spec marker and the acknowledgement marker exactly once each passes
+ok 29 - technical Spec marker binds the neighboring spec.md bytes and detects drift
+ok 30 - invalid UTF-8 in the primary profile or PRD text fails closed
+ok 31 - a bound plan digest detects a stale post-validation PRD
+ok 32 - a bound Spec digest alone accepts the current PRD's neighboring spec.md
+Plan submitted by "coordinator" on 2026-07-18T18:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature/prd_feature.md(eb603ed913c6...)+specs/feature/spec.md(a4a3e6a77385...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-07-18T18:00:00.000Z; bound to submission ecab1bc5ae80....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "feature",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/feature/design-input.md",
+      "sha256": "80ca7bad734aac45a2ff64c568a99dc0c7e39d441622887963345f2124880b53",
+      "content": "Original request for feature.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/feature/prd_feature.md",
+      "sha256": "eb603ed913c6fece6bd764ffc940ee9d55a5e400ac4b742737fb499744db600a",
+      "content": "<!-- po-language: de -->\n<!-- technical-spec-sha256: a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341 -->\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n# PRD\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/feature/spec.md",
+      "sha256": "a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341",
+      "content": "# Technical Spec\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/feature/design.md",
+      "sha256": "7c6286e2e1eafb8edfd383c21ecead4b33b839228a397c9ac92fcc0480399fd5",
+      "content": "Revised design for feature.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/feature/traceability.md",
+      "sha256": "6ae54c097144d75e627ae589726e83702cf89bac474b18246466f75c094bcbd1",
+      "content": "Requirements for feature are mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/feature/evidence/advisor.json",
+      "sha256": "14797f866c0eae618222d1d23fc3083642adb2d1c58768139a487664fd34bb5e",
+      "dispatchId": "advisor-feature",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/feature/evidence/readiness.json",
+    "sha256": "d4f49cf94a8920e8470c5ae16cb4dcfb636239cef2c16525e7575c23064e2f66",
+    "dispatchId": "readiness-feature",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "a155f3d043804974aaa13f89d3a4f2c33781f50a6a7c3e935945db24d29183f9",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The current sources are ready for one final PO review.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "The source requirements are traced."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json (package sha256 3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Error: approve-plan requires the exact complete design-workflow package previously presented (DWP-READINESS-HOST-RECEIPT-UNAVAILABLE); no authority was written.
+ok 33 - approve-plan rejects bare attribution when the shared human-approval receipt is required
+Plan submitted by "coordinator" on 2026-07-18T18:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature/prd_feature.md(eb603ed913c6...)+specs/feature/spec.md(a4a3e6a77385...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-07-18T18:00:00.000Z; bound to submission 9186a309d720....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "feature",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/feature/design-input.md",
+      "sha256": "80ca7bad734aac45a2ff64c568a99dc0c7e39d441622887963345f2124880b53",
+      "content": "Original request for feature.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/feature/prd_feature.md",
+      "sha256": "eb603ed913c6fece6bd764ffc940ee9d55a5e400ac4b742737fb499744db600a",
+      "content": "<!-- po-language: de -->\n<!-- technical-spec-sha256: a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341 -->\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n# PRD\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/feature/spec.md",
+      "sha256": "a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341",
+      "content": "# Technical Spec\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/feature/design.md",
+      "sha256": "7c6286e2e1eafb8edfd383c21ecead4b33b839228a397c9ac92fcc0480399fd5",
+      "content": "Revised design for feature.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/feature/traceability.md",
+      "sha256": "6ae54c097144d75e627ae589726e83702cf89bac474b18246466f75c094bcbd1",
+      "content": "Requirements for feature are mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/feature/evidence/advisor.json",
+      "sha256": "14797f866c0eae618222d1d23fc3083642adb2d1c58768139a487664fd34bb5e",
+      "dispatchId": "advisor-feature",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/feature/evidence/readiness.json",
+    "sha256": "d4f49cf94a8920e8470c5ae16cb4dcfb636239cef2c16525e7575c23064e2f66",
+    "dispatchId": "readiness-feature",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "a155f3d043804974aaa13f89d3a4f2c33781f50a6a7c3e935945db24d29183f9",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The current sources are ready for one final PO review.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "The source requirements are traced."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json (package sha256 3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Error: approve-plan requires the exact complete design-workflow package previously presented (DWP-READINESS-HOST-RECEIPT-UNAVAILABLE); no authority was written.
+ok 34 - approve-plan rejects bare attribution before a stale revalidation can reach the writer
+Plan submitted by "coordinator" on 2026-07-18T18:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature/prd_feature.md(eb603ed913c6...)+specs/feature/spec.md(a4a3e6a77385...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-07-18T18:00:00.000Z; bound to submission 593f36be5a69....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-workflow-approval-review.v1",
+  "featureId": "feature",
+  "candidate": {
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "packageSha256": "3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335",
+  "sources": [
+    {
+      "name": "input",
+      "path": "specs/feature/design-input.md",
+      "sha256": "80ca7bad734aac45a2ff64c568a99dc0c7e39d441622887963345f2124880b53",
+      "content": "Original request for feature.\n"
+    },
+    {
+      "name": "prd",
+      "path": "specs/feature/prd_feature.md",
+      "sha256": "eb603ed913c6fece6bd764ffc940ee9d55a5e400ac4b742737fb499744db600a",
+      "content": "<!-- po-language: de -->\n<!-- technical-spec-sha256: a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341 -->\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n# PRD\n"
+    },
+    {
+      "name": "spec",
+      "path": "specs/feature/spec.md",
+      "sha256": "a4a3e6a77385c5642ce09349c66b8b7f7bcdfa54e1e42a1156d5fdf2d6423341",
+      "content": "# Technical Spec\n"
+    },
+    {
+      "name": "design",
+      "path": "specs/feature/design.md",
+      "sha256": "7c6286e2e1eafb8edfd383c21ecead4b33b839228a397c9ac92fcc0480399fd5",
+      "content": "Revised design for feature.\n"
+    },
+    {
+      "name": "traceability",
+      "path": "specs/feature/traceability.md",
+      "sha256": "6ae54c097144d75e627ae589726e83702cf89bac474b18246466f75c094bcbd1",
+      "content": "Requirements for feature are mapped.\n"
+    }
+  ],
+  "advisor": {
+    "status": "answered",
+    "runner": "codex",
+    "nativeAvailable": false,
+    "assurance": "fallback-self-dispatch",
+    "receipt": {
+      "path": "specs/feature/evidence/advisor.json",
+      "sha256": "14797f866c0eae618222d1d23fc3083642adb2d1c58768139a487664fd34bb5e",
+      "dispatchId": "advisor-feature",
+      "adapter": "consult",
+      "observedStatus": "answered",
+      "observedIdentity": {
+        "provider": "openai",
+        "modelId": "gpt-6-sol",
+        "effort": "high"
+      }
+    },
+    "attempts": [],
+    "routeSelection": null,
+    "disposition": {
+      "decision": "accept",
+      "rationale": "The advice is reflected in the design."
+    },
+    "exception": null
+  },
+  "readiness": {
+    "path": "specs/feature/evidence/readiness.json",
+    "sha256": "d4f49cf94a8920e8470c5ae16cb4dcfb636239cef2c16525e7575c23064e2f66",
+    "dispatchId": "readiness-feature",
+    "runner": "codex",
+    "hostExecution": {
+      "schema": "pipeline.design-readiness-host-execution.v1",
+      "runner": "codex",
+      "repoFingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selectionId": "css_aaaaaaaaaaaaaaaaaaaaaaaaae",
+      "selectionSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "executionReceiptSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "dutyReceiptSha256": "a155f3d043804974aaa13f89d3a4f2c33781f50a6a7c3e935945db24d29183f9",
+      "route": {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "sourceSha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "candidateCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "outcome": "ready-for-po-review",
+    "summary": "The current sources are ready for one final PO review.",
+    "findings": [
+      {
+        "code": "TRACE-OK",
+        "severity": "non-blocking",
+        "summary": "The source requirements are traced."
+      }
+    ],
+    "unresolvedChoices": []
+  },
+  "approvalStatus": "pending-po-approval",
+  "implementationAuthority": false
+}
+Exact PO request: scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json (package sha256 3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335).
+For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request scratch/design-workflow-approval-request-3b5a30ce33fc29393da59afb29a684d0a4cafc3c9f170b0bbcb09da75f080335.json.
+The request is pending only; it does not approve the package or unlock implementation.
+Error: approve-plan blocked by PO-PROFILE-RECEIPT-STALE; repair the repository-scoped PO profile and single-PRD authority first.
+ok 35 - approve-plan leaves state unchanged when the initial worktree authority is invalid
+ok 36 - detached worktree porcelain is parsed without branch inference
+ok 37 - parseGitWorktreeList surfaces the prunable state per entry without dropping the record or its validation
+ok 38 - topology accepts only a status-zero Git observation carrying the documented EPERM false-positive
+ok 39 - a prunable worktree registration is excluded from registeredWorktreeRoots without aborting topology resolution
+ok 40 - a stale worktree registration that Git has NOT marked prunable still throws (fail-closed baseline preserved)
+ok 41 - topology still rejects EPERM unless Git reported an actual zero exit status and stdout
+ok 42 - topology still rejects a genuinely different physical directory even though both sides are real, existing paths
+ok 43 - failures and public evidence never expose machine-specific absolute roots
+ok 44 - literal linked detached worktree uses the primary receipt without reconciling legacy profile bytes
+ok 45 - the operator-facing language is correctable from a consumer project's own primary checkout
+ok 46 - a corrected consumer project accepts an honestly marked PRD and refuses a wrongly marked one
+ok 47 - the marker grammar stays closed and single-line after the language is corrected
+ok 48 - republication without --human-facing keeps the English-configured project exactly as it is today
+ok 49 - the language route refuses unsupported values and every ambiguous language scalar
+ok 50 - a stale plan digest is rejected before any language byte is written
+ok 51 - profile repair guidance names a route a consumer project can actually run
+ok 52 - a language-mismatched PRD is signposted to the operator-language route, not to plan-path repair
+ok 53 - a documentLanguage-mismatched PRD is signposted to the marker, not to the operator-facing route
+ok 54 - the language guidance names an invocation the repair script itself accepts
+ok 55 - a real plan-path defect still returns the plan-path repair, unchanged
+ok 56 - missing, duplicate and malformed language markers still fail before approval
+ok 57 - a Spec-binding mismatch is signposted to spec.md and its marker, not to plan-path repair
+ok 58 - an absent technical Spec marker is signposted to adding the line, and names reopen-design for an already-bound PRD
+ok 59 - an absent PO plan acknowledgement marker is signposted to the PO adding the line, and names no route for an already-bound PRD
+ok 60 - the Spec guidance names a rebind route pipeline-state actually provides
+ok 61 - the acknowledgement guidance names an acknowledge route pipeline-state actually provides
+ok 62 - a non-UTF-8 PRD is signposted to the file's encoding, not to plan-path repair
+ok 63 - digest staleness is signposted to re-reading and re-submitting, not to plan-path repair
+ok 64 - every genuine plan-path defect still returns the plan-path repair verbatim
+ok 65 - the re-signposted failures still expose no machine-local absolute path
+ok 66 - a WSL default-mount spelling and the native Windows spelling of the same physical checkout hash identically
+ok 67 - a bare separator/case rewrite is not what collapses the WSL/Windows boundary -- the mount prefix itself must be recognized
+ok 68 - two genuinely different working copies still yield different fingerprints
+ok 69 - a plain POSIX repository path is unaffected by the fix (no migration needed for that majority case)
+ok 70 - a receipt fingerprint published under the pre-fix formula for a WSL-mount checkout is still found
+po-gate-authority: 70 checks passed
+✔ plugins/pipeline-core/lib/po-gate-authority.test.mjs (3319.486844ms)
+✔ acknowledge returned-action roundtrip carries every supported runner into markerless attended apply (59.610032ms)
+✔ acknowledge plan rejects absent and invalid runner without mutation (4.489404ms)
+✔ markerless external acknowledge apply recovers runner from plan when runner tail is omitted (17.191262ms)
+✔ submit-plan honors the exact generator-identical acknowledgement exemption (1813.875474ms)
+✔ submit-plan records modified non-exempt feature bytes without granting approval (1706.990886ms)
+✔ submit-plan records feature authority independently of an exempt bootstrap observation (1640.296669ms)
+✔ submit-plan mini still refuses missing historical acknowledgement without mutation (1577.711051ms)
+✔ inspect exposes one typed PO approval action after submit and presentation, independent of runner (5558.092103ms)
+✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval with a genuinely stale, otherwise-valid authority now succeeds (5.986852ms)
+✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still fails PO-REBIND-NOT-STALE, not PO-REBIND-APPROVAL (1.490928ms)
+✔ rebind-apply: every explicit supported runner reaches all three V4 intents unchanged (13.427792ms)
+✔ rebind-apply: absent --runner resolves via CLAUDECODE at the CLI boundary (claude) (4.681737ms)
+✔ rebind-apply: absent --runner without a recognized runner marker fails closed instead of guessing codex (1.717282ms)
+✔ rebind-apply: invalid explicit --runner fails closed without mutation (1.739743ms)
+✔ decision returned-action roundtrip carries every supported runner explicitly through plan, select, and apply (18.71252ms)
+✔ decision-apply: legacy action without runner or recognized marker fails closed instead of guessing codex (3.158139ms)
+✔ rebind returned-action roundtrip recognizes both Codex session identity signals (8.245664ms)
+✔ whitespace-only Codex identity signals do not impersonate a Codex runner (2.368315ms)
+✔ fresh and existing roots advance through portable seed and runtime initialization (102070.166468ms)
+✔ read-only host-control paths receive portable host-managed onboarding (2001.867764ms)
+✔ an existing linked Git worktree is adopted without replacing its .git pointer (44402.696981ms)
+✔ ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs (136657.941162ms)
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (198264.534166ms)
+ℹ codex: verified original intake {"sha256":"7f20392cdcb17ff87149ff7de331b483a8e53d81a1bead1da97c1b9f156165f4","byteLength":67,"consentGranted":true,"captureRoute":"returned-consent-with-explicit-description","nativeReference":false}
+ℹ codex: real hooked bootstrap candidate {"commit":"501187f86c636081b1f1227f4c61c2f48cd7b68d","tree":"ef37c20a4f8939f0e8502c6b10fca1e16f2ea3aa"}
+ℹ codex: real hooked five-source design candidate {"commit":"b1496490af253d329ff12887229bcf34d612e314","tree":"ceedf960dccf8e7c4f01d20b86d0a254289aa407"}
+ℹ codex: exact requested readiness route {"authoringRunner":"codex","requestedRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"b1496490af253d329ff12887229bcf34d612e314"},"registeredCell":{"state":"default","selector":{"kind":"alias","value":"sonnet"},"effort":"high","unavailable":"defer","evidence":"dispatch-receipt"},"registrySha256":"c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac","reasonFieldPresent":false,"explanation":"The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider."}
+ℹ codex: assigned local readiness host {"authoringRunner":"codex","reviewRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"b1496490af253d329ff12887229bcf34d612e314"},"assignment":"existing-v1-local-host","nativeProviderAvailabilityClaim":false}
+ℹ codex: canonical fixture readiness {"reviewRunner":"claude","candidate":{"commit":"b1496490af253d329ff12887229bcf34d612e314","tree":"ceedf960dccf8e7c4f01d20b86d0a254289aa407"},"selectionId":"drh_de7677c957f72ff3c0a51e8cdce6dbc4","assurance":"host-observed-local","providerAttestation":false}
+ℹ codex: real lifecycle gate after final approval {"status":2,"stderr":"[guard-devplan] implementation requires a valid private design Advisor transaction (DAA-PUBLIC-UNAVAILABLE).\nExisting implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,\ncomplete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.\nUse design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.\nAn unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery."}
+ℹ codex: returned-action architecture authoring and one signed final design approval passed
+﹣ legacy helper-driven intake-to-implementation path (superseded by the driver-only E2E above) (0.404608ms) # SKIP
+✖ R7-3a present-plan validation refuses a git-ignored bound path with DWP-BOUND-PATH-IGNORED and the tracked-prefix repair (527.848798ms)
+✖ R7-3a present-plan validation refuses an untracked bound path with DWP-BOUND-PATH-UNTRACKED and the stage-and-commit repair (22.036471ms)
+✖ R7-3a present-plan validation refuses a bound path modified against HEAD with DWP-BOUND-PATH-MODIFIED and the stage-and-commit repair (21.735718ms)
+✔ R7-3a present-plan validation does not refuse a tracked, clean bound path as a bound-path violation (22.662253ms)
+✔ R7-3c close check lists every State bound path with its status and fails on an ignored one (40.613188ms)
+✔ R7-3c close check fails on one untracked bound path and lists the others as tracked (28.86287ms)
+✔ R7-3c close check reports a bound path modified against HEAD with its own status and code (29.381229ms)
+✔ R7-3c close check passes when every bound path is tracked and clean (29.652215ms)
+✔ R7-3c handover output names the device-local artifacts as device-local (29.603612ms)
+✔ R7-3d ratchet walker finds every path-naming field of the fixture State (non-vacuity guard) (0.393717ms)
+✔ R7-3d every State field that names a bound path has a classification (1.641741ms)
+✔ R7-3d every path-naming field of the repository's live State has a classification (6.615974ms)
+✔ R7-3d private-store references classify as device-local by value (0.175873ms)
+ℹ tests 89
+ℹ suites 0
+ℹ pass 82
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 486110.045368
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:138:30
+✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (534.592005ms)
+  AssertionError [ERR_ASSERTION]: ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the evidence-only diff says
+  + actual - expected
+  
+    {
+  +   approval: 'refused:DAC-FINAL-ENDPOINT',
+  +   reader: 'refused:DAC-FINAL-ENDPOINT'
+  -   approval: 'refused:DWP2-CURRENT-CANDIDATE',
+  -   reader: 'refused:DWP2-CURRENT-CANDIDATE'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:391:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { reader: 'refused:DAC-FINAL-ENDPOINT', approval: 'refused:DAC-FINAL-ENDPOINT' },
+    expected: { reader: 'refused:DWP2-CURRENT-CANDIDATE', approval: 'refused:DWP2-CURRENT-CANDIDATE' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ DWP21 the implementation guard verifies the package signature and admits the explicit chat posture (70.850882ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-package.test.mjs:936:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:780:1
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (198264.534166ms)
+  AssertionError [ERR_ASSERTION]: codex: [guard-devplan] implementation requires a valid private design Advisor transaction (DAA-PUBLIC-UNAVAILABLE).
+  Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,
+  complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.
+  Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.
+  An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1607:14)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:145:1
+✖ R7-3a present-plan validation refuses a git-ignored bound path with DWP-BOUND-PATH-IGNORED and the tracked-prefix repair (527.848798ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-IGNORED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:148:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-IGNORED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:151:1
+✖ R7-3a present-plan validation refuses an untracked bound path with DWP-BOUND-PATH-UNTRACKED and the stage-and-commit repair (22.036471ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-UNTRACKED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:154:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-UNTRACKED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:157:1
+✖ R7-3a present-plan validation refuses a bound path modified against HEAD with DWP-BOUND-PATH-MODIFIED and the stage-and-commit repair (21.735718ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-PACKAGE-REFERENCES"}
+  + actual - expected
+  
+  + 'DWP-PACKAGE-REFERENCES'
+  - 'DWP-BOUND-PATH-MODIFIED'
+         ^
+  
+      at assertRefusal (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:140:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs:160:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DWP-PACKAGE-REFERENCES',
+    expected: 'DWP-BOUND-PATH-MODIFIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

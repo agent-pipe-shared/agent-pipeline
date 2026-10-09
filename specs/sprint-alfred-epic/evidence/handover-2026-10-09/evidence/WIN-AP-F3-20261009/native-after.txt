@@ -1,0 +1,802 @@
+# command: node --test --test-reporter=tap plugins/pipeline-core/lib/hardened-private-directory.test.mjs plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs plugins/pipeline-core/lib/governance-event-store.test.mjs
+# host: platform=win32 node=v24.20.0
+# captured: 2026-10-09T05:45:39.895Z
+TAP version 13
+# (node:34848) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository
+ok 1 - pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository
+  ---
+  duration_ms: 1441.3598
+  type: 'test'
+  ...
+# Subtest: pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository
+not ok 2 - pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository
+  ---
+  duration_ms: 404.2167
+  type: 'test'
+  location: '<repo-root>\\plugins\\pipeline-core\\lib\\agent-pipeline-root-creation.test.mjs:107:1'
+  failureType: 'testCodeFailure'
+  error: 'pin (b): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+    file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:118:5
+    withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+    TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:108:9)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1397:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+    Test.postRun (node:internal/test_runner/test:1537:19)
+    Test.run (node:internal/test_runner/test:1462:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository
+not ok 3 - pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository
+  ---
+  duration_ms: 404.1341
+  type: 'test'
+  location: '<repo-root>\\plugins\\pipeline-core\\lib\\agent-pipeline-root-creation.test.mjs:122:1'
+  failureType: 'testCodeFailure'
+  error: 'pin (c): the "agent-pipeline" segment is not private after its first creator ran (status=insecure, reason=private path DACL grants a non-owner principal)'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertCreatorRanThenSegmentPrivate (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+    file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:132:5
+    withRepository (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:18)
+    TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:123:9)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1397:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+    Test.postRun (node:internal/test_runner/test:1537:19)
+    Test.run (node:internal/test_runner/test:1462:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+  ...
+# Subtest: pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host
+ok 4 - pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host
+  ---
+  duration_ms: 992.3186
+  type: 'test'
+  ...
+# Subtest: pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user
+ok 5 - pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user
+  ---
+  duration_ms: 2047.0484
+  type: 'test'
+  ...
+# Subtest: portable append publishes canonical bytes, readback checkpoint, and source-last head
+ok 6 - portable append publishes canonical bytes, readback checkpoint, and source-last head
+  ---
+  duration_ms: 444.2044
+  type: 'test'
+  ...
+# Subtest: ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality
+ok 7 - ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality
+  ---
+  duration_ms: 1438.9111
+  type: 'test'
+  ...
+# Subtest: ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused
+ok 8 - ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused
+  ---
+  duration_ms: 551.5734
+  type: 'test'
+  ...
+# Subtest: exact idempotency is a zero-write replay while a conflicting key fails closed
+ok 9 - exact idempotency is a zero-write replay while a conflicting key fails closed
+  ---
+  duration_ms: 938.9976
+  type: 'test'
+  ...
+# Subtest: D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe
+ok 10 - D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe
+  ---
+  duration_ms: 142.781
+  type: 'test'
+  ...
+# Subtest: agent journal payloads persist only as candidate-bound, closed observational events
+ok 11 - agent journal payloads persist only as candidate-bound, closed observational events
+  ---
+  duration_ms: 417.2981
+  type: 'test'
+  ...
+# Subtest: portable admission requires the exact effective policy and closed safe payload
+ok 12 - portable admission requires the exact effective policy and closed safe payload
+  ---
+  duration_ms: 182.5649
+  type: 'test'
+  ...
+# Subtest: A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can
+ok 13 - A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can
+  ---
+  duration_ms: 493.5304
+  type: 'test'
+  ...
+# Subtest: A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out
+ok 14 - A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out
+  ---
+  duration_ms: 180.5267
+  type: 'test'
+  ...
+# Subtest: verification is checkpoint-aware and queries return only validated chain records
+ok 15 - verification is checkpoint-aware and queries return only validated chain records
+  ---
+  duration_ms: 794.9935
+  type: 'test'
+  ...
+# Subtest: tampering, non-canonical bytes, and forks fail before projection or query
+ok 16 - tampering, non-canonical bytes, and forks fail before projection or query
+  ---
+  duration_ms: 844.2927
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query
+ok 17 - K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query
+  ---
+  duration_ms: 672.6799
+  type: 'test'
+  ...
+# Subtest: inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present
+ok 18 - inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present # SKIP SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+  ---
+  duration_ms: 1209.0337
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery
+ok 19 - K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery
+  ---
+  duration_ms: 514.7249
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record
+ok 20 - K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record
+  ---
+  duration_ms: 1031.137
+  type: 'test'
+  ...
+# Subtest: inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere
+ok 21 - inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere
+  ---
+  duration_ms: 393.6145
+  type: 'test'
+  ...
+# Subtest: inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences
+ok 22 - inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences
+  ---
+  duration_ms: 382.6326
+  type: 'test'
+  ...
+# Subtest: K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file
+ok 23 - K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file
+  ---
+  duration_ms: 2349.2148
+  type: 'test'
+  ...
+# Subtest: K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept
+ok 24 - K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept
+  ---
+  duration_ms: 966.8748
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK
+ok 25 - K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK
+  ---
+  duration_ms: 1297.4864
+  type: 'test'
+  ...
+# Subtest: K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths
+ok 26 - K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths
+  ---
+  duration_ms: 993.0051
+  type: 'test'
+  ...
+# Subtest: ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members
+ok 27 - ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members
+  ---
+  duration_ms: 0.2105
+  type: 'test'
+  ...
+# Subtest: ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable
+ok 28 - ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable
+  ---
+  duration_ms: 677.9351
+  type: 'test'
+  ...
+# Subtest: ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged
+ok 29 - ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged
+  ---
+  duration_ms: 1958.3634
+  type: 'test'
+  ...
+# Subtest: ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim
+ok 30 - ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim
+  ---
+  duration_ms: 1293.3213
+  type: 'test'
+  ...
+# Subtest: ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature
+ok 31 - ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature
+  ---
+  duration_ms: 1230.248
+  type: 'test'
+  ...
+# warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+# Subtest: ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode
+ok 32 - ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode
+  ---
+  duration_ms: 1119.1517
+  type: 'test'
+  ...
+# warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+# Subtest: ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork
+ok 33 - ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork
+  ---
+  duration_ms: 1116.9821
+  type: 'test'
+  ...
+# Subtest: ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature
+ok 34 - ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature
+  ---
+  duration_ms: 978.6934
+  type: 'test'
+  ...
+# Subtest: ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now
+ok 35 - ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now
+  ---
+  duration_ms: 1092.0368
+  type: 'test'
+  ...
+# Subtest: ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too
+ok 36 - ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too # SKIP SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+  ---
+  duration_ms: 613.6565
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception
+ok 37 - K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception
+  ---
+  duration_ms: 1168.6075
+  type: 'test'
+  ...
+# Subtest: K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL
+ok 38 - K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL
+  ---
+  duration_ms: 1011.1079
+  type: 'test'
+  ...
+# Subtest: K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream
+ok 39 - K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream
+  ---
+  duration_ms: 789.0308
+  type: 'test'
+  ...
+# Subtest: K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection
+ok 40 - K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection
+  ---
+  duration_ms: 498.5558
+  type: 'test'
+  ...
+# Subtest: symlink, cross-repository, and writer-owned intent fields are rejected
+ok 41 - symlink, cross-repository, and writer-owned intent fields are rejected # SKIP SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+  ---
+  duration_ms: 169.4075
+  type: 'test'
+  ...
+# Subtest: NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect)
+ok 42 - NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect)
+  ---
+  duration_ms: 417.0226
+  type: 'test'
+  ...
+# Subtest: NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY)
+ok 43 - NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY)
+  ---
+  duration_ms: 488.3487
+  type: 'test'
+  ...
+# Subtest: NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused
+ok 44 - NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused
+  ---
+  duration_ms: 1457.8934
+  type: 'test'
+  ...
+# Subtest: NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths
+ok 45 - NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths # SKIP SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+  ---
+  duration_ms: 48.2558
+  type: 'test'
+  ...
+# Subtest: projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events
+ok 46 - projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events
+  ---
+  duration_ms: 962.6277
+  type: 'test'
+  ...
+# Subtest: writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer
+ok 47 - writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer
+  ---
+  duration_ms: 898.658
+  type: 'test'
+  ...
+# Subtest: competing dead-lock recovery cannot delete a newly acquired writer lock
+ok 48 - competing dead-lock recovery cannot delete a newly acquired writer lock
+  ---
+  duration_ms: 713.5101
+  type: 'test'
+  ...
+# Subtest: restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure
+ok 49 - restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure
+  ---
+  duration_ms: 6332.3543
+  type: 'test'
+  ...
+# Subtest: K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened
+ok 50 - K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened
+  ---
+  duration_ms: 1026.7903
+  type: 'test'
+  ...
+# Subtest: PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed
+ok 51 - PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed
+  ---
+  duration_ms: 104.1614
+  type: 'test'
+  ...
+# Subtest: PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened
+ok 52 - PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened
+  ---
+  duration_ms: 125.2895
+  type: 'test'
+  ...
+# Subtest: PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed
+ok 53 - PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed
+  ---
+  duration_ms: 118.6741
+  type: 'test'
+  ...
+# Subtest: PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged)
+ok 54 - PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) # SKIP POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here
+  ---
+  duration_ms: 0.1571
+  type: 'test'
+  ...
+# Subtest: PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch
+ok 55 - PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch
+  ---
+  duration_ms: 112.1527
+  type: 'test'
+  ...
+# Subtest: existing repository identity: missing identity refuses without creating namespace or binding
+ok 56 - existing repository identity: missing identity refuses without creating namespace or binding
+  ---
+  duration_ms: 87.7568
+  type: 'test'
+  ...
+# Subtest: existing repository identity: legacy identity refuses without migration or changed bytes
+ok 57 - existing repository identity: legacy identity refuses without migration or changed bytes
+  ---
+  duration_ms: 1835.7146
+  type: 'test'
+  ...
+# (node:31812) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes
+ok 58 - existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes
+  ---
+  duration_ms: 2517.3502
+  type: 'test'
+  ...
+# Subtest: existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding
+ok 59 - existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding
+  ---
+  duration_ms: 10065.4405
+  type: 'test'
+  ...
+# Subtest: existing repository identity: multiple links refuse
+ok 60 - existing repository identity: multiple links refuse
+  ---
+  duration_ms: 1686.6378
+  type: 'test'
+  ...
+# Subtest: existing repository identity: writable binding refuses
+ok 61 - existing repository identity: writable binding refuses # SKIP POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here; a writable binding is a POSIX mode, its win32 equivalent (a DACL that is not private) is pinned by the WIN-GES-T4 pin below
+  ---
+  duration_ms: 0.2043
+  type: 'test'
+  ...
+# Subtest: existing repository identity: file/root symlink aliases refuse
+ok 62 - existing repository identity: file/root symlink aliases refuse # SKIP SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+  ---
+  duration_ms: 734.1451
+  type: 'test'
+  ...
+# (node:31812) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# Subtest: WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened existing-v2 binding is accepted
+ok 63 - WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened existing-v2 binding is accepted
+  ---
+  duration_ms: 2060.3929
+  type: 'test'
+  ...
+# Subtest: WIN-GES-T4 pin: on a host without POSIX mode bits a binding whose DACL is not private refuses while the identical hardened binding is accepted
+ok 64 - WIN-GES-T4 pin: on a host without POSIX mode bits a binding whose DACL is not private refuses while the identical hardened binding is accepted
+  ---
+  duration_ms: 1740.983
+  type: 'test'
+  ...
+# Subtest: existing repository identity: oversized binding is rejected while preserving exact synthetic bytes
+ok 65 - existing repository identity: oversized binding is rejected while preserving exact synthetic bytes
+  ---
+  duration_ms: 1396.5082
+  type: 'test'
+  ...
+# Subtest: existing repository identity: linked worktree observes same common identity; bare repository remains unsupported
+ok 66 - existing repository identity: linked worktree observes same common identity; bare repository remains unsupported
+  ---
+  duration_ms: 1234.7774
+  type: 'test'
+  ...
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# (node:23636) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: an owner-only protected DACL replaced the previous one.
+# Subtest: non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers
+ok 67 - non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers
+  ---
+  duration_ms: 2.4788
+  type: 'test'
+  ...
+# Subtest: win32 hardens every directory it created before descending and only assesses pre-existing ones
+ok 68 - win32 hardens every directory it created before descending and only assesses pre-existing ones
+  ---
+  duration_ms: 1.9359
+  type: 'test'
+  ...
+# Subtest: win32 refuses a pre-existing insecure directory instead of silently re-hardening it
+ok 69 - win32 refuses a pre-existing insecure directory instead of silently re-hardening it
+  ---
+  duration_ms: 1.5901
+  type: 'test'
+  ...
+# Subtest: win32 fails closed when hardening a directory it just created does not end secure
+ok 70 - win32 fails closed when hardening a directory it just created does not end secure
+  ---
+  duration_ms: 1.0368
+  type: 'test'
+  ...
+# Subtest: a target outside the anchor and a non-directory segment are refused on every platform
+ok 71 - a target outside the anchor and a non-directory segment are refused on every platform
+  ---
+  duration_ms: 1.6561
+  type: 'test'
+  ...
+# Subtest: real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened
+ok 72 - real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened
+  ---
+  duration_ms: 2426.2394
+  type: 'test'
+  ...
+# Subtest: pre-commit installer creates its private state directories with a secure DACL
+ok 73 - pre-commit installer creates its private state directories with a secure DACL
+  ---
+  duration_ms: 1621.7236
+  type: 'test'
+  ...
+# Subtest: commit-msg installer creates its private state directories with a secure DACL
+ok 74 - commit-msg installer creates its private state directories with a secure DACL
+  ---
+  duration_ms: 1606.7867
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory
+ok 75 - win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory
+  ---
+  duration_ms: 2.7582
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory
+ok 76 - win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory
+  ---
+  duration_ms: 2.5072
+  type: 'test'
+  ...
+# Subtest: win32 removes only the failing created segment and never a pre-existing parent
+ok 77 - win32 removes only the failing created segment and never a pre-existing parent
+  ---
+  duration_ms: 1.8262
+  type: 'test'
+  ...
+# Subtest: win32 removes a failed created segment only while it is still empty and says when it could not
+ok 78 - win32 removes a failed created segment only while it is still empty and says when it could not
+  ---
+  duration_ms: 1.6377
+  type: 'test'
+  ...
+# Subtest: win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged
+ok 79 - win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged
+  ---
+  duration_ms: 0.9811
+  type: 'test'
+  ...
+# Subtest: win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy
+ok 80 - win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy
+  ---
+  duration_ms: 1.394
+  type: 'test'
+  ...
+# Subtest: win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy
+ok 81 - win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy
+  ---
+  duration_ms: 1.4589
+  type: 'test'
+  ...
+# Subtest: ensureAgentPipelineRoot (Ruling 141 D0 root entry point)
+    # Subtest: the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32)
+    ok 1 - the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32)
+      ---
+      duration_ms: 3.7569
+      type: 'test'
+      ...
+    # Subtest: an absent root is created hardened and reported as created, nothing repaired (seam-driven win32)
+    ok 2 - an absent root is created hardened and reported as created, nothing repaired (seam-driven win32)
+      ---
+      duration_ms: 1.1782
+      type: 'test'
+      ...
+    # Subtest: a present, secure root is returned as found under either posture, never hardened (seam-driven win32)
+    ok 3 - a present, secure root is returned as found under either posture, never hardened (seam-driven win32)
+      ---
+      duration_ms: 2.0405
+      type: 'test'
+      ...
+    # Subtest: an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32)
+    ok 4 - an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32)
+      ---
+      duration_ms: 1.0146
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is insecure is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 5 - a repair whose re-assessment is insecure is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 1.09
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is unavailable is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 6 - a repair whose re-assessment is unavailable is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 1.0449
+      type: 'test'
+      ...
+    # Subtest: a repair whose re-assessment is unreported is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+    ok 7 - a repair whose re-assessment is unreported is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32)
+      ---
+      duration_ms: 0.9083
+      type: 'test'
+      ...
+    # Subtest: a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32)
+    ok 8 - a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32)
+      ---
+      duration_ms: 7.6114
+      type: 'test'
+      ...
+    # Subtest: a root owned by anyone else is refused and left untouched under either posture (seam-driven win32)
+    ok 9 - a root owned by anyone else is refused and left untouched under either posture (seam-driven win32)
+      ---
+      duration_ms: 2.5249
+      type: 'test'
+      ...
+    # Subtest: a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32)
+    ok 10 - a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.3072
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (an unavailable status carrying an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 11 - a root whose owner and DACL cannot be observed (an unavailable status carrying an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.3422
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (an unavailable status without an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 12 - a root whose owner and DACL cannot be observed (an unavailable status without an observation) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.2463
+      type: 'test'
+      ...
+    # Subtest: a root whose owner and DACL cannot be observed (no observation at all) is refused with the unavailable remedy and left untouched (seam-driven win32)
+    ok 13 - a root whose owner and DACL cannot be observed (no observation at all) is refused with the unavailable remedy and left untouched (seam-driven win32)
+      ---
+      duration_ms: 1.3251
+      type: 'test'
+      ...
+    # Subtest: a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link)
+    ok 14 - a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link)
+      ---
+      duration_ms: 4.0721
+      type: 'test'
+      ...
+    # Subtest: a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file)
+    ok 15 - a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file)
+      ---
+      duration_ms: 3.4357
+      type: 'test'
+      ...
+    # Subtest: an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform)
+    ok 16 - an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform)
+      ---
+      duration_ms: 2.0299
+      type: 'test'
+      ...
+    # Subtest: an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX)
+    ok 17 - an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX)
+      ---
+      duration_ms: 3.6652
+      type: 'test'
+      ...
+    # Subtest: a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX)
+    ok 18 - a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX)
+      ---
+      duration_ms: 2.7344
+      type: 'test'
+      ...
+    # Subtest: a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX)
+    ok 19 - a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX)
+      ---
+      duration_ms: 1.7179
+      type: 'test'
+      ...
+    # Subtest: an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX)
+    ok 20 - an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX)
+      ---
+      duration_ms: 1.5671
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an absent root is created with mode 0o700 and reported as created
+    ok 21 - real POSIX mode host: an absent root is created with mode 0o700 and reported as created # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0794
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: a present root with mode 0o700 is returned as found
+    ok 22 - real POSIX mode host: a present root with mode 0o700 is returned as found # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0455
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o755 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 23 - real POSIX mode host: an insecure root of mode 0o755 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0258
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o770 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 24 - real POSIX mode host: an insecure root of mode 0o770 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0607
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: an insecure root of mode 0o705 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED
+    ok 25 - real POSIX mode host: an insecure root of mode 0o705 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.042
+      type: 'test'
+      ...
+    # Subtest: real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE
+    ok 26 - real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0343
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found
+    ok 27 - real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found
+      ---
+      duration_ms: 1630.1979
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED
+    ok 28 - real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED
+      ---
+      duration_ms: 1632.7966
+      type: 'test'
+      ...
+    # Subtest: real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE
+    ok 29 - real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE
+      ---
+      duration_ms: 853.2191
+      type: 'test'
+      ...
+    # Subtest: F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven win32)
+    ok 30 - F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven win32)
+      ---
+      duration_ms: 1.7101
+      type: 'test'
+      ...
+    # Subtest: F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven POSIX)
+    ok 31 - F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven POSIX) # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0382
+      type: 'test'
+      ...
+    # Subtest: F1: without an emitWarning seam the repair surfaces as a typed process warning, so every caller sees it (seam-driven win32)
+    not ok 32 - F1: without an emitWarning seam the repair surfaces as a typed process warning, so every caller sees it (seam-driven win32)
+      ---
+      duration_ms: 13.1701
+      type: 'test'
+      location: '<repo-root>\\plugins\\pipeline-core\\lib\\hardened-private-directory.test.mjs:764:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        expected one process warning with code PB-ROOT-REPAIRED, saw 6 warning(s)
+        
+        6 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 6
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/hardened-private-directory.test.mjs:779:12)
+        async Test.run (node:internal/test_runner/test:1404:7)
+        async Suite.processPendingSubtests (node:internal/test_runner/test:969:7)
+      ...
+    # Subtest: F2: a PRIVATE root owned by someone else is refused with PB-ROOT-INSECURE under either posture, untouched and never chmodded (seam-driven POSIX over a real directory)
+    ok 33 - F2: a PRIVATE root owned by someone else is refused with PB-ROOT-INSECURE under either posture, untouched and never chmodded (seam-driven POSIX over a real directory) # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.6528
+      type: 'test'
+      ...
+    # Subtest: F2 control: a private root owned by the current user is returned as found, with no chmod and no warning (seam-driven POSIX)
+    ok 34 - F2 control: a private root owned by the current user is returned as found, with no chmod and no warning (seam-driven POSIX) # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0614
+      type: 'test'
+      ...
+    # Subtest: D1: an existing 0o777 root of the current user whose chmod takes no effect is accepted with PB-ROOT-MODE-UNRECORDED, neither repaired nor refused (seam-driven POSIX)
+    ok 35 - D1: an existing 0o777 root of the current user whose chmod takes no effect is accepted with PB-ROOT-MODE-UNRECORDED, neither repaired nor refused (seam-driven POSIX) # SKIP SKIP-HOST-CLASS open-mode-not-buildable
+      ---
+      duration_ms: 1.6931
+      type: 'test'
+      ...
+    # Subtest: D1: a fresh root this call created that reads 0o777 only because the filesystem records no mode bits is accepted with PB-ROOT-MODE-UNRECORDED and kept (seam-driven POSIX)
+    ok 36 - D1: a fresh root this call created that reads 0o777 only because the filesystem records no mode bits is accepted with PB-ROOT-MODE-UNRECORDED and kept (seam-driven POSIX) # SKIP SKIP-HOST-CLASS open-mode-not-buildable
+      ---
+      duration_ms: 0.063
+      type: 'test'
+      ...
+    # Subtest: D1 real host that records no POSIX mode bits: a fresh and an existing root are accepted with PB-ROOT-MODE-UNRECORDED and left as found
+    ok 37 - D1 real host that records no POSIX mode bits: a fresh and an existing root are accepted with PB-ROOT-MODE-UNRECORDED and left as found # SKIP SKIP-HOST-CLASS no-posix-owner-ids
+      ---
+      duration_ms: 0.0604
+      type: 'test'
+      ...
+    1..37
+not ok 82 - ensureAgentPipelineRoot (Ruling 141 D0 root entry point)
+  ---
+  duration_ms: 4181.0617
+  type: 'suite'
+  location: '<repo-root>\\plugins\\pipeline-core\\lib\\hardened-private-directory.test.mjs:280:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..82
+# tests 118
+# suites 1
+# pass 96
+# fail 3
+# cancelled 0
+# skipped 19
+# todo 0
+# duration_ms 66214.2456
+
+# exit code: 1

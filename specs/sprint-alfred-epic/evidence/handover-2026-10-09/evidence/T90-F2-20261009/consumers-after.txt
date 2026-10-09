@@ -1,0 +1,96 @@
+command: node --test plugins/pipeline-core/hooks/guard-testpath.test.mjs plugins/pipeline-core/hooks/guard-gate-strength.test.mjs
+label: wsl-after
+exitCode: 0
+head: b42c8db1cc49bf9ef3bf225f4181270275ac5e6a
+tree: 15debf74021dbff952cbe2c5b7cb9a798d7ef3f5
+dirty: true
+--- stdout ---
+PASS GST01 every gate-strength path is refused, by absolute and relative form
+PASS GST02 the refusal names the audited ceremony, never a hand-editing route, and offers no in-session activation of its own
+PASS GST03 ordinary files are untouched
+PASS GST04 a path escaping the repository is not claimed by this guard
+PASS GST05 a directory with no pipeline marker at all is left alone
+PASS GST06 the rule resolver is case-insensitive and separator-agnostic
+PASS GST07 the guard is actually wired into PreToolUse for every write tool
+PASS GST08 this repository's own gate is not currently weakened
+PASS GST09 the guard code that is enforcing right now is not agent-writable (GS-6)
+PASS GST10 GS-6 does not depend on the project being governed
+PASS GST39 inactive repository still blocks an installed live plugin edit and admits an ordinary file
+PASS GST40 a legacy marker alone does not enroll an inactive repository for ordinary path-table rules
+PASS GST11 an over-broad CLAUDE_PLUGIN_ROOT cannot turn this into a blanket refusal
+PASS GST12 a source checkout stays writable when it is not the enforcing copy
+PASS GST13 a shell command that writes a gate-strength file is refused
+PASS GST14 the cat-shaped reads (cat, sha256sum, git diff, rg, head) of a gate-strength file are never claimed by this rule -- GST34 covers the script-identity exemption shape
+PASS GST15 the shell lane itself offers no in-session override, and names the real route (the Edit/Write tool) instead of a hand-edit
+PASS GST16 an unrelated command in the same repository is untouched
+PASS GST17 every rule in the table is refused by both lanes
+PASS GST18 both authority tiers of the guard config are defended
+PASS GST19 a legacy-tier project's guard config is refused through the write lane
+PASS GST20 a real armed GS-6 window lifts an ordinary plugin file but a kernel path stays refused
+PASS GST21 a chat-armed capability admits the exact bound edit to a GS-1..GS-5/GS-7 path
+PASS GST22 a signature-armed capability admits it regardless of the committed mode
+PASS GST23 with nothing armed, the refusal names the mode-appropriate next command
+PASS GST24 an unusable override store leaves the refusal exactly as it was
+PASS GST25 a capability bound to a different edit does not admit this one
+PASS GST26 the capability is single-use: the same edit is refused again
+PASS GST27 GS-6 is never lifted by this path, even with a real, valid, exactly-matching armed capability
+PASS GST28 the HGO consume call is reached only when the matched rule is not GS-6
+PASS GST29 the refusal text differs: GS-6 states there is no in-session override, the lifted rules do not
+PASS GST30 an unusable override store still says a route was attempted, and what the attempt hit
+PASS GST31 no refusal text in the three governed hook files advertises hand-editing a governed file as the escape hatch
+PASS GST32 the kernel-path GS-6 refusal says no route exists and why, and names no file to edit
+PASS GST33 every GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS entry, and its transitive plugin-local imports, carry no filesystem-write API
+PASS GST34 the exact preflight command is admitted for every declared gate-strength path
+PASS GST35 a lookalike script, a same-basename script elsewhere, and the same relative path under a DIFFERENT root are never exempt
+PASS GST36 naming the exempt script inside a write command does not exempt the write
+PASS GST37 every path-table rule stands down, in both lanes, when no governance marker is present
+PASS GST38 GS-15 stands down for exactly the two staging authoring writes, and only in the state that admits them
+
+guard-gate-strength: 40 passed, 0 failed
+✔ plugins/pipeline-core/hooks/guard-gate-strength.test.mjs (538154.906753ms)
+PASS  TP01 block  Edit on configured protected test file
+PASS  TP02 block  Edit on a shipped baseline guard hook
+PASS  TP03 block  Write on configured protected test file (Write tool, not just Edit)
+PASS  TP04 block  path with backslashes (Windows) still matches (normalization)
+PASS  TP05 block  missing project config still keeps the shipped minimum active
+PASS  TP06 block  broken JSON is baseline-only and cannot remove static protection
+PASS  TP07 allow  no file_path at all
+PASS  TP08 block  explicit config id is used in the block message
+PASS  TP09 real armed GMW window scoped to TP-1 lifts the matching Edit
+PASS  TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule
+PASS  TP10 block  chat mode names its own next step (authorize --activate), not signature's
+PASS  TP11 block  chat mode's own next step still names authorize --activate given a relative path
+PASS  TP12 block  a route-less denial (Pipeline source) names the planner status it actually got
+PASS  TP13 block  the same fixture still offers a real route for an ordinary protected path
+PASS  TP15 block  test path refusal clearly states route-available-via-briefed-authorization
+PASS  TP16 block  non-test path refusal clearly states no-route-for-this-target
+PASS  TP17 allow  briefed test-change authorization admits exact target with matching digest
+PASS  TP18 block  briefed test-change authorization blocks when presenting mismatching digest
+✔ TPC001 TP01 block  Edit on configured protected test file (6940.428667ms)
+✔ TPC002 TP02 block  Edit on a shipped baseline guard hook (2393.234135ms)
+✔ TPC003 TP03 block  Write on configured protected test file (Write tool, not just Edit) (2487.287995ms)
+✔ TPC004 TP04 block  path with backslashes (Windows) still matches (normalization) (2710.630494ms)
+✔ TPC005 TP05 block  missing project config still keeps the shipped minimum active (2850.965987ms)
+✔ TPC006 TP06 block  broken JSON is baseline-only and cannot remove static protection (4554.478306ms)
+✔ TPC007 TP07 allow  no file_path at all (2150.213068ms)
+✔ TPC008 TP08 block  explicit config id is used in the block message (4538.712604ms)
+✔ TPC009 TP09 real armed GMW window scoped to TP-1 lifts the matching Edit (34867.503758ms)
+✔ TPC010 TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule (33716.63702ms)
+✔ TPC011 TP10 block  chat mode names its own next step (authorize --activate), not signature's (4309.903643ms)
+✔ TPC012 TP11 block  chat mode's own next step still names authorize --activate given a relative path (2270.812069ms)
+✔ TPC013 TP12 block  a route-less denial (Pipeline source) names the planner status it actually got (4417.501551ms)
+✔ TPC014 TP13 block  the same fixture still offers a real route for an ordinary protected path (2217.906804ms)
+✔ TPC015 TP15 block  test path refusal clearly states route-available-via-briefed-authorization (2207.232214ms)
+✔ TPC016 TP16 block  non-test path refusal clearly states no-route-for-this-target (2402.165916ms)
+✔ TPC017 TP17 allow  briefed test-change authorization admits exact target with matching digest (4417.820062ms)
+✔ TPC018 TP18 block  briefed test-change authorization blocks when presenting mismatching digest (2348.47061ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 538165.573354
+
+--- stderr ---

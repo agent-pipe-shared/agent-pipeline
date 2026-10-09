@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "E2E-ONB-B3-20261009",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "127ead916baaf2c9ebd0875a0766a3b5c55c070c",
+  "outcome": "partial",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit"},
+  "commits": ["1503a68287f491411f30a85c58516279d345badb"],
+  "log": [
+    {"phase": "opening: briefings, B2 report, rulings, runner and authoring helper read, preflight run by the marketplace path, record created", "toolUses": 23},
+    {"phase": "runner, git-step.sh and commit message written; advisor consulted; project-onboarding-v3 read", "toolUses": 29},
+    {"phase": "replay 01c-07b done in 3 WSL calls; sandbox git script: host refusal (file name git-step.sh), pre-commit node-not-found, GIT-03 trailers, 4th attempt committed in the sandbox", "toolUses": 42},
+    {"phase": "inspect/acknowledge after the commit read from digests; sandbox deleted; hook 80 percent checkpoint fired; log read showed inspect returned the chat route (dispatch error: cleanup ran before the read)", "toolUses": 48},
+    {"phase": "report written and committed 1503a6828; interim checkpoint", "toolUses": 53},
+    {"phase": "record finalized, closing handover", "toolUses": 54}
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": false, "guardrails": false, "security": false}
+    },
+    "appliedRow": "T3"
+  },
+  "resultSha256": null,
+  "report": {
+    "text": "CLOSING-ALLOWANCE-STYLE HANDOVER (partial; implementation of the walk is incomplete). 1. DoD results. Step logs in evidence/E2E-ONB-B3-20261009/ (step-01..10, runner-written, scrubbed): passed for the steps walked (01c-07b, 08 sandbox commit, 09i, 09a, 10). Report specs/sprint-alfred-epic/evidence/e2e-onb-b3-walk-2026-10-09.md in the B2 format (step table, H1 verdict, frictions F13-F18 each with a slice, exact remaining work, limits): passed. One commit with the briefed subject: passed (1503a68287f491411f30a85c58516279d345badb). Temp dir deleted (rm -rf exit 0, ls -d exit 2): passed. Walk to submit-plan: FAILED/not reached (chat acknowledgement, bootstrap-bind-plan/-apply, design-course steps, submit-plan not run). Terminal record: passed (this file). Independent review: pending. 2. Evidence. All walk calls were wsl.exe -e bash -lc strings (CLAUDECODE=1 exported inside, cd to the sandbox) through walk-runner.mjs; exit codes: 01c 0, 02a 0, 02b 0, 03a 0, 03b 0, 04pre 0, 04a 0, 04b 0, 05a 0, 05b 0, 05c 0, 06a 2 (expected refusal, code not read back), 06b 0, 07a 0, 07b 0, 09i 0, 09a 0, 10a 0, 10b 2 (gone). Sandbox git step via git-step.sh run as wsl.exe -e bash [-l] with a doubled leading slash: attempt 1 (bash -lc wrapper) refused by host guard-push (file name only), attempt 2 exit 8 (pre-commit: node not found, non-login shell), attempt 3 exit 8 (GIT-03-MARKER-MISSING and GIT-03-DISPATCH-MISSING), attempt 4 exit 0 (sandbox commit e7c7cc1: pipeline.user.yaml and specs/). 09b policy grep refused by guard-gate-strength (file name in the command); not worked around. H1 result: inspect after the sandbox commit (09i) returned bootstrap-acknowledge-chat-apply --plan-sha256 eb63873b...21157 (local-process, agent-tool-call); bootstrap-acknowledge-plan (09a) still returned signature-required with the attended user-copy-only sign-intent and wrote a request; intentSha256 equals the chat action's plan sha. 3. Changed files. specs/sprint-alfred-epic/evidence/e2e-onb-b3-walk-2026-10-09.md (committed report). Uncommitted by design: evidence/E2E-ONB-B3-20261009/ (walk-runner.mjs, git-step.sh, walk-vars.json, step logs), this record, scratch/commit-msg/E2E-ONB-B3-20261009.txt. 4. Deliberately not changed. All production and test files; foreign uncommitted edits (pipeline-state, po-human-approval, sanctioned-args-onboarding, onboarding-continuity, harness pipeline-state.test and others) never staged or touched; no push, no remote; nothing signed; the host guards were not worked around (no obfuscated invocation of the refused forms; the bare script form that was admitted is the briefed one). Owner of the inspect-side policy reader was not located. 5. Deviations from spec. (a) DISPATCH ERROR: the briefed stop was applied on the bootstrap-acknowledge-plan result alone; the 09i inspect digest already showed local-process/agent-tool-call and I ordered the sandbox cleanup in the same batch in which I read the log; the log then showed the chat action, so item 1(c) was not run and the sandbox was gone; a rebuild needs about 9-14 calls, beyond the remaining budget. (b) chain mode runs several logged steps per WSL call to fit the budget; B2 steps 06c/06d (reads) not replayed. (c) git-step.sh run as the bare form wsl.exe -e bash -l //<path> (the briefed bash <script> plus -l for the sandbox hooks and a doubled slash against MSYS path conversion), not wrapped in a bash -lc string (that form is refused by guard-push, F13). (d) One retry of the sandbox commit with the two trailers the hook refusal named; trailer Dispatch: E2E-ONB-B3-20261009 (goldfish) exists only in the throwaway sandbox repository. (e) Route: requested goldfish-deep, tool-layer model sonnet, effort xhigh; observed identity Sonnet 5.5 (claude-sonnet-5-5) from this dispatch's runtime prompt; class research/report so the A/G/S pre-check does not apply; no contradiction. (f) The bootstrap preflight had to be re-run by the marketplace path the Write refusal named. (g) The opening-record read-back was satisfied by the Write tool confirmation, no separate Read. 6. Open items. Triggered: hook DISPATCH-BUDGET-CHECKPOINT (80 percent, call 44) and tool-budget end; own error (a). Committed: 1503a68287f491411f30a85c58516279d345badb (report). Verified green: the walk steps listed under Evidence with exit codes. Remains undone: chat acknowledgement as simulated PO, bootstrap-bind-plan/-apply, design-course steps, submit-plan; uncommitted untracked files as listed under item 3. Next briefing: rebuild the sandbox (runner and git-step.sh are on disk; the exact 8-step sequence is in the report section 'Not reached'), do NOT run bootstrap-acknowledge-plan, run inspect, then the chat apply as simulated PO and continue per returned actions; delete the sandbox only after the logs are read; give 25 to 30 calls. Friction slices proposed in the report: F13 narrowed, F14 narrowed, F15 pre-commit node not found, F16 GIT-03 trailers unannounced, F17 .git pre-exists while initializesGit false, F18 contradictory diagnostic guidance. independent review: pending (the Elephant dispatches the Critic)."
+    ,
+    "changedFiles": ["specs/sprint-alfred-epic/evidence/e2e-onb-b3-walk-2026-10-09.md"]
+  }
+}

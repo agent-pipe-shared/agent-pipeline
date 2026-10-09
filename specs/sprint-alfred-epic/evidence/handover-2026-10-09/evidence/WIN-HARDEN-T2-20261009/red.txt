@@ -1,0 +1,59 @@
+command: node --test plugins/pipeline-core/lib/windows-private-state.test.mjs
+label: WIN-HARDEN-T2-red
+exitCode: 1
+head: 3d5c858c048e6a298aa32d15ebe2859f79f3773d
+tree: 42869e4b60700a3b2c00ac967c2643bddcf685e6
+dirty: true
+--- stdout ---
+✔ WPS001 accepts only the concrete owner with no reparse point (0.8947ms)
+✔ WPS002 rejects SYSTEM and Administrators as implicit exceptions (0.1382ms)
+✔ WPS003 rejects owner drift and reparse points (0.0924ms)
+✔ WPS004 keeps malformed observations unavailable (0.0847ms)
+✔ WPS005 batched Windows observations preserve exact per-path owner and ACL policy (0.6045ms)
+✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.1563ms)
+✔ WPS007 rejects malformed or oversized path batches before starting PowerShell (0.3649ms)
+✔ WPS008 accepts only the documented completed WSL EPERM shape (0.1389ms)
+✔ WPS009 requires callers to enumerate typed nonzero completion statuses (0.1194ms)
+✔ WPS010 hardens every newly-created component of a recursive private directory (0.2045ms)
+✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.3394ms)
+✔ WPS012 sanitizeChildEnvironment strips PSModulePath in any casing and preserves everything else (0.1172ms)
+✔ WPS013 invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN-PSM-1 regression) (1449.0498ms)
+✔ WPS014 hardenWindowsPrivateDirectory stays secure when called again on the same directory (win32-native only: no seam for the fixed powershell.exe lookup) (1676.6307ms)
+✔ WPS015 hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (win32-native only: no seam for the fixed powershell.exe lookup) (1659.3396ms)
+✖ WPS016 hardenWindowsPrivateDirectory stays secure, twice in a row, under an inherited Modify-only ACL with no per-user ACE (win32-native only: no seam for the fixed powershell.exe lookup) (492.1891ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5345.442
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\test-case-completion.mjs:218:5
+✖ WPS016 hardenWindowsPrivateDirectory stays secure, twice in a row, under an inherited Modify-only ACL with no per-user ACE (win32-native only: no seam for the fixed powershell.exe lookup) (492.1891ms)
+  AssertionError [ERR_ASSERTION]: hardenWindowsPrivateDirectory call 1 of 2 under an inherited Modify-only ACL returned {"status":"unavailable","reason":"native Windows DACL hardening failed (exit 1, UnauthorizedAccessException)"}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'secure'
+  
+      at Object.run (file:///<repo-root>/plugins/pipeline-core/lib/windows-private-state.test.mjs:228:14)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'secure',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

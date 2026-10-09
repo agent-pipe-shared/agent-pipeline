@@ -1,0 +1,92 @@
+command: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs
+label: native
+exitCode: 1
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+✔ portable append publishes canonical bytes, readback checkpoint, and source-last head (405.6872ms)
+✔ ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality (1319.3007ms)
+✔ ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused (503.5689ms)
+✔ exact idempotency is a zero-write replay while a conflicting key fails closed (845.0335ms)
+✔ D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe (123.9194ms)
+✔ agent journal payloads persist only as candidate-bound, closed observational events (366.5644ms)
+✔ portable admission requires the exact effective policy and closed safe payload (178.2617ms)
+✔ A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can (431.2204ms)
+✔ A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out (155.5208ms)
+✔ verification is checkpoint-aware and queries return only validated chain records (705.4063ms)
+✔ tampering, non-canonical bytes, and forks fail before projection or query (777.0452ms)
+✔ K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query (595.8438ms)
+﹣ inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present (1069.4469ms) # SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+✔ K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery (492.3343ms)
+✔ K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record (966.9804ms)
+✔ inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere (359.5961ms)
+✔ inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences (364.1283ms)
+✔ K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file (2316.7189ms)
+✔ K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept (920.72ms)
+✔ K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK (1253.2447ms)
+✔ K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths (918.7617ms)
+✔ ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members (0.1845ms)
+✔ ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable (657.0707ms)
+✔ ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged (1985.0462ms)
+✔ ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim (1172.0089ms)
+✔ ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature (1197.4282ms)
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+✔ ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode (1002.7417ms)
+warning: in the working copy of 'pipeline.user.yaml', LF will be replaced by CRLF the next time Git touches it
+✔ ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork (1040.4103ms)
+✔ ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature (875.8672ms)
+✔ ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now (972.925ms)
+﹣ ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too (570.8054ms) # SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+✔ K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception (1127.8292ms)
+✔ K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL (1002.7646ms)
+✔ K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream (777.9606ms)
+✔ K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection (470.356ms)
+﹣ symlink, cross-repository, and writer-owned intent fields are rejected (153.5457ms) # SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+✔ NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect) (396.0711ms)
+✔ NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY) (455.8308ms)
+✔ NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused (1435.1598ms)
+﹣ NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths (41.0853ms) # SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+✔ projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events (955.4001ms)
+✔ writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer (877.3568ms)
+✔ competing dead-lock recovery cannot delete a newly acquired writer lock (690.5471ms)
+✖ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (1113.4369ms)
+✔ K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened (961.7892ms)
+✔ PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed (93.4531ms)
+✔ PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened (94.1676ms)
+✔ PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed (96.9408ms)
+﹣ PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) (1.6577ms) # POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here
+✔ PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch (108.8477ms)
+✔ existing repository identity: missing identity refuses without creating namespace or binding (67.3741ms)
+✔ existing repository identity: legacy identity refuses without migration or changed bytes (331.4366ms)
+﹣ existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes (0.1558ms) # POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here; the (mode & 0o022n) === 0n predicate in readExistingLocalRepositoryFingerprint refuses every binding on such a host (product fault, pinned RED by the WIN-GES-T3 pin until WIN-GES-F4)
+✔ existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding (2639.2754ms)
+✔ existing repository identity: multiple links and writable binding refuse (355.6012ms)
+﹣ existing repository identity: file/root symlink aliases refuse (36.7175ms) # SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run
+✔ WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened existing-v2 binding is accepted (2059.8333ms)
+✔ existing repository identity: oversized binding is rejected while preserving exact synthetic bytes (63.94ms)
+﹣ existing repository identity: linked worktree observes same common identity; bare repository remains unsupported (0.193ms) # POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here; the (mode & 0o022n) === 0n predicate in readExistingLocalRepositoryFingerprint refuses every binding on such a host (product fault, pinned RED by the WIN-GES-T3 pin until WIN-GES-F4)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 50
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 41031.6761
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1138:1
+✖ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (1113.4369ms)
+  Error [GovernanceEventStoreError]: Restricted storage Windows DACL assurance is unavailable: native Windows DACL observation failed.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:61:38)
+      at assertRestrictedRoot (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:238:36)
+      at async putRestrictedGovernanceEvent (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:1729:26)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1165:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'GES-RESTRICTED-WINDOWS-ASSURANCE'
+  }
+
+--- stderr ---

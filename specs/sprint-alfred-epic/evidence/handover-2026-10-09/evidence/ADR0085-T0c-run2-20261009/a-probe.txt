@@ -1,0 +1,38 @@
+command: node --test scratch/dispatch-wip/t0c-run2/a-probe.test.mjs
+label: a-probe
+exitCode: 1
+head: dfa9aba6a7e1055adb8057338851031cf0ec9ab5
+tree: bbb99a5367dd1742aee5bc494e7f02e57ae00e1b
+dirty: true
+--- stdout ---
+✖ A-probe feature: a v7-shaped approval in the A fixture is admitted by the lifecycle layer (7879.610066ms)
+✔ A-probe mini: a v7-shaped approval in the A fixture is admitted by the lifecycle layer (5375.118437ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13320.618754
+
+✖ failing tests:
+
+test at scratch/dispatch-wip/t0c-run2/a-probe.test.mjs:108:3
+✖ A-probe feature: a v7-shaped approval in the A fixture is admitted by the lifecycle layer (7879.610066ms)
+  AssertionError [ERR_ASSERTION]: feature: expected admission (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/dispatch-wip/t0c-run2/a-probe.test.mjs:111:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

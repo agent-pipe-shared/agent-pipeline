@@ -1,0 +1,242 @@
+command: node --test --test-name-pattern signature-anchor --test-name-pattern "signature anchor" --test-name-pattern "new-key bootstrap" --test-name-pattern "new-key post-setup" --test-name-pattern first-anchor --test-name-pattern existing-key --test-name-pattern "leaves no copy of the private key" --test-name-pattern "writes the machine plane into the injected home" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: head
+exitCode: 1
+head: 6b3acec961b198ffc44786c7f1db76a5995f637e
+tree: c7f7064444b55079305aed3e6412a16c849399a7
+dirty: true
+--- stdout ---
+✔ a failed first-anchor action returns an attended digest-bound recovery command (1.499186ms)
+✖ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (48845.473249ms)
+✔ a failed separate signature-anchor action preserves the completed initial chat-free transaction (79083.947765ms)
+✔ new-key bootstrap omits an existing-key operand, requires durable pointer readback, and refuses a pre-existing repository anchor before setup (52298.478059ms)
+✔ setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor (2413.462662ms)
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (2430.388594ms)
+✔ the in-process setup step writes the machine plane into the injected home and never into the ambient home (12.015163ms)
+✖ signature anchor reuses a key already at the canonical directory path without importing or replacing it (51529.212792ms)
+✔ first-anchor transaction restores exact repository, machine, and pointer preimages on every post-setup failure boundary (132557.050515ms)
+✔ a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice (54583.925228ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 7
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 427354.455429
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:967:1
+✖ public onboarding driver keeps chat keyless and reaches a separate signature-anchor action (48845.473249ms)
+  AssertionError [ERR_ASSERTION]: approval/claude/signature: node --test exited 1
+  TAP version 13
+  # Subtest: isolated onboarding matrix cell
+  not ok 1 - isolated onboarding matrix cell
+    ---
+    duration_ms: 41687.552897
+    type: 'test'
+    location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2315:3'
+    failureType: 'testCodeFailure'
+    error: |-
+      claude: 
+      
+      {
+        "schema": "pipeline.onboarding-init.v1",
+        "runner": "claude",
+        "root": "/tmp/onboarding-init-test-umjJxH",
+        "outcome": "error",
+        "bootstrap": {
+          "ok": false,
+          "code": "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED"
+        },
+        "recovery": {
+          "kind": "external-operator",
+          "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",
+          "executable": "<home-path>",
+          "argv": [
+            "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+            "plan",
+            "--root",
+            "/tmp/onboarding-init-test-umjJxH",
+            "--mode",
+            "existing",
+            "--directory",
+            "/tmp/onboarding-init-test-home-HlXFM4/po-authority",
+            "--human-name",
+            "Greenfield Anchor PO",
+            "--existing-key",
+            "/tmp/onboarding-init-existing-source-HkDZNU/existing-private.pem"
+          ],
+          "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."
+        }
+      }
+      
+      
+      1 !== 0
+      
+    code: 'ERR_ASSERTION'
+    name: 'AssertionError'
+    expected: 0
+    actual: 1
+    operator: 'strictEqual'
+    stack: |-
+      checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:947:14)
+      TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2321:36)
+      Test.runInAsyncScope (node:async_hooks:227:14)
+      Test.run (node:internal/test_runner/test:1201:25)
+      Test.start (node:internal/test_runner/test:1096:17)
+      startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+    ...
+  1..1
+  # tests 1
+  # suites 0
+  # pass 0
+  # fail 1
+  # cancelled 0
+  # skipped 0
+  # todo 0
+  # duration_ms 43192.691478
+  
+  + actual - expected
+  
+  + [
+  +   'approval/claude/signature: node --test exited 1\n' +
+  +     'TAP version 13\n' +
+  +     '# Subtest: isolated onboarding matrix cell\n' +
+  +     'not ok 1 - isolated onboarding matrix cell\n' +
+  +     '  ---\n' +
+  +     '  duration_ms: 41687.552897\n' +
+  +     "  type: 'test'\n" +
+  +     "  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2315:3'\n" +
+  +     "  failureType: 'testCodeFailure'\n" +
+  +     '  error: |-\n' +
+  +     '    claude: \n' +
+  +     '    \n' +
+  +     '    {\n' +
+  +     '      "schema": "pipeline.onboarding-init.v1",\n' +
+  +     '      "runner": "claude",\n' +
+  +     '      "root": "/tmp/onboarding-init-test-umjJxH",\n' +
+  +     '      "outcome": "error",\n' +
+  +     '      "bootstrap": {\n' +
+  +     '        "ok": false,\n' +
+  +     '        "code": "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED"\n' +
+  +     '      },\n' +
+  +     '      "recovery": {\n' +
+  +     '        "kind": "external-operator",\n' +
+  +     '        "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",\n' +
+  +     '        "executable": "<home-path>",\n' +
+  +     '        "argv": [\n' +
+  +     '          "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",\n' +
+  +     '          "plan",\n' +
+  +     '          "--root",\n' +
+  +     '          "/tmp/onboarding-init-test-umjJxH",\n' +
+  +     '          "--mode",\n' +
+  +     '          "existing",\n' +
+  +     '          "--directory",\n' +
+  +     '          "/tmp/onboarding-init-test-home-HlXFM4/po-authority",\n' +
+  +     '          "--human-name",\n' +
+  +     '          "Greenfield Anchor PO",\n' +
+  +     '          "--existing-key",\n' +
+  +     '          "/tmp/onboarding-init-existing-source-HkDZNU/existing-private.pem"\n' +
+  +     '        ],\n' +
+  +     '        "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."\n' +
+  +     '      }\n' +
+  +     '    }\n' +
+  +     '    \n' +
+  +     '    \n' +
+  +     '    1 !== 0\n' +
+  +     '    \n' +
+  +     "  code: 'ERR_ASSERTION'\n" +
+  +     "  name: 'AssertionError'\n" +
+  +     '  expected: 0\n' +
+  +     '  actual: 1\n' +
+  +     "  operator: 'strictEqual'\n" +
+  +     '  stack: |-\n' +
+  +     '    checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:947:14)\n' +
+  +     '    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2321:36)\n' +
+  +     '    Test.runInAsyncScope (node:async_hooks:227:14)\n' +
+  +     '    Test.run (node:internal/test_runner/test:1201:25)\n' +
+  +     '    Test.start (node:internal/test_runner/test:1096:17)\n' +
+  +     '    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n' +
+  +     '  ...\n' +
+  +     '1..1\n' +
+  +     '# tests 1\n' +
+  +     '# suites 0\n' +
+  +     '# pass 0\n' +
+  +     '# fail 1\n' +
+  +     '# cancelled 0\n' +
+  +     '# skipped 0\n' +
+  +     '# todo 0\n' +
+  +     '# duration_ms 43192.691478\n'
+  + ]
+  - []
+  
+      at runMatrix (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:216:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:968:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ `approval/claude/signature: node --test exited 1\nTAP version 13\n# Subtest: isolated onboarding matrix cell\nnot ok 1 - isolated onboarding matrix cell\n  ---\n  duration_ms: 41687.552897\n  type: 'test'\n  location: '<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2315:3'\n  failureType: 'testCodeFailure'\n  error: |-\n    claude: \n    \n    {\n      "schema": "pipeline.onboarding-init.v1",\n      "runner": "claude",\n      "root": "/tmp/onboarding-init-test-umjJxH",\n      "outcome": "error",\n      "bootstrap": {\n        "ok": false,\n        "code": "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED"\n      },\n      "recovery": {\n        "kind": "external-operator",\n        "code": "BTR-EXTERNAL-ATTENDED-RECOVERY",\n        "executable": "<home-path>",\n        "argv": [\n          "<repo-root>/plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",\n          "plan",\n          "--root",\n          "/tmp/onboarding-init-test-umjJxH",\n          "--mode",\n          "existing",\n          "--directory",\n          "/tmp/onboarding-init-test-home-HlXFM4/po-authority",\n          "--human-name",\n          "Greenfield Anchor PO",\n          "--existing-key",\n          "/tmp/onboarding-init-existing-source-HkDZNU/existing-private.pem"\n        ],\n        "guidance": "The PO runs this plan in an external attended terminal, then its digest-bound apply. Terminal confirmation is audited and does not waive any approval gate."\n      }\n    }\n    \n    \n    1 !== 0\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 0\n  actual: 1\n  operator: 'strictEqual'\n  stack: |-\n    checkApprovalCell (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:947:14)\n    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:2321:36)\n    Test.runInAsyncScope (node:async_hooks:227:14)\n    Test.run (node:internal/test_runner/test:1201:25)\n    Test.start (node:internal/test_runner/test:1096:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 43192.691478\n` ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1160:1
+✖ setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory (2430.388594ms)
+  AssertionError [ERR_ASSERTION]: a failed key derivation must leave no copy of the private key in the target directory
+  + actual - expected
+  
+  + [
+  +   'po-private.pem'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1184:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'po-private.pem' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:1224:1
+✖ signature anchor reuses a key already at the canonical directory path without importing or replacing it (51529.212792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   code: 'TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED',
+  +   ok: false
+  -   code: 'TRUST-ANCHOR-BOOTSTRAP-COMPLETE',
+  -   mode: 'existing',
+  -   ok: true
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:1246:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { ok: false, code: 'TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED' },
+    expected: { ok: true, code: 'TRUST-ANCHOR-BOOTSTRAP-COMPLETE', mode: 'existing' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

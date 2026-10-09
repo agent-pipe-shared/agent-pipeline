@@ -1,0 +1,72 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "ADR0085-T0b3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "agent": "goldfish-deep",
+  "outcome": "implementation-complete-critic-review-and-po-acceptance-pending",
+  "commits": ["ed87c330e"],
+  "log": [
+    { "phase": "opening record after both preflights (share-root: plugin-refresh-required; loaded-plugin-root named by GUARD-BOOTSTRAP-RECEIPT-MISSING: ready)", "toolUses": 9 },
+    { "phase": "draft copied minus line 1 to plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs; first native capture: 13/13 red, route cases failed on a FIXTURE fault (ENOENT project/pipeline-state.json)", "toolUses": 14 },
+    { "phase": "fixture fix: state file is .claude/pipeline-state.json (readState, decision-V statePath, header A11); GUARD-LIFECYCLE-NOT-READY cured by project-onboarding-v3 inspect --intent session; second native capture: 13/13 red for the stated reasons", "toolUses": 23 },
+    { "phase": "consumer-safe check exit 0 (9/9); commit message file written; DISPATCH-BUDGET-CHECKPOINT at call 24 of 30; staged and committed ed87c330e by exact pathspec; advisor consulted; terminal record", "toolUses": 29 }
+  ],
+  "report": {
+    "dod": {
+      "nativeCapture": "passed: evidence/ADR0085-T0b-20261009/red.txt, exit code 1 (the suite is RED by design), 13 tests, 0 pass, 13 fail, every failure for its stated reason (see measured). No case needed todo.",
+      "consumerSafe": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0, 9 pass 0 fail",
+      "commit": "passed: git add -- <path> then git commit -F scratch/commit-msg/ADR0085-T0b3.txt -- <path> produced ed87c330e on feat/sprint-alfred (1 file, 407 insertions); trailers exactly Dispatch: ADR0085-T0b3-20261009 (goldfish) and AI-Assisted: true; no Co-Authored-By, no Claude-Session",
+      "terminalRecord": "passed: this file, written after the commit (an in-progress opening record existed first, see deviations)",
+      "overall": "implementation complete; independent Critic review and PO acceptance still pending (not 'done')"
+    },
+    "evidence": [
+      "evidence/ADR0085-T0b-20261009/red.txt (machine-written by capture-evidence.mjs). Command: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0b-20261009/red.txt --label red -- node --test plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs. Wrapped exit code 1. Header: head 63ba0c32cb3e..., dirty true (the capture predates the commit; the test file was not edited between the second capture and ed87c330e, the only write in between was scratch/commit-msg/ADR0085-T0b3.txt, so the captured bytes are the committed bytes). HEAD moved from the briefed 1af634bde to 63ba0c32 through foreign commits on the shared tree, which is within 'or later'.",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0, 9/9 pass (console output only)",
+      "git commit ed87c330e"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs (NEW, committed ed87c330e, 407 lines): the row-2 e2e RED contract, the predecessor draft minus its DRAFT-UNVERIFIED line, plus the state-path fix",
+      "evidence/ADR0085-T0b-20261009/red.txt (NEW, untracked, left for the dispatcher to integrate)",
+      "scratch/commit-msg/ADR0085-T0b3.txt (NEW, untracked scratch, commit message with this slice's Dispatch trailer)",
+      "evidence/dispatch-record-ADR0085-T0b3-20261009.json (this record)"
+    ],
+    "measured": {
+      "CORRECTION_stateFile": "The T0b2 record claims 'State file is project/pipeline-state.json'. WRONG. The local state is .claude/pipeline-state.json (pipeline-state.mjs header and line 340; root key 'continuity' holds queueHead). The first capture failed route cases 1-4 with ENOENT on project/pipeline-state.json. Any later fixture (ADR0085-T0c-a/-b) that copies this pattern must use .claude/pipeline-state.json. Header assumption A11 of the committed test now says so.",
+      "firstFailureOfEveryRouteCase": "route 1, 2, 3, 4 all fail at present-plan --review-receipt exiting 2 with 'present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.' (the missing flag). Routes 3 and 4 fail on the present-plan exit assertion before any boundary or dispatch assertion, so neither can pass vacuously.",
+      "greenVsRedPerCase": {
+        "decisionV": "RED solely on the hint. Holding already: approve-plan exits non-zero, the refusal carries a typed code (DWP-PACKAGE-PHYSICAL matches the pattern), per the first assertions. RED: the refusal does not name 'present-plan --review-receipt'. The no-approval-written assertions are after the failing one and were not reached.",
+        "retiredPresentPlan": "non-zero exit holds (exit 2). RED on the code: today the message names DWP-PACKAGE-PHYSICAL, not DWP-PRESENT-RETIRED.",
+        "retiredApprovePlan": "non-zero exit holds (exit 2). RED on the code: today 'approve-plan requires a prior present-plan record bound to this exact submission', not DWP-APPROVAL-REQUEST-RETIRED.",
+        "fiveRetiredScripts": "non-zero exit holds for all five. RED on the code and the hint. Today: coordinator DAC-CLI-RUNNER, admission DAA-CLI-USAGE, course-session DESIGN-COURSE-ROOT-UNSAFE, course-coordinator DESIGN-COURSE-CLI-USAGE, readiness-bootstrap exit 64 usage text.",
+        "retiredCodesLib": "RED: lib/retired-design-codes.mjs does not exist, the dynamic import fails.",
+        "boundaryRoute3": "RED only through the upstream present-plan failure (the boundary function designAdvisoryAdmission is not reached); its own behaviour is therefore NOT measured here.",
+        "zeroContinuityCasRoute4": "RED only through the upstream present-plan failure; the zero-cas assertions are not reached, so the 'green where the behaviour exists' question is unmeasurable for this case until present-plan works.",
+        "greenCases": "none: 0 of 13 pass"
+      },
+      "fixtureTimingNote": "each buildSubmittedFeature fixture costs about 17-19 s natively on Windows (git plus three CLI calls); the suite runs about 82 s. Three fixtures are built (route, decision V, retired-present, retired-approve = four)."
+    },
+    "deliberatelyNotChanged": [
+      "No production file, no other test file (pipeline-state.test.mjs is TP-5), nothing under harness/, lib/guard/ or hooks/.",
+      "The T0b2 record (evidence/dispatch-record-ADR0085-T0b2-20261009.json) and the scratch draft stay untouched, including the wrong state-file claim in the T0b2 record; correction lives here.",
+      "The foreign dirty and staged files in the tree (harness/scripts/pipeline-state.test.mjs, sanctioned-args-onboarding.mjs, pipeline-state.mjs, execution-lane-credential.mjs and others) were not touched; the commit used an exact pathspec.",
+      "The route-4 'dispatch stays null' assertion is vacuous before present-plan is fixed; it is guarded by the preceding approve-plan success assertion and the verb ledger, and I did not strengthen it."
+    ],
+    "deviations": [
+      "An opening in-progress record was written per the role contract (GF-09-D), so this terminal record is an overwrite, not a single write. The same deviation T0b2 logged.",
+      "DISPATCH-BUDGET-CHECKPOINT fired at hook call 24 of 30, before the commit. The commit was made within the remaining working budget; the record and handback used the closing allowance. No further work was started.",
+      "Two fixture fixes were needed (state file path in two places plus the A11 header text); both fall in the single allowed category (fixture failures).",
+      "The opening-record readback was done with wc -c (592 bytes) in parallel with the first capture, not as a separate gate before it."
+    ],
+    "openItems": [
+      "No stop condition fired. Guard codes met and cured, neither refused the new path: GUARD-BOOTSTRAP-RECEIPT-MISSING (cured by the preflight from the loaded plugin root named in the refusal) and GUARD-LIFECYCLE-NOT-READY (cured by project-onboarding-v3.mjs inspect --intent session, status ready). Also GUARD-READ-TARGET-MISSING on a first Read of the specs/... record path: evidence/ means repo-root evidence/.",
+      "Assumptions A1-A12 in the committed test header are still unconfirmed against the final implementation; in particular A2 (DWP-APPROVAL-REQUEST-RETIRED mapping) and A10 (v8 reuses readCriticalHumanProofPolicy) are the ones most likely to need a PO or design ruling.",
+      "The sign-intent step is not driven (gap A10); the proof is produced with node:crypto.",
+      "Untracked evidence/ADR0085-T0b-20261009/red.txt and scratch/commit-msg/ADR0085-T0b3.txt are for the dispatcher to integrate or discard.",
+      "Independent Critic review of the new test file and PO acceptance are pending.",
+      "Route check: requested goldfish-deep, claude-sonnet-5-5, xhigh; no A/G/S class named. Observed: this dispatch's runtime prompt states 'The exact model ID is claude-sonnet-5-5'. No contradiction; effort is not observable from inside the run."
+    ]
+  }
+}

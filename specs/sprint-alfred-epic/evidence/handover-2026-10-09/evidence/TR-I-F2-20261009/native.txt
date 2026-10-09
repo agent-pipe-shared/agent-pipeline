@@ -1,0 +1,28 @@
+command: node --test plugins/pipeline-core/lib/test-case-completion.test.mjs
+label: native
+exitCode: 0
+head: bfb0e49f9da0d765b55f70c98832cb9097b34331
+tree: ce1ad3c8a46739d483e05e63230897c32b197087
+dirty: true
+--- stdout ---
+✔ rejects duplicate, unstable, and invalid declared ids before emitting bytes (3.189ms)
+✔ rejects unknown and duplicate disposal without forging extra records (3.4286ms)
+✔ fails closed when the explicitly configured inherited descriptor is missing (0.8173ms)
+✔ retries short descriptor writes with exact offsets and rejects zero progress (0.2607ms)
+✔ one early failure stays red while later siblings dispose and terminal remains complete (58.1627ms)
+✔ dual runtime skip and todo remains red and is disposed as fail (56.5068ms)
+✔ outside Verify a completion suite runs as a plain single file and reports its cases (57.2248ms)
+✔ inside Verify an unwritable completion descriptor still fails closed with TCC-FD-WRITE (49.4711ms)
+✔ outside Verify a descriptor 3 nobody announced receives no completion bytes (63.162ms)
+✔ inside Verify a writable descriptor 3 receives the complete declared-to-terminal stream (65.3721ms)
+✔ preflights the complete bounded stream before declaration and emits within the accepted cap (2.5106ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 423.5543
+
+--- stderr ---

@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-J-T3c-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "1e8141240 test(pre-push-install): run against a frozen plugin-root copy -- only plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs"
+  ],
+  "resultSha256": null,
+  "report": {
+    "text": "NOT a closing-allowance handover: the work finished under the base cap (about 40 of 55 tool uses, allowance not entered). Implementation complete; independent review: pending; PO acceptance pending.\n\n1. DoD RESULTS\n- Before captures, native + WSL: passed (captured). native-before exit 0, 45 tests, 45 pass. wsl-before exit 1, 45 tests, 44 pass, 1 fail = HK3b with GHS-SOURCE-DRIFT (the live-tree race this slice removes).\n- After captures: passed. native-after exit 0, 45/45, copy line present. wsl-after exit 0, 45/45 (HK3b now green), copy line present. No failing case in an after capture is absent from the matching before capture.\n- Copy proven in use: passed. Four load-time assertions plus the stderr line '# frozen plugin copy in use: pre-push-hook-plugin-<rand>' appear in both after captures.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed (9/9, exit 0).\n- One commit, exact subject, exact two trailers, via git commit -F <file> -- <path>: passed (1e8141240).\n- Basis for 'no live read of lib/installer/snapshot': every planInstall/applyInstall call passes PLUGIN_LIB_DIR (the copy); planRemoval/applyRemoval/planDecline/applyDecline (installer lines 680-766) take only rootDir and reference neither pluginLibDir nor the snapshot module (grep of the installer).\n\n2. EVIDENCE\n- evidence/TR-J-T3c-20261009/native-before.txt, native-after.txt, wsl-before.txt, wsl-after.txt (machine-written by capture-evidence.mjs).\n- Native: node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <l> -- node --test plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs (wrapped exit 0 / 0).\n- WSL: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out <file> --label <l> -- node --test ...\" (wrapped exit 1 / 0). Plain node --test worked under WSL for this file, no direct-run form needed. WSL duration 499 s -> 91 s (the copy lives on /tmp, not drvfs).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: 9 pass, exit 0.\n\n3. CHANGED FILES\n- plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs (24+/6-, committed 1e8141240): imports (after, cpSync, basename); frozen plugin-root copy made once at load, removed in after(); PLUGIN_LIB_DIR under the copy; four load-time assertions and a stderr proof line; offer builder imported from the copy; the --install CLI case spawns the frozen installer.\n- evidence/TR-J-T3c-20261009/*.txt (the four captures), scratch/commit-msg/TR-J-T3c-20261009.txt (commit message), evidence/dispatch-record-TR-J-T3c-20261009.json (this record).\n\n4. DELIBERATELY NOT CHANGED\n- The statically imported installer functions (renderShim, planInstall, applyInstall, ...) are still the LIVE module: they are the code under test, as in 0ad7ab3df; only the tree they read is frozen.\n- No env override (PIPELINE_CORE_TEST_PLUGIN_LIB_DIR style) added: this test never had one, adding it would be new behaviour.\n- No production file, hooks/, lib/guard/, harness/ or other test touched. No assertion text/meaning changed, no case added (45 before, 45 after).\n\n5. DEVIATIONS FROM SPEC\n- A fourth site the briefing did not name: the first case (onboarding offer) imported buildPrePushHookOfferAction statically from the live project-onboarding-v3.mjs, whose offer argv[0] resolves next to its own module (project-onboarding-v3.mjs:673), so it always named and ran the LIVE installer (a full live-tree applyInstall). I replaced the static import with a top-level await import() of the same module from the frozen copy. The mechanism (dynamic import, top-level await) is not in 0ad7ab3df. Assertions are unchanged. Side effect: the test now holds two instances of pre-push-hook-install.mjs (live via static import, frozen via the copied onboarding module); nothing compares their identity. If the narrow pattern is preferred, revert that one hunk; that case then keeps a live install and a residual race.\n- 0ad7ab3df kept its CLI typed-refusal case on the live installer; here that case (briefing line 841) spawns the frozen installer, as the briefing listed it. Safe because the stub resolves by the '/lib/hardened-private-directory.mjs' suffix, which the copy shares; the case passes on both platforms.\n- Unlike 0ad7ab3df there is no env override, so the copy is unconditional.\n\n6. OPEN ITEMS\n- Evidence caveat: the WSL pair is not on an identical tree. wsl-before ran at head 98b81b479, wsl-after at head 88ff139b3 (a parallel commit landed in between), both dirty:true. The comparison still holds because the before failure code was itself GHS-SOURCE-DRIFT; the native pair is 45/45 on both sides.\n- Not verifiable: whether harness/scripts/verify.mjs's suite runner treats the stderr proof line as a fault (full Verify is forbidden on this host, harness/ is forbidden). If it does, drop the stderr line; the load-time assertions remain the proof.\n- Caveat: cpSync of the live plugin root at load can itself race a parallel writer (ENOENT mid-copy); not seen in two native and two WSL runs.\n- resultSha256 left null: no hashing route inside the one-simple-command rules (no node -e).\n- Guard friction for the next briefing header: Glob was refused (GUARD-READ-TARGET); the first Write was refused with GUARD-BOOTSTRAP-RECEIPT-MISSING until the preflight ran with the exact backslash path the guard printed (the forward-slash spelling of the same root did not count). Two extra tool uses.\n- independent review: pending. Not PO-accepted.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs",
+      "evidence/TR-J-T3c-20261009/native-before.txt",
+      "evidence/TR-J-T3c-20261009/native-after.txt",
+      "evidence/TR-J-T3c-20261009/wsl-before.txt",
+      "evidence/TR-J-T3c-20261009/wsl-after.txt",
+      "scratch/commit-msg/TR-J-T3c-20261009.txt",
+      "evidence/dispatch-record-TR-J-T3c-20261009.json"
+    ]
+  },
+  "log": [
+    { "phase": "opening: briefing + agent-obligations + CONT17 header read, both preflights run (repo copy, then the loaded root named by the guard), record written and read back", "toolUses": 13 },
+    { "phase": "orientation: reference commit 0ad7ab3df, test file regions (live lib, snapshot read, spawned installers), project-onboarding-v3 offer argv", "toolUses": 19 },
+    { "phase": "baselines: native before exit 0 (45/45); WSL before exit 1 (45 tests, 44 pass, HK3b failed with GHS-SOURCE-DRIFT, a live-tree race)", "toolUses": 24 },
+    { "phase": "edits: imports, frozen plugin-root copy + load-time proofs, offer builder from the copy, CLI case spawns the frozen installer", "toolUses": 27 },
+    { "phase": "after-runs: native exit 0 (45/45, copy line present); WSL exit 0 (45/45, copy line present, HK3b green); consumer-safe check 9/9", "toolUses": 33 },
+    { "phase": "commit 1e8141240 (exact pathspec), record checkpointed", "toolUses": 38 },
+    { "phase": "advisor consulted; residual-live-read grep of the installer (removal/decline paths clean); terminal record written", "toolUses": 41 }
+  ]
+}

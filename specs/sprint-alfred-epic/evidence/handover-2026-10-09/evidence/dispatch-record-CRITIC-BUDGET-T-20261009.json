@@ -1,0 +1,75 @@
+{
+  "taskId": "CRITIC-BUDGET-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation-complete-red-pins-committed; green depends on CRITIC-BUDGET-F",
+  "commits": [
+    "d0fdf3c9ceb1c790a6ff463f0078d8b4f946d7c0 test(critic-budget): pin the Critic maxTurns 50 and base cap 30 (Ruling 98c)"
+  ],
+  "log": [
+    {"phase": "opening: both preflights run (repo copy plugin-refresh-required, loaded root ready), record created and read back", "toolUses": 9},
+    {"phase": "measurement: rg sweeps over lib, scripts, hooks, harness/scripts; Ruling 98 and template :278 read; advisor consulted once; conclusion: no existing test pins the shipped Critic values, so briefing path 3", "toolUses": 36},
+    {"phase": "write: commit message first, then 3 pin cases DP25-DP27 and the 38 to 41 count pin; WSL capture; scratch arithmetic proof; consumer-safe check; commit by exact pathspec", "toolUses": 51},
+    {"phase": "terminal record", "toolUses": 53}
+  ],
+  "pins": [
+    {"file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs", "line": 702, "case": "DP25", "assertion": "dispatchBudgetLineForRole('critic') renders the line with 30 tool uses", "old": 24, "new": 30, "newTest": true},
+    {"file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs", "line": 708, "case": "DP26", "assertion": "readAgentMaxTurns('critic', <shipped plugin root>) equals 50", "old": 40, "new": 50, "newTest": true},
+    {"file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs", "line": 713, "case": "DP27", "assertion": "default Critic binding: baseCalls 30, maxTurns 50, workingCap 35, effectiveCap 30, tierLimited false, base+closing 35, reserve 15", "old": "24/40/25/24/false, 29, 11", "new": "30/50/35/30/false, 35, 15", "newTest": true},
+    {"file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs", "line": 730, "case": "corpus count pin", "assertion": "cases.length", "old": 38, "new": 41, "newTest": false}
+  ],
+  "measurement": {
+    "command": "rg -n -l \"maxTurns: 40|critic: 24|min\\(24\" plugins/pipeline-core/lib plugins/pipeline-core/scripts harness/scripts plugins/pipeline-core/hooks",
+    "hits": [
+      "lib/dispatch-policy.mjs:54 critic: 24 -> PRODUCTION (CRITIC-BUDGET-F), not a test",
+      "lib/dispatch-budget-calibration.test.mjs:174,183,184 maxTurns: 40 -> parser edge-case input fixtures, not the Critic value",
+      "lib/dispatch-budget-calibration.test.mjs:289,297 maxTurns: 40 -> ratchet-detector string fixtures; :298 already says 'maxTurns = 50, workingCap is 35'",
+      "lib/dispatch-budget-calibration.test.mjs:151-216 critic definition fixtures at 41/42/43 -> synthetic, role-name only"
+    ],
+    "widerSweeps": [
+      "lib/dispatch-budget-core.test.mjs:66 effectiveDispatchBaseCap(24, 30) -> 15: role-agnostic arithmetic of the core function",
+      "'<=24 tool uses' fixture prompts: lib/dispatch-policy.test.mjs:46,84; hooks/guard-dispatch.test.mjs:67,103; hooks/guard-dispatch-native-worker.test.mjs:67,103; hooks/antigravity-pretool-guard.test.mjs:917,991; lib/antigravity-execution-host.test.mjs:27 -> briefed caps; 24 is under working cap 25 today and 35 after F, so green both ways; AMBIGUOUS between 'pin' and 'fixture', left alone per stop rule",
+      "hooks/guard-dispatch-budget-checkpoint.test.mjs:91 CRITIC_MAX_TURNS and hooks/guard-dispatch-budget.test.mjs:822-862 read the live definition -> they adapt, no hooks/ post-image needed",
+      "lib/dispatch-budget-binding.test.mjs, hooks/guard-dispatch-budget.test.mjs maxTurns 50 / cap 35 -> goldfish-implementor, not Critic"
+    ]
+  },
+  "report": {
+    "status": "Implementation complete; verification partial; NOT accepted. Three new pins are committed RED by design and go green only when CRITIC-BUDGET-F lands the production change. Independent Critic review and PO acceptance pending.",
+    "dod": [
+      "Native capture per changed test: passed. evidence/CRITIC-BUDGET-T-20261009/red.txt via capture-evidence.mjs under WSL. 38 pre-existing cases green, DP25/DP26/DP27 red, each for the ruled reason (24 vs 30, 40 vs 50, base cap 24 vs 30). Note: native Windows was not run (targeted-files-only rule, WSL per briefing notes).",
+      "consumer-safe check: passed (node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9 pass, 0 fail, tool reported no error)",
+      "One commit: passed (d0fdf3c9c, one file, two trailers only, no Co-Authored-By or Claude-Session). README section: not applicable, there is no hooks/ post-image because no hooks/ test pins the shipped Critic values.",
+      "Terminal record listing every pin with file:line, old and new: this file",
+      "Green-after-F demonstration: partial. scratch/critic-budget-green-proof.mjs (untracked) runs the real bindDispatchBudget with base 30 and maxTurns 50 and asserts DP27's numbers (exit 0). The full test cannot go green before F, so DP25/DP26 green is untested end to end."
+    ],
+    "evidence": [
+      "evidence/CRITIC-BUDGET-T-20261009/red.txt; command: wsl.exe -e bash -lc \"cd <repo>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/CRITIC-BUDGET-T-20261009/red.txt --label CRITIC-BUDGET-T-red -- node --test --test-reporter=spec plugins/pipeline-core/lib/dispatch-policy.test.mjs\"; wrapped exit code 1 (expected: 3 red)",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: 9 pass",
+      "node scratch/critic-budget-green-proof.mjs: exit 0, prints 'green-after-F arithmetic holds'"
+    ],
+    "changedFiles": [
+      "plugins/pipeline-core/lib/dispatch-policy.test.mjs (committed d0fdf3c9c): DP25-DP27 RED pins, 3 imports, corpus count 38 to 41",
+      "evidence/dispatch-record-CRITIC-BUDGET-T-20261009.json (this record, untracked)",
+      "evidence/CRITIC-BUDGET-T-20261009/red.txt (capture, untracked)",
+      "scratch/commit-msg/CRITIC-BUDGET-T.txt and scratch/critic-budget-green-proof.mjs (scratch, untracked)"
+    ],
+    "notChanged": [
+      "Template prose (29/11 arithmetic sentence in both critic-review.md copies, now at templates/prompts/critic-review.md:278 and the default at :183 and :278): not pinned. A prose pin is brittle and would not be red for a mechanical reason. F's template edit is guarded only by check-vendored-template-sync (byte equality) and DP11 (the filled template passes the policy); it has no RED pin, so the Critic review of F is its gate.",
+      "The '<=24 tool uses' fixture prompts listed above: valid under both working caps, left alone.",
+      "Any hooks/ or lib/guard/ file: no tranche-2 post-image and no README section written; specs/sprint-alfred-epic/signed-package/tranche-2/README.md untouched.",
+      "codex-isolated-critic-protected-preimage*: excluded (REPIN-CRITIC).",
+      "Production: agents/critic.md, lib/dispatch-policy.mjs, both critic-review.md copies."
+    ],
+    "deviations": [
+      "Briefing cites templates/prompts/critic-review.md:271 for the arithmetic sentence; it is at :278 in the current tree (:271 is the 'Bootstrap role' line). Line drift only.",
+      "Briefing step 3 names 'a small pin' in two assertions; I added three cases (budget line, definition maxTurns, derived binding) so each red states its own ruled reason. Corpus count pin moved 38 to 41 in the same file.",
+      "Capture ran under WSL only; no separate native-Windows capture was taken."
+    ],
+    "openItems": [
+      "CRITIC-BUDGET-F must make DP25, DP26 and DP27 green: agents/critic.md maxTurns 50, DEFAULT_DISPATCH_BASE_CALL_CAP.critic 30, plus template text in both copies. The calibration ratchet (dispatch-budget-calibration.test.mjs:263-264) does not flag 'critic: 30' (patterns need 'maxTurns' or a MAX_TURNS name), so F's cap edit is safe there.",
+      "Pre-existing, unchanged: the protected-preimage pin for agents/critic.md and critic-review.md stays red until REPIN-CRITIC.",
+      "The guard counted a 65-call budget; the 75-call briefing budget was not reached. No stop condition triggered."
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+command: node --test --test-name-pattern "greenfield walk" plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+label: onb-t3-continuity-pins
+exitCode: 1
+head: 511f85f33249d3a91b2a8fb6fe2fa9231eaa2daa
+tree: 39b40977bbca9168496586b518c77e8713838f15
+dirty: true
+--- stdout ---
+✖ OBC299 planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7) (201.051562ms)
+✖ OBC300 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9) (169.465448ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4319.017035
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ OBC299 planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7) (201.051562ms)
+  AssertionError [ERR_ASSERTION]: the refusal must name the next step inspect would return, not leave the walker with a code and no action
+  + actual - expected
+  
+  + undefined
+  - 'architecture-design-required'
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:5024:10
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'architecture-design-required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ OBC300 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9) (169.465448ms)
+  AssertionError [ERR_ASSERTION]: a generated draft must be refused with the typed BOOTSTRAP-ACK-PLACEHOLDER-CONTENT code before any acknowledgement request is offered
+  + actual - expected
+  
+  + undefined
+  - 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  
+      at file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:5041:10
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

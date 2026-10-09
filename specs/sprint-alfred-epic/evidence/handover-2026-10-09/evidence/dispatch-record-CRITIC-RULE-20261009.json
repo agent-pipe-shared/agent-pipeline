@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "CRITIC-RULE-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "sonnet",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "f06975126",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["b90402938"],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": { "schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false, "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false } },
+    "appliedRow": "T3"
+  },
+  "closingAllowance": { "schema": "pipeline.dispatch-closing-allowance.v1", "committed": ["b90402938: MP-07 rewrite, critic-review batch-scope field, backlog Triage"], "verifiedGreen": [], "remainsUndone": ["canonical wording in review-protocol 2.1, roles/critic.md, critic-review SKILL, ADR-0003, ADR-0014 (needs ADR amendment)", "critic-review.md line 25 tier text and line 275 example", "model-policy.md line 82 speed-profile sentence", "German reference half of model-policy.md", "repo consistency checks not run", "evidence/ is gitignored so sweep.txt is untracked", "resultSha256 not computed"], "nextBriefingAdjustments": ["budget 35 is too small for this sweep", "decide ADR amendment route first", "evidence/ is ignored, force-add or move"] },
+  "log": [ { "phase": "opening", "toolUses": 8 }, { "phase": "sweep before/after", "toolUses": 20 }, { "phase": "edits and commit", "toolUses": 36 } ],
+  "report": {
+    "text": "Partial. Commit b90402938 (3 files): MP-07 rewritten to the batched Opus rule, critic-review.md gains a Batch scope field (re-critic names delta range), backlog Triage updated (names subject; SHA is in this record). Sweep captured before and after in evidence/CRITIC-RULE-20261009/sweep.txt (gitignored, untracked). Not done: consistency checks not run (not verifiable, budget); canonical trigger wording in harness/review-protocol.md 2.1, roles/critic.md, critic-review SKILL.md, ADR-0003, ADR-0014 still states per-diff A/G/S escalation: PO decision needed, quote: 'Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier'. Also untouched: critic-review.md line 25, model-policy line 82, German half. Independent review: pending.",
+    "changedFiles": ["policies/model-policy.md", "templates/prompts/critic-review.md", "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md"]
+  }
+}

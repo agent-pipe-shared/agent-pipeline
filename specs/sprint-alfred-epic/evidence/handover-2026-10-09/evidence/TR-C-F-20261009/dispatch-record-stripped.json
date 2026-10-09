@@ -1,0 +1,14 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "162bf1468"
+  ],
+  "report": {
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-F-MANIFEST.md",
+      "plugins/pipeline-core/lib/git-cmd.mjs"
+    ]
+  }
+}

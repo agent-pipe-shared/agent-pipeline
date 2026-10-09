@@ -1,0 +1,62 @@
+command: node --test plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+label: native-before
+exitCode: 0
+head: 997356d7e8ab058935a0b3630fe2a4dab1b453fe
+tree: 616762af352ca70ec3705c518813bf77ca788670
+dirty: true
+--- stdout ---
+✔ onboarding pre-push offer executes from a consumer repository with an absolute installer path (9364.1336ms)
+✔ parseRefUpdates: ordinary update line (2.6393ms)
+✔ parseRefUpdates: delete case (local-sha all zeroes, 40-hex) (0.145ms)
+✔ parseRefUpdates: delete case (local-sha all zeroes, 64-hex/sha256 repo) (0.0959ms)
+✔ parseRefUpdates: multiple lines, malformed lines ignored rather than fabricated (0.1343ms)
+✔ parseRefUpdates: empty stdin yields no updates (0.4654ms)
+✔ checkEvidenceFreshness: missing file (2858.1813ms)
+✔ checkEvidenceFreshness: corrupt JSON (2634.0279ms)
+✔ checkEvidenceFreshness: stale commit binding (2487.1607ms)
+✔ checkEvidenceFreshness: fresh and exitCode 0 passes clean (2413.7106ms)
+✔ installed hook: no manifest at all -> allow (opt-in feature, not a 'cannot evaluate' case) (11772.2974ms)
+✔ installed hook: push gate mode off -> allow (11979.7898ms)
+✔ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (12417.2168ms)
+✔ installed hook: verify evidence missing -> BLOCK (12779.5214ms)
+✔ installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK (12785.6198ms)
+✔ installed hook: repository root unresolvable (invoked outside any git repo) -> BLOCK (84.3477ms)
+✔ installed hook: fresh verify evidence + standing-approved -> ALLOW, record written (13076.0231ms)
+✔ installed hook: linked worktree reads fresh canonical evidence (12817.6725ms)
+✔ HK1 installed hook, signature mode: a clean exact checkpoint with NO recorded approval is blocked (12848.2173ms)
+✔ HK2 installed hook: a stale approval (another commit), an expired one and one bound to another destination are blocked (34655.7412ms)
+✔ HK3 installed hook: a valid commit-bound approval admits the checkpoint with no Verify evidence, tolerating exactly the approval record as dirt (13013.6295ms)
+✔ HK3b installed hook: a valid approval does not excuse any other dirt (untracked file, staged state record) (20989.1839ms)
+✔ HK4 installed hook: chat mode keeps today's behaviour (no approval needed) and never tolerates the approval record as dirt (20684.9637ms)
+✔ HK5 fail closed: a malformed proof policy blocks, and so does an import fault of the approval module (15222.1216ms)
+✔ HK6 installed hook: a push to another remote name, or addressed by URL, is not admitted by an approval for 'origin' and never echoes the URL (20403.0627ms)
+✔ HK7 the snapshot digest tracks the approval module and the installer, so an existing install reports updateRequired (5872.0485ms)
+✔ installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (standing-approved variant) (10943.7469ms)
+✔ installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW (10961.8897ms)
+✔ installed hook: ref deletion is blocked without evidence evaluation, and recorded (11504.5902ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (2651.9224ms)
+✔ applyInstall then applyRemoval: removes exactly what was installed (8986.6184ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (8418.688ms)
+✔ applyRemoval: nothing-to-remove when never installed (2443.3208ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (14303.4307ms)
+✔ planInstall: an intact pipeline hook bound to an older plugin library is stale and applyInstall upgrades it (7288.6977ms)
+✔ planInstall: an intact recorded older implementation is upgradeable (9112.4306ms)
+✔ planInstall: an impl or marker discrepancy is foreign and applyInstall leaves the hook untouched (16097.3107ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.1949ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.1345ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (3409.1558ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (17.006ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (3471.9663ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (8602.8015ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (9533.2918ms)
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (157.8811ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 379450.1956
+
+--- stderr ---

@@ -1,0 +1,11 @@
+{
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "commits": [
+    "588b845521d579a3df4e70850239f987286641fc"
+  ],
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs"
+    ]
+  }
+}

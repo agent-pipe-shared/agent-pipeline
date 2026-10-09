@@ -1,0 +1,42 @@
+command: node --test plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
+label: diagnostics-wsl
+exitCode: 0
+head: 63ba0c32cb3e6cf960b0ea9a615c5081c1fb2c72
+tree: 7ace42f8b46b4caf3b8e93d8a15571a35bc4824e
+dirty: true
+--- stdout ---
+security-scan: diagnostic sidecar unavailable (exit code unchanged)
+✔ G13D001 one existing child call preserves clean verdict, argv/deadline and fixed offline env (1.708643ms)
+✔ G13D002 clean JSON preceding ETIMEDOUT remains ERROR with original raw null and useful structural facts (0.55692ms)
+✔ G13D003 throw EPERM retains execution-environment ERROR; unknown code/signal never transport text (0.371787ms)
+✔ G13D004 nonzero, malformed and tool error payload preserve their original ERROR classifications (0.701883ms)
+✔ G13D005 untrusted version suffix and over-budget JSON are unknown rather than persisted or re-probed (2.513837ms)
+✔ G13D006 bound envelope keeps exact evidence/candidate; closed validator rejects injection, duplicate records and coercion (0.53484ms)
+✔ G13D007 absent child is explicit and never confuses missing capability or gate authority (0.342036ms)
+✔ G13D008 unsupported rules mechanics never follow alias/special files or manufacture digests (0.384017ms)
+✔ G13D009 supported Linux genuinely publishes bounded owned latest data and atomically replaces a valid predecessor (2.327114ms)
+✔ G13D010 foreign existing regular bytes survive rejected publication (0.620132ms)
+✔ G13D011 terminal symlink and hardlink are not followed/replaced and unrelated referent survives (0.703744ms)
+✔ G13D012 actual special socket target is rejected without removal (2.279623ms)
+✔ G13D013 shared/unsafe evidence directory and root aliases are rejected (0.608432ms)
+✔ G13D014 ancestor directory replacement is detected; anchored cleanup touches only owned staging inode (0.54262ms)
+✔ G13D015 detected terminal content drift keeps the changed bytes instead of overwriting (0.872206ms)
+✔ G13D016 foreign staging replacement is neither published nor reclaimed by cleanup (0.56283ms)
+✔ G13D017 cooperative concurrent publisher is rejected busy and cannot overwrite the admitted publisher (1.561259ms)
+✔ G13D018 new terminal alias during preparation is detected without following or deleting it (0.505ms)
+✔ G13D019 strict readback rejects duplicate/escaped duplicate keys, invalid UTF8, oversized bytes and stale binding (5.344141ms)
+✔ G13D020 public CLI genuine missing-tool result publishes an empty bound diagnostic without native scanner execution (314.202042ms)
+✔ G13D021 producer completed synthetic Semgrep preserves clean v1 and binds genuine sidecar executable observation (87.701947ms)
+✔ G13D022 producer selected child EPERM after real preflight retains ERROR and withholds secret error text (86.8224ms)
+✔ G13D023 producer clean JSON before timeout remains ERROR while bounded diagnostic retains completed output facts (87.411761ms)
+✔ G13D024 producer publication refusal preserves original evidence and verdict semantics and unrelated foreign bytes (157.29655ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1014.277391
+
+--- stderr ---

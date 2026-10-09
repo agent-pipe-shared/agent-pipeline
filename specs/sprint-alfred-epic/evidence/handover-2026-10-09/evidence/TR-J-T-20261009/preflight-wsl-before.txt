@@ -1,0 +1,95 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+label: preflight-wsl-before
+exitCode: 0
+head: 56ec8c380185712f5b7c09fae6c5c615c5e5ff1c
+tree: de0e8794329fb9707538155c841eb5f6f168889f
+dirty: true
+--- stdout ---
+✔ preflight declares what its status ranges over, in every status (20.788238ms)
+✔ preflight gates mandatory local hooks and keeps pre-push advisory (15055.980491ms)
+✔ all three runner bootstraps expose the same nonblocking decision digest (14.573097ms)
+✔ AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations (76.750746ms)
+✔ preflight reports exact identity and no-handoff without secret fields (3.442674ms)
+✔ normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness (2.799372ms)
+✔ a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal (3.398174ms)
+✔ a durable decision with a present physical map does not repeatedly propose adoption (2.579989ms)
+✔ normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted (4.541004ms)
+✔ Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity (24.396276ms)
+✔ all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume (24.57186ms)
+✔ NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape (4.266299ms)
+✔ a soft plugin refresh still exposes the not-ready project's onboarding action (3.533376ms)
+✔ NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged (2.68858ms)
+✔ NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string (142.580487ms)
+✔ preflight declares the Claude runner when CLAUDECODE marks the session (3.031847ms)
+✔ preflight keeps the Codex runner default for any non-Claude-Code session (11.664317ms)
+✔ resolveActiveRunner: a genuine Codex session resolves codex even in a claude-default repository (0.242754ms)
+✔ resolveActiveRunner: a signal-less shell in a claude-default repository resolves claude (0.914297ms)
+✔ resolveActiveRunner: a signal-less shell in a repository declaring nothing resolves codex (0.178644ms)
+✔ resolveActiveRunner: an actual CLAUDECODE/Antigravity signal is never overridden by a declared default (0.097312ms)
+✔ a rendered PO-facing re-run command always carries --runner explicitly (0.213094ms)
+✔ normal bootstrap receipt retains exact envelope measurement and over-budget state (0.327776ms)
+✔ preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0 (12.328912ms)
+✔ PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary (8.129562ms)
+✔ preflight distinguishes complete and malformed handoff by presence only (17982.004266ms)
+✔ preflight turns a loaded/installed mismatch into a typed refresh handoff (4598.502992ms)
+✔ an exact registered local marketplace is a visible development source (4833.953298ms)
+✔ an attested local-development entry wins over a coexisting official entry (Codex, D5) (4915.257939ms)
+✔ the isolated development id is accepted only from its exact local marketplace root (0.222984ms)
+✔ unavailable registry remains non-blocking when the loaded identity is coherent (15862.375996ms)
+✔ installed version accepts only one exact enabled Agent-Pipeline entry (0.422818ms)
+✔ missing or malformed manifest fails identity closed (4411.80731ms)
+✔ a Claude session reads the Claude source manifest, never the Codex one (3.48994ms)
+✔ a non-Claude-Code session still reads the Codex source manifest, never the Claude one (3.884412ms)
+✔ Antigravity reads its own plugin manifest, never the Codex-shaped manifest (0.238654ms)
+✔ a Claude bare-array registry resolves an attested local-development installation (4.464815ms)
+✔ an attested local-development entry wins over a coexisting official entry (D1) (5170.136347ms)
+✔ an unattested local-development entry does not win over a coexisting official entry (0.352547ms)
+✔ two eligible Claude local-development entries still collide as ambiguous (0.103642ms)
+✔ a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity (3.736021ms)
+✔ a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry (3.936441ms)
+✔ two eligible Claude project-scope entries for the same id and cwd still collide as ambiguous (3.52405ms)
+✔ a malformed, non-array, or empty Claude registry yields no identity without crashing (19981.600132ms)
+✔ a Claude version mismatch between loaded and installed identity requires refresh (4656.16866ms)
+✔ the Claude local-development id is accepted only from an attested directory-source marketplace (0.52571ms)
+✔ Codex registry binding rejects equal manifest versions with stale cached installer bytes (7.166385ms)
+✔ Codex direct local registry binding supplies its verified content identity (6.470721ms)
+✔ a Gitless Codex local-development install is ready only with its installer-owned receipt (11295.335039ms)
+✔ Agy managed copy missing a receipt has an exact host recovery action from a Git source (2002.812156ms)
+✔ Codex attestation source selection binds only a verified checkout and retains sanitized observation codes (0.345126ms)
+✔ a non-local Claude installation id reports unknown source without touching the host marketplace registry (0.114652ms)
+✔ preflight calls observe self-referentially with the loaded plugin root on both sides (12756.074247ms)
+✔ an unattested origin keeps plugin refresh required and returns a non-executable advisory (11963.630533ms)
+✔ the second reviewed origin (SSH form) also attests as ready (10676.824461ms)
+✔ a rejected observation keeps plugin refresh required and returns a non-executable advisory (10224.443057ms)
+✔ a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation (3719.826813ms)
+✔ plugin-identity-unavailable keeps nextAction null even under a failing attestation (2953.656598ms)
+✔ F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout (10040.18393ms)
+✔ F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all (12052.588043ms)
+✔ F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub (11147.283736ms)
+✔ F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub (11344.783459ms)
+✔ F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub (35709.347923ms)
+✔ PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity (9675.417812ms)
+✔ PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate (10678.993ms)
+✔ PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value (17252.725356ms)
+✔ PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change (54639.604023ms)
+✔ PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning (33902.486708ms)
+✔ PHX-WP-AAC01-MULTISESSION: a repository root with no registered descriptors at all never warns and never throws (34712.673137ms)
+✔ PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws (8.355102ms)
+✔ observeDutyNotRuntimeLive reports in-force when roots are identical or match (0.649547ms)
+✔ observeDutyNotRuntimeLive recognizes two paths to one physical plugin root (0.318376ms)
+✔ observeDutyNotRuntimeLive reports differing and lists differing files when modified (0.378587ms)
+✔ observeDutyNotRuntimeLive reports not-applicable when roots are missing or null (0.117332ms)
+✔ NVA-B8-11: gitless Claude recovery references survive a skill-only installation (138.141685ms)
+✔ AM-W-T2: pipeline-start-preflight.mjs imports observeAgyStartHint and calls it (structural stand-in) (9.983057ms)
+✔ AM-W-T2: a governed-but-not-loaded agy workspace surfaces the agy hint in the preflight output (0.102342ms) # missing seam: observePipelineStartPreflight() must accept an injectable observeAgyStartHint (or the workspace root, config root and loaded plugin root it reads) before this can be pinned against a fixture governed workspace whose loaded agy plugin root differs from the managed copy, without touching the real home or resolving the real agy CLI. The wiring slice must provide that seam; the case then asserts that the agy hint appears in the preflight output. The output field name is the wiring slice's to choose and is deliberately not pinned here.
+✔ AM-W-T2: a governed-and-loaded or an ungoverned agy workspace adds no agy hint to the preflight output (0.058801ms) # missing seam: same injectable seam as the case above. The wiring slice must provide it; the case then asserts, for a governed workspace whose loaded agy plugin root is the managed copy and for an ungoverned workspace, that the preflight output carries no agy hint and is otherwise byte-identical to the output of a run without the agy observation.
+ℹ tests 78
+ℹ suites 0
+ℹ pass 76
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 407284.078757
+
+--- stderr ---

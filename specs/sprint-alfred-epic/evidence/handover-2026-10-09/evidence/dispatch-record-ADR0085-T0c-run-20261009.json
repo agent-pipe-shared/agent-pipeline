@@ -1,0 +1,74 @@
+{
+  "taskId": "ADR0085-T0c-run-20261009",
+  "agent": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing family CONT19-20261009)",
+  "outcome": "interim-budget-checkpoint-handback",
+  "commits": [],
+  "log": [
+    { "phase": "opening: record created after the named preflight (status ready); route pre-check: requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 from the runtime prompt, no contradiction", "toolUses": 9 },
+    { "phase": "orientation: CONT19 + CONT17 headers, both drafts, both predecessor records, Rulings 77/80, tranche-2 listing (README.md exists, tracked, clean), advisor consulted once", "toolUses": 23 },
+    { "phase": "scratch copies written (scratch/dispatch-wip/t0c-run/a.test.mjs, b.test.mjs); first WSL run of both captured", "toolUses": 29 },
+    { "phase": "B fixture fix 1 (move the evidence commit before the approval request), B rerun captured; diagnosis of the second B defect", "toolUses": 40 },
+    { "phase": "DISPATCH-BUDGET-CHECKPOINT fired at hook-counted call 40 of 50; no new work started; this record written; hand-back. No post-image written, no commit made.", "toolUses": 41 }
+  ],
+  "report": {
+    "dodResults": {
+      "wslCaptureA": "passed (capture exists, expected RED): evidence/ADR0085-T0c-a-20261009/red.txt, wrapped exit code 1",
+      "wslCaptureB": "partial: evidence/ADR0085-T0c-b-20261009/red.txt exists but holds a FIXTURE-BUILD failure (DWP2-CURRENT-CANDIDATE at the approval request), not yet the target's real refusal. NOT acceptable as RED evidence for the target case.",
+      "consumerSafeCheck": "not verifiable: not run (no tracked file was added)",
+      "commit": "failed: none made (checkpoint hand-back)",
+      "postImages": "failed: neither tranche-2 file was written",
+      "readmeLines": "failed: not written",
+      "terminalRecord": "this file is INTERIM"
+    },
+    "evidence": {
+      "commandA": "wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T0c-a-20261009/red.txt --label red -- node --test scratch/dispatch-wip/t0c-run/a.test.mjs\"",
+      "commandB": "same form with ADR0085-T0c-b-20261009 and scratch/dispatch-wip/t0c-run/b.test.mjs",
+      "captureHeader": "head 1ba019d0be001c000ede72c65b4c38a9217fe84f, tree c73801109f004cdf8b036bd15317f5e1e672d08e, dirty true; the capture script writes the file itself"
+    },
+    "draftAResult": {
+      "summary": "ALL cases behave exactly as the CONT19 briefing predicted; NO fixture-shape defect found, NO fixture fix applied. 9 tests, 2 pass, 7 fail.",
+      "perCase": {
+        "C1": "RED, stated reason: exit 2, lifecycle block 'Feature authority-feature lifecycle is awaiting-approval ... authority is stale or closed; run reopen-design'",
+        "C2": "RED, same lifecycle block",
+        "C3": "RED, stderr is the same lifecycle block, DAA-PO-APPROVAL-MODE-MISMATCH absent",
+        "C4": "RED, DAA-DESIGN-APPROVAL-BINDING-DRIFT absent (lifecycle block only)",
+        "C5": "RED, DAA-DESIGN-SOURCE-DRIFT absent (lifecycle block only)",
+        "C6": "RED, mini profile blocked by the lifecycle layer",
+        "C7": "RED because of its control (the valid v8 record is blocked by the lifecycle layer); the mixed variants were never reached",
+        "FX1": "green (fixture self-check)",
+        "FX2": "green (fixture self-check)"
+      },
+      "reasonEvidence": "plan-spec-state-v2.mjs:16 CURRENT_APPROVAL_SCHEMA is v7; validCurrentPlanApproval (:370-384) requires schema v7 and its exact key set; line 620 maps approval === null to status awaiting-approval. So a v8 record yields the observed message.",
+      "caveat": "The 'blocked only because the schema is v8' reading rests on that code reading. I ran no v7-shaped control on the A fixture, so I cannot rule out that the fixture is also lifecycle-invalid for another reason; the generic remediation text does not distinguish. A cheap discriminator for the continuation: a throw-away probe that builds the same state with the schema string changed and the four v7 design keys present, expecting admission.",
+      "postImageRecipe": "Original draft bytes (scratch/dispatch-wip/ADR0085-T0c-a-test-draft.mjs.txt) minus header lines 7-10 (the DRAFT paragraph: 'DRAFT, NEVER RUN ...' through 'Delete this DRAFT line when installing it.'). Keep its HOOKS_DIR = dirname(fileURLToPath(import.meta.url)). The scratch run copy differs from the post-image ONLY in the HOOKS_DIR line (tagged SCRATCH-ONLY) and in those 4 header lines. Optionally add today's observed lifecycle message to the header."
+    },
+    "draftBResult": {
+      "summary": "Control and target NOT reached. The fixture builder fails before any subtest; two fixture-shape defects found so far, one fixed.",
+      "defect1": "DWP-BOUND-PATH-UNTRACKED at createDesignWorkflowPackageApprovalRequest: the bound path must be tracked before the request is built. FIXED in scratch b.test.mjs by moving the 'git add -- evidence; git commit' block above the request.",
+      "defect2": "DWP2-CURRENT-CANDIDATE at the same assert (b.test.mjs line 178 after fix 1, the 'prepared.ok' assertion). Cause read from design-workflow-package-v2.mjs:135: when requireCurrentCandidate holds, a differing candidate is tolerated only on the NON-prepare path via isEvidenceOnlyDescendant; the request builder is the prepare path, so the package candidate must equal the current candidate exactly. But committing the evidence moves HEAD, so after fix 1 the package candidate is stale. The existing fixture test-design-workflow-fixture.mjs avoids this by injecting gitCandidate: () => ({ ok: true, ...candidate }) (lines 103-106).",
+      "proposedFix2_UNVERIFIED": "In b.test.mjs make the callback frozen: replace 'const readCandidate = () => observeAdvisorCandidate(root);' with a function returning the candidate object observed BEFORE the evidence commit (the 'candidate' const), used for the request, the verify call, the exception-binding read and reread(). That mirrors approval time. It is a fixture-shape change only. Not run: the checkpoint stopped me.",
+      "afterFix2": "Expected next fixture hurdles, unseen: the boundary then runs with the real HEAD (post-commit). The control must be green; the target must fail with today's re-read code, which the draft prints in its failure text as 'package re-read today' (predecessor predicted DWP2-DURABLE-FAILURE or DWP2-PHYSICAL-OR-GIT; write whatever is observed into the header as 'today'). A control red for an unrelated reason must be reported, not hidden.",
+      "postImageRecipe": "Final bytes = scratch b.test.mjs after its fixture fixes, with '../../../plugins/pipeline-core/lib/' -> '../lib/', '.../scripts/' -> '../scripts/', '.../hooks/' -> './' (the guard-lifecycle-ready import and the GUARD URL), the DRAFT paragraph (header lines 4-8) removed, and 'today' filled in."
+    },
+    "changedFiles": [
+      "scratch/dispatch-wip/t0c-run/a.test.mjs (untracked scratch run copy of draft A; one-line HOOKS_DIR change)",
+      "scratch/dispatch-wip/t0c-run/b.test.mjs (untracked scratch run copy of draft B; import depth +1, evidence commit moved before the request)",
+      "evidence/ADR0085-T0c-a-20261009/red.txt (machine-written capture)",
+      "evidence/ADR0085-T0c-b-20261009/red.txt (machine-written capture of the SECOND run; the first run's DWP-BOUND-PATH-UNTRACKED text is overwritten and only quoted here)",
+      "evidence/dispatch-record-ADR0085-T0c-run-20261009.json (this interim record)"
+    ],
+    "deliberatelyNotChanged": "No file under plugins/, harness/, tests, tranche-2, no pipeline-state patch, no scratch/commit-msg file, no README or NEW-HOOK-TESTS.md. Nothing was committed or staged. The write to specs/sprint-alfred-epic/signed-package/tranche-2/hooks/ was NEVER attempted, so whether PB-CONTRACT-TESTS or any other guard fires on that path is UNKNOWN.",
+    "deviationsFromSpec": [
+      "Record: CONT17 says write the terminal record once, after the commit; the role contract says open with a record. The opening record was created at the canonical repo-root evidence path and is overwritten by this interim version. Disclosed.",
+      "No commit and no post-images: stopped at the DISPATCH-BUDGET-CHECKPOINT (hook-counted call 40 of 50). Not a DoD pass."
+    ],
+    "openItems": [
+      "Continuation dispatch (about 14-16 hook-counted calls): (1) apply proposedFix2 to scratch b.test.mjs, rerun B under WSL, at most one more fixture fix (this was fix 1 of 2 allowed per file; stop condition 1 is the second red on the same cause); (2) Write the two final files to the tranche-2 hooks directory, reporting any guard code verbatim; (3) sha256sum both; (4) append a 'New contract test files' section to the tracked, clean tranche-2/README.md with repo-relative target path, sha256 and the WSL command (no /mnt/d path in the text); (5) scratch/commit-msg/ADR0085-T0c-run.txt with subject 'test(design-approval): tranche-2 post-images for the ADR-0085 boundary contract tests' and exactly the two trailers Dispatch: ADR0085-T0c-run-20261009 (goldfish) and AI-Assisted: true; (6) node --test harness/scripts/check-consumer-safe-paths.test.mjs; (7) git add -- <3 paths>, then git commit -F ... -- <3 paths> as separate calls; (8) terminal record.",
+      "Guard notes: Glob is refused (GUARD-READ-TARGET); composed or piped Bash is refused (GUARD-PARSE-UNSUPPORTED); the first Write needed the preflight from the loaded plugin root (GUARD-BOOTSTRAP-RECEIPT-MISSING, cured, status ready). The WSL capture form works.",
+      "Both scratch copies and both red.txt files are untracked or ignored working files; they survive for the continuation."
+    ]
+  }
+}

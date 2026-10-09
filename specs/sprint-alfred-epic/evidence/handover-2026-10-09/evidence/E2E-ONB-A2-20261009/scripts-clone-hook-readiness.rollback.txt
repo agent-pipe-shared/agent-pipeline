@@ -1,0 +1,26 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs
+label: scripts-clone-hook-readiness.rollback
+exitCode: 0
+head: b46403a06df7237197a34da3b2eee5ef6a864090
+tree: 86b605a07c56d52aaf2dca61f1b826c170b4545e
+dirty: true
+--- stdout ---
+✔ CHRB001 second install throws: pre-commit is removed again and the typed error names commit-msg and the rollback (8975.996006ms)
+✔ CHRB002 rollback refused by the installer (hook modified meanwhile): both hooks named, original cause kept, modified hook left alone (8590.013463ms)
+✔ CHRB003 rollback itself throws: both hooks named, original cause preserved, rollback error reachable (85.300725ms)
+✔ CHRB004 both installs succeed: default behaviour is unchanged (ready, two installed results, no rollback) (37064.268769ms)
+✔ CHRB005 both injected installs return: the readback verdict is unchanged and the removal seam is never used (91.353997ms)
+✔ CHRB006 a foreign pre-commit hook that existed before the call is never touched or removed (104.514499ms)
+✔ CHRB007 re-pointed by HOOKREFRESH-T7, Ruling 84: an already-installed pre-commit hook of ours is never touched or removed when the missing commit-msg install fails (44701.421379ms)
+✔ CHRB008 pre-commit was not installed by this call: a failing second install triggers no removal at all (129.836822ms)
+✔ CHRB009 second install RETURNS a refusal instead of throwing: it rolls back exactly like a throw, with the refusal as cause (18184.138079ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 118180.397634
+
+--- stderr ---

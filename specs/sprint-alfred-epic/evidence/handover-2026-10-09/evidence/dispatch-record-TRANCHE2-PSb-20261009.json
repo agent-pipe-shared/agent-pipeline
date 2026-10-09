@@ -1,0 +1,35 @@
+{
+  "taskId": "TRANCHE2-PSb-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "interim-budget-handback",
+  "commits": [],
+  "log": [
+    {"phase": "opening: briefing, CONT15 header, preflight, scratch opening marker", "toolUses": 9},
+    {"phase": "orientation: lib export, test pins, pipeline-state.mjs regions, Rulings 58/76, tranche-1 README shape", "toolUses": 29},
+    {"phase": "scratch copies made (cp route NOT refused), commit message file written, Reads armed", "toolUses": 36},
+    {"phase": "budget checkpoint hook fired at call 36 of 45: handed back before any edit", "toolUses": 37}
+  ],
+  "report": {
+    "dod": "NOT MET (interim hand-back at the budget checkpoint). Content gate: not reached. Syntax gate: not reached. Commit of patch + README: not made (nothing tracked was changed). Consumer-safe check: not run (no tracked change). Terminal record: this file is an INTERIM record, not terminal.",
+    "evidence": "git diff --stat -- plugins/pipeline-core/scripts/pipeline-state.mjs -> '1 file changed, 1 insertion(+)' (exit 0): the only dirty line vs HEAD is the :423 import. git ls-files --eol -> i/lf w/lf attr/text eol=lf (exit 0): patch must be LF. cp of the real file to scratch/tranche2/ps-base.txt and scratch/tranche2/ps-check.mjs -> exit 0 both, so the copy route is NOT refused. preflight (hook-required before first Write) -> status ready, exit 0.",
+    "changedFiles": [
+      "scratch/tranche2/dispatch-opening.json (scratch-only opening marker, GF-09-D)",
+      "scratch/tranche2/ps-base.txt (working-tree copy; STILL carries the :423 import, so it is not yet the HEAD image)",
+      "scratch/tranche2/ps-check.mjs (working-tree copy, unedited; intended work copy, .mjs name for node --check)",
+      "scratch/commit-msg/TRANCHE2-PSb.txt (final commit message, subject 'feat(alfred): add the pipeline-state patch to tranche 2', exactly the two required trailers, no Co-Authored-By/Claude-Session)",
+      "evidence/dispatch-record-TRANCHE2-PSb-20261009.json (this interim record)"
+    ],
+    "notChanged": "No tracked file touched. DWP-REBIND-ARGS ('rebind-approval accepts no arguments') sits in the lib REPAIR table but is unreachable: refuse() is not exported and the briefed case spec has no argv check; left as briefed, flagged for the dispatcher. No second advisor call and no readback of the scratch opening marker (Write confirmed creation).",
+    "deviations": [
+      "Record: briefing/CONT15 T88 says write ONCE after the commit; the budget-checkpoint hook instructs an interim record now. Followed the hook; a follow-up dispatch should write the terminal record (overwrite) after its commit.",
+      "Opening marker kept in scratch/ (not at the record path) to honour T88's single-write rule while keeping a durable GF-09-D trace."
+    ],
+    "openItems": [
+      "BUDGET STOP: 13 tool calls were still needed after call 36 (9 left of 45); the checkpoint hook said hand back. Dispatcher decides: grant more budget or re-dispatch from this report.",
+      "Remaining steps (about 12 calls): (1) Edit scratch/tranche2/ps-base.txt, remove line 423 (old_string = line 422 plus line 423, new_string = line 422 alone; Read a small range first to arm Edit). (2) Read then Edit scratch/tranche2/ps-check.mjs: hunk 4 add `import { rebindApproval } from \"../lib/rebind-approval.mjs\";` right after the architecture-design import (working-tree line 428, double-quote style); hunk 5 change the `\"inspect\",` entry of PIPELINE_STATE_COMMANDS (working-tree line 711-712) to `\"inspect\", \"rebind-approval\",`; one Edit over `case \"inspect\"` (working-tree 12306-12336, HEAD numbering is minus 1): hunk 1 insert before `const payload = {` the line `const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);`, hunk 2 `nextAction: buildInspectNextAction(dir, base, lifecycle, deps) ?? drift?.recovery ?? null,`, hunk 3 `continuityAuthorityDrift: drift,` as LAST payload key after nextActionText, hunk 6 a new `case \"rebind-approval\": { const rebind = rebindApproval({ dir, now, deps }); console.log(JSON.stringify(rebind.payload, null, 2)); return rebind.exit; }` after the inspect block closes (pass RAW deps, no defaulted gitCandidate: the test pins real git ancestry). (3) `git diff --no-index --stat -p scratch/tranche2/ps-base.txt scratch/tranche2/ps-check.mjs`; the index pre-image must read 7964fd4 (this is the pre-image gate). (4) Write specs/sprint-alfred-epic/signed-package/tranche-2/pipeline-state-R6F2b-R75.patch from that diff, rewriting diff --git / --- / +++ paths to a/plugins/pipeline-core/scripts/pipeline-state.mjs and b/... (LF endings). (5) node --check scratch/tranche2/ps-check.mjs. (6) Write tranche-2/README.md in the tranche-1 R7-6-P shape: HEAD blob 7964fd426f71ccefa5be656a69aa1cf4525f02e2, each hunk, git apply inside the ceremony, pins and exact commands (pipeline-state-inspect-continuity-drift.test.mjs 0 fail, baseline 9 tests/1 pass/8 fail in evidence/R6-F2b-20261009/before-target.txt; rebind-approval.test.mjs 3 pass + 1 todo; scripts/pipeline-state.test.mjs against evidence/R6-F2b-20261009/before-plugin-suite.txt), verify-suites.json registration (TP-13) of both new test files in the same tranche, TESTFIX-A regions of harness/scripts/pipeline-state.test.mjs (Region A staged, Region B in PS06, AR03h and HL blocks) as tranche members citing specs/sprint-alfred-epic/plans/po-list-2026-10-08.md, and the apply-time prerequisite that the working tree equals blob 7964fd4 (today's tree carries the :423 import uncommitted, so the first hunk fails unless that line is restored first). (7) git add -- <patch> <README> by exact path only (new files; the index holds foreign staged files), then git commit -F scratch/commit-msg/TRANCHE2-PSb.txt -- <patch> <README>. (8) node --test harness/scripts/check-consumer-safe-paths.test.mjs (exit 0). (9) Terminal record at evidence/dispatch-record-TRANCHE2-PSb-20261009.json with commits and report.changedFiles.",
+      "Ruling 76(b) 'git apply --check against a clean blob copy' was not attempted (briefing forbids git apply against tree/index); the hash/index pre-image equality 7964fd4 is the substitute gate; the real check happens at ceremony apply."
+    ]
+  }
+}

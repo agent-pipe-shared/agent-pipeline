@@ -1,0 +1,539 @@
+command: node --test plugins/pipeline-core/lib/governance-event-store.test.mjs
+label: native-store-before
+exitCode: 1
+head: ebd4db3d53714f40db8fe11cdefd38fc7dce71bb
+tree: fe24204f556f40d55ccbac15127acbdf90c4de9f
+dirty: true
+--- stdout ---
+✖ portable append publishes canonical bytes, readback checkpoint, and source-last head (438.5444ms)
+✖ ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality (430.1794ms)
+✔ ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused (572.6678ms)
+✖ exact idempotency is a zero-write replay while a conflicting key fails closed (452.0568ms)
+✔ D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe (147.6721ms)
+✖ agent journal payloads persist only as candidate-bound, closed observational events (454.9312ms)
+✔ portable admission requires the exact effective policy and closed safe payload (182.6811ms)
+✖ A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can (471.5129ms)
+✔ A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out (179.6047ms)
+✖ verification is checkpoint-aware and queries return only validated chain records (402.3138ms)
+✖ tampering, non-canonical bytes, and forks fail before projection or query (406.2372ms)
+✖ K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query (411.499ms)
+✖ inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present (398.0537ms)
+✖ K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery (487.0664ms)
+✖ K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record (444.5606ms)
+✖ inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere (444.11ms)
+✖ inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences (415.1811ms)
+✖ K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file (404.2342ms)
+✖ K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept (411.4215ms)
+✖ K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK (419.5616ms)
+✖ K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths (410.3613ms)
+✔ ADR-0072 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members (0.2712ms)
+✖ ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable (407.8739ms)
+✖ ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged (418.2141ms)
+✖ ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim (434.9151ms)
+✖ ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature (425.5196ms)
+✖ ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode (411.6605ms)
+✖ ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork (413.9685ms)
+✖ ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature (390.0468ms)
+✖ ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now (394.2093ms)
+✖ ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too (428.7051ms)
+✖ K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception (463.1535ms)
+✖ K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL (435.0395ms)
+✖ K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream (444.4027ms)
+✖ K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection (463.1682ms)
+✖ symlink, cross-repository, and writer-owned intent fields are rejected (201.0239ms)
+✖ NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect) (537.5907ms)
+✖ NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY) (430.8042ms)
+✖ NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused (415.9509ms)
+✖ NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths (49.0816ms)
+✖ projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events (420.7376ms)
+✖ writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer (423.9504ms)
+✖ competing dead-lock recovery cannot delete a newly acquired writer lock (423.3315ms)
+✖ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (444.4357ms)
+✖ K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened (433.3318ms)
+✔ PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed (112.3895ms)
+✔ PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened (117.153ms)
+✔ PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed (125.8327ms)
+✖ PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) (122.2668ms)
+✔ PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch (131.8763ms)
+✔ existing repository identity: missing identity refuses without creating namespace or binding (79.1019ms)
+✔ existing repository identity: legacy identity refuses without migration or changed bytes (89.8492ms)
+✖ existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes (123.4469ms)
+✔ existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding (638.1626ms)
+✖ existing repository identity: file/root aliases, multiple links and writable binding refuse (55.047ms)
+✔ existing repository identity: oversized binding is rejected while preserving exact synthetic bytes (79.0798ms)
+✖ existing repository identity: linked worktree observes same common identity; bare repository remains unsupported (249.1741ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 13
+ℹ fail 44
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19705.5506
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:261:1
+✖ portable append publishes canonical bytes, readback checkpoint, and source-last head (438.5444ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:274:1
+✖ ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality (430.1794ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:376:1
+✖ exact idempotency is a zero-write replay while a conflicting key fails closed (452.0568ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:404:1
+✖ agent journal payloads persist only as candidate-bound, closed observational events (454.9312ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:463:1
+✖ A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can (471.5129ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:494:1
+✖ verification is checkpoint-aware and queries return only validated chain records (402.3138ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:507:1
+✖ tampering, non-canonical bytes, and forks fail before projection or query (406.2372ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:520:1
+✖ K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query (411.499ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:530:1
+✖ inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present (398.0537ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:553:1
+✖ K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery (487.0664ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:573:1
+✖ K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record (444.5606ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:596:1
+✖ inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere (444.11ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:604:1
+✖ inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences (415.1811ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:612:1
+✖ K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file (404.2342ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:648:1
+✖ K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept (411.4215ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:660:1
+✖ K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK (419.5616ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:672:1
+✖ K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths (410.3613ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:702:1
+✖ ADR-0072 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable (407.8739ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:710:1
+✖ ADR-0072 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged (418.2141ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:727:1
+✖ ADR-0072 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim (434.9151ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:740:1
+✖ ADR-0072 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature (425.5196ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:751:1
+✖ ADR-0072 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode (411.6605ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:768:1
+✖ ADR-0076 committed global human_approval: chat records a terminal- and proof-free explicit attribution bound to the observed fork (413.9685ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:783:1
+✖ ADR-0072 the durable record references the verified approval and never re-embeds the raw proof or signature (390.0468ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:795:1
+✖ ADR-0072 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now (394.2093ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:814:1
+✖ ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too (428.7051ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:823:1
+✖ K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception (463.1535ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:848:1
+✖ K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL (435.0395ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:858:1
+✖ K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream (444.4027ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:886:1
+✖ K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection (463.1682ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:897:1
+✖ symlink, cross-repository, and writer-owned intent fields are rejected (201.0239ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at async symlink (node:internal/fs/promises:1707:10)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:902:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:930:1
+✖ NVA-GESBIND-2: a tracked registry carrying a fingerprint that does not match the physical repository is now usable (the fixed clone-at-a-different-path defect) (537.5907ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:942:1
+✖ NVA-GESBIND-2: an event copied verbatim from a genuinely different physical repository still fails closed on read-back (GES-EVENT-PATH, not GES-CROSS-REPOSITORY) (430.8042ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:960:1
+✖ NVA-REPOID-1: a fingerprint present at first use is adopted as a legacy alias and keeps validating, but a fingerprint that was never present is still refused (415.9509ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1012:1
+✖ NVA-REPOID-1: the same repository resolves to one identity across two different absolute access paths (49.0816ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at async symlink (node:internal/fs/promises:1707:10)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1021:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1040:1
+✖ projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events (420.7376ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1055:1
+✖ writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer (423.9504ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1074:1
+✖ competing dead-lock recovery cannot delete a newly acquired writer lock (423.3315ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1100:1
+✖ restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure (444.4357ms)
+  Error [GovernanceEventStoreError]: Restricted storage Windows DACL assurance is insecure.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:60:38)
+      at assertRestrictedRoot (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:232:36)
+      at async planRestrictedGovernanceOperation (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:1721:26)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1119:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'GES-RESTRICTED-WINDOWS-ASSURANCE'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1154:1
+✖ K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened (433.3318ms)
+  Error [GovernanceEventStoreError]: Governance event store operation failed.
+      at ChildProcess.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:721:30)
+      at ChildProcess.wrapper (node:events:639:12)
+      at ChildProcess.emit (node:events:514:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12) {
+    code: 'GES-LOCKED'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1247:1
+✖ PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged) (122.2668ms)
+  Error [GovernanceEventStoreError]: Restricted storage must not grant group or other access.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:60:38)
+      at assertRestrictedRoot (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:226:27)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1252:20)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'GES-RESTRICTED-PERMISSIONS'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1307:1
+✖ existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes (123.4469ms)
+  Error [GovernanceEventStoreError]: A physical existing v2 repository binding is required.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:60:38)
+      at unavailable (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:861:29)
+      at readExistingLocalRepositoryFingerprint (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:900:13)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1309:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'GES-EXISTING-REPOSITORY-BINDING'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1320:1
+✖ existing repository identity: file/root aliases, multiple links and writable binding refuse (55.047ms)
+  Error: EPERM: operation not permitted, symlink '<home-path>' -> '<home-path>'
+      at Module.symlinkSync (node:fs:1938:11)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1321:94)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: '<host-path>',
+    dest: '<host-path>'
+  }
+
+test at plugins\pipeline-core\lib\governance-event-store.test.mjs:1332:1
+✖ existing repository identity: linked worktree observes same common identity; bare repository remains unsupported (249.1741ms)
+  Error [GovernanceEventStoreError]: A physical existing v2 repository binding is required.
+      at fail (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:60:38)
+      at unavailable (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:861:29)
+      at readExistingLocalRepositoryFingerprint (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.mjs:900:13)
+      at async TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-event-store.test.mjs:1337:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'GES-EXISTING-REPOSITORY-BINDING'
+  }
+
+--- stderr ---

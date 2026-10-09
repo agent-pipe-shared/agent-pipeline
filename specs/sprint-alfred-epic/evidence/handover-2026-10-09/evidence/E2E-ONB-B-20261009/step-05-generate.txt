@@ -1,0 +1,19 @@
+STEP 05 intake-design-questions-apply, intake-generate-plan, intake-generate-apply
+Placeholders: <repo-root-in-wsl>, <temp-repo>. Prefix CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core.
+
+05a  node .../project-onboarding-v3.mjs intake-design-questions-apply --root <temp-repo> --answers-json "{\"disposition\":\"no-open-questions\"}" --activate --runner claude
+     exit code: 0
+     status: applied; checkpoint revision 2, designQuestions [], transactionState ready-to-generate
+     PO answer used: affirmative disposition no-open-questions (one bundled round).
+     note: output carries no nextAction; the generate-plan command was taken from intake-generate-design.md (command table), not from a returned action.
+
+05b  node .../project-onboarding-v3.mjs intake-generate-plan --root <temp-repo> --runner claude
+     exit code: 0
+     status: plan summary (pipeline.onboarding-intake-generate-plan-summary.v1), featureId onboarding-c7166f570a9a, planSha256 988a63e7...994e32
+     targets: specs/onboarding-c7166f570a9a/{design-input.md (782 B), prd_onboarding-c7166f570a9a.md (2834 B), spec.md (1529 B)}
+     nextAction: intake-generate-apply --root <temp-repo> --plan-sha256 988a63e7...994e32 --activate   (NOTE: no --runner claude, unlike the neighbouring actions)
+
+05c  node .../project-onboarding-v3.mjs intake-generate-apply --root <temp-repo> --plan-sha256 988a63e768c0c5440cb1b4fc33f0bb041a1db9d2fabcf233868486218b994e32 --activate   (verbatim)
+     exit code: 0
+     status: applied; all three targets wrote true; checkpoint revision 3, transactionState generated
+     no nextAction in the output; the walk continued with the bind command from the doc table.

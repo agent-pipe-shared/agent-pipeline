@@ -1,0 +1,56 @@
+command: node --test plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs plugins/pipeline-core/lib/hardened-private-directory.test.mjs
+label: wsl-after
+exitCode: 1
+head: c7aa931021895c6608bbb7037d0c234d763462de
+tree: baf648f86a943e7f8c21c059245495d32c169263
+dirty: true
+--- stdout ---
+✖ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (22.111218ms)
+✔ pin (b): recordBootstrapPreflightReceipt leaves the agent-pipeline segment private on a fresh repository (10.080302ms)
+✔ pin (c): a denial-telemetry write leaves the agent-pipeline segment private on a fresh repository (8.920947ms)
+✔ pin (e) premise: the insecure pre-existing agent-pipeline segment can be built on this host (8.989724ms)
+✔ pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insecure agent-pipeline segment owned by the current user (11.197566ms)
+✔ non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers (1.324855ms)
+✔ win32 hardens every directory it created before descending and only assesses pre-existing ones (0.42807ms)
+✔ win32 refuses a pre-existing insecure directory instead of silently re-hardening it (0.557313ms)
+✔ win32 fails closed when hardening a directory it just created does not end secure (0.21926ms)
+✔ a target outside the anchor and a non-directory segment are refused on every platform (0.320085ms)
+﹣ real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened (0.067517ms) # native Windows DACL behaviour
+✔ pre-commit installer creates its private state directories with mode 0o700 (6.640818ms)
+✔ commit-msg installer creates its private state directories with mode 0o700 (6.558013ms)
+✔ win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory (0.61748ms)
+✔ win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory (0.40356ms)
+✔ win32 removes only the failing created segment and never a pre-existing parent (0.313455ms)
+✔ win32 removes a failed created segment only while it is still empty and says when it could not (0.306045ms)
+✔ win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged (0.290956ms)
+✔ win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy (0.243038ms)
+✔ win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy (0.448958ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 1666.933762
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:99:1
+✖ pin (a): readLocalRepositoryFingerprint leaves the agent-pipeline segment private on a fresh repository (22.111218ms)
+  AssertionError [ERR_ASSERTION]: pin (a): the "agent-pipeline" segment is not private after its first creator ran (mode=0o755)
+      at assertCreatorRanThenSegmentPrivate (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:75:10)
+      at file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:103:5
+      at async withRepository (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:55:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs:100:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,30 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "PRODUCER-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "ea5401ec69812e0f9b40627d6ca1bddddf4e12eb",
+  "outcome": "completed",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit"},
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {"schema": "pipeline.critic-trigger-input.v1", "rigorLevel": 2, "riskClass": "low", "riskFlag": false,
+      "diff": {"mechanical": false, "architecture": false, "guardrails": false, "security": false}},
+    "appliedRow": "T3"
+  },
+  "commits": ["c754022f61ab0ba88b143cf19e50dd71cf9dd9d8"],
+  "log": [
+    {"phase": "orientation done: obligations, CONT17/18/25 headers, PRODUCER-T section, producer lib/CLI/test, Ruling 150 read; preflight run after GUARD-BOOTSTRAP-RECEIPT-MISSING", "toolUses": 18},
+    {"phase": "before capture: wrapped exit 0, all old cases green", "toolUses": 21},
+    {"phase": "advisor consulted; six PRODUCER-T cases appended to the test file and commit message file written", "toolUses": 24},
+    {"phase": "red capture wrapped exit 1: 26 tests, 20 pass, 6 fail (only PRODUCER-T a-f); consumer-safe 9/9 exit 0", "toolUses": 28},
+    {"phase": "committed c754022f61ab0ba88b143cf19e50dd71cf9dd9d8; terminal record written", "toolUses": 35}
+  ],
+  "report": {
+    "text": "1 DoD: native before capture (all 20 old cases green, exit 0): passed. Native red capture: passed (26 tests, 20 pass, 6 fail; the 6 failures are exactly the new PRODUCER-T (a)-(f), every old case unchanged and green). check-consumer-safe-paths.test.mjs: passed (9/9, exit 0). One commit with the exact subject: passed (c754022f61ab0ba88b143cf19e50dd71cf9dd9d8). Old cases pinning the retired -m/--trailer form (listed, NOT changed; both go red after PRODUCER-F): 'legacy Goldfish command flow renders separate exact-path argv without shell composition' and 'generated commands create one exact-path Git commit with the required trailer block'. COMMITFLOW-T2 S1-S3 (a)-(e) and both CLI cases are route-neutral. 2 Evidence: evidence/PRODUCER-T-20261009/before.txt (node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/PRODUCER-T-20261009/before.txt --label native -- node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs, wrapped exit 0); evidence/PRODUCER-T-20261009/red.txt (same command, wrapped exit 1); node --test harness/scripts/check-consumer-safe-paths.test.mjs exit 0. Red reasons in red.txt: (a)(b)(e) commit argv still contains -m x3 and --trailer x2 (the assertion message names Ruling 150 / PRODUCER-F); (c) argv is the -m form; (d) messagePath is undefined; (f) typeof plan.messagePath is undefined, not string. 3 Changed files: plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs (+122 lines, pure append: a header comment naming the assumptions plus six RED cases for the library, the in-process CLI, per-taskId message and path, writes nothing, guard-parsed argv at linux and win32, and a real exact-path commit end to end). 4 Deliberately not changed: production files, the two old --trailer cases, other tests, the template, hooks, harness; no duplicate refusal case was added because the existing second test already pins GF-COMMAND-INPUT/-PATH/-PATH-ORDER/-MESSAGE and a new one would pass today; the CLI was exercised in-process, as the file already does, not spawned. 5 Deviations: the opening dispatch record was written after the briefing-mandated reading, and only after the preflight the guard required (run once); route pre-check: field 6 names no A/G/S class, requested claude-sonnet-5-5, observed claude-sonnet-5-5 from the runtime prompt, no contradiction; the DISPATCH-BUDGET-CHECKPOINT notice fired at call 28 of 35 and the remaining calls went to commit and record only. 6 Open items: PRODUCER-F must change lib/goldfish-commit-command-flow.mjs, after which the two old cases need a test-only update; the pre-existing modified and untracked files in the tree were not touched. independent review: pending.",
+    "changedFiles": ["plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs"]
+  },
+  "resultSha256": "8d1e9ab6fb3eb6e22b849960982731fe70f5f919a9eed2a196792993cc7ba2c6"
+}

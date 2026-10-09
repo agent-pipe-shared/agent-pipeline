@@ -1,0 +1,53 @@
+{
+  "taskId": "SF22b-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "implementation complete; Critic review and PO acceptance pending",
+  "commits": ["7d2837f8d9dd077e2079fbbb766c573bf01978b3"],
+  "log": [
+    {"phase": "opening: preflight run (ready), record created, route pre-check done (requested claude-sonnet-5-5/xhigh, observed claude-sonnet-5-5 per runtime prompt, no contradiction)", "toolUses": 5},
+    {"phase": "scratch copy written (SF22b with explicit id, check() id param, count 24, comment blocks); native run green: 24 pass, SF22 4 spawns, SF22b first 4 / second 0", "toolUses": 36},
+    {"phase": "mutation run (rm ledger dir between the Stops) red on spawns; final native 24/24 green; WSL 24/24 green (SF22b 0/0)", "toolUses": 47},
+    {"phase": "post-image written, scratch-vs-post-image diff = 4 lines, base blob e7388629 unchanged, sha256 recorded, README section, consumer-safe exit 0, committed 7d2837f8d", "toolUses": 60}
+  ],
+  "report": {
+    "dodResults": {
+      "nativeCapture": "passed: 24 tests, 24 pass, 0 fail; every case listed (SF01-SF21, SF22, SF22b, SF23); SF22 = 4 powershell.exe spawns, SF22b first Stop 4 / second Stop 0",
+      "wslCapture": "passed: 24 tests, 24 pass, 0 fail; SF22 ledger-side 0, SF22b first 0 / second 0 on linux",
+      "postImageSha256InReadme": "passed: 4f4e069ef0e904af6d28b944cdd7f92f86160fc7b8094c5ecc7b83b2f6d064b6 (LF only, file reports no CRLF)",
+      "consumerSafePaths": "passed: node --test harness/scripts/check-consumer-safe-paths.test.mjs, 9/9 pass, exit 0",
+      "oneCommit": "passed: 7d2837f8d9dd077e2079fbbb766c573bf01978b3, type test(tranche-2), message file, exact pathspecs, trailers Dispatch and AI-Assisted only; 2 files, 655 insertions",
+      "terminalRecord": "this file"
+    },
+    "evidence": [
+      "evidence/SF22b-20261009/native.txt (node plugins/pipeline-core/scripts/capture-evidence.mjs --out ... --label native -- node --test scratch/dispatch-wip/SF22b/stop-fanout.test.mjs; wrapped exit 0)",
+      "evidence/SF22b-20261009/wsl.txt (same under wsl.exe -e bash -lc, cd to the repo mount; wrapped exit 0)",
+      "evidence/SF22b-20261009/mutation-native.txt (scratch copy with the ledger directory removed between the Stops; wrapped exit 1; SF22b red: the second Stop against the same common dir spawned 2 child process(es) on win32; the other 23 cases green)",
+      "git diff --no-index --stat scratch copy vs post-image: 4 insertions, 4 deletions (3 import lines + HOOK constant); base vs post-image: 76 insertions, 16 deletions"
+    ],
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/stop-fanout.test.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/README.md"
+    ],
+    "notChangedOnPurpose": [
+      "SF22 case name ('... bound 4, must drop to 0'), the comment above its ledgerSide equality and that assertion's failure message still carry the stale 'tracked fix landed / set the constant to 0' wording: outside the briefed comment blocks, and renaming a case changes a registered case. Listed in the README as the next tranche-2 touch-up.",
+      "plugins/pipeline-core/hooks/stop-fanout.mjs header comment ('Measured by the SF22 tripwire ... 4 spawnSync powershell.exe') is production and forbidden; it should say first Stop per common dir.",
+      "The backlog item re-scope and close-out is the dispatcher's (Ruling 87)."
+    ],
+    "deviations": [
+      "The scratch copy differs from the post-image in 4 lines (3 imports + the HOOK constant), not only its import lines as the briefing phrased it; the README says so.",
+      "check() gained an optional third id parameter and a separate auto-counter: the one structural change outside the briefed comment blocks, needed to register SF22b between SF22 and SF23 without renumbering SF23. TCC-CASE-ORDER accepts SF22 < SF22b < SF23 (proved by the green run).",
+      "SF22b asserts the spawn list before the decision and ledger assertions: the first mutation run showed the ledger assertion firing first and masking the spawn signal; the reordered run produced the intended red on spawns.",
+      "One evidence file beyond the two named: mutation-native.txt.",
+      "Does not assert the first Stop's exact count (SF22 owns it); first-Stop count is a t.diagnostic only, so SF22 and SF22b fail for separate reasons."
+    ],
+    "openItems": [
+      "verify-suites case-count or case-set digest pin for this file NOT checked (directory Greps were refused by the guard); the case set grows 23 -> 24.",
+      "Install happens in the tranche-2 ceremony against base blob e738862997b90adc22f9527e648e61c81484d8cd.",
+      "README edit tool warned the README changed on disk since my read; git diff --stat before staging showed only my 37 insertions and the commit stat (655 = 618 post-image + 37 README) confirms no foreign lines landed.",
+      "Observation: the mutation's second Stop spawned 2, not 4, because only fanout/ was recreated (agent-pipeline/ survived): two PowerShell runs per created directory level, consistent with all spawns coming from ensurePrivateDirectory.",
+      "Status: implementation complete; independent Critic review and PO acceptance pending. Not done."
+    ]
+  }
+}

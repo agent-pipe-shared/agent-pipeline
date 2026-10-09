@@ -1,0 +1,78 @@
+06a?  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs bootstrap-bind-plan --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 2
+  --- output ---
+
+[stderr]
+KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING: The promoted PRD must carry the PO's plan acknowledgement marker exactly once, as <!-- po-plan-acknowledged: content-sound-and-spec-consistent --> on its own line; the PO plan gate will otherwise refuse it with no sanctioned repair route once bound.
+
+  --- end ---
+
+06b  <wsl-node> <repo-root-in-wsl>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root <temp-repo> --runner claude
+  cwd: <temp-repo>
+  exit code: 0
+  --- output ---
+{
+  "schema": "pipeline.project-onboarding.v4",
+  "status": "bootstrap-binding-required",
+  "root": "<temp-repo>",
+  "runner": "claude",
+  "intent": "onboarding",
+  "repository": {
+    "status": "local-valid-writable",
+    "mode": "local",
+    "gitVersion": "2.53.0",
+    "initializesGit": false,
+    "rootWritable": "passed",
+    "sessionCapability": "not-required",
+    "worktreeCapability": "not-required"
+  },
+  "runtime": {
+    "status": "readback-not-applicable",
+    "sourceSha256": "4b91f3cdb947706e7677a91607b24fa4ebcb850fd9a93dec13e2ab3e555bc831",
+    "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+    "barrierSha256": null,
+    "readbackSha256": null
+  },
+  "continuity": {
+    "status": "absent-pristine",
+    "stateSha256": null,
+    "handoverSha256": null,
+    "historySha256": null
+  },
+  "appServer": {
+    "required": false,
+    "status": "not-applicable",
+    "code": null
+  },
+  "runnerPermissions": {
+    "target": ".claude/settings.local.json",
+    "status": "pending-runtime-initialization",
+    "lanes": [
+      "Bash",
+      "PowerShell"
+    ],
+    "exactEntries": []
+  },
+  "nextAction": {
+    "kind": "architecture-design-required",
+    "mutation": false,
+    "requiresConfirmation": false,
+    "schema": "pipeline.architecture-design-remediation.v1",
+    "code": "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE",
+    "prdPath": "specs/onboarding-c6ec83912c1e/prd_onboarding-c6ec83912c1e.md",
+    "specPath": "specs/onboarding-c6ec83912c1e/spec.md",
+    "guidance": "Agent design work is required before the single PO approval: author an explicit pipeline-architecture-design block in the staging PRD with module responsibilities, ownership, contracts, verification entry points, implementation surface, fitness model, zero-debt initial baseline, and scoped disposition. Review the whole design with the PO; do not sign a scaffold or infer approval."
+  },
+  "diagnostics": [
+    {
+      "path": "$.continuity",
+      "code": "bootstrap_binding_required",
+      "message": "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD",
+      "guidance": "ask the PO to review the staging PRD and specification, then follow the exact detached-signature acknowledgement action; do not edit an acknowledgement marker manually"
+    }
+  ]
+}
+
+  --- end ---
+

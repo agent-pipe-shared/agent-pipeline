@@ -1,0 +1,19 @@
+command: node --test scratch/dispatch-wip/t0c-run2/a-probe2.test.mjs
+label: a-probe-2
+exitCode: 0
+head: f9007f38f4cf08adcf9781e3d71629b48db3144f
+tree: 640a8c13b210afab1868bd8eb9152f254c2186ea
+dirty: true
+--- stdout ---
+probe2 result: exit 2; stderr: [guard-devplan] implementation requires a valid private design Advisor transaction (DWP-PACKAGE-PHYSICAL). Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>, complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation. Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> 
+✔ A-probe 2 feature: a v7 approval with a package binding passes the lifecycle layer (no awaiting-approval block) (8229.44648ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8293.781677
+
+--- stderr ---

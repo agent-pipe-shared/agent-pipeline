@@ -1,0 +1,59 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WPS013-T-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "4b79b33a0",
+  "outcome": "partial",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "9a6bac257"
+  ],
+  "resultSha256": "20880fe165f8af489653dd4c634d454d050070a12ebb2228cd3077b04f0db286",
+  "report": {
+    "text": "Fixture fault confirmed: WPS013 batch asserted the unhardened TEMP probeRoot as secure; module (windows-private-state.mjs lines 49-53) documents a DACL granting a non-owner principal as insecure. Fix: second hardened sibling directory in the batch. Commit 9a6bac257 (test file only). Native before.txt exit 1 (WPS013 only red; WPS014/015 green), after.txt exit 0, wsl-after.txt exit 0 (evidence/WPS013-T-20261009/). Not verified: consumer-safe-paths (script not located within budget). resultSha256 not computed (no budget for finalizer). Independent review: pending. Stray helper scratch/wps013-run.mjs is untracked and ignored.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/windows-private-state.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "orientation",
+      "toolUses": 8
+    },
+    {
+      "phase": "fix+verify",
+      "toolUses": 27
+    },
+    {
+      "phase": "committed 9a6bac257",
+      "toolUses": 30
+    },
+    {
+      "phase": "Elephant digest bind (Ruling 156): resultSha256 computed over the unchanged report.text",
+      "toolUses": null
+    }
+  ]
+}

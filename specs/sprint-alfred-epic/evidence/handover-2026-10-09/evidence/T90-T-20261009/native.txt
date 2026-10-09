@@ -1,0 +1,131 @@
+command: node --test --test-name-pattern=T90-T plugins/pipeline-core/lib/human-guard-override.test.mjs
+label: native
+exitCode: 1
+head: 8328f56bb437549da2a8f2caededf8219b99f4b8
+tree: 226dc80fa0fed6972ca9efea198e46f36d19b651
+dirty: true
+--- stdout ---
+✖ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (2339.1404ms)
+✖ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (1902.5498ms)
+✖ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (2112.6591ms)
+✖ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (2948.5598ms)
+✔ T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous (6903.8378ms)
+✔ T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous (2373.8121ms)
+✔ T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time (5142.7735ms)
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (2574.9292ms)
+﹣ T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy (0.1065ms) # Linux control: needs /proc on a Linux host
+ℹ tests 9
+ℹ suites 0
+ℹ pass 3
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 26640.1038
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6056:3
+✖ T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed (2339.1404ms)
+  AssertionError [ERR_ASSERTION]: (a) dead pid, locally recorded boot time: expected the dead owner's lock to be reclaimed (recovered: true), but acquireAuditLock threw HGO-AUDIT-LOCK-AMBIGUOUS: audit lock owner state is ambiguous
+  
+  false !== true
+  
+      at expectReclaimed (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6039:14)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6060:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6064:3
+✖ T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400) (1902.5498ms)
+  AssertionError [ERR_ASSERTION]: (a2) expected the dead recovery guard to be cleared and the lock acquired, but acquireAuditLock threw HGO-AUDIT-LOCK-AMBIGUOUS: audit lock recovery owner state is ambiguous
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6070:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6078:3
+✖ T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead (2112.6591ms)
+  AssertionError [ERR_ASSERTION]: (b) legacy bootId, dead pid: expected the dead owner's lock to be reclaimed (recovered: true), but acquireAuditLock threw HGO-AUDIT-LOCK-AMBIGUOUS: audit lock owner state is ambiguous
+  
+  false !== true
+  
+      at expectReclaimed (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6039:14)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6082:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6086:3
+✖ T90-T (c): win32 owner with a live pid but a different recorded boot time is dead (2948.5598ms)
+  AssertionError [ERR_ASSERTION]: (c) live pid, different boot time: expected the dead owner's lock to be reclaimed (recovered: true), but acquireAuditLock threw HGO-AUDIT-LOCK-AMBIGUOUS: audit lock owner state is ambiguous
+  
+  false !== true
+  
+      at expectReclaimed (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6039:14)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6090:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\human-guard-override.test.mjs:6135:3
+✖ T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command (2574.9292ms)
+  AssertionError [ERR_ASSERTION]: (f) ordinary lock: the HGO-AUDIT-LOCK-AMBIGUOUS refusal carries no typed recovery (error.recovery is undefined)
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/human-guard-override.test.mjs:6146:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

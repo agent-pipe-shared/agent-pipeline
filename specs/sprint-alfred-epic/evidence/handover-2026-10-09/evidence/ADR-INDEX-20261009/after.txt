@@ -1,0 +1,10 @@
+command: node harness/scripts/check-adr-consistency.mjs
+label: adr-index-after
+exitCode: 0
+head: 08b896e613beb2c7084f1a8bc53247070a87e662
+tree: 764771fd15692350b3293e9f7b3f507f9bac8ed6
+dirty: true
+--- stdout ---
+ADR corpus consistency: 5 classes green -- 85 numbered ADR files, 0 duplicate numbers, 0 missing status lines, 59 ADR-NNNN supersession targets resolved (0 dangling), 1/1 status-line supersession pair(s) compared and agreeing, 85 English index rows all resolving to their claimed file at their claimed number. Unparsed supersession pairs (counted, not judged): 0. NOT checked: whether an ADR's decision is reflected in the code that implements it; German reference translations below the DE-REFERENCE-BELOW marker; any supersession claim phrased other than the two literal shapes this check parses (see module header, "CLASS 4 -- NARROWING") -- such a pair is reported as unparsed above, never silently agreed; whether a decision recorded here is still a GOOD decision -- this check is purely mechanical cross-reference consistency, never semantic judgment.
+
+--- stderr ---

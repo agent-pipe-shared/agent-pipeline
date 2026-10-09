@@ -1,0 +1,87 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-S1-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh (requested; the runtime prompt shows a numeric reasoning-effort tag of 30 that cannot be mapped to xhigh; disclosed, not a proven contradiction)",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": "112ab590e5ccdac5ed022af57e9891aa4158a85681fc0b9ecd7d4f69f0894d47",
+  "report": {
+    "text": "STOPPED at field-5 stop condition: \"the gate causes a neighbour red you cannot resolve inside the file\". CLOSING-ALLOWANCE HANDOVER. Nothing committed. The production edit is complete and sits UNCOMMITTED in the shared tree (1 file changed, 66 insertions(+), 2 deletions(-)); a copy of the diff is saved at evidence/TR-S1-F2-20261009/po-human-approval.patch.\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh; observed identity claude-sonnet-5-5 (runtime prompt: \"exact model ID is claude-sonnet-5-5\"). The effort could not be mapped (the prompt shows a numeric reasoning-effort tag of 30). Disclosed, not a contradiction.\n\n1. DoD results\n- TR-S1 pins, WSL, po-human-approval.test.mjs: 170 tests, 169 pass, 1 fail. All five TR-S1-T pins and the five retired-subject cases are green. The one red is NVA-SWEEP-F2f-REWORK, thrown as SIGN-READINESS-FAILED key-anchor-mismatch at the anchor check, which runs BEFORE the new gate (stack ends in assertSigningReadyBeforePrompt at the readinessFailure throw); Ruling 91(a) and the predecessor record name it as red before and after. I did not capture my own pre-edit baseline of the target file (the briefed before.txt covers the neighbours only), so \"already red at baseline\" rests on that ruling, not on my measurement.\n- Neighbours (20 operands of before.txt, WSL): FAILED. Four cases are red in neighbours.txt and absent from before.txt:\n  (a) signing-ceremony.test.mjs:166, :226 and :263, the three \"maintenance-window ceremony ...\" cases. Each stack runs poKeyGateFailure <- refuseUnencryptedPoPrivateKey <- assertPoPrivateKeyProtected with code PO-KEY-UNENCRYPTED. They drive sign-intent with an UNENCRYPTED key and a typed confirmation, which is exactly the path Ruling 78 retires. Caused by this change.\n  (b) human-guard-override.test.mjs:6135 \"T90-T (f)\": AssertionError \"the HGO-AUDIT-LOCK-AMBIGUOUS refusal carries no typed recovery\". A foreign red pin from another test-first slice, unrelated to po-human-approval.mjs. HEAD moved from 56ec8c3 to 11657e2 between before.txt and neighbours.txt and the test count rose from 742 to 751, because the shared tree carries other dispatches' work.\n  Also: two onboarding-init.test.mjs cases that were already red at baseline (:919 and :1066) now carry PO-KEY-UNENCRYPTED in their error output. Their red state is unchanged by name, but their cause is now partly this gate; they stay masked until their baseline cause is fixed.\n- Consumer-safe check: passed (9/9, exit 0).\n- Commit: NOT made (stop condition). Prepared message: scratch/commit-msg/TR-S1-F2.txt (subject and the two trailers exactly as briefed).\n\n2. Evidence\n- evidence/TR-S1-F2-20261009/after.txt: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-S1-F2-20261009/after.txt --label after -- node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs\"; wrapped exit code 1 (the one expected red).\n- evidence/TR-S1-F2-20261009/neighbours.txt: the same capture command with the 20 operands of evidence/TR-S1-F-20261009/before.txt line 1, label neighbours; wrapped exit code 1 (223 red, 222 at baseline).\n- Comparators (scratch, machine output quoted above): node scratch/cmp-neighbours-TR-S1-F2.mjs and node scratch/attribute-neighbours-TR-S1-F2.mjs, each exit 0.\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0.\n- evidence/TR-S1-F2-20261009/po-human-approval.patch: the complete production diff.\n\n3. Changed files\n- plugins/pipeline-core/scripts/po-human-approval.mjs (UNCOMMITTED): classifyPoPrivateKeyArmor (PKCS#8 BEGIN PRIVATE KEY = unencrypted, checked first; BEGIN ENCRYPTED PRIVATE KEY = encrypted; else other), poKeyGateFailure (PO-KEY-UNENCRYPTED / PO-KEY-UNREADABLE with error.code, one attended finding, repair text, no key bytes or path), and the gate at six sites: setup --existing-key (one read, classified bytes are the copied bytes), setup recover branch, sign-intent inside assertSigningReadyBeforePrompt (after the anchor check, before the attended-terminal check and the first spawn), signIntentIntoProof (first statement), authorize-critical, approve/approve-critical. isPrivateKeyPassphraseProtected now uses the classifier.\n- evidence/TR-S1-F2-20261009/{after.txt,neighbours.txt,po-human-approval.patch}, evidence/dispatch-record-TR-S1-F2-20261009.json (this record).\n- scratch/commit-msg/TR-S1-F2.txt and three scratch comparator/finalizer scripts (scratch is ignored).\n\n4. Deliberately not changed\n- Every test file (signing-ceremony.test.mjs included), hooks/, lib/guard/, harness/.\n- The setup branch where all three of private key, public key and authority already exist (not named by Ruling 113 TR-S1-F). Traditional unencrypted armors (BEGIN RSA/EC/OPENSSH PRIVATE KEY) are classified \"other\" and pass as before (Ruling 113 keeps them out of scope). probeSigningReadiness stays a read-only probe that never opens the private key.\n- NVA-SWEEP-F2f-REWORK and T90-T (f) (not this slice).\n\n5. Deviations from spec\n- The neighbour capture was started with run_in_background and polled in-turn (until-loops), not run in the foreground: it takes longer than the Bash tool 600000 ms ceiling. I held the result in-turn.\n- No commit and no \"committed-pending-report\" checkpoint, because the stop condition fired before any commit. The terminal record is kind stopped-without-commit, as the template defines.\n- Wording of the codes: both PO-KEY-UNENCRYPTED and PO-KEY-UNREADABLE satisfy the pins' typed-shape test (A1 asserts only a typed shape); they are not asserted by name.\n\n6. Open items\n- STOP: three signing-ceremony.test.mjs cases need an encrypted key. A fix inside the production file would be a bypass of the gate, which I did not build.\n- Dispatcher decision: either (i) dispatch a test-only slice (QG-04, a different Goldfish) that moves the three maintenance-window ceremony cases onto an encrypted key, in the manner of the central lever in po-human-approval.test.mjs, then commit this diff; or (ii) commit now with the three reds named. I did not check whether Ruling 113 already names signing-ceremony.test.mjs as a re-point target; the TR-S1-T header accounts only for po-human-approval.test.mjs cases.\n- Until it is committed or reverted, any run of signing-ceremony.test.mjs in the shared tree is red because of this uncommitted edit.\n- independent review: pending. A Critic (security class, Ruling 113 names an Opus Critic for TR-S1-F) has not seen this.\n\nClosing-allowance handover (pipeline.dispatch-closing-allowance.v1)\n- Committed: nothing committed.\n- Verified green: po-human-approval.test.mjs 169/170 (only the known NVA-SWEEP-F2f-REWORK red), after.txt, exit 1 by design; consumer-safe check exit 0.\n- Remains undone: neighbour DoD (3 new gate-caused reds); the commit; the Critic. The production file is modified, complete and uncommitted.\n- Next briefing must say differently: sequence the signing-ceremony test re-point BEFORE this commit; exclude the foreign T90-T (f) red from the comparator; allow background-and-poll for the 20-file capture (about 20+ minutes under load) or re-run only signing-ceremony.test.mjs and onboarding-init.test.mjs after the test slice; budget the ceremony check as its own step.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/po-human-approval.mjs (uncommitted)",
+      "evidence/TR-S1-F2-20261009/after.txt",
+      "evidence/TR-S1-F2-20261009/neighbours.txt",
+      "evidence/TR-S1-F2-20261009/po-human-approval.patch",
+      "evidence/dispatch-record-TR-S1-F2-20261009.json"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: obligations + CONT17/CONT15 headers read, preflight run from the loaded plugin root (cured GUARD-BOOTSTRAP-RECEIPT-MISSING), predecessor record + prepared commit message read, opening in-progress record written",
+      "toolUses": 9
+    },
+    {
+      "phase": "orientation done (pin header, production call sites, advisor consulted once); commit message scratch/commit-msg/TR-S1-F2.txt written; 7 edits applied to po-human-approval.mjs only (classifier + typed refusals + gate at existing-key, recover, sign-intent readiness, signIntentIntoProof, authorize-critical, approve)",
+      "toolUses": 34
+    },
+    {
+      "phase": "after.txt (WSL, evidence/TR-S1-F2-20261009/after.txt, exit 1): tests 170, pass 169, fail 1 = NVA-SWEEP-F2f-REWORK only (SIGN-READINESS-FAILED key-anchor-mismatch thrown at the anchor check before the new gate; Ruling 91(a) names it as staying red). All five TR-S1 pins and the five retired-subject cases green. Consumer-safe check exit 0 (9/9). Neighbour capture launched in WSL (background shell, polled in-turn): evidence/TR-S1-F2-20261009/neighbours.txt",
+      "toolUses": 41
+    },
+    {
+      "phase": "neighbours.txt compared: 4 cases absent from before.txt (3 gate-caused in signing-ceremony.test.mjs, 1 foreign T90-T (f)); STOP condition fired; patch saved; terminal record written",
+      "toolUses": 51
+    }
+  ],
+  "candidateCommit": "c050c41160e11f21d58b6a3227639daa75851b9e",
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": [],
+    "verifiedGreen": [
+      {
+        "check": "po-human-approval.test.mjs (169 pass, 1 known red)",
+        "artifact": "evidence/TR-S1-F2-20261009/after.txt",
+        "exitCode": 1
+      },
+      {
+        "check": "node --test harness/scripts/check-consumer-safe-paths.test.mjs",
+        "artifact": null,
+        "exitCode": 0
+      }
+    ],
+    "remainsUndone": [
+      "neighbour DoD: 3 signing-ceremony.test.mjs cases newly red from PO-KEY-UNENCRYPTED",
+      "the commit of plugins/pipeline-core/scripts/po-human-approval.mjs (modified, complete, uncommitted)",
+      "independent Critic review"
+    ],
+    "nextBriefingAdjustments": [
+      "re-point the three signing-ceremony maintenance-window cases onto an encrypted key in a test-only slice first",
+      "exclude the foreign T90-T (f) red from the neighbour comparator",
+      "allow background-and-poll for the long WSL capture"
+    ]
+  }
+}

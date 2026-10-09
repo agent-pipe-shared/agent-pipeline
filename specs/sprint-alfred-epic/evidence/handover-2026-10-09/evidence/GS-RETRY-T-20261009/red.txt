@@ -1,0 +1,185 @@
+command: node --test plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs
+label: GS-RETRY-T-red
+exitCode: 1
+head: a8dba59ffce7de7028f7b772d6a587964089832b
+tree: 5722ab60465d507c386923ef8e49b97689ebd08c
+dirty: true
+--- stdout ---
+✔ GUARD valid readback returns the journal and runs exactly the read-only inspect command (82.6207ms)
+✔ GUARD a valid document with the wrong schema is its own error, distinct from empty and invalid, with no retry (33.5837ms)
+✔ GUARD malformed output (truncated object) is INVALID, exec runs once, and no retry is offered (32.8428ms)
+✔ GUARD malformed output (plain text) is INVALID, exec runs once, and no retry is offered (32.2515ms)
+✔ GUARD malformed output (truncated mid-document) is INVALID, exec runs once, and no retry is offered (31.4443ms)
+✔ GUARD a child that fails outright propagates unchanged and is not retyped as a readback code or retry (31.0658ms)
+✔ GUARD empty readback (empty string) raises the EMPTY code after exactly one exec call and changes no state (52.6677ms)
+✔ GUARD empty readback (whitespace only) raises the EMPTY code after exactly one exec call and changes no state (51.2939ms)
+✔ GUARD empty readback (undefined (no output at all)) raises the EMPTY code after exactly one exec call and changes no state (52.6549ms)
+✔ GUARD empty readback (null) raises the EMPTY code after exactly one exec call and changes no state (52.4515ms)
+✖ RETRY empty readback (empty string) carries ONE exact, read-only, host-boundary nextAction (32.2148ms)
+✖ RETRY empty readback (whitespace only) carries ONE exact, read-only, host-boundary nextAction (31.4009ms)
+✖ RETRY empty readback (undefined (no output at all)) carries ONE exact, read-only, host-boundary nextAction (31.0849ms)
+✖ RETRY empty readback (null) carries ONE exact, read-only, host-boundary nextAction (31.3278ms)
+✖ RETRY the nextAction is bounded to one attempt, plain serialisable data, and identical for every empty variant (122.3787ms)
+✖ RETRY the host follows the nextAction once: a retry that returns valid output yields the journal (31.0945ms)
+✖ RETRY a second empty readback after the retry stays the typed EMPTY refusal and never loops (30.4805ms)
+✖ RETRY invalid output after the retry is INVALID with no further retry (30.0789ms)
+✖ RETRY the retry flow changes no lifecycle state (40.3756ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 10
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1394.5544
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:239:3
+✖ RETRY empty readback (empty string) carries ONE exact, read-only, host-boundary nextAction (32.2148ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: EMPTY must carry a single typed nextAction object (A1); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:244:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:239:3
+✖ RETRY empty readback (whitespace only) carries ONE exact, read-only, host-boundary nextAction (31.4009ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: EMPTY must carry a single typed nextAction object (A1); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:244:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:239:3
+✖ RETRY empty readback (undefined (no output at all)) carries ONE exact, read-only, host-boundary nextAction (31.0849ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: EMPTY must carry a single typed nextAction object (A1); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:244:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:239:3
+✖ RETRY empty readback (null) carries ONE exact, read-only, host-boundary nextAction (31.3278ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: EMPTY must carry a single typed nextAction object (A1); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:244:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:257:1
+✖ RETRY the nextAction is bounded to one attempt, plain serialisable data, and identical for every empty variant (122.3787ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: every empty variant needs the typed nextAction (A1); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:260:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:267:1
+✖ RETRY the host follows the nextAction once: a retry that returns valid output yields the journal (31.0945ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: the host must be offered exactly one retry (A4/A5); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:270:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:277:1
+✖ RETRY a second empty readback after the retry stays the typed EMPTY refusal and never loops (30.4805ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: one retry must be offered before the refusal (A4/A7); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:280:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:286:1
+✖ RETRY invalid output after the retry is INVALID with no further retry (30.0789ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: one retry must be offered after the empty readback (A4); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:289:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins\pipeline-core\lib\governance-scope-retirement-retry.test.mjs:295:1
+✖ RETRY the retry flow changes no lifecycle state (40.3756ms)
+  AssertionError [ERR_ASSERTION]: GS-RETRY-T: the retry flow must exist before its state-safety can be pinned (A4); fix location: governance-scope.mjs readGovernanceEnrollmentRetirement child-readback block
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs:299:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

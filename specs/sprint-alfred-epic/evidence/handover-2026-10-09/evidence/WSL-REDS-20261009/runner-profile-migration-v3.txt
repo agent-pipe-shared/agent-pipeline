@@ -1,0 +1,77 @@
+command: node --test plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+label: runner-profile-migration-v3
+exitCode: 0
+head: 5031d4dc474cdeab4f533d14b8bd0f5292d44352
+tree: 801823c0ddb41a10182bd6caf5838bc057af038c
+dirty: true
+--- stdout ---
+✔ RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization (1202.608647ms)
+✔ RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner (162.376922ms)
+✔ RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty (72.173487ms)
+✔ RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature (97.286977ms)
+✔ RPM05 apply requires explicit activation and an unchanged in-process digest-only plan (31.655351ms)
+✔ RPM06 a V3 authority update refreshes every frozen routing mapping as one registry (81.522762ms)
+✔ RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection (93.216361ms)
+✔ RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction (91.893975ms)
+✔ RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it (81.645145ms)
+✔ RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed (286.283835ms)
+✔ RPM11 a cached preview acknowledgement cannot authorize a second recovery (67.001031ms)
+✔ RPM12 stale source invalidates a reviewed plan before staging (32.932045ms)
+✔ RPM13 a handled durable exclusive-commit error rolls every target back (47.383345ms)
+✔ RPM14 already-current v3 inspects ready and plans noop (73.078854ms)
+✔ RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh (9.048429ms)
+✔ RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial (103.762848ms)
+✔ RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy (91.60788ms)
+✔ RPM18 Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs (232.466341ms)
+✔ RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract (158.887766ms)
+✔ RPM20 legacy additions roll back files and created directories after interruption (100.15887ms)
+✔ RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target (50.444172ms)
+✔ RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup (57.219499ms)
+✔ RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes (439.14688ms)
+✔ RPM24 exclusive absent-target commit closes the race after its final preimage check (55.344284ms)
+✔ RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary (46.164143ms)
+✔ RPM26 current V3 with any missing runtime target remains fail-closed (6.739005ms)
+✔ RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable (49.060936ms)
+✔ RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant (49.756079ms)
+✔ RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent (94.017326ms)
+✔ RPM30 slim V3 initialization never replaces a present malformed runtime baseline (19.581795ms)
+✔ RPM31 legacy compatibility remains closed to malformed and unknown aliases (9.263254ms)
+✔ RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert (48.174379ms)
+✔ RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets (87.80446ms)
+✔ RPM34 authenticated noop apply remains bound to source, runtime digests, and root (181.103401ms)
+✔ RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors (307.460661ms)
+✔ RPM36 an unsafe existing neutral authority mirror fails planning without a transaction (11.834142ms)
+✔ RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply (76.301974ms)
+✔ RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically (84.757992ms)
+✔ RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded (79.193108ms)
+✔ RPM40 a source stale only in critic_export classifies as v3-refresh (81.569174ms)
+✔ RPM41 a source with critic_export entirely absent still fills it in unchanged (78.045727ms)
+✔ RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid (9.703572ms)
+✔ RPM43 CLI enforces inspect/plan/apply and explicit activation (107.438686ms)
+✔ RPM44 CLI activated apply emits the complete classified preview before any target mutation (103.38615ms)
+✔ RPM45 CLI production preview contract completes bounded short writes before activation (77.73093ms)
+✔ RPM46 CLI production preview zero-progress and failure seams stop before apply (100.396386ms)
+✔ RPM47 CLI preview-channel failure returns one sanitized result and cannot activate (51.385369ms)
+✔ RPM48 CLI previews a classified pending recovery before recovery and activation (142.916488ms)
+✔ RPM49 CLI completes bounded short writes for pending recovery before touching its journal (141.486071ms)
+✔ RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes (164.567344ms)
+✔ RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate (75.898326ms)
+✔ RPM52 a freshly onboarded project seeds both manifest tiers byte-identically (23922.344188ms)
+✔ RPM53 both freshly seeded manifest tiers resolve the same gate chapter (28267.939099ms)
+✔ RPM54 a customised existing manifest is never replaced by the fresh seed (57.808242ms)
+✔ RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply (76801.76465ms)
+✔ RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed (38848.811498ms)
+✔ RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed (23626.398122ms)
+✔ RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier (23712.085635ms)
+✔ RPM59 an Antigravity enrolment publishes its own tier and no Codex target (46486.595252ms)
+✔ RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines (25610.637317ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 60
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 294640.932996
+
+--- stderr ---

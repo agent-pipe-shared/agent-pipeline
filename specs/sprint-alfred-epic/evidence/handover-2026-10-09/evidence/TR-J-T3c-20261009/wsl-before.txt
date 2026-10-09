@@ -1,0 +1,80 @@
+command: node --test plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
+label: wsl-before
+exitCode: 1
+head: 98b81b479fb3f92aa8a798f7ae8525353162e226
+tree: a2b444bc7ae55be8f3a21c93dc1ceb507fa439cb
+dirty: true
+--- stdout ---
+✔ onboarding pre-push offer executes from a consumer repository with an absolute installer path (14097.563256ms)
+✔ parseRefUpdates: ordinary update line (1.972796ms)
+✔ parseRefUpdates: delete case (local-sha all zeroes, 40-hex) (0.203844ms)
+✔ parseRefUpdates: delete case (local-sha all zeroes, 64-hex/sha256 repo) (0.196573ms)
+✔ parseRefUpdates: multiple lines, malformed lines ignored rather than fabricated (0.301786ms)
+✔ parseRefUpdates: empty stdin yields no updates (0.678912ms)
+✔ checkEvidenceFreshness: missing file (2015.733852ms)
+✔ checkEvidenceFreshness: corrupt JSON (2174.061141ms)
+✔ checkEvidenceFreshness: stale commit binding (2202.501056ms)
+✔ checkEvidenceFreshness: fresh and exitCode 0 passes clean (2149.707282ms)
+✔ installed hook: no manifest at all -> allow (opt-in feature, not a 'cannot evaluate' case) (14929.786414ms)
+✔ installed hook: push gate mode off -> allow (14800.422067ms)
+✔ installed hook: manifest present but unparseable -> BLOCK (fail-closed, diverges from guard-push.mjs's WARN) (14401.949779ms)
+✔ installed hook: verify evidence missing -> BLOCK (14578.868815ms)
+✔ installed hook: push approval state missing (approval required, not standing-approved) -> BLOCK (14450.207783ms)
+✔ installed hook: repository root unresolvable (invoked outside any git repo) -> BLOCK (31.90605ms)
+✔ installed hook: fresh verify evidence + standing-approved -> ALLOW, record written (14570.217548ms)
+✔ installed hook: linked worktree reads fresh canonical evidence (10705.967967ms)
+✔ HK1 installed hook, signature mode: a clean exact checkpoint with NO recorded approval is blocked (11809.803203ms)
+✔ HK2 installed hook: a stale approval (another commit), an expired one and one bound to another destination are blocked (51198.682238ms)
+✔ HK3 installed hook: a valid commit-bound approval admits the checkpoint with no Verify evidence, tolerating exactly the approval record as dirt (11635.309557ms)
+✖ HK3b installed hook: a valid approval does not excuse any other dirt (untracked file, staged state record) (30781.415265ms)
+✔ HK4 installed hook: chat mode keeps today's behaviour (no approval needed) and never tolerates the approval record as dirt (31780.389335ms)
+✔ HK5 fail closed: a malformed proof policy blocks, and so does an import fault of the approval module (13721.208591ms)
+✔ HK6 installed hook: a push to another remote name, or addressed by URL, is not admitted by an approval for 'origin' and never echoes the URL (35441.740269ms)
+✔ HK7 the snapshot digest tracks the approval module and the installer, so an existing install reports updateRequired (13812.769161ms)
+✔ installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit (standing-approved variant) (12363.43413ms)
+✔ installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW (12082.416973ms)
+✔ installed hook: ref deletion is blocked without evidence evaluation, and recorded (11718.888284ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (1731.2626ms)
+✔ applyInstall then applyRemoval: removes exactly what was installed (10692.474135ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (11298.400595ms)
+✔ applyRemoval: nothing-to-remove when never installed (1806.370509ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (42329.030002ms)
+✔ planInstall: an intact pipeline hook bound to an older plugin library is stale and applyInstall upgrades it (1798.093489ms)
+✔ planInstall: an intact recorded older implementation is upgradeable (18973.019494ms)
+✔ planInstall: an impl or marker discrepancy is foreign and applyInstall leaves the hook untouched (20378.788376ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.124612ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.149743ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (1589.429836ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (4.231279ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (1569.642206ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (8338.369903ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (19059.378301ms)
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (137.709095ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 44
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 499433.465499
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs:451:1
+✖ HK3b installed hook: a valid approval does not excuse any other dirt (untracked file, staged state record) (30781.415265ms)
+  Error: GHS-SOURCE-DRIFT
+      at footprintFail (file://<repo-root>/plugins/pipeline-core/lib/git-hook-footprint.mjs:11:57)
+      at assertSameSourceInventory (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:23:297)
+      at assertSourceUnchanged (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:68:142)
+      at publishGitHookRuntimeSnapshot (file://<repo-root>/plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs:37:1049)
+      at applyInstall (file://<repo-root>/plugins/pipeline-core/scripts/pre-push-hook-install.mjs:713:27)
+      at runInstalledHook (file://<repo-root>/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs:106:19)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs:460:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'GHS-SOURCE-DRIFT'
+  }
+
+--- stderr ---

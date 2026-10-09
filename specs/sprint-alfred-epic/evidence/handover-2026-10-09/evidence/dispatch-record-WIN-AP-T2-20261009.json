@@ -1,0 +1,63 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-T2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "ad3e7f2bcf77cd758c845c4dd0b4359dc5c30ec8",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "f79f0bf9ff1404ba5f698298dd2982c57c76222e"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations read, preflight run, record created",
+      "toolUses": 12
+    },
+    {
+      "phase": "test block authored (describe, 29 new cases) and committed",
+      "toolUses": 36
+    },
+    {
+      "phase": "native capture exit 0 (38 pass, 6 typed skip, 0 fail); consumer-safe check exit 0",
+      "toolUses": 29
+    },
+    {
+      "phase": "WSL capture exit 0 (40 pass, 4 skip, 0 fail)",
+      "toolUses": 31
+    },
+    {
+      "phase": "terminal write: commit bound, report and resultSha256 in one write",
+      "toolUses": 40
+    }
+  ],
+  "report": {
+    "text": "WIN-AP-T2-20261009: closing report (implementation complete; independent review: pending). Route pre-check: requested model/effort `claude-sonnet-5-5` / `xhigh` (field 6, no A/G/S class declared); observed identity from this dispatch's runtime prompt: \"Sonnet 5.5 ... claude-sonnet-5-5\"; agent definition frontmatter `effort: xhigh`, `maxTurns: 80`. No contradiction.\n\n1. DoD results\n- Native capture of `node --test plugins/pipeline-core/lib/hardened-private-directory.test.mjs`: passed (44 tests, 38 pass, 6 typed skips, 0 fail; every pre-existing case unchanged and green).\n- WSL capture of the same command: passed (44 tests, 40 pass, 4 skipped, 0 fail; the skips are the one pre-existing native-Windows case and the 3 win32-DACL cases with typed reason `SKIP-HOST-CLASS no-windows-dacl-on-this-host`).\n- `node --test harness/scripts/check-consumer-safe-paths.test.mjs`: passed (exit 0).\n- One commit of the test file with the exact subject: passed (`f79f0bf9ff1404ba5f698298dd2982c57c76222e`).\n- No new case came out red: no case was dropped, no finding about the implementation.\n\n2. Evidence (machine-written by `scratch/win-ap-t2-tool.mjs capture`, which scrubs host paths and appends `exit code: N`)\n- `evidence/WIN-AP-T2-20261009/native-hardened-private-directory.txt` (exit 0)\n- `evidence/WIN-AP-T2-20261009/native-check-consumer-safe-paths.txt` (exit 0)\n- `evidence/WIN-AP-T2-20261009/wsl-hardened-private-directory.txt` (exit 0)\n- Commands: `node scratch/win-ap-t2-tool.mjs capture native all`; under WSL `node scratch/win-ap-t2-tool.mjs capture wsl hpd` (foreground, timeout 600000).\n- Positive real-host evidence: natively the real repair case and the real refuse case both RAN (the temp directory inherited a foreign ACE): the repair hardened it to secure with `PB-ROOT-REPAIRED`, and the refuse posture left it insecure. Under WSL the real POSIX cases ran (absent -> created 0o700, secure unchanged, 0o755/0o770/0o705 repaired to 0o700 with the `mode 0o755 reset to 0o700` detail, refuse posture keeps 0o755). A real directory junction at the root ran natively (not skipped) and is refused with `PB-DIRECTORY`.\n\n3. Changed files\n- `plugins/pipeline-core/lib/hardened-private-directory.test.mjs`: imports extended (4 lines edited) and a new `describe(\"ensureAgentPipelineRoot (Ruling 141 D0 root entry point)\")` block of 29 cases: posture constant and default; win32 seams for created, secure (both postures), repaired, repair-not-secure (insecure / unavailable / unreported), refuse and unrecognised postures, foreign owner, reparse point, unobservable assurance (3 shapes); link and file at the root under all three platform branches; `PB-ANCHOR` (missing, file, empty, non-string); POSIX seams for foreign or unknown uid, refuse posture, chmod that does not take (`PB-ROOT-INSECURE`, bound to the assessed inode), chmod that throws; real POSIX and real win32 cases. Seam cases say \"seam-driven\" in the title; real-host cases skip with a typed `SKIP-HOST-CLASS` reason.\n- Uncommitted by design (the Elephant integrates): `evidence/WIN-AP-T2-20261009/*.txt`, `evidence/dispatch-record-WIN-AP-T2-20261009.json`; throwaway scratch: `scratch/win-ap-t2-tool.mjs`, `scratch/win-ap-t2-report.md`, `scratch/commit-msg/WIN-AP-T2-20261009.txt`.\n\n4. Deliberately not changed\n- The production module, `agent-pipeline-root-creation.test.mjs`, the untracked `scratch/win-ap-f2-probe.mjs`, and the pre-existing `windowsOnly` skip in the same test file.\n- Not pinned (no production seam exists, none added): the swapped-inode / symlink-swap guard inside the private `chmodPhysicalDirectory` (a race between assessment and chmod cannot be built from outside); the real foreign-owner case (no real host state can build it, so it is seam-driven only).\n\n5. Deviations from spec\n- `WIN32_DACL_HOST_SKIP` is `process.platform === \"win32\"` with a typed reason attached; the briefing said never `process.platform` alone. The POSIX side is capability-probed (owner ids, mode bits recorded); the win32 side adds runtime premise probes (an insecure DACL must be buildable, else typed skip) but the host-class gate itself is platform-based, as in the file's pre-existing `windowsOnly`.\n- The briefing's \"reparse point / symlink -> `PB-ANCHOR` or `PB-DIRECTORY`\" was loose. Observed and pinned: a real link or junction at the root -> `PB-DIRECTORY` on every platform branch; a seam-reported reparse point on win32 -> `PB-WINDOWS-ASSURANCE`; `PB-ANCHOR` belongs to anchor problems only. Not a contradiction.\n- Dispatch record: the template's per-commit checkpoint (set `committed-pending-report` after the commit) was collapsed into the single terminal write that field 6 mandated (commits, outcome, report and `resultSha256` bound together; `resultSha256` is the SHA-256 of the exact UTF-8 bytes of `report.text`, per template line 475). The candidate is recorded as the full SHA `ad3e7f2bcf77cd758c845c4dd0b4359dc5c30ec8`.\n- No Co-Authored-By or Claude-Session trailer despite the harness reminder (GIT-03); trailers are `AI-Assisted: true` and `Dispatch: WIN-AP-T2-20261009 (goldfish)`.\n\n6. Open items\n- independent review: pending (only the Elephant dispatches the Critic; `criticRequired` is the conservative T3 decision).\n- Untracked evidence files and the dispatch record await the Elephant's integration commit; reconcile `report.changedFiles` (the one committed test file) against staged paths first.\n- Real win32 repair/refuse cases skip with a typed reason on hosts whose temp directory hands down no foreign ACE; an explicit foreign ACE is the known fail-closed refusal (Ruling 146 open item ii), deliberately not pinned here.\n- Tool use: about 42 of 45 base, no closing-allowance handover (task complete, not a budget stop).",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/hardened-private-directory.test.mjs"
+    ]
+  },
+  "resultSha256": "4cff6abcb28eab08092252e1c7b90d5025a36f808dcfbe2da6e4a5ff69842ab2"
+}

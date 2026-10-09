@@ -1,0 +1,64 @@
+command: node --test --test-name-pattern recovery --test-name-pattern "initial answer" --test-name-pattern "intake language" --test-name-pattern host-managed --test-name-pattern later-language --test-name-pattern "public re-entry" --test-name-pattern maintenance-window --test-name-pattern SigningCeremony --test-name-pattern "portable lifecycle" --test-name-pattern DEFAULT_STEP_CAP plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: whole-2
+exitCode: 1
+head: c7aa931021895c6608bbb7037d0c234d763462de
+tree: baf648f86a943e7f8c21c059245495d32c169263
+dirty: true
+--- stdout ---
+✔ recovery plan is bound to the public preimage and refuses an in-repository key directory (3.542558ms)
+✔ recovery requires exact digest and explicit attended confirmation before bounded setup (0.899416ms)
+✔ recovery CLI rejects non-TTY activation without invoking setup (0.558533ms)
+✔ recovery reports source complete if audit fails, without pretending the setup rolled back (0.582611ms)
+✔ successful attended recovery writes a bounded, replay-safe private audit receipt (1.056779ms)
+✔ a failed first-anchor action returns an attended digest-bound recovery command (0.760853ms)
+✔ initial answer CLI refuses absent or invalid language before any source or receipt write (41428.193335ms)
+✔ an earlier intake language cannot be mislabeled as a later override (52089.050415ms)
+✔ a later explicit intake language override is reported by the real CLI (57166.323463ms)
+✔ host-managed initial answers publish privately and never write reserved Git or Codex controls (11873.664769ms)
+✔ host-managed first stop asks identity, approval and language before intake consent (8362.438938ms)
+✖ host-managed consent CLI routes its later explicit language into private intake state (22726.137363ms)
+✔ later intake language projection resumes after each target publication (26569.110326ms)
+✔ public re-entry repairs consent recorded before language projection (16489.371879ms)
+✔ later-language recovery refuses foreign edits without publishing an audit (9236.789684ms)
+✔ later-language projection completes a prior three-target journal after plugin upgrade (10070.912976ms)
+✔ host-managed first answers recover after every publication boundary (24220.303359ms)
+✔ host-managed first answers complete a prior three-target journal after plugin upgrade (5416.125841ms)
+✔ host-managed recovery refuses changed answers and foreign post-interruption bytes (5493.845393ms)
+✔ a new-key post-setup failure replays the same public action from its bound recovery receipt without running setup twice (34298.364741ms)
+✔ new-key recovery refuses malformed or foreign authority receipts before setup (74071.94689ms)
+✔ portable lifecycle apply returns its rollback instead of replanning the same seed (96.084846ms)
+✔ DEFAULT_STEP_CAP is a small, positive constant (0.172035ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 22
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 402234.42281
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/onboarding-init.test.mjs:495:1
+✖ host-managed consent CLI routes its later explicit language into private intake state (22726.137363ms)
+  AssertionError [ERR_ASSERTION]: INTAKE-GENERATE-LINE-ENDINGS-REFUSED: design document line-ending preparation failed: LINE-ENDINGS-GIT-FAILED
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/onboarding-init.test.mjs:559:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

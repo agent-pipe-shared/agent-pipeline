@@ -1,0 +1,239 @@
+command: node --test plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: target-before
+exitCode: 1
+head: 9d2c4b27fd85bb3db6e03f5237cd53ad0dd94222
+tree: 274fb2427f2e55568cd179572793f2e41c77f04f
+dirty: true
+--- stdout ---
+✖ R1 re-read: design-workflow-package.mjs exports the re-read function (373.470386ms)
+✖ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (0.180454ms)
+✖ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (0.182504ms)
+✖ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (0.260045ms)
+✖ R5 re-read: package bytes changed after the approval are refused (item 1) (0.374677ms)
+✖ R6 re-read: a missing package file is a typed refusal (0.145272ms)
+✖ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (0.127152ms)
+✖ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (0.229125ms)
+✖ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (0.237555ms)
+✖ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (3.536705ms)
+✖ R11 re-read: a package of another feature is refused (0.297146ms)
+✖ R12 re-read: malformed approval inputs are a typed input refusal (0.137363ms)
+✔ V0 v8: pipeline.plan-approval.v8 is the current approval schema (25.037686ms)
+✔ V1 v8: a signature-mode record with a proof is valid (3.601185ms)
+✔ V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid (0.319706ms)
+✔ V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid) (0.269245ms)
+✔ V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid) (0.251555ms)
+✔ V5 v8: the mode must be exactly signature or chat (0.259665ms)
+✔ V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid) (0.285505ms)
+✔ V7 v8: the plan approval carries designApproval and none of the four retired v7 fields (0.195673ms)
+✔ V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1 (0.226665ms)
+✔ V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO) (0.283325ms)
+✔ V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval (0.291185ms)
+✔ V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable) (0.219815ms)
+✔ L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception (22.412576ms)
+✔ L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid (0.153683ms)
+✔ L3 classification: other or malformed records are unknown (0.127513ms)
+✔ L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent (1.690321ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 16
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 494.103337
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:260:1
+✖ R1 re-read: design-workflow-package.mjs exports the re-read function (373.470386ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:261:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:264:1
+✖ R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode (0.180454ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:265:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:275:1
+✖ R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package) (0.182504ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:276:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:294:1
+✖ R4 re-read: a v1 package re-reads as ok with a null recorded exception binding (0.260045ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:295:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:304:1
+✖ R5 re-read: package bytes changed after the approval are refused (item 1) (0.374677ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:305:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:312:1
+✖ R6 re-read: a missing package file is a typed refusal (0.145272ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:313:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:320:1
+✖ R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2) (0.127152ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:321:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:327:1
+✖ R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3) (0.229125ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:328:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:335:1
+✖ R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3) (0.237555ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:336:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:347:1
+✖ R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4) (3.536705ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:348:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:357:1
+✖ R11 re-read: a package of another feature is refused (0.297146ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:358:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:364:1
+✖ R12 re-read: malformed approval inputs are a typed input refusal (0.137363ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export rereadApprovedDesignWorkflowPackage in ./design-workflow-package.mjs [slice F2a]
+      at loadExport (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:86:12)
+      at async loadReread (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:95:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:365:18)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+--- stderr ---

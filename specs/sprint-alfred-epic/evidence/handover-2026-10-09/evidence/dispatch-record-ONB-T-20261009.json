@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ONB-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "24a27a1c9cf231e87f585f9396c08065fe0e49f0",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "stopped-without-commit"
+  },
+  "commits": [],
+  "resultSha256": null,
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {"phase": "opening-record (briefing, obligations, preflight)", "toolUses": 14},
+    {"phase": "orientation (owners located: lib/project-onboarding-v3.mjs intakeConsentAction 2719-2762; lib/onboarding-continuity.mjs 5186; existing contract pin project-onboarding-v3.test.mjs 9297-9334)", "toolUses": 36},
+    {"phase": "advisor consult; commit message file written", "toolUses": 38},
+    {"phase": "pins drafted: F3 argv + F4 in project-onboarding-v3.test.mjs, F7 in onboarding-continuity.test.mjs", "toolUses": 45},
+    {"phase": "measured: project-onboarding-v3 exit 1 (suite asserts 216 stable callbacks, got 218); onboarding-continuity exit 1 (corpus asserts 298, got 299) - red for a structural reason, not the stated one", "toolUses": 53},
+    {"phase": "restore-before-yield: both test files reverted to HEAD by exact-text Edit; nothing committed", "toolUses": 55},
+    {"phase": "closing: scratch report write refused by guard-dispatch-budget (only record write, git add, git commit permitted); resultSha256 could not be computed", "toolUses": 56}
+  ],
+  "report": {
+    "changedFiles": [],
+    "text": "ONB-T-20261009 stopped-without-commit (closing-allowance handover). Committed: nothing. Verified green: none. Both edited test files (plugins/pipeline-core/lib/project-onboarding-v3.test.mjs, plugins/pipeline-core/lib/onboarding-continuity.test.mjs) were restored to HEAD by exact-text Edit; untracked scratch/commit-msg/ONB-T-20261009.txt (message for a F3, F4, F7 commit; needs a subject check) and the machine-local artifacts evidence/ONB-T-20261009/red-project-onboarding-v3.txt and red-onboarding-continuity.txt remain. Cause of the stop: the pins were drafted and run (capture-evidence, exit code 1 each) but every run is red for a structural reason, not the stated one. project-onboarding-v3.test.mjs asserts it declares exactly 216 stable callbacks, sharded 12 x 18 (line about 10440: EXPECTED_CASE_COUNT, CASES_PER_CHILD), and got 218. onboarding-continuity.test.mjs asserts a registered corpus of 298 (line about 5030) and got 299. A pin added as a new case therefore fails the whole file before any case runs. Remains undone: the F3 argv pin, the F4 pins and the F7 pin (all drafted, text in the hand-back message), F9 (not reached), and the F3 language half (not written: it contradicts the existing contract pin project-onboarding-v3.test.mjs 9297-9334, language visible as a default and not forced; the dispatcher must rule). Production owners for the F slice: F3 argv intakeConsentAction, plugins/pipeline-core/lib/project-onboarding-v3.mjs 2755-2759 (argv.indexOf for the text-file flag is -1 for runner claude, so slice(0,-1) drops the runner value and capture flags are appended); F4 the CLI result assembly of the intake-consent, intake-capture, intake-design-questions and intake-generate apply actions plus the intake-generate-plan nextAction argv; F7 buildKickoffPromotionPlan throw site plugins/pipeline-core/lib/onboarding-continuity.mjs 5186. Next briefing must say: bump the callback and corpus counts (and the 12 x 18 sharding in project-onboarding-v3.test.mjs) together with the new case, or place the pins in a test file without a count guard such as onboarding-first-restart-intake.test.mjs; allow about 25 tool uses for orientation-free writing and measuring; rule on the F3 language half. Record defect: resultSha256 is null because the budget guard refused every hashing and scratch step in the closing allowance, so the dispatcher must bind the sha256 of this report text. independent review: pending."
+  }
+}

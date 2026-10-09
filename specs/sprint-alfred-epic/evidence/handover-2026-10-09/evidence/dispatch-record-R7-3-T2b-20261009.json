@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "R7-3-T2b-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "67de9ac61",
+    "659fc9b53"
+  ],
+  "resultSha256": null,
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs",
+      "plugins/pipeline-core/lib/test-design-workflow-fixture.mjs"
+    ],
+    "text": "Implementation complete (test-only); independent review: pending; PO acceptance: open. 1 DoD: BEFORE descendant 7/7 pass, callers 19/19 pass; AFTER descendant 9/9 pass (old 7 unchanged, EVDESC-f chain green, EVDESC-g green only after its briefed code was corrected, see finding), callers 19/19 pass: passed. Fixture commitPackage option: NOT VERIFIABLE by execution (no caller exercises it; the ad hoc check was refused twice by guards, GUARD-CROSS-REPO-MUTATION on a scratchpad write and guard-push shell-expansion on a node -e command). 2 Evidence (WSL, capture-evidence.mjs, evidence/R7-3-T2b-20261009/): before-descendant.txt exit 0; before-callers.txt exit 0; after-descendant.txt exit 1 (EVDESC-g with the briefed code: actual DWP2-PHYSICAL-OR-GIT at both entry points, expected DWP2-CURRENT-CANDIDATE); after-descendant-final.txt exit 0; after-callers.txt exit 0. 3 Changed: design-workflow-evidence-descendant.test.mjs (cases F and G, header assumption 5), test-design-workflow-fixture.mjs (opt-in commitPackage, returns head). 4 Not changed: production files, harness/, TP-protected files, the other fixture callers, verify-suites manifest. 5 Deviations: EVDESC-g asserts DWP2-PHYSICAL-OR-GIT, not the briefed DWP2-CURRENT-CANDIDATE, because the briefed code is unreachable for add-then-delete (net tree diff candidate..HEAD has no D entry: bound artifacts do not exist at the candidate); the true D branch of ruling 68 for a bound path is not pinned. Dispatch record written once at the end per briefing (not an opening in-progress record); commit trailers are exactly the two briefed ones. 6 Open: a follow-up fixture with a bound artifact tracked at the candidate would pin the true D entry; commitPackage needs a first real caller or a small test; scratch/r7-3-t2b-msg-*.txt and evidence/R7-3-T2b-20261009/ are untracked.",
+    "toolUses": 48
+  },
+  "log": [
+    { "phase": "orientation: briefing, fixture, descendant test, rulings 65/66/68, gate code read", "toolUses": 19 },
+    { "phase": "BEFORE captures: descendant 7/7, callers 19/19", "toolUses": 24 },
+    { "phase": "fixture commitPackage + cases F and G written; AFTER: F green, G red with DWP2-PHYSICAL-OR-GIT", "toolUses": 36 },
+    { "phase": "G corrected to observed behaviour; descendant 9/9 green; callers 19/19 green", "toolUses": 40 },
+    { "phase": "commits 67de9ac61 (test file), 659fc9b53 (fixture); record written", "toolUses": 48 }
+  ],
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  }
+}

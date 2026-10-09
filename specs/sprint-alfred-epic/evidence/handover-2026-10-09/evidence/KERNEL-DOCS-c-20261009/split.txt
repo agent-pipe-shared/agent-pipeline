@@ -1,0 +1,50 @@
+command: node --test plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+label: split
+exitCode: 1
+head: 6ebec9435e16bc6056145b4c341f4cfa969ce199
+tree: 86fbe3346787efdff1db202738783c4bdb9fea98
+dirty: true
+--- stdout ---
+✔ GSC01 the module files of lib/guard are exactly the modules of the split map (1.7082ms)
+✔ GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle (6.9636ms)
+✔ GSC03 the facade's export surface is exactly the pinned 40-name table (name and typeof) (364.5619ms)
+✔ GSC04 once the facade is wired to lib/guard it is a thin facade of at most 500 lines (0.6116ms)
+✖ GSC05 every lib/guard module is a never-liftable kernel path (1.0373ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 461.8918
+
+✖ failing tests:
+
+test at plugins\pipeline-core\lib\guard\guard-split-contract.test.mjs:215:1
+✖ GSC05 every lib/guard module is a never-liftable kernel path (1.0373ms)
+  AssertionError [ERR_ASSERTION]: lib/guard modules missing from NEVER_LIFTABLE_KERNEL_PATHS:
+  plugins/pipeline-core/lib/guard/env-dump-lane.mjs
+  + actual - expected
+  
+  + [
+  +   'plugins/pipeline-core/lib/guard/env-dump-lane.mjs'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///<repo-root>/plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs:219:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'plugins/pipeline-core/lib/guard/env-dump-lane.mjs' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

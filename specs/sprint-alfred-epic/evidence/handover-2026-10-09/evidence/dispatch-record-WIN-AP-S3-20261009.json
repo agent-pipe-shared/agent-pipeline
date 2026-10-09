@@ -1,0 +1,70 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S3-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "5428bfecc"
+  ],
+  "log": [
+    {
+      "phase": "opening: record created; preflight run once; route pre-check requested claude-sonnet-5-5/xhigh == observed claude-sonnet-5-5 (effort not observable)",
+      "toolUses": 11
+    },
+    {
+      "phase": "orientation: store :147-160, hardened-private-directory entry points, pins, Rulings 141/146; the other mkdir sites in the store are not creators of this root",
+      "toolUses": 27
+    },
+    {
+      "phase": "native baselines: root-before 5/2/3/0 (a,b,c red), store-before 59/49/2/8",
+      "toolUses": 32
+    },
+    {
+      "phase": "edits: import plus the replaced mkdir line in governance-event-store.mjs; commit message file written",
+      "toolUses": 35
+    },
+    {
+      "phase": "native after: root-after 5/3/2/0 (a green, b,c red), store-after 59/49/2/8 same two reds; WSL after 64/63/0/1 (all five root lines green); consumer-safe 9/9 exit 0",
+      "toolUses": 41
+    },
+    {
+      "phase": "diff has two hunks, both mine; staged and committed 5428bfecc by exact pathspec",
+      "toolUses": 45
+    },
+    {
+      "phase": "closing allowance: a scratch finalize script to compute resultSha256 was refused by the budget guard (only record writes, git add, git commit are admitted past the cap); record written directly, resultSha256 left null",
+      "toolUses": 47
+    }
+  ],
+  "report": {
+    "text": "WIN-AP-S3-20261009 completion report (goldfish-deep, claude-sonnet-5-5 / xhigh). Committed 5428bfecc. independent review: pending. Implementation complete; the class-S Critic review and PO acceptance are outstanding (not done). Closing-allowance handover: the work is finished and committed, but the record is NOT fully finalized, see section 5/6 (outcome committed-pending-report, resultSha256 null).\n\nRoute pre-check: requested claude-sonnet-5-5 / xhigh (field 6); observed from this dispatch's own runtime prompt: model claude-sonnet-5-5 (The exact model ID is claude-sonnet-5-5). Effort is not directly observable (reported unknown). No contradiction.\n\n1. DoD results\n- Native root-creation pins, before / after: passed. Before: 5 tests, 2 pass, 3 fail (pins a, b, c red; premise and pin e green). After: 5 tests, 3 pass, 2 fail. Pin (a) is GREEN; pins (b) and (c) stay red as required (they belong to S4); premise and pin (e) stay green.\n- Native governance-event-store suite, before / after: passed, no new red. Both runs: tests 59, pass 49, fail 2, skipped 8, equal to the WIN-GES-T3 baseline. The same two pre-existing reds appear before and after (the restricted-storage erasure case and the WIN-GES-T3 pin on a host without POSIX mode bits).\n- WSL after: passed. One run of both files (64 tests, 63 pass, 0 fail, 1 skipped): all five root-creation lines are green, pin (a) included, so the store part is 59 tests, 58 pass, 0 fail, 1 skipped (derived by subtraction, not a separate capture).\n- check-consumer-safe-paths.test.mjs: passed, 9/9, exit 0 (run directly, not through capture-evidence, so there is no machine-written artifact for this one; the result is this run's tool output).\n- git diff of the production file before staging: exactly two hunks, both mine (the import, the replaced mkdir line). Nothing foreign.\n- One commit of the production file only, subject verbatim, trailers AI-Assisted: true and Dispatch: WIN-AP-S3-20261009 (goldfish) only (no Co-Authored-By / Claude-Session: GIT-03 and the briefing override the harness attribution reminder): 5428bfecc, 1 file changed, 7 insertions, 1 deletion.\n\n2. Evidence (repo-root evidence/WIN-AP-S3-20261009/, written by plugin capture-evidence.mjs, commands exactly as briefed)\n- root-before.txt wrapped exit 1; root-after.txt wrapped exit 1 (pins b and c red by design); store-before.txt wrapped exit 1; store-after.txt wrapped exit 1 (the same two pre-existing reds); wsl-after.txt wrapped exit 0. The WSL capture ran both test files in one node --test invocation.\n- The artifacts and this record are NOT in the commit (briefing: production file only).\n\n3. Changed files (commit 5428bfecc)\n- plugins/pipeline-core/lib/governance-event-store.mjs: new import of ensureAgentPipelineRoot and ensureHardenedPrivateDirectory from ./hardened-private-directory.mjs; in bindLocalRepositoryFingerprint the bare recursive mkdir at mode 0o755 is replaced by ensureAgentPipelineRoot(gitCommonDir) (root created hardened, or an own insecure root repaired under the D0 posture, or refused) followed by ensureHardenedPrivateDirectory(root path, governance-events directory) (the child created owner-private: 0o700 on POSIX, hardened and assessed on win32). The assertNoSymlinkAncestry before, the assertNoSymlink(directory) after, the binding schema, the legacy-alias adoption and every other branch are unchanged.\n\n4. Deliberately not changed\n- Other directory creators in this file, none of which creates the agent-pipeline root: the restricted-store creators (assertRestrictedRoot, restrictedRecordsRoot, restrictedAuxiliaryRoot) already use mode 0o700 under a store root that must lie outside the repository; ensureSafeDirectory creates repository-relative governance/events/* tracked content at 0o755 on purpose. So the answer to 'other bare creators of the same root in this file' is: none beyond line 155. The mkdir import stays because those four still use it.\n- PB-* errors from the private-boundary family are not wrapped into GES-* errors (every other branch unchanged).\n- The binding check near line 901 (WIN-GES-F4), all test files, hooks, lib/guard, harness, hardened-private-directory.mjs, windows-private-state.mjs. Foreign staged and dirty files (the index held foreign staged files; the commit was by exact pathspec and touched one file).\n- The scratch commit message file is ignored scratch, not committed.\n\n5. Deviations from spec\n- None in design. Process: (a) I kept working after the 80 % hook notice (call 36 of 45) because only DoD verification (WSL capture, consumer-safe check, diff), staging and the commit remained, all inside the base cap; no edit or new work followed the notice. (b) The WSL check is one aggregated capture of both files rather than two (per-file counts derived as stated). (c) Two orientation calls were wasted on a guessed capture-evidence path. (d) The briefing asked for the terminal classification and resultSha256 in ONE write. I planned a scratch node script to compute the sha256 of report.text, but past the 45 cap the budget guard admits only record writes, git add and git commit, so the script write was refused and I cannot compute SHA-256 by hand. This record therefore carries outcome committed-pending-report (the interim value the template defines) and resultSha256 null.\n\n6. Open items\n- independent review: pending (the Elephant dispatches the Opus Critic over the WIN-AP chain: T 588b84552, F2 e51844ab8, S3 5428bfecc and T2).\n- Dispatcher action: bind resultSha256 to the exact UTF-8 bytes of report.text in this record and set the final outcome (completed) in one write; nothing else in the record needs to change. Run dispatch-authorship-verify afterwards.\n- Behaviour changes the Critic should see: (i) on win32, if governance-events already exists but is not secure and the binding file is absent, ensureHardenedPrivateDirectory assesses and refuses (PB-WINDOWS-ASSURANCE) where the old code silently reused the directory; on POSIX the helper does not assess an existing child's mode (the root is 0o700, so it is unreachable by others). Real checkouts with a binding file never reach this branch. (ii) PrivateBoundaryError (PB-*) can now escape bindLocalRepositoryFingerprint, where before only GES-* or raw fs errors could; callers were not audited for catching only GES-*. (iii) Not exercised through the store: the refusal branches (foreign owner, reparse point, refuse posture); T2 pins them on the entry point itself. (iv) Carried from Ruling 146: children created before a win32 root repair are not re-inherited (not measured here), and a host with an explicit rather than inherited foreign ACE makes the entry point refuse (predicted, not run).\n- Pins (b) and (c) stay red natively until S4. WIN-GES-F4 follows S3 in the same file.\n- Budget: the 45 base cap was reached at the commit; this record write is the closing allowance. No other stop condition triggered.\n- Next briefing adjustment: when the closing allowance must compute a hash, brief a pre-built finalize path under evidence/ or allow one scratch script run before the cap, because past the cap only record writes and git add/commit are admitted.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.mjs"
+    ]
+  },
+  "resultSha256": null
+}

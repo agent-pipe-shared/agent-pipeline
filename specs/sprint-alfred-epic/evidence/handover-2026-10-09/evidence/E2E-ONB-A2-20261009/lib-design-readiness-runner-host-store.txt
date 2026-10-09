@@ -1,0 +1,21 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/design-readiness-runner-host-store.test.mjs
+label: lib-design-readiness-runner-host-store
+exitCode: 0
+head: 37862e2953e3de7d413a2dc290b8e31e179a032e
+tree: e10c05bc73f3b6e3e87b847791bf9df26e2b57b8
+dirty: true
+--- stdout ---
+✔ DRHS01 stores one canonical, repository-private immutable host receipt and independently reads it back (8.468337ms)
+✔ DRHS02 rejects record drift, malformed receipts and wrong repository bindings (1.755949ms)
+✔ DRHS03 refuses a symlinked private receipt directory and never follows it (0.62289ms)
+✔ DRHS04 refuses a shared-access evidence directory rather than weakening its boundary (0.61759ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141.952124
+
+--- stderr ---

@@ -1,0 +1,57 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-T-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "partial",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": ["4e661fe61"],
+  "resultSha256": null,
+  "closingAllowance": {
+    "schema": "pipeline.dispatch-closing-allowance.v1",
+    "committed": ["4e661fe61: guard-git.test.mjs post-image (sha256 05e6d7a2...589fdc) + TR-C-MANIFEST.md"],
+    "verifiedGreen": [
+      "WSL capture evidence/TR-C-T-20261009/red.txt (wrapped exit 1 by design): guard-git 250/253, guard-push 190/197, every pre-existing case at its baseline result",
+      "node --test harness/scripts/check-consumer-safe-paths.test.mjs: exit 0 (9/9)"
+    ],
+    "remainsUndone": [
+      "guard-push post-image specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs (sha256 842c74ad...fa5777d): written, run, STAGED, NOT committed - pre-commit private-identifier scan refuses it (2 e-mail literals that exist in the live test)",
+      "the briefed single commit (both post-images + manifest) therefore did not happen; two commits are needed"
+    ],
+    "nextBriefingAdjustments": [
+      "decide how the pre-commit identifier scan treats the guard-push post-image (path exemption by the owner of that hook, or a stage-0 commit by the Elephant); the contents must not be edited because the literals belong to existing fixture cases",
+      "then commit the staged guard-push post-image by exact pathspec; the manifest already carries its sha256"
+    ]
+  },
+  "log": [
+    { "phase": "opening: briefing + obligations + CONT15/CONT17 headers read; preflight run from loaded plugin root (status ready)", "toolUses": 9 },
+    { "phase": "orientation done (design rows, Rulings 80/81, guard-push/guard-git/git-cmd classifier, GG-22 pathspec fast path); advisor consulted once", "toolUses": 41 },
+    { "phase": "baseline captured: evidence/TR-C-T-20261009/baseline.txt (guard-git 247/247, guard-push 177/179, the 2 PG-CHECKPOINT fails pre-existing)", "toolUses": 35 },
+    { "phase": "build.mjs written; scratch run 1: guard-git T51e unexpectedly lacked GG-17 text -> split into T51e (exit only) and T51f (GG-17 needle); rebuilt and re-run", "toolUses": 48 },
+    { "phase": "final run as stated: guard-git 250/253 (3 RED: T51a, T51b, T51f), guard-push 190/197 (5 new RED plus the 2 pre-existing); post-images and manifest written, consumer-safe check exit 0, files staged", "toolUses": 56 },
+    { "phase": "commit 1 refused by .git/index.lock; commit 2 refused by the pre-commit private-identifier scan (2 e-mail literals in the guard-push post-image, existing fixture strings)", "toolUses": 59 },
+    { "phase": "partial commit 4e661fe61: guard-git post-image + manifest; guard-push post-image left staged and uncommitted", "toolUses": 61 },
+    { "phase": "terminal record written", "toolUses": 63 }
+  ],
+  "report": {
+    "text": "PARTIAL (closing-allowance handover). Committed 4e661fe61: guard-git post-image + TR-C-MANIFEST.md. NOT committed: guard-push post-image (staged), refused by the pre-commit private-identifier scan (2 existing fixture e-mail literals). Pins: guard-push 18 new (13 GREEN, 5 RED: T38c, T80b, T42c, T82c text pins naming 'git commit -F' and 'use rg'; T85a git --version); guard-git 6 new (3 GREEN, 3 RED: T51a, T51b, T51f). Baseline vs run: all pre-existing cases keep their result (guard-push's 2 PG-CHECKPOINT fails are pre-existing). 80 percent checkpoint fired at call 48. independent review: pending.",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.test.mjs"
+    ]
+  }
+}

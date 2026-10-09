@@ -1,0 +1,63 @@
+command: node --test plugins/pipeline-core/lib/hardened-private-directory.test.mjs
+label: native
+exitCode: 0
+head: c754022f61ab0ba88b143cf19e50dd71cf9dd9d8
+tree: 2534e67e442f6611745f6c478f05942161b3b924
+dirty: true
+--- stdout ---
+✔ non-win32 platform creates one 0o700 directory per segment and never touches the DACL helpers (3.0199ms)
+✔ win32 hardens every directory it created before descending and only assesses pre-existing ones (2.1192ms)
+✔ win32 refuses a pre-existing insecure directory instead of silently re-hardening it (1.4466ms)
+✔ win32 fails closed when hardening a directory it just created does not end secure (1.0001ms)
+✔ a target outside the anchor and a non-directory segment are refused on every platform (1.5881ms)
+✔ real native Windows: created directories assess secure; a pre-existing insecure one is refused and stays unhardened (2271.639ms)
+✔ pre-commit installer creates its private state directories with a secure DACL (1650.0219ms)
+✔ commit-msg installer creates its private state directories with a secure DACL (1633.922ms)
+✔ win32 removes a created segment whose hardening ends unavailable, so a retry meets no existing insecure directory (2.4596ms)
+✔ win32 removes a created segment whose hardening ends insecure, so a retry meets no existing insecure directory (1.933ms)
+✔ win32 removes only the failing created segment and never a pre-existing parent (1.4194ms)
+✔ win32 removes a failed created segment only while it is still empty and says when it could not (1.4276ms)
+✔ win32 removes a created segment when the hardening primitive throws, and rethrows that error unchanged (0.9128ms)
+✔ win32 refusal of a pre-existing segment whose assurance is unavailable gets the unavailable remedy (1.1488ms)
+✔ win32 refusal of a pre-existing insecure directory leaves it in place and names it with the remedy (1.1115ms)
+▶ ensureAgentPipelineRoot (Ruling 141 D0 root entry point)
+  ✔ the D0 default posture is repair, and an omitted, undefined or explicit posture takes it (seam-driven win32) (2.494ms)
+  ✔ an absent root is created hardened and reported as created, nothing repaired (seam-driven win32) (1.0876ms)
+  ✔ a present, secure root is returned as found under either posture, never hardened (seam-driven win32) (1.8698ms)
+  ✔ an insecure root owned by the current user is repaired in place and carries PB-ROOT-REPAIRED (seam-driven win32) (0.8692ms)
+  ✔ a repair whose re-assessment is insecure is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32) (0.9248ms)
+  ✔ a repair whose re-assessment is unavailable is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32) (0.7956ms)
+  ✔ a repair whose re-assessment is unreported is refused with PB-WINDOWS-ASSURANCE, never reported repaired, and the root stays (seam-driven win32) (0.8705ms)
+  ✔ a refuse or unrecognised posture leaves an insecure root untouched and refuses (seam-driven win32) (5.6604ms)
+  ✔ a root owned by anyone else is refused and left untouched under either posture (seam-driven win32) (2.0941ms)
+  ✔ a root the observation reports as a reparse point is refused even with a clean DACL, and left untouched (seam-driven win32) (1.1013ms)
+  ✔ a root whose owner and DACL cannot be observed (an unavailable status carrying an observation) is refused with the unavailable remedy and left untouched (seam-driven win32) (1.2173ms)
+  ✔ a root whose owner and DACL cannot be observed (an unavailable status without an observation) is refused with the unavailable remedy and left untouched (seam-driven win32) (1.0478ms)
+  ✔ a root whose owner and DACL cannot be observed (no observation at all) is refused with the unavailable remedy and left untouched (seam-driven win32) (0.9738ms)
+  ✔ a link at the root is refused with PB-DIRECTORY under every platform branch, link and target untouched (seam-driven platform over a real link) (3.032ms)
+  ✔ a file at the root path is refused with PB-DIRECTORY under every platform branch and its content stays (seam-driven platform over a real file) (3.3383ms)
+  ✔ an anchor that is missing, empty, not a string or not a directory is refused with PB-ANCHOR and creates nothing (seam-driven platform) (1.6067ms)
+  ✔ an insecure root owned by someone else, or by an unknown uid, is refused with PB-ROOT-INSECURE and never chmodded (seam-driven POSIX) (3.0493ms)
+  ✔ a refuse or unrecognised posture refuses an insecure root owned by the current user without chmod (seam-driven POSIX) (2.0478ms)
+  ✔ a chmod that does not take is refused with PB-ROOT-INSECURE after exactly one attempt on the assessed inode (seam-driven POSIX) (1.4726ms)
+  ✔ an error thrown by the chmod seam propagates unchanged and is not read as a repair (seam-driven POSIX) (1.2156ms)
+  ﹣ real POSIX mode host: an absent root is created with mode 0o700 and reported as created (0.0421ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ﹣ real POSIX mode host: a present root with mode 0o700 is returned as found (0.0366ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ﹣ real POSIX mode host: an insecure root of mode 0o755 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED (0.0267ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ﹣ real POSIX mode host: an insecure root of mode 0o770 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED (0.0338ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ﹣ real POSIX mode host: an insecure root of mode 0o705 owned by the current user is repaired to 0o700 with PB-ROOT-REPAIRED (0.0201ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ﹣ real POSIX mode host: the refuse posture leaves an insecure root of the current user at its mode and refuses with PB-ROOT-INSECURE (0.0202ms) # SKIP-HOST-CLASS no-posix-owner-ids
+  ✔ real win32 DACL host: an absent root is created with a secure DACL; a second call returns it as found (1554.883ms)
+  ✔ real win32 DACL host: an insecure root of the current user is repaired to a secure DACL with PB-ROOT-REPAIRED (1602.8057ms)
+  ✔ real win32 DACL host: the refuse posture leaves an insecure root of the current user insecure and refuses with PB-WINDOWS-ASSURANCE (897.6134ms)
+✔ ensureAgentPipelineRoot (Ruling 141 D0 root entry point) (4093.3142ms)
+ℹ tests 44
+ℹ suites 1
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 9748.2673
+
+--- stderr ---

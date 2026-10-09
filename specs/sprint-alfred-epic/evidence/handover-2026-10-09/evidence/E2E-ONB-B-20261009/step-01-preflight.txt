@@ -1,0 +1,21 @@
+STEP 01 preflight (SKILL.md Step 0 / V4 onboarding)
+Path placeholders: <repo-root-in-wsl> = checkout in WSL, <temp-repo> = fresh empty WSL directory, <wsl-node> = WSL node 24 binary, <wsl-home> = WSL user home.
+
+01a  wsl.exe -e bash -lc "mkdir -p /tmp/e2e-onb-b-20261009 && cd /tmp/e2e-onb-b-20261009 && PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core node <repo-root-in-wsl>/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs; echo EXIT=$?"
+     exit code: printed EXIT=0 but NOT MEASURED. The outer quotes were double, so the host shell expanded $? before WSL saw it.
+     status: pipeline-governance-inactive (repositoryKind non-git, root /tmp/e2e-onb-b-20261009)
+     nextAction: onboarding-init.mjs --root <temp-repo> --runner codex   (runner CODEX, though the caller is a Claude session)
+     cause (pipeline-start-preflight.mjs:918-931): the runner resolves to claude only when CLAUDECODE=1 is in the environment; wsl.exe does not forward it, so detection falls back to "codex".
+     environmentReadiness: trust-anchor-match attended (key-anchor-mismatch), git-hooks unknown (no git repository), three probes unregistered; ok:false, nonGating.
+
+01b  same command with CLAUDECODE=1 and cd to the SAME /tmp path, issued later in the session
+     exit code: bash reported "cd: /tmp/e2e-onb-b-20261009: No such file or directory"; the preflight then ran in the inherited cwd, which is the SOURCE CHECKOUT ROOT.
+     status: plugin-refresh-required (installedVersion 0.7.0+claude.20261005050809.dd1fb3ea vs source 0.7.0+claude.20261008194106.da20519d), runner claude, root = source checkout (read-only preflight; not part of the walk).
+     faults printed: bootstrap-scratch-lifecycle faults ["sweep:WT-SESSION-RECOVERY-JOURNAL"].
+     finding: WSL /tmp did not survive between two wsl.exe invocations a few minutes apart; the walk moved to <wsl-home>/tmp/.
+
+01c  wsl.exe -e bash -lc 'mkdir -p ~/tmp/e2e-onb-b-20261009 && cd ~/tmp/e2e-onb-b-20261009 && CLAUDECODE=1 PIPELINE_PLUGIN_ROOT=<repo-root-in-wsl>/plugins/pipeline-core node .../scripts/pipeline-start-preflight.mjs; echo EXIT=$?; pwd'
+     exit code: 0 (measured, single-quoted)
+     status: pipeline-governance-inactive, runner claude
+     nextAction: <wsl-node> .../scripts/onboarding-init.mjs --root <temp-repo> --runner claude  (mutation false, guidance: ask once whether the project should use Agent-Pipeline)
+     PO question answered: consent to use the Pipeline = yes (fixed test value, given by the briefing).

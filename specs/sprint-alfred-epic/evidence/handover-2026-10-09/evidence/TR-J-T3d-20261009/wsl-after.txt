@@ -1,0 +1,82 @@
+command: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs
+label: wsl-after
+exitCode: 0
+head: 1e814124079d6f20dea878977350312c51b38059
+tree: 2e4ce263d2426b540eed58429ffc4185c2e074b5
+dirty: true
+--- stdout ---
+# frozen plugin copy in use: pre-commit-hook-plugin-0Ui7iJ
+✔ --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (80.22783ms)
+✔ installed pre-commit hook rejects a staged local private pattern before Git commits (2625.527891ms)
+✔ stagedPaths: lists a newly staged file relative to HEAD (1618.073424ms)
+✔ stagedPaths: falls back to the empty-tree comparison before any commit exists (1708.625307ms)
+✔ stagedPaths: nothing staged yields an empty array, not null (1682.1734ms)
+✔ pathAlreadyTrackedInHistory: unborn HEAD (no commit exists yet) -> false, nothing can be already tracked (1583.390025ms)
+✔ pathAlreadyTrackedInHistory: HEAD exists but the path was never committed -> false (first appearance) (1567.0712ms)
+✔ pathAlreadyTrackedInHistory: a committed path -> true (already tracked) (1585.159649ms)
+✔ pathAlreadyTrackedInHistory: a path committed then deleted -> still true (currently absent is not first appearance) (1599.805252ms)
+✔ installed hook impl: repository root unresolvable (invoked outside any git repo) -> BLOCK (33.126599ms)
+✔ installed hook: gate-strength-protected path (pipeline.user.yaml, GS-1) ALREADY tracked, re-write with no consumed capability -> commit refused (2418.88232ms)
+✔ installed hook: gate-strength-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2428.98699ms)
+✔ installed hook: testpath-protected path ALREADY tracked, re-write with no consumed capability -> commit refused (2545.916632ms)
+✔ installed hook: testpath-protected path's FIRST appearance in git history, no consumed capability -> commit ALLOWED (first-appearance exemption) (2522.860814ms)
+✔ installed hook: a spawned Node process re-writing an ALREADY-COMMITTED protected path (never crossing any PreToolUse hook) is still refused at commit (2550.655304ms)
+✔ installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override (2453.05891ms)
+✔ installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery (2682.495893ms)
+✔ installed hook: refuses a late verify rewrite when it also stages lifecycle state (2633.900134ms)
+✔ installed hook: refuses late verify recovery when committed plan approval is stale (2665.393831ms)
+✔ installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction (2468.046285ms)
+✔ installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition (2544.72694ms)
+✔ installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED (2242.724542ms)
+✔ installed hook: staged path with a matching CONSUMED capability -> commit ALLOWED (2284.30298ms)
+✔ installed hook: admits one complete proof-bound quality package, never a widened index (2997.366609ms)
+✔ installed hook: matching signed GMW permits a non-kernel TP rewrite (2709.964794ms)
+✔ installed hook: wrong-scope signed GMW does not permit a TP rewrite (2791.723204ms)
+✔ installed hook: matching signed GMW never permits hooks.json kernel rewrite (2717.907231ms)
+✔ installed hook: staged NON-protected path is unaffected -> commit succeeds (2756.91534ms)
+✔ installed hook: nothing staged (--allow-empty) -> commit succeeds (2595.049471ms)
+✔ applyInstall: refuses to overwrite a pre-existing foreign hook (1469.333738ms)
+✔ applyInstall then applyRemoval: removes exactly what was installed (1761.374934ms)
+✔ applyRemoval: refuses when the installed hook was modified after install (2019.871978ms)
+✔ applyRemoval: nothing-to-remove when never installed (1617.939383ms)
+✔ planInstall then applyInstall: reinstalling over our OWN prior install upgrades cleanly (2375.789427ms)
+✔ renderShim: execs the impl file with an absolute, JSON-quoted path (0.156053ms)
+✔ renderImpl: the agent-facing refusal marks any override as human-operator-only, without naming the bypass flag as an instruction (0.128323ms)
+✔ applyDecline: records a decline marker with a timestamp, no name/credential (1590.919529ms)
+✔ planDecline: read-only, repository-unresolved when no git repo present (4.578086ms)
+✔ planInstall: reports 'declined' distinctly from 'ready' after a decline is recorded (1715.355525ms)
+✔ applyInstall: installing after a decline succeeds (declining is not a permanent refusal) (1800.18785ms)
+✔ planInstall: a decline marker never suppresses an already-installed hook (1861.65489ms)
+✔ gitObjectBytes: absent at HEAD (never committed) -> present:false, ok:true, bytes:0 (1593.461367ms)
+✔ gitObjectBytes: present blob -> ok:true, bytes matches the exact utf8 byte length (1785.246871ms)
+✔ handoverSizeFinding: a net decrease relative to HEAD is never blocked, regardless of absolute size (1847.611097ms)
+✔ handoverSizeFinding: at/over cap and not a decrease -> blocked, naming current/proposed/max bytes (1649.286777ms)
+✔ handoverSizeFinding: below cap and not a decrease -> not blocked (unaffected default behaviour) (1704.366897ms)
+✔ installed hook: a spawned Node process growing the handover file past its cap (never crossing any PreToolUse hook) is refused at commit (2637.60947ms)
+✔ installed hook: a commit that shrinks the handover file is allowed even while the file remains over its cap after the shrink (2760.028091ms)
+✔ installed hook: staged handover file below cap and not a decrease -- commit allowed (unaffected default behaviour) (2929.385757ms)
+✔ installed hook: the handover-size measurement module is broken -- commit refused, never silently allowed (2783.351226ms)
+✔ installed hook: a commit shrinking a handover file whose COMMITTED (HEAD) version exceeds 1 MiB is admitted, not blocked by the inability to read HEAD's content (2703.160508ms)
+✔ installed hook: a staged handover file far larger than 1 MiB is measured EXACTLY (no output-buffer ceiling) and refused for genuinely being over cap (2744.155481ms)
+✔ gitObjectBytes: present blob whose object is corrupted on disk -> ok:false (fail closed, never a silent measurement) (1615.378072ms)
+✔ handoverSizeFinding: the committed (HEAD) blob is corrupted -> measurable:false, never a silent allow (1649.498121ms)
+✔ handoverSizeFinding: the staged (index) blob is corrupted -> measurable:false, never a silent allow (NVA-B-STAGEDPIN) (2044.591472ms)
+✔ installed hook: non-UTF-8 content in the handover file is measured as its exact raw byte length, not as re-encoded characters (2763.612819ms)
+✔ installed hook: a non-canonical but valid calibration path spelling for the handover file is still matched at the commit boundary (2703.32492ms)
+# frozen plugin copy in use: pre-commit-hook-tofu-plugin-tZ7VFI
+✔ trust-anchor bootstrap exemption: (a) REPLACING an existing single anchor with a different one stays BLOCKED (2674.377966ms)
+✔ trust-anchor bootstrap exemption: (b) ADDING a second anchor to a policy that already has one stays BLOCKED (2494.884601ms)
+✔ trust-anchor bootstrap exemption: (c) an UNRELATED field change (requiredKinds) bundled alongside the first anchor addition stays BLOCKED (2626.690054ms)
+✔ trust-anchor bootstrap exemption: (d) a policy whose trustAnchors set is ALREADY non-empty gaining one more entry stays BLOCKED, regardless of current set size (2508.459986ms)
+✔ trust-anchor bootstrap exemption: a genuine v1(no-anchor) -> v3(one-anchor) upgrade, unrelated fields unchanged, commits ALLOWED (2502.020445ms)
+✔ trust-anchor bootstrap exemption: v1(no-anchor) -> v3(no-anchor, empty trustAnchors) is NOT the anchor upgrade -- still blocked (no anchor actually added) (2452.835765ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 63
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 121202.378481
+
+--- stderr ---

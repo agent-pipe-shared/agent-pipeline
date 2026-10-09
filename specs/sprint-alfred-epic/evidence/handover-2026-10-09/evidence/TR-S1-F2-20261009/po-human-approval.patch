@@ -1,0 +1,128 @@
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index d9c64ec3e..4961396ce 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -1165,6 +1165,10 @@ function assertSigningReadyBeforePrompt({ repository, inspection, legacy, keys,
+   const keyDirectoryReady = keyDirectory.findings.every((entry) => entry.status === "ok");
+   if (!keyDirectoryReady && keyDirectory.anchorCount > 0) throw readinessFailure(keyDirectory.findings);
+   if (!keyDirectoryReady) throw readinessFailure([...probeSigningToolchain(dependencies), ...keyDirectory.findings]);
++  // TR-S1 (Ruling 78): the encrypted-key gate. Placed after the anchor check above (the private key is
++  // never opened without a committed anchor to hold it against) and before the attended-terminal
++  // check and the first toolchain spawn (no process of any kind runs for an unprotected key).
++  assertPoPrivateKeyProtected(keys.privateKey, dependencies);
+   assertAttendedTerminalWhenPassphraseKey(keys, dependencies);
+   const findings = [...probeSigningToolchain(dependencies), ...keyDirectory.findings];
+   if (findings.some((entry) => entry.status !== "ok")) throw readinessFailure(findings);
+@@ -1345,7 +1349,52 @@ function isPrivateKeyPassphraseProtected(pemPath, dependencies) {
+   const read = dependencies.readFile ?? readFileSync;
+   let pem;
+   try { pem = read(pemPath, "utf8"); } catch { return false; }
+-  return pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----");
++  return classifyPoPrivateKeyArmor(pem) === "encrypted";
++}
++
++/**
++ * TR-S1 (Rulings 75, 78, 83, 91): the armor class of a PO private key, decided by its own PEM
++ * header and nothing else. Only the PKCS#8 armors are classified: "BEGIN PRIVATE KEY" is
++ * "unencrypted" (checked FIRST, so a file that carries both armors is refused), "BEGIN ENCRYPTED
++ * PRIVATE KEY" is "encrypted", and anything else is "other" -- passed through untouched, so a
++ * non-PEM or traditional-armor file keeps the outcome it had before this gate existed (Ruling 113
++ * keeps those armors out of scope).
++ */
++function classifyPoPrivateKeyArmor(content) {
++  const pem = String(content);
++  if (pem.includes("-----BEGIN PRIVATE KEY-----")) return "unencrypted";
++  if (pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")) return "encrypted";
++  return "other";
++}
++
++/** The typed refusal of the encrypted-key gate. Shaped like readinessFailure: `code: cause; repair: ...`,
++ * with error.code, one attended finding and its repair. The cause never carries key bytes or a path. */
++function poKeyGateFailure(code, cause) {
++  const repair = code === "PO-KEY-UNENCRYPTED"
++    ? "in your own terminal, re-encrypt the same key in place: run openssl pkcs8 -topk8 -v2 aes-256-cbc -in \"<key>\" -out \"<key>.encrypted\" (it asks you for the new passphrase), replace the original with the .encrypted file (mv on POSIX, move /Y on Windows), then re-run; the keypair is unchanged, so po-public.pem, trust-policy.json and the committed trust anchors stay valid."
++    : "make the key a regular file this operating-system user can read, then re-run.";
++  const finding = readinessFinding("po-key-passphrase-protected", "attended", cause, attendedRepair("po-key-passphrase-protected", repair));
++  const error = new Error(`${code}: ${cause}; repair: ${repair}`);
++  error.code = code; error.finding = finding; error.findings = [finding];
++  return error;
++}
++
++/** One read of the PO private key through the injected seam; any failure is PO-KEY-UNREADABLE (errno only). */
++function readPoPrivateKeyOrRefuse(read, pemPath, ...encoding) {
++  try { return read(pemPath, ...encoding); } catch (caught) {
++    throw poKeyGateFailure("PO-KEY-UNREADABLE", `the PO private key could not be read (${typeof caught?.code === "string" ? caught.code : "read-failed"})`);
++  }
++}
++
++function refuseUnencryptedPoPrivateKey(content) {
++  if (classifyPoPrivateKeyArmor(content) === "unencrypted") {
++    throw poKeyGateFailure("PO-KEY-UNENCRYPTED", "the PO private key is not passphrase-protected (unencrypted PKCS#8 armor), so signing with it would need no passphrase");
++  }
++}
++
++/** The gate for a key already registered at `pemPath`: unreadable or unencrypted ends the verb before any prompt or spawn. */
++function assertPoPrivateKeyProtected(pemPath, dependencies) {
++  refuseUnencryptedPoPrivateKey(readPoPrivateKeyOrRefuse(dependencies.readFile ?? readFileSync, pemPath, "utf8"));
+ }
+ 
+ /**
+@@ -1637,6 +1686,10 @@ function isAttendedTerminal(dependencies = {}) {
+  * removed on every path.
+  */
+ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }) {
++  // TR-S1 (Ruling 78), defence in depth: the gate ran earlier in the verb, but a typed confirmation or a
++  // passphrase decision can sit between that check and this spawn, so the armor is checked once more
++  // immediately before the intent file is written and OpenSSL receives the key path.
++  assertPoPrivateKeyProtected(keys.privateKey, dependencies);
+   // pipeline.signing-requires-attended-terminal: fail closed BEFORE ever writing the
+   // intent file or spawning OpenSSL when the key about to sign will make OpenSSL run
+   // its own interactive prompt (NVA-SIGNONCE-1: exactly the passphrase-protected
+@@ -1801,6 +1854,11 @@ function executeHumanApproval(args, dependencies = {}) {
+       if (!exists(args.existingKey)) {
+         fail(`--existing-key path does not exist: ${args.existingKey}`);
+       }
++      // TR-S1 (Rulings 75, 78, 91): the candidate key is read ONCE, and the bytes classified here are
++      // exactly the bytes copied below. An unreadable or unencrypted key is refused before the copy,
++      // the OpenSSL derivation and the authority record, so nothing is registered.
++      const importedKeyBytes = readPoPrivateKeyOrRefuse(read, args.existingKey);
++      refuseUnencryptedPoPrivateKey(importedKeyBytes);
+       if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
+       // Copy the private key bytes verbatim into the machine-plane directory (same
+       // final location fresh generation writes to) rather than leaving the original
+@@ -1808,7 +1866,6 @@ function executeHumanApproval(args, dependencies = {}) {
+       // authorize-critical, ...) reads the key from `paths.privateKey` unconditionally,
+       // so a key that stayed only at its original path would silently stop working the
+       // moment that path moved or was cleaned up.
+-      const importedKeyBytes = read(args.existingKey);
+       write(paths.privateKey, importedKeyBytes, { mode: 0o600 });
+       // Derive (and thereby VALIDATE -- an unparsable or corrupt key fails this
+       // command() call, exactly like every other openssl step in this file) the public
+@@ -1827,6 +1884,9 @@ function executeHumanApproval(args, dependencies = {}) {
+       // No authority record exists yet -- there is nothing to read a name from, so this
+       // is exactly the same requirement fresh generation has below (FIXTURE-2).
+       if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
++      // TR-S1 (Ruling 78): recovering the key already sitting here registers it as the authority, so an
++      // unreadable or unencrypted key is refused before the authority record is built or written.
++      assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
+       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+       persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+@@ -1900,6 +1960,8 @@ function executeHumanApproval(args, dependencies = {}) {
+     // Fail closed on missing key material before anything is written or observed:
+     // there is no point preparing a request this terminal could not sign.
+     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before authorize-critical");
++    // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the request is built or written.
++    assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+     const { request, subjectPreimage } = criticalApprovalRequest({ args, repository, featureId, dependencies });
+     // Written before the prompt, and only ever the request built above: any file
+     // already sitting at this path is overwritten, never read, so a stale request
+@@ -2138,6 +2200,8 @@ function executeHumanApproval(args, dependencies = {}) {
+   if (!SHA.test(intentSha256 ?? "")) fail("request has no valid approval intent");
+   if (args.command === "approve" || args.command === "approve-critical") {
+     if (!exists(paths.privateKey)) fail("private key is unavailable");
++    // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the confirmation prompt.
++    assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+     const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
+     const summary = [`kind: ${kind}`, `intent sha256: ${intentSha256}`, `candidate commit: ${request?.candidate?.commit}`];
+     if (critical) {

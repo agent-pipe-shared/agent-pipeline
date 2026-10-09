@@ -1,0 +1,62 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-GES-F4-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "7dd17c23a"
+  ],
+  "resultSha256": "48600c6b6d09753268599dcaf1d6996811749af18ce2ab24681afaf97cb4cf91",
+  "report": {
+    "changedFiles": [
+      "plugins/pipeline-core/lib/governance-event-store.mjs"
+    ],
+    "text": "Route pre-check: requested claude-sonnet-5-5 / xhigh (class S named in field 6); observed model identity claude-sonnet-5-5 from this dispatch's runtime prompt; no contradiction. Effort xhigh is not directly observable by me: unverified, disclosed. independent review: pending. PO acceptance: pending. Outcome: COMPLETED. This is NOT a closing-allowance handover for the work; only the record write fell into the allowance (working cap 45 reached at the commit, hook call 44).\n\n1. DoD results.\n(a) Native before/after of governance-event-store.test.mjs: passed. Before 59/49/2/8 exit 1 (reds: the 1138 restricted-storage case and the WIN-GES-T3 pin); after 59/50/1/8 exit 1: the WIN-GES-T3 pin is GREEN, skipped stays 8, nothing else changed state. The 1138 restricted-storage case is still red, so WIN-HARDEN-F has not landed on the measured HEAD (inferred from the same unavailable status, not read from that slice). Measured heads: before 1c7c37f4a, after c754022f6 (candidate was ea5401ec6; the shared tree advanced; both captures dirty:true from foreign files).\n(b) WSL after 59/58/0/1 exit 0: passed (the pin is skipped there by its POSIX-MODE-HONOURED probe).\n(c) Native agent-pipeline-root-creation.test.mjs, pin (a): passed (green). The file exits 1 because pins (b) and (c) are red (recordBootstrapPreflightReceipt and a denial-telemetry write; status insecure, reason: DACL grants a non-owner principal). I took no before capture for that file and did not touch those modules, so I cannot prove they were red before; they exercise code this commit does not reach.\n(d) check-consumer-safe-paths.test.mjs: passed, exit 0, 9/9.\n(e) One commit of the production file, exact subject: passed (7dd17c23a, 1 file, 9 insertions, 2 deletions; trailers AI-Assisted and Dispatch only; the diff was reviewed first and every hunk is mine).\n\n2. Evidence. All via node plugins/pipeline-core/scripts/capture-evidence.mjs --label native|wsl -- node --test <file>: evidence/WIN-GES-F4-20261009/before.txt (wrapped exit 1), after.txt (1), wsl-after.txt (0, run through wsl.exe -e bash -lc), root-creation.txt (1). Consumer-safe check: plain node --test, exit 0, output inline.\n\n3. Changed files. plugins/pipeline-core/lib/governance-event-store.mjs (committed 7dd17c23a): in readExistingLocalRepositoryFingerprint a win32 flag drops only the mode clause from validFile and one assessWindowsPrivatePath call (status must be secure, else the same GES-EXISTING-REPOSITORY-BINDING) runs after the type/link/size/realpath checks and before open(); in assertRestrictedRoot the assessor reason is appended to the message (code unchanged). Uncommitted by convention: evidence/WIN-GES-F4-20261009/*, this record, scratch/ files.\n\n4. Deliberately not changed. Every test (QG-04); the 8 typed skips including 1307/1332; windows-private-state.mjs; hardened-private-directory.mjs; bindLocalRepositoryFingerprint; no io seam was added to readExistingLocalRepositoryFingerprint (briefing: replace the clause only), so the win32 branch is not unit-testable off win32 until a test slice decides on one; foreign staged and dirty files.\n\n5. Deviations and drift. (i) The briefing cites the assertRestrictedRoot refusal at 231-232; in the current file it is line 238 (231-232 is the POSIX refusal). Same defect, edited there. (ii) Ruling 143 says F4 must un-skip 1307/1332; the CONT25 briefing says do NOT and QG-04 forbids test edits. I followed the briefing; the skips remain. (iii) Reason format: the message keeps its old text and appends colon plus reason only when a reason exists. (iv) The opening record write was refused once with GUARD-BOOTSTRAP-RECEIPT-MISSING; preflight run once, identical write retried. (v) Field 6's one-write rule honoured by a finalizer script (scratch/dispatch/win-ges-f4/finalize-record.mjs): no separate interim checkpoint write. (vi) Hook-counted: 44 at the commit.\n\n6. Open items. (A) The pre-existing win32 refusal cases (legacy v1, closed-validation drift, writable binding second half, oversized) use unhardened os.tmpdir fixtures; I infer, without having measured it, that they now refuse at the DACL assessor before reading content, so they stay green but cannot tell their reasons apart (Ruling 143 carried item); a later test-only slice must harden the fixture or declare the limit. (B) The 1138 case now reports its reason: Windows DACL assurance is unavailable: native Windows DACL observation failed; that is the second-hardener-call failure (Ruling 143 / WIN-GES-D3), a windows-private-state.mjs question, not this slice. (C) The code comment says a DACL change moves ctime so the later same() comparisons catch an in-place change between assessment and open; that is NTFS ChangeTime semantics, not measured here. (D) The assessor is a synchronous PowerShell spawn (up to 7 s timeout) per existing-binding read on win32; no caching, a possible cost for hot admission callers. (E) A win32 binding whose directory was not hardened now fails closed (inherited ACEs); production minting hardens the directory, so only externally created bindings are affected. (F) Untested: elevated token (owner may be Administrators), non-German locale, Codex/Antigravity on Windows.\n\nClosing handover: Committed: 7dd17c23a (governance-event-store.mjs). Verified green: items (a) to (e) with the commands above. Remains undone: nothing of the briefed DoD; evidence and record are untracked by convention. Next briefing would say: cite 238 not 231-232; state that Ruling 143's un-skip DoD is superseded; give the test slice the unhardened-fixture limit (A) and pins (b)/(c) of root-creation as separate owners."
+  },
+  "log": [
+    {
+      "phase": "opening: record created after reading agent-obligations, CONT17/CONT18 headers, CONT25 WIN-GES-F4 section, goldfish-task 455-481; preflight run once; route pre-check: requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5, no contradiction",
+      "toolUses": 13
+    },
+    {
+      "phase": "orientation done (store 146-260 and 860-940, windows-private-state, T3 pin and native.txt, Rulings 140/143); native before captured (59/49/2/8, head 1c7c37f4a); advisor consulted",
+      "toolUses": 31
+    },
+    {
+      "phase": "two production edits applied (binding DACL assessment; reason pass-through at 238); commit message written before the 80 percent notice",
+      "toolUses": 36
+    },
+    {
+      "phase": "native after 59/50/1/8 (pin green, 1138 still red, head c754022f6); WSL after 59/58/0/1; root-creation pin (a) green, (b)/(c) red; consumer-safe exit 0",
+      "toolUses": 41
+    },
+    {
+      "phase": "diff reviewed (all hunks mine), staged, committed 7dd17c23a; terminal record written in one write by the finalizer",
+      "toolUses": 46
+    }
+  ]
+}

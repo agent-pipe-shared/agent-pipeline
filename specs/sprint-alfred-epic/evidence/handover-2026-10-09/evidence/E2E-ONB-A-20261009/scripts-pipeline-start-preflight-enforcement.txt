@@ -1,0 +1,37 @@
+command: node --test --test-timeout=90000 plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
+label: scripts-pipeline-start-preflight-enforcement
+exitCode: 0
+head: 24a27a1c9cf231e87f585f9396c08065fe0e49f0
+tree: c5eb106a47f837ea8bbb2431f66f1063fbf02bd5
+dirty: true
+--- stdout ---
+✔ ENFORCEMENT: Elephant, all three hooks stale -> non-ready, ONE action refreshes all of them (33.434714ms)
+✔ ENFORCEMENT: Elephant, one mandatory hook stale next to a current one -> action covers exactly the stale one (24.405493ms)
+✔ ENFORCEMENT [T0 case re-pointed by HOOKREFRESH-T6, Ruling 84 F1]: Elephant, a stale hook next to a MISSING one goes provisioning first, then refresh, then ready (50.874622ms)
+✔ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-HUMAN-CONFIRMATION-REQUIRED as its own status, not `unavailable` (12.050179ms)
+✔ RED F4 (Ruling 84): the field carries `confirmation-required` / MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED as its own status, not `unavailable` (12.000849ms)
+✔ RED F4 (Ruling 84): the field carries `admission-pending` / MODEL-ROLE-BOOTSTRAP-ADMISSION-PENDING as its own status, not `unavailable` (12.640399ms)
+✔ GREEN control F4: genuinely unavailable results, unknown statuses and a null result still read `unavailable` (41.05028ms)
+✔ RED F2 (Ruling 84, ASSUMED NAME R5): the preflight's readback call carries readOnly: true in its argument bag (seam spy) (11.352107ms)
+✔ ENFORCEMENT: an absent role is the Elephant (strict default) -> stale mandatory hook is non-ready (27.533445ms)
+✔ CONTROL: goldfish readback is unaffected by stale hooks (they never install) (27.347802ms)
+✔ CONTROL: critic readback is unaffected by stale hooks (they never install) (28.725706ms)
+✔ CONTROL: Elephant, only the ADVISORY pre-push hook stale -> still ready (assumption: pre-push is not mandatory) (26.59682ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: absent) (13.608025ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: elephant) (12.554578ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: goldfish) (11.327349ms)
+✔ ENFORCEMENT: every ready envelope carries modelRoleBootstrap (role: critic) (11.195994ms)
+✔ ENFORCEMENT: a ready model-role bootstrap is passed through as its own status and code (11.852486ms)
+✔ ENFORCEMENT: `unavailable` with its code is a legal value and does not downgrade the envelope (12.010609ms)
+✔ ENFORCEMENT: a bootstrap that throws is still a present field (`unavailable`), never an absent one (12.954365ms)
+✔ TODO: plugin update under an onboarded project -> one typed refresh nextAction, not a two-step repair (0.101251ms) # not expressible at the preflight seam: the preflight only distinguishes ProjectOnboardingReadyError code PORG-NOT-READY (never onboarded, projection drift and cleanup residue all fold into it) and answers with the guided-driver / inspect action; projection drift after a plugin update is classified inside project-onboarding-v3, and no 'refresh' action or command exists in any contract yet (backlog item pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair: 'Not designed here'; pipeline.typed-plugin-update-next-action has no design). Pin it in the project-onboarding-v3 suite once the refresh action's identity is decided.
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 3153.344937
+
+--- stderr ---

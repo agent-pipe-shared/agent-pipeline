@@ -1,0 +1,56 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-AP-S4-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "4b79b33a0",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "332b0d4c0"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations read, route pre-check passed (observed claude-sonnet-5-5, effort unmappable), record created",
+      "toolUses": 11
+    },
+    {
+      "phase": "committed; record checkpointed",
+      "toolUses": 46
+    },
+    {
+      "phase": "final report written",
+      "toolUses": 48
+    }
+  ],
+  "report": {
+    "text": "WIN-AP-S4-20261009 completion report (goldfish-deep). Implementation complete; independent review: pending; PO acceptance and the ceremony install: pending.\n\nRoute pre-check: requested (field 6) goldfish-deep, claude-sonnet-5-5 at xhigh. Observed from this dispatch's own runtime prompt: \"You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5\". Model matches, no contradiction. Effort: the runtime prompt carries only a numeric reasoning-effort hint (30) that I cannot map to a named level, so the effective effort stays unknown (disclosed, not a mismatch).\n\n1. DoD results\n- Pins (b) and (c) green with the post-images redirected in, native and WSL: passed.\n- Pin (a), the pin (e) premise and pin (e) stay green: passed (3 captures).\n- Nothing else changes state between before and after: passed (before 5 tests / 3 pass / 2 fail = (b),(c) red; after 5 / 5 / 0).\n- Redirect really served the post-images: passed (WINAPS4-REDIRECT-FIRED for both modules, 1 load each, in after.txt and wsl-after.txt).\n- consumer-safe-paths: passed (exit 0, \"1769 tracked file(s) under plugins/pipeline-core/\"; it scans only plugins/pipeline-core, which this commit does not touch).\n- One commit of the two post-images and the manifest: passed, 332b0d4c0 (from the commit output).\n\n2. Evidence (all machine-written by capture-evidence.mjs)\n- evidence/WIN-AP-S4-20261009/before.txt: `node plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs`, native, live modules, wrapped exit 1.\n- evidence/WIN-AP-S4-20261009/after.txt: same test with `--import ./scratch/dispatch-wip/WIN-AP-S4/redirect.mjs`, native, wrapped exit 0.\n- evidence/WIN-AP-S4-20261009/wsl-after.txt: same, under `wsl.exe -e bash -lc`, wrapped exit 0.\n- `node harness/scripts/check-consumer-safe-paths.mjs` exit 0 (console output; no artifact file).\n- Build: `node scratch/dispatch-wip/WIN-AP-S4/build.mjs` exit 0 (prints the shas recorded in the manifest).\n\n3. Changed files (commit 332b0d4c0, 3 files, 497 insertions)\n- specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/bootstrap-receipt.mjs: post-image, 4 anchored edits (import, helper, two mkdir sites), sha256 7a0f39e1627bd336e68123c50104b615f7538daadd0950e37b25bddd9289f0d3, 10229 bytes.\n- specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/denial-telemetry.mjs: post-image, 3 anchored edits (import, helper, one mkdir site), sha256 8d2904c4d1b26ec691788892608ceec2faef6db712b5b9392c7b8fb2e60c5e3b, 13000 bytes.\n- specs/sprint-alfred-epic/signed-package/tranche-2/WIN-AP-S4-MANIFEST.md: targets, base blobs, post-image shas and bytes, edits, behaviour changes, commands, results.\nUncommitted by design: the dispatch record, evidence/WIN-AP-S4-20261009/*.txt, and the git-ignored scratch under scratch/dispatch-wip/WIN-AP-S4/ (build.mjs, redirect.mjs, finalize-record.mjs, report.txt) and scratch/commit-msg/.\n\n4. Deliberately not changed\n- Live plugins/pipeline-core/lib/guard/*.mjs, hooks/, tests, the tranche README: untouched (git status showed the two live files clean).\n- The sibling creators (governance-event-store already done in S3; S5/S6/S7 sites) are other slices.\n- Foreign staged files in the index were not touched; the commit used an exact pathspec.\n\n5. Deviations from spec\n- Named method deviation, same shape as TR-C-F: post-images exercised through a scratch ESM load hook, test file run directly with --import (the test imports the modules in-process, so no child-process propagation was needed).\n- The `mkdirSyncFn` dependency seam is passed through to the entry points (`{ mkdir: mkdirSyncFn }`) instead of being dropped; no test injects it, behaviour under test is unchanged.\n- git diff of a new untracked file is empty, so the \"every hunk is mine\" check was done as `git status --short` over the exact paths (three new files, the two live files clean) plus the build's single-occurrence anchor assertions.\n- No WSL baseline (before) was captured; the briefing asks for wsl-after only, and on POSIX the old mkdir already passed mode 0o700.\n\n6. Open items\n- Independent Critic review: pending (only the Elephant dispatches it).\n- Ceremony install of both post-images at the live paths: pending; after install, re-run the three captures without --import and expect the after.txt shape.\n- Install precondition, win32 (disclosed in the manifest): ensureHardenedPrivateDirectory refuses a pre-existing child that assesses insecure and does not repair it. A checkout whose bootstrap-receipt child was created by the old mkdir under an insecure root can fail every receipt write after install, and with no receipt each dispatched subagent's first Write is refused (GUARD-BOOTSTRAP-RECEIPT-MISSING). Assess and, if needed, re-harden the existing children before installing. The telemetry child fails open to the full-text rendering, so there it is only a cost.\n- Per-call cost, win32: the observation site runs on every dispatched-subagent gate decision, so a DACL assessment of root and child now runs per call. Not redesigned.\n- Not a closing-allowance handover: the work was complete at the 80 % notice (call 44 of 55); the remaining calls went to the record and this report only.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/bootstrap-receipt.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/denial-telemetry.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/WIN-AP-S4-MANIFEST.md"
+    ]
+  },
+  "resultSha256": "3a345aba957ea726a8393a941416b0ebe44179272c384a864a4c96c36d6bd87d"
+}

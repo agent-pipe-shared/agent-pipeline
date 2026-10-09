@@ -1,0 +1,30 @@
+{
+  "taskId": "FANOUT-WIN-F-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant (briefing FANOUT-WIN-F-20261009)",
+  "outcome": "stopped",
+  "outcomeClassification": "stop-condition-2-briefing-vs-repo-contradiction (also 1, 3, 5 in part)",
+  "commit": null,
+  "changedFiles": [],
+  "untrackedArtifacts": [
+    "evidence/FANOUT-WIN-F-20261009/dispatch-progress.json",
+    "evidence/dispatch-record-FANOUT-WIN-F-20261009.json"
+  ],
+  "toolUses": 36,
+  "routeCheck": {
+    "requested": "goldfish-deep, claude-sonnet-5-5, xhigh (field 6; no A/G/S class declared)",
+    "observed": "runtime prompt: 'You are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5.'",
+    "result": "match"
+  },
+  "log": [
+    "opening: bootstrap line, route pre-check, preflight run, interim progress file created and read back",
+    "orientation: pin commits, backlog item, both production files, stop-fanout.mjs, SF22, private-boundary.mjs, governance-scope tests",
+    "baseline: node --test plugins/pipeline-core/hooks/stop-fanout.test.mjs -> 23 pass / 0 fail, SF22 observed 4 win32 powershell.exe spawns (transcript stdout only)",
+    "advisor consulted: confirmed the stop; no production edit attempted",
+    "stop: pins and fix sites do not match the briefing's description"
+  ],
+  "report": "see the SubagentHandback message of this dispatch; summary: STOPPED before any production edit. (1) The pin commits 2a51a0356 and de4d37afa touch only hooks/stop-fanout.test.mjs (SF22); there are no lib pins. (2) SF22 is green today (exact equality, 4 spawns) and is designed to turn red when the item is fixed; flipping it is a hooks/ edit, forbidden here and deferred to the tranche. (3) Neither fix site fits the described change: fanout-ledger.mjs:185 is creation-only (existing dir already takes the cheap lstat branch), governance-scope.mjs:256-258 is observe(), which has no requiresEnforcement input, and the explicit-boolean short-circuit lives in hooks/stop-fanout.mjs:153-155. Nothing in tracked files changed; no commit."
+}

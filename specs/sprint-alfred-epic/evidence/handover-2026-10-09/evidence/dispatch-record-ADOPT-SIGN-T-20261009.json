@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADOPT-SIGN-T-20261009",
+  "agentType": "goldfish-deep",
+  "model": "sonnet",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "05c17ddb830d9e357c75e3c1102b326f578c48e3",
+  "resultSha256": "dc7e9d5ffd7f0cc8c0ef99af5cdb1b688b06793797addfe991c112387014bb72",
+  "outcome": "completed",
+  "outcomeClassification": { "schema": "pipeline.dispatch-outcome-classification.v1", "kind": "authored-commit" },
+  "commits": ["05c17ddb830d9e357c75e3c1102b326f578c48e3"],
+  "log": [
+    { "phase": "opening: record created after orientation reads (briefing family, obligations, schema)", "toolUses": 19 },
+    { "phase": "orientation done: sign-intent --request branch, prepare CLI, NVA-SIGNONCE-1 fixture pattern read; advisor consulted", "toolUses": 38 },
+    { "phase": "pins written (two test files) plus commit message file", "toolUses": 42 },
+    { "phase": "WSL red run via capture-evidence: tests 6, pass 2, fail 4, wrapped exit 1; all four new pins red for the stated reasons, both neighbours green", "toolUses": 45 },
+    { "phase": "git add of evidence/ refused (gitignored); committed the two test files only", "toolUses": 49 },
+    { "phase": "terminal record written", "toolUses": 54 }
+  ],
+  "report": {
+    "text": "ADOPT-SIGN-T-20261009: completion report (class S, test-only, QG-04). Independent review: pending.\nRoute pre-check: requested goldfish-deep / sonnet (Sonnet 5.5) / effort xhigh. Observed (own runtime prompt): 'powered by the model named Sonnet 5.5', id claude-sonnet-5-5. Effort not directly observable (definition frontmatter says xhigh). No contradiction.\n\n1. DoD results\n- Four new pins, all red for the stated reasons: passed. Neighbours green (refuses ordinary apply in architecture-adoption.test.mjs; NVA-SIGNONCE-1 in po-human-approval.test.mjs): passed.\n- evidence/ADOPT-SIGN-T-20261009/red.txt: passed, written by capture-evidence, on disk but NOT committed (see deviations).\n- One commit with the briefed subject: passed, 05c17ddb830d9e357c75e3c1102b326f578c48e3.\n- Independent review: pending (Elephant dispatch only).\n\n2. Evidence\n- Command: wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADOPT-SIGN-T-20261009/red.txt --label adopt-sign-t-red -- node --test --test-name-pattern=ADOPT-SIGN-T|NVA-SIGNONCE-1: sign-intent skips|refuses ordinary apply plugins/pipeline-core/scripts/architecture-adoption.test.mjs plugins/pipeline-core/scripts/po-human-approval.test.mjs'\n- Wrapped exit code 1 (red as intended). Result in red.txt: tests 6, pass 2, fail 4. red.txt holds no host path.\n- Red reasons from red.txt: (a1) prepare --out: 'Unknown or incomplete option: --out'. (a2) refusal pin: stderr is the unknown-flag error, not a scratch/ refusal. (b) sign-intent --request: '--request JSON must carry an intentSha256 field'. (c) mismatched intent.sha256: the same generic missing-field message, not an adoption-specific refusal.\n\n3. Changed files\n- plugins/pipeline-core/scripts/architecture-adoption.test.mjs: new describe with two pins for prepare --out (byte-identical request file; refusal outside scratch/).\n- plugins/pipeline-core/scripts/po-human-approval.test.mjs: aliased imports, adoptSignRequest helper (a genuine pipeline.adoption-approval-request.v1 prepared in its own throwaway git root), two pins for sign-intent --request (sign + disclosure + proof shape + scratch mirror; mismatched intent.sha256 refused before confirmation or signing).\n- Untracked or ignored: evidence/ADOPT-SIGN-T-20261009/red.txt, scratch/commit-msg/ADOPT-SIGN-T-20261009.txt, this record.\n\nContract the pins define for the production slice (ADOPT-SIGN-CLI):\n- --out is pinned with an absolute path under scratch/ of --root; outside paths (root, scratch/.., os tmpdir) must exit non-zero, name scratch in stderr, not be the unknown-flag error, and write nothing.\n- sign-intent --request must read intent.sha256 for schema pipeline.adoption-approval-request.v1, disclose the digest, subject.decisionRef, subject.decision and every subject.scope entry (never the 'no recorded request resolves' fallback), return PO-HUMAN-SIGN-INTENT-READY, write a proof with exactly schema/intentSha256/keyReference/publicKey/signatureBase64 that verifyPoApprovalProof accepts, and mirror it to adoption-proof-1.json beside adoption-request-1.json.\n- A request with a wrong intent.sha256 must throw a message matching /adoption.*request does not bind/ (house style: the adoption approval request does not bind its exact ... intent digest), never the generic missing-field message, with zero signing spawns, zero confirmations and no proof files.\n- The describer must validate from the request alone: the signing repo root in the pin has no adoption state or git history.\n\n4. Deliberately not changed\n- plugins/pipeline-core/scripts/po-human-approval.mjs and the other foreign uncommitted edits (pipeline-state.mjs, sanctioned-args-onboarding.mjs, harness pipeline-state.test.mjs and the rest): never touched or staged.\n- No production file. Relative --out resolution (against --root versus cwd), chat-mode adoption requests and symlinked scratch/ are deliberately not pinned.\n\n5. Deviations from spec\n- red.txt is not in the commit: the repo-root evidence/ tree is gitignored and git add refused it; I did not use -f. It sits on disk for the dispatcher.\n- Orientation used about 37 tool calls, not 10 (three source regions plus the fixture patterns were needed to write non-vacuous pins). The bootstrap line was printed after the opening reads, not as the first output line.\n- The terminal record sets candidateCommit to the new commit (v4 authored-commit rule: commits.at(-1) must equal candidateCommit); the briefed base candidate was 00e62f8b4e31e7022ca6d56af0ed3668a62e6162.\n- The budget notice fired at call 44 of 55 after the work was done; the remaining calls went to commit and record only.\n\n6. Open items\n- Independent review: pending.\n- No stop condition triggered; no pin was green; neither test file is guard-protected.\n- Next: ADOPT-SIGN-CLI (production) turns these four pins green; TR-S1-F4 edits po-human-approval.mjs in parallel, so sequence the two.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+      "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": { "mechanical": false, "architecture": false, "guardrails": false, "security": false }
+    },
+    "appliedRow": "T3"
+  }
+}

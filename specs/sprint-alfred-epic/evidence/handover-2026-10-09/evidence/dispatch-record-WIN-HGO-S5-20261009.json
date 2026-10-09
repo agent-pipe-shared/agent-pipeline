@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "WIN-HGO-S5-20261009",
+  "agentType": "goldfish-deep",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "runner": "claude",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "3f7708289400d67577c46d0eb0e87ff0b71b8e8f",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "commits": [
+    "eba5e5a11b933ce5696e48b67bb92a345f16b4e3"
+  ],
+  "resultSha256": "43a0344f13a46901177c736736911c4cb9fe75fe0c485791e1138f2d6a2e3ff4",
+  "report": {
+    "text": "WIN-HGO-S5-20261009 report (goldfish-deep, Sonnet 5.5 / xhigh). Implementation complete, committed eba5e5a11b933ce5696e48b67bb92a345f16b4e3. Independent review: pending. PO acceptance pending.\n\nRoute pre-check: class is test-only (QG-04), not A/G/S. Requested route (field 6): goldfish-deep, tool-layer model sonnet (Sonnet 5.5, effort xhigh). Observed (this dispatch's runtime prompt): 'Sonnet 5.5 ... claude-sonnet-5-5'. No contradiction. GUARD-BOOTSTRAP-RECEIPT-MISSING fired once on the first Write; the named preflight ran once (exit 0), then the identical write succeeded.\n\n1. DoD results\n- Per-chunk native captures, every targeted case green or typed-skipped: passed. Final-state chunk-2: pass 4, fail 0, skipped 7 (typed), wrapped exit 0.\n- WSL capture of the same chunk, no change: passed. pass 11, fail 0, skipped 0, wrapped exit 0 (counts read from the artifact).\n- One commit of the two test files with the prescribed subject: passed (eba5e5a11b933ce5696e48b67bb92a345f16b4e3, 2 files, 23 insertions, 11 deletions).\n- Terminal record evidence/dispatch-record-WIN-HGO-S5-20261009.json: written (this file).\nPer goal item: S1 four symlink cases: typed skip natively (symlink probe EPERM on this host), bodies pass under WSL. CROSSREPOGUIDANCE-1a/1b: join(...) around the git toplevel at both assert.equal(recorded.root, ...) lines, native pass, plan.root assertion untouched. Recovery-guard case: native pass (40.6 s), WSL pass. NVA-HGOFIX-2 lib x3 and script x1: see section 5.\n\nRecovery-guard verdict (briefing condition: confirm the live-owner design first). Trace: the nested acquireAuditLock inside afterRecoveryGuardFn enters clearAbandonedAuditRecovery because the recovery guard exists; its owner is this live process; win32AuditLockOwnerState never answers 'live' by documented design (no per-process start identity); so HGO-AUDIT-LOCK-AMBIGUOUS is thrown at the 'state !== dead' line BEFORE any rename, the guard stays in place and the outer call still returns recovered:true with the protected bytes unchanged. The second half of the case needs nothing: the nested call there finds no recovery file and no lock, and the outer HGO-AUDIT-LOCK-CHANGED comes from the !sameLockIdentity clause, which short-circuits before any owner-state read. Verdict: test fault, same design as the held-lock case; not a product fault. Edit: the expected code is platform-conditional (AMBIGUOUS on win32, RECOVERY-BUSY elsewhere), mirroring heldLockCode. No assertion added, removed or weakened.\n\n2. Evidence (repo-root-relative; evidence/ is git-ignored)\n- evidence/WIN-HGO-S5-20261009/chunk-2-lib-and-script-final.txt: node plugins/pipeline-core/scripts/capture-evidence.mjs --label WIN-HGO-S5-chunk-2 --out <that path> -- node --test <7 x --test-name-pattern: 'security and authority boundaries', 'NVA-W4-01B', 'pipeline author repair binds', 'NOVA-HGOELIG-4', 'a recovery guard excludes', 'NVA-HGOFIX-2', 'NVA-CROSSREPOGUIDANCE-1'> plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs ; native Windows ; wrapped exit 0 ; pass 4 / fail 0 / skipped 7.\n- evidence/WIN-HGO-S5-20261009/wsl-chunk-1-lib-and-script.txt: the same command under wsl.exe -e bash -lc 'cd <repo-root-in-wsl>; ...' ; wrapped exit 0 ; pass 11 / fail 0 / skipped 0.\n- evidence/WIN-HGO-S5-20261009/chunk-1-lib-and-script.txt: discovery capture before the last edit; native; wrapped exit 1 ; pass 3 / fail 1 / skipped 7. The one red was NVA-HGOFIX-2 eligibility() Bash argv-token case (assert eligible === true, actual false: default platform is win32 on this host). Kept as the trail for why that case changed.\n\n3. Changed files (commit eba5e5a11b933ce5696e48b67bb92a345f16b4e3)\n- plugins/pipeline-core/lib/human-guard-override.test.mjs: S1 skip DIRECTORY_SYMLINK_SKIP on four tests; join(...) at the two CROSSREPOGUIDANCE root assertions; recovery-guard expected code per platform; NVA-HGOFIX-2 separatorNormalized/safePath and crossBoundaryTarget cases typed-skipped on win32 via the existing POSIX_BACKSLASH_SKIP; NVA-HGOFIX-2 eligibility() Bash case passes explicit { platform: 'linux' } for its POSIX arm.\n- plugins/pipeline-core/scripts/guard-human-override.test.mjs: NVA-HGOFIX-2 backslash-name case typed-skipped on win32 (inline skip option with reason).\nUntracked or git-ignored, not committed: evidence/WIN-HGO-S5-20261009/*.txt, this record, scratch/commit-msg/WIN-HGO-S5-20261009.txt, scratch/finalize-WIN-HGO-S5.mjs.\n\n4. Deliberately not changed\n- All production files (forbidden). No assertion weakened or removed; POSIX behaviour of every touched test is byte-identical (skips are false off win32, the explicit platform equals the POSIX default, join() is a no-op on POSIX).\n- The author-repair case ('pipeline author repair binds ...') still compares a git --show-toplevel result directly (around the original line 2137). It is gated by the S1 skip here. On a Developer-Mode host where the symlink probe passes it may go red for the same separator reason as CROSSREPOGUIDANCE. Not verifiable on this host; NOT fixed.\n- Cost of the typed skips: the win32-injection arms inside the two skipped NVA-HGOFIX-2 lib cases (separatorNormalized with platform win32, safePath and crossBoundaryTarget forced to win32) now run only on POSIX hosts, not natively; WSL (pass 11) covers them.\n- The foreign uncommitted edits (pipeline-state.mjs, po-human-approval.mjs, sanctioned-args-onboarding.mjs, pipeline-state.test.mjs) were never staged or touched; the commit used exact pathspecs and lists only the two test files.\n- The rest of the 6000-line lib file was not run natively (targeted chunks only, per the Windows rule); other reds in the original 20 not named in this slice were not re-measured.\n\n5. Deviations from spec\n- NVA-HGOFIX-2 lib cases (separatorNormalized/safePath, crossBoundaryTarget): the briefing said 'pass an explicit platform'; I used a typed skip (POSIX_BACKSLASH_SKIP) instead. Grounds: the platform seam reaches separatorNormalized() only; resolve() and relative() in crossBoundaryTarget/safePath are the host path module, so with platform linux on win32 relative() returns a backslash path, the escape check (rel.startsWith('../')) does not recognise it and crossBoundaryTarget returns null, so the case still fails. The safePath fixture also does mkdirSync(join(root, '..\\hgofix-seam')), which on NTFS creates a directory OUTSIDE root that the finally block never removes. The native-reds note (section C) names the skip alternative. The third NVA-HGOFIX-2 lib case (eligibility Bash) did take the explicit platform, as briefed.\n- Those NVA-HGOFIX-2 cases live in the LIB test file (three of them); the script file holds one. The briefing text placed them under the script file. Both files were in scope, so no scope burst.\n- Script-file backslash case: briefing said typed skip; done. There is no NTFS fixture to create there (it is a platform-seam call), but the default-platform arm only exists on POSIX, so the skip is correct.\n- One failed attempt: the 4th NVA-HGOFIX-2 lib case (eligibility Bash) was red on the first native capture (not in the native-reds table) and green after one edit; a single failure, not a stop condition. The advisor was consulted twice (before edits, before closing).\n- Budget: the 80 % notice fired on call 44, after all edits and both captures were done; later calls were the WSL count read, staging, commit, record writes and the closing advisor consult. No edit was made after the notice.\n\n6. Open items\n- independent review: pending (only the Elephant may dispatch the Critic). PO acceptance pending. Not a closing-allowance handover: all briefed work is committed and verified.\n- For the dispatcher: whether to schedule a Developer-Mode native run so the four S1 bodies and the author-repair show-toplevel comparison are measured natively (they are typed-skipped here and pass under WSL).\n- No triggered stop condition, no briefing defect beyond the file-placement wording noted in section 5.\n",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+      "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "log": [
+    {
+      "phase": "opening: briefing read (obligations, CONT17/18/35 headers, section WIN-HGO-S5), record created",
+      "toolUses": 11
+    },
+    {
+      "phase": "orientation done (lib test, production seams, native-reds doc B-C); advisor consulted; edits applied (S1 x4, CROSSREPO 1a/1b, recovery guard, NVA-HGOFIX-2 x2 typed skip, script case typed skip)",
+      "toolUses": 33
+    },
+    {
+      "phase": "native chunk-1 captured: pass 3, fail 1 (NVA-HGOFIX-2 eligibility Bash case, default platform on win32), skipped 7; fixed with explicit platform linux",
+      "toolUses": 40
+    },
+    {
+      "phase": "native chunk-2 (final state) pass 4, fail 0, skipped 7, wrapped exit 0; WSL pass 11, fail 0, skipped 0, wrapped exit 0",
+      "toolUses": 44
+    },
+    {
+      "phase": "committed eba5e5a11 (two test files, exact pathspec); checkpoint written",
+      "toolUses": 47
+    },
+    {
+      "phase": "finalized: completed",
+      "toolUses": 50
+    }
+  ]
+}

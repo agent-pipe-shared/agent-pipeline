@@ -1,0 +1,1 @@
+before = evidence/TR-S1-T3g-20261009/new-pins.txt (WSL, machine-written, candidate 5cd3c2f87 + T3g test commit a055f078f): key-copy pin RED, actual [po-private.pem] vs expected []. No separate pre-edit run was made; the T3g capture is the same pin on the same production code.

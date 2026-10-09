@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-C-F2-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "candidateCommit": "862db7a68",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "189130971"
+  ],
+  "log": [
+    {
+      "phase": "opening: briefing + obligations + TR-C manifests read, route pre-check clean (requested goldfish-deep/Sonnet 5.5/xhigh; observed claude-sonnet-5-5; effort unobserved)",
+      "toolUses": 12
+    },
+    {
+      "phase": "terminal: commit made, report written (independent review: pending)",
+      "toolUses": 51
+    }
+  ],
+  "report": {
+    "text": "TR-C-F2-20261009 (goldfish-deep, claude-sonnet-5-5 / xhigh). Implementation complete; independent review: pending. One DoD check (consumer-safe-paths) failed for a pre-existing cause outside scope, see section 1 and 6. Candidate 862db7a68, commit 189130971.\n\nRoute pre-check (class G): requested route (field 6) goldfish-deep, Sonnet 5.5 / xhigh, tool-layer model sonnet. Observed model identity, from this dispatch's own runtime prompt: \"claude-sonnet-5-5\". Effort unobserved (no direct evidence of the effort name). No contradiction.\n\n1. DoD results\n- The four TR-C-T5 reds green: passed. GG22-T5F1a, GG22-T5F1b (guard-git) and PGC-T5F3b, PGC-T5F3c (guard-push) no longer fail.\n- Every other case unchanged: passed. guard-git 258/258; guard-push 200/202, the two failures being PG-CHECKPOINT and PG-CHECKPOINT-WORKTREE (exit 2, \"signature mode requires a current approval\"), the same two as in every earlier capture. The apply step asserted exactly those two failing names and the 258/202 totals before writing the manifest.\n- Redirect fired: passed. TRCT5-REDIRECT-FIRED guard-git.mjs (243 loads) and guard-push.mjs (203 loads) are in the capture, so the run used the edited tranche-2 guard post-images.\n- consumer-safe-paths exits 0: FAILED. Exit 2, \"Consumer-safe-path check failed: 3 finding(s)\", all three in plugins/pipeline-core/docs/adr/0014-critic-contract.md (lines 68, 70, 90, source-only prefix \"harness/\"). That file is not in this commit and not in this dispatch's scope; the three findings are not caused by my four files. Not repaired (scope).\n- One commit of the two guard post-images and the two manifests: passed, 189130971, 4 files, 88 insertions, 13 deletions, subject \"fix(guard-git,guard-push): consumed values never act as flags; marker-keyed Why line (tranche-2)\". Trailers: Dispatch: TR-C-F2-20261009 (goldfish), AI-Assisted: true.\n\n2. Evidence\n- evidence/TR-C-F2-20261009/green.txt (35876 bytes at the wait, machine-written by capture-evidence.mjs, wrapped exit code 1 as expected from the two PG-CHECKPOINT* failures). Command: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-F2-20261009/green.txt --label green -- node --test scratch/dispatch-wip/TR-C-T5/guard-push.trc.test.mjs scratch/dispatch-wip/TR-C-T5/guard-git.trc.test.mjs\" (run in the background and awaited with the wait helper; the background job status reported exit code 1).\n- consumer-safe-paths: node harness/scripts/check-consumer-safe-paths.mjs, exit 2 (the failure above), taken after the manifest edits and before the commit.\n- Scratch tool (git-ignored): scratch/dispatch-wip/TR-C-F2/run.mjs (measure, wait, apply, finalize) and rest.mjs; commit message file scratch/commit-msg/TR-C-F2-20261009.txt. Measured before the run: live pre-images equal the recorded pre-image digests, their blob ids equal git hash-object output, HEAD's post-images were the TR-C-F ones, both test post-images equal the TR-C-T5 digests.\n\n3. Changed files (new post-image digests are in the TR-C-F2 section of TR-C-F-MANIFEST.md)\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs: F1, consumedAsValue flag in the GG-22 look-behind loop. sha256 a57566f883aa48dd4566e6ea377f14cef4c45e92e0b95a41c08770571e4b863e, 89845 bytes, 1500 lines.\n- specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs: F3 / Ruling 159, the Why line emitted only when the command carries a marker the line names. sha256 9686bbec296411e480a72bc4f0ae49600e452b413370f88ecc8319b3b5dfee49, 149849 bytes, 2697 lines.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-F-MANIFEST.md: F2 (git blob ids of both pre-images c37d8cc9c5fd... guard-push, 363a46a27a92... guard-git), model/effort line dropped, test digests refreshed to the TR-C-T5 post-images, new TR-C-F2 section.\n- specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md: F5, line 21 host path replaced with <repo-root-in-wsl>; one update sentence in the TR-C-T5 section.\n- Not in the commit (untracked, for the Elephant): evidence/TR-C-F2-20261009/green.txt, evidence/dispatch-record-TR-C-F2-20261009.json.\n\n4. Deliberately not changed\n- Both test post-images, live hooks/ and lib/, the tranche README, push.\n- The Instead: line of the refusal stays unconditional; only the Why: line is marker-keyed (as briefed).\n- TR-C-MANIFEST.md line 79 keeps the pin literal \"cd /mnt/d/repo\" (a test fixture string of PGC-T85d, not a machine path). The TR-C-F table rows keep the TR-C-F post-image digests, with a note that the TR-C-F2 section supersedes them.\n- plugins/pipeline-core/docs/adr/0014-critic-contract.md (the consumer-safe-paths findings).\n\n5. Deviations from spec\n- The briefing says \"add a TR-C-F2 section with new sha256/bytes\" without naming the manifest; it is in TR-C-F-MANIFEST.md, where the guard post-image digests live.\n- The Why test inside guard-push.mjs repeats a subset of the marker rule (the markers the Why line names: ( ) { $ backtick, nested shell with -c; the two nested-shell regexes are byte copies from lib/git-cmd.mjs) because hasFailClosedMarker is not exported and lib/ is forbidden. Typographic quotes, a backslash outside a path token and a shell-received here-document are markers there but carry no Why line here. The drift-free form (export the function and call it) is a lib/ change for a later slice.\n- The dispatch record log has two entries (opening, terminal), not per-phase appends, a budget trade. The commit-checkpoint write was folded into the one terminal write, as briefed.\n- The first apply run wrote TR-C-F-MANIFEST.md and then aborted on an over-strict assertion of mine (it rejected the legitimate \"/mnt/d/repo\" fixture literal); the rest of the apply (TR-C-MANIFEST.md, commit message) was run by a second small script. No file was written twice; the diff was reviewed hunk by hunk before the commit.\n\n6. Open items\n- independent review: pending (Elephant dispatches the G/S Critic); nothing here is PO-accepted.\n- consumer-safe-paths is red at HEAD for plugins/pipeline-core/docs/adr/0014-critic-contract.md (3 findings, \"harness/\" prefix). A follow-up must repair that file or the DoD item needs a re-ruling. Likely origin: the recent ADR-0014 amendment commit (not verified).\n- The ceremony needs the new guard post-image digests of the TR-C-F2 section; if verify-suites pins case counts for either guard test file, it needs the matching refresh (not checked).\n- The dispatch hook's 80 % notice fired at counted call 44; the remaining steps (manifest tail, diff, check, add, commit, record) were commit-path only. This is not a closing-allowance handover.\n",
+    "changedFiles": [
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-F-MANIFEST.md",
+      "specs/sprint-alfred-epic/signed-package/tranche-2/TR-C-MANIFEST.md"
+    ]
+  },
+  "resultSha256": "0aeafa09f10b8cd3825f9a267b24fa7277b40b2f4c5ffd1ff6daa03ba4791247"
+}

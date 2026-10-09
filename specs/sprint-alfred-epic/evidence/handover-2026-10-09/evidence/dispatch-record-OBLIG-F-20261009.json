@@ -1,0 +1,28 @@
+{
+  "taskId": "OBLIG-F-20261009",
+  "agentType": "goldfish-implementor",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "criticRequired": true,
+  "outcome": "committed-pending-report",
+  "commits": ["03f32e3"],
+  "log": [
+    { "phase": "orientation, preflight (receipt-missing cure), edit, regenerate, verify, commit", "toolUses": 23 }
+  ],
+  "report": {
+    "dod": {
+      "generate-agent-obligations.test.mjs": "passed (10/10, exit 0)",
+      "generate-vendored-canon.test.mjs": "passed (8/8, exit 0)",
+      "check-consumer-safe-paths.test.mjs": "passed (9/9, exit 0)",
+      "diffScope": "passed (3 files only)",
+      "commit": "passed (03f32e3, trailers Dispatch + AI-Assisted only)"
+    },
+    "changedFiles": [
+      "harness/scripts/generate-agent-obligations.mjs",
+      "templates/prompts/agent-obligations.md",
+      "plugins/pipeline-core/templates/prompts/agent-obligations.md"
+    ],
+    "independentReview": "pending"
+  }
+}

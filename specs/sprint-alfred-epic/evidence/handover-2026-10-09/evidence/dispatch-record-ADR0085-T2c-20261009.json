@@ -1,0 +1,67 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "ADR0085-T2c-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agentType": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "candidateCommit": "eae79f881a5335e1256961c745c5baba11cf651e",
+  "outcome": "committed-pending-report",
+  "outcomeClassification": {
+    "schema": "pipeline.dispatch-outcome-classification.v1",
+    "kind": "authored-commit"
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T3"
+  },
+  "commits": [
+    "6f9aba5a0c7f26b42ea1ffc3a7e5c895dca9df0c"
+  ],
+  "log": [
+    {
+      "phase": "opening: route pre-check done (requested claude-sonnet-5-5 / xhigh, observed claude-sonnet-5-5 from this dispatch's runtime prompt, no contradiction; effort not observable); obligations + CONT17 header + goldfish-task 455-481 read; T2b record read for shape; GUARD-BOOTSTRAP-RECEIPT-MISSING cured by preflight from the loaded plugin root",
+      "toolUses": 7
+    },
+    {
+      "phase": "orientation: read design-workflow-approval.mjs, route test R block and tail, po-approval-proof/critical-human-proof-policy verifier codes, re-read source-drift code (design-workflow-package.mjs:821); advisor consulted once before writing",
+      "toolUses": 19
+    },
+    {
+      "phase": "edit: node:crypto import line + block S1-S11 appended (2 Edit calls)",
+      "toolUses": 21
+    },
+    {
+      "phase": "verify: red.txt captured (wrapped exit 1, 29 pass / 10 fail of 39: R1-R12, V0-V11, L1-L4 and S9 pass; S1-S8, S10, S11 fail because the throwing readCandidate is reached at design-workflow-package.mjs:573 via readApprovedDesignWorkflowPackage:675 from design-workflow-approval.mjs:187); R/V/L states identical to before.txt (28 of 28 pass); check-consumer-safe-paths.test.mjs 9 of 9 pass, exit 0",
+      "toolUses": 26
+    },
+    {
+      "phase": "commit 6f9aba5a0 (test file only, exact pathspec); checkpointing the record before the final report",
+      "toolUses": 30
+    },
+    {
+      "phase": "final: report written with resultSha256 in one write",
+      "toolUses": 32
+    }
+  ],
+  "resultSha256": "e3f11db0c062f499e841445907cf988626bc3608acbddfdb0be1070ec1ee9ef1",
+  "report": {
+    "text": "independent review: pending. Implementation complete and committed; not PO-accepted, no independent Critic receipt yet.\n\nRoute pre-check (class S): requested route claude-sonnet-5-5 / xhigh (field 6, agentType goldfish-deep); observed model identity claude-sonnet-5-5, quoted from this dispatch's runtime prompt (\"The exact model ID is claude-sonnet-5-5\"). No contradiction. Effort is not observable from the prompt and the agent-definition frontmatter was not read, so the xhigh part is unverified.\n\n1. DoD results\n- Native targeted capture after the edit (red.txt): passed as a RED capture. Wrapped exit code 1 by design; 39 tests, 29 pass, 10 fail. R1-R12, V0-V11 and L1-L4 are all pass, identical to before.txt (28 of 28 pass), so no existing case changed state (stop condition not triggered).\n- node --test harness/scripts/check-consumer-safe-paths.test.mjs: passed, exit 0, 9 of 9 (output observed in the session, no artifact file written by me).\n- One commit of the test file only, subject and trailers as briefed: passed, 6f9aba5a0c7f26b42ea1ffc3a7e5c895dca9df0c.\n- WSL capture: not run (host load cap, as briefed); the Elephant re-captures.\n\nPer-pin table (state at this candidate; reason is what red.txt shows)\n- S1 accept v2 (Advisor-unavailable): RED. The throwing readCandidate is reached (design-workflow-package.mjs:573 via readApprovedDesignWorkflowPackage:675, called from design-workflow-approval.mjs:187).\n- S2 accept v1: RED, same stack.\n- S3 package byte drift (DWP-APPROVAL-DIGEST-DRIFT): RED, same stack (the positive control throws).\n- S4 PRD drift and Spec drift (DWP-APPROVAL-SOURCE-DRIFT): RED, same stack.\n- S5 exception altered, and dropped on v2 (DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING): RED, same stack.\n- S6 exception replayed onto a v1 record (DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING): RED, same stack.\n- S7 intent drift (DWP-APPROVAL-INTENT-DRIFT): RED, same stack.\n- S8 approvedBy and proofSha256 mismatch (DWP-APPROVAL-RECORD-DRIFT): RED, same stack.\n- S9 record shape (DWP-APPROVAL-RECORD-SHAPE, 7 sub-cases: extra key, chat mode, other schema, foreign packageSha256, non-sha intentSha256, non-sha proofSha256, missing proof; each with zero candidate reads): GREEN, regression guard as briefed.\n- S10 forged signature (PO-APPROVAL-PROOF-MISMATCH): RED, same stack.\n- S11 key absent from anchors (PO-APPROVAL-TRUST-MISMATCH for a valid signature by an unanchored key under the anchored keyReference; PO-APPROVAL-PROOF-INVALID when the signer's keyReference is not anchored): RED, same stack.\nAll ten RED states fail for the C2 reason (the verifier still samples the live candidate), not a fixture error: the fixture precondition (signed proof verifies against its anchor) passed in every case, and the call reached the re-read.\n\n2. Evidence\n- evidence/ADR0085-T2c-20261009/red.txt, written by plugins/pipeline-core/scripts/capture-evidence.mjs. Command: node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/ADR0085-T2c-20261009/red.txt --label red -- node --test plugins/pipeline-core/lib/design-approval-route.test.mjs. Wrapped exit code 1.\n- Baseline compared against evidence/ADR0085-T2b-20261009/before.txt (taken at a662f4dc6; this run at parent eae79f881).\n- Consumer-safe test: node --test harness/scripts/check-consumer-safe-paths.test.mjs, exit 0.\n\n3. Changed files\n- plugins/pipeline-core/lib/design-approval-route.test.mjs: node:crypto import gains generateKeyPairSync and sign; block S1-S11 appended after L4 (221 insertions, 1 deletion = the import line).\n- Untracked, not committed: evidence/dispatch-record-ADR0085-T2c-20261009.json, evidence/ADR0085-T2c-20261009/red.txt, scratch/commit-msg/ADR0085-T2c-20261009.txt, scratch/finalize-ADR0085-T2c.mjs.\n\n4. Deliberately not changed\n- Every production file and every other test file.\n- The file header (lines 47-50 still list the stored-signature check as NOT PINNED HERE, owned by F2b). It is now partly stale; left alone because the briefing asked for one appended block. The S block comment says what it pins.\n- Foreign staged and dirty files (committed by exact pathspec; a foreign commit eae79f881 landed on the branch between session start a7fb4f76d and my commit).\n- Observation, not pinned: verifyAgainstTrustAnchors (critical-human-proof-policy.mjs:539-546) derives trust from the proof itself when the anchor list is empty, so the stored verifier accepts any self-consistent proof if a caller passes an empty list. Every S case uses a non-empty list. The Elephant may want to know which callers can pass an empty one.\n\n5. Deviations from spec\n- The two library exports (createPoApprovalIntent, verifyAgainstTrustAnchors) and the verifier are loaded with the file's own loadExport convention instead of static imports, so a failing import cannot turn R, V or L red. Only generateKeyPairSync and sign were added to the static node:crypto import.\n- Two key-absent pins instead of one (TRUST-MISMATCH and PROOF-INVALID), plus S6 (replayed exception on a v1 record) and a counted-reads assertion on every case. All inside the briefed refusal list.\n- candidateReads is asserted to be 0 after every case, which is stricter than the briefing's \"readCandidate that throws\" alone.\n- The refusal codes of S3-S8, S10 and S11 are derived from reading the source (design-workflow-package.mjs:807, :821, :824; design-workflow-approval.mjs:202, :218; po-approval-proof.mjs:46, :48, :51), not observed by a run, because today the first call throws before any typed code is produced. S9 and the signing preconditions are the only parts executed to a conclusion.\n\n6. Open items\n- independent review: pending (only the Elephant dispatches the Critic).\n- For F2b: the live candidate is handed down at two sites, design-workflow-approval.mjs:187-191 and again through the nested verifyDesignWorkflowPackageApproval call at :210-214, which with allowUnrelatedCommits routes to readApprovedDesignWorkflowPackage at :131-136. Both must stop sampling it for S1-S8, S10 and S11 to go green. The accept path beyond the first re-read (nested request validation, trust-anchor check) is unexecuted until then; if S1/S2 stay red after F2b for a reason other than the reader, suspect that nested validation before the fixture.\n- Elephant re-capture under WSL still to do. No stop condition triggered; no index.lock. Hook-counted tool uses at the final record write: about 32 of 35.\n- Closing handover facts: committed 6f9aba5a0c7f26b42ea1ffc3a7e5c895dca9df0c (test file only); verified green: consumer-safe test exit 0, R/V/L unchanged and S9 green in red.txt; remains undone: nothing in the briefed scope, F2b implementation is a separate slice; no file left modified and uncommitted by me apart from the untracked evidence and scratch files listed in section 3.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/design-approval-route.test.mjs"
+    ]
+  }
+}

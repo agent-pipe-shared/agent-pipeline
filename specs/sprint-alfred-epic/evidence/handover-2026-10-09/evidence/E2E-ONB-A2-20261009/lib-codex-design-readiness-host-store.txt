@@ -1,0 +1,23 @@
+command: node --test --test-timeout=300000 plugins/pipeline-core/lib/codex-design-readiness-host-store.test.mjs
+label: lib-codex-design-readiness-host-store
+exitCode: 0
+head: 3211c15eafe9d042e29ced644e0581853907a0c6
+tree: cae39dbc20f88836d4da65f38315c975eb5ba108
+dirty: true
+--- stdout ---
+✔ private store independently binds real closed ownership, with exact durable reads (2453.833415ms)
+✔ valid-looking caller ownership cannot substitute for registered process evidence (1994.634066ms)
+✔ different source/candidate coordinates, missing expectations and weak assurance are rejected (1611.740705ms)
+✔ receipt hardlinks and nonprivate modes fail closed on read (2289.307796ms)
+✔ drifted ownership chain invalidates an already stored receipt (1954.745714ms)
+✔ private store rejects common-dir aliases before any write (1.106248ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10832.959522
+
+--- stderr ---
