@@ -155,6 +155,43 @@ bytes.
   and the `GUARD` line): `evidence/ADR0085-T0c-b-20261009/red-run4.txt`. The two earlier failing states of the same
   fixture are in `red.txt` (`DWP2-CURRENT-CANDIDATE`, then the declined enrollment) and `enroll-diagnostic.txt`.
 
+### SF22b: stop-fanout.test.mjs (steady-state Stop spawns 0; Ruling 87)
+
+Unlike the two files above, the target already exists: this member REPLACES a committed test file.
+
+- Target path: `plugins/pipeline-core/hooks/stop-fanout.test.mjs`
+- Base blob: `e738862997b90adc22f9527e648e61c81484d8cd` (`git rev-parse HEAD:plugins/pipeline-core/hooks/stop-fanout.test.mjs`;
+  the working-tree copy hashes identically with `git hash-object`)
+- Post-image: `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/stop-fanout.test.mjs`
+- sha256: `4f4e069ef0e904af6d28b944cdd7f92f86160fc7b8094c5ecc7b83b2f6d064b6` (over the LF bytes; `file` reports no CRLF)
+- Change against the base blob (76 insertions, 16 deletions): the new case SF22b, registered with the explicit id `SF22b`
+  (`check()` gains an optional third `id` parameter and numbers only the auto-id cases, so SF23 keeps its id; the ids stay in
+  the strict ascending order `test-case-completion.mjs` requires: SF22 < SF22b < SF23); the case-count pin 23 -> 24; and the
+  reworded comment blocks above `TRIPWIRE_SOURCE` and above `LEDGER_POWERSHELL_SPAWN_BOUND_WIN32`. SF22's bound stays 4 and
+  the other 23 cases are byte-identical.
+- Contract: SF22b runs a first ledger-writing Stop against a fresh common dir and then a second Stop against the same common
+  dir and session, each as its own hook process with its own tripwire. The second Stop must spawn exactly 0 children of any
+  executable on every platform, decide `block` like the first, and append to the ledger (`stop-eval, block` twice). A control
+  spawn through the second Stop's own preload and log proves its empty log is measured.
+- Install: copy the post-image to the target path unchanged, after confirming `git hash-object` of the target prints the
+  base blob above. It resolves its imports and `HOOK` from its own location, so it runs only at the target path.
+- Run commands. WSL (hook tests run under WSL):
+  `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/stop-fanout.test.mjs"`.
+  Native win32 (this one file only, never the full suite): `node --test plugins/pipeline-core/hooks/stop-fanout.test.mjs`.
+- State: a contract pin, not a RED. All 24 cases are green on native win32 (SF22: 4 PowerShell spawns; SF22b: first Stop 4,
+  second Stop 0) and under WSL (SF22 and SF22b: 0 and 0). With the ledger directory removed between the two Stops, SF22b
+  goes red natively ("the second Stop ... spawned 2 child process(es) on win32"), so the zero is not vacuous.
+- Evidence (machine-written captures of a scratch run copy that differs from the post-image only in its 3 import lines and
+  the `HOOK` constant, 4 lines; `git diff --no-index --stat` between the two reports 4 insertions and 4 deletions):
+  `evidence/SF22b-20261009/native.txt`, `evidence/SF22b-20261009/wsl.txt` and the mutation run
+  `evidence/SF22b-20261009/mutation-native.txt`. Basis: `evidence/FANOUT-WIN-M-20261009/spawns.txt`.
+- Left unchanged on purpose (outside the briefed comment blocks): SF22's case name ("... bound 4, must drop to 0"), the
+  inline comment above its `ledgerSide` equality and that assertion's failure message still say that a reduction means the
+  tracked fix landed and the constant must become 0. Ruling 87 re-scoped the backlog item, so those three strings are now
+  stale; they are the next tranche-2 touch-up.
+- Same-tranche obligation: the case set grows from 23 to 24 ids. If `verify-suites` pins a case count or case-set digest
+  for this file, it needs the matching refresh (not checked here).
+
 ### guard-split-contract.test.mjs (KERNEL-DOCS-c/d; Ruling 105)
 
 - Target path: `plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs`
