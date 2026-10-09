@@ -22,7 +22,11 @@ test("legacy Goldfish command flow renders separate exact-path argv without shel
   assert.deepEqual(result.steps[0].argv, ["add", "--", ...input.paths]);
   assert.deepEqual(result.steps[1].argv.slice(-3), ["--", ...input.paths]);
   assert.ok(result.steps[0].command.includes("'src/odd value.txt'"));
-  assert.ok(result.steps[1].command.includes("'Keep the user'"));
+  // Ruling 150: the body travels in the message file, not in the commit command (no -m, no --trailer).
+  assert.deepEqual(result.steps[1].argv, ["commit", "-F", result.messagePath, "--", ...input.paths]);
+  assert.ok(result.steps[1].command.includes(result.messagePath));
+  assert.ok(!result.steps[1].command.includes("Keep the user"));
+  assert.ok(result.message.includes("Keep the user's literal $VALUE and don't expand it."));
   assert.ok(result.steps.every((step) => !step.command.includes(" && ")));
   for (const step of result.steps) {
     assert.equal(typeof step.copyCommand.posix, "string");
@@ -97,6 +101,9 @@ test("generated commands create one exact-path Git commit with the required trai
   writeFileSync(join(root, "src", "odd value.txt"), "exact content\n");
   const plan = createGoldfishCommitCommandFlow({ ...input, paths: ["src/odd value.txt"] });
   assert.equal(plan.ok, true);
+  // Ruling 150: the agent writes `plan.message` to `plan.messagePath` before the commit step.
+  mkdirSync(join(root, "scratch", "commit-msg"), { recursive: true });
+  writeFileSync(join(root, plan.messagePath), plan.message);
   for (const step of plan.steps) run("bash", ["-c", step.command]);
   assert.equal(run("git", ["show", "--format=", "--name-only", "HEAD"]).trim(), "src/odd value.txt");
   const message = run("git", ["show", "-s", "--format=%B", "HEAD"]);
