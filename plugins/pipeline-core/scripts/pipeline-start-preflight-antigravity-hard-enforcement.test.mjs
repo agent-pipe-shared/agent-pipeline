@@ -98,11 +98,30 @@ function noSelfApplicationGitScriptUrl(root) {
   return pathToFileURL(join(root, "scripts", "pipeline-start-preflight.mjs")).href;
 }
 
+// These preflight unit cases exercise Antigravity signal wiring. Supply the
+// complete current clone-provisioning observation as an explicit dependency so
+// their synthetic, non-Git roots do not accidentally test mandatory hook setup.
+function currentCloneProvisioning(root) {
+  const hooksDir = join(root, ".git", "hooks");
+  return {
+    schema: "pipeline.clone-provisioning-report.v1",
+    status: "ready",
+    checks: [
+      { id: "pre-push-hook", status: "current", path: join(hooksDir, "pre-push"), repairAction: null },
+      { id: "pre-commit-hook", status: "current", path: join(hooksDir, "pre-commit"), repairAction: null },
+      { id: "commit-msg-hook", status: "current", path: join(hooksDir, "commit-msg"), repairAction: null },
+      { id: "po-profile-receipt", status: "present", path: join(root, ".git", "agent-pipeline", "po-gate", "profile-receipt.json"), repairAction: null },
+      { id: "private-state-directory", status: "present", path: join(root, ".git", "agent-pipeline"), repairAction: null },
+    ],
+  };
+}
+
 // A hermetic current Antigravity topology for the preflight wiring cases.
 // These cases measure how the hard-enforcement observation affects readiness,
 // not the independent physical topology reader's registry/file validation.
 function readyAntigravityInstallation(root) {
   return {
+    checkCloneProvisioningFn: currentCloneProvisioning,
     antigravityPluginRegistries: () => [JSON.stringify({ entries: [{ path: root }] })],
     observeAntigravityLoadedTopologyFn: ({ loadedPluginRoot }) => ({
       schema: "pipeline.antigravity-loaded-topology.v1",
@@ -434,6 +453,7 @@ test("a Claude session never invokes the Antigravity detector, carries no such f
     env: { CLAUDECODE: "1" },
     pluginList: pluginList(),
     read: () => JSON.stringify({ version: TEST_VERSION }),
+    checkCloneProvisioningFn: currentCloneProvisioning,
     observeAntigravityHardEnforcementFn: spy,
     observe: readyObservation,
   });
@@ -447,6 +467,7 @@ test("a Codex session never invokes the Antigravity detector, carries no such fi
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
+    checkCloneProvisioningFn: currentCloneProvisioning,
     observeAntigravityHardEnforcementFn: spy,
     observe: readyObservation,
   });
@@ -471,12 +492,13 @@ test("Codex preflight output keys and status are unchanged by this addition (byt
     pluginList: pluginList(),
     read: () => manifest,
     cwd,
+    checkCloneProvisioningFn: currentCloneProvisioning,
     observeAntigravityHardEnforcementFn: spy,
     observe: readyObservation,
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation", "installedSource",
-    "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
+    "installedVersion", "mandatoryHookReadiness", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
   assert.equal(result.status, "ready");

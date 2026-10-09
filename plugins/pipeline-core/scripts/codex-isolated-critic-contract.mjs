@@ -68,6 +68,25 @@ const SCHEMA_PATHS = Object.freeze({
   verdict: join(HERE, "codex-isolated-critic-verdict.schema.json"),
 });
 const SCHEMAS = Object.freeze(Object.fromEntries(Object.entries(SCHEMA_PATHS).map(([key, path]) => [key, JSON.parse(readFileSync(path, "utf8"))])));
+const CLAIMS_SCHEMA_DATA = JSON.parse(readFileSync(join(HERE, "codex-isolated-critic-claims.schema.json"), "utf8"));
+// schema-lite intentionally supports bounded local JSON pointers only. The
+// journal's owned request schema is known at module load, so assemble that
+// schema here instead of teaching the validator to load a filename reference.
+const JOURNAL_VALIDATION_SCHEMA = {
+  ...SCHEMAS.journal,
+  properties: {
+    ...SCHEMAS.journal.properties,
+    request: SCHEMAS.request,
+  },
+};
+const RECEIPT_VALIDATION_SCHEMA = {
+  ...SCHEMAS.receipt,
+  $defs: { ...(SCHEMAS.receipt.$defs ?? {}), ...(CLAIMS_SCHEMA_DATA.$defs ?? {}) },
+  properties: {
+    ...SCHEMAS.receipt.properties,
+    claims: CLAIMS_SCHEMA_DATA,
+  },
+};
 const VERDICT_SCHEMA_SHA256 = sha256(readFileSync(SCHEMA_PATHS.verdict));
 const HEX32 = /^[0-9a-f]{32}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -466,7 +485,7 @@ function transitionAllowed(previous, current) {
 }
 
 export function validateJournal(journal) {
-  validateLite(journal, SCHEMAS.journal, "journal");
+  validateLite(journal, JOURNAL_VALIDATION_SCHEMA, "journal");
   validateRequestShape(journal.request);
   if (!Number.isSafeInteger(journal.revision) || journal.revision < 0
     || (journal.priorRawSha256 !== null && !SHA256.test(journal.priorRawSha256))
@@ -955,7 +974,7 @@ export function buildReceipt(context, claims, { clock = Date.now } = {}) {
 }
 
 export function validateReceipt(receipt) {
-  validateLite(receipt, SCHEMAS.receipt, "receipt");
+  validateLite(receipt, RECEIPT_VALIDATION_SCHEMA, "receipt");
   if (!HEX32.test(receipt.dispatchNonce) || !HEX32.test(receipt.attemptNonce)
     || !OID.test(receipt.candidate.commit) || !OID.test(receipt.candidate.tree) || !SHA256.test(receipt.candidate.diffSha256)
     || !SAFE_ID.test(receipt.profile.id) || !SHA256.test(receipt.profile.rawSha256) || !SHA256.test(receipt.inputSetSha256)

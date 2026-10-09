@@ -348,6 +348,7 @@
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-capture-header-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-course-admission-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
@@ -2347,6 +2348,7 @@
         "verify-phase:harness/scripts/verify.mjs:model-family-approval-request-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-push-anchor-tests",
         "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-scratch-tests",
         "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
       ],
       "runners": [
@@ -2404,6 +2406,7 @@
       "status": "optional",
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:attended-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:devplan-shell-lane-recovery-tests",
         "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-archive-tests",
         "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-refusal-registry-tests",

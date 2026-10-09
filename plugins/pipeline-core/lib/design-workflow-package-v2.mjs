@@ -53,13 +53,14 @@ function boundEvidencePaths(pkg,packagePath){
  const a=pkg.advisor,sourcePaths=new Set(SOURCE_NAMES.map(n=>pkg.sources?.[n]?.path));
  return new Set([packagePath,pkg.readiness?.path,a?.initialContext?.path,a?.failureEvidence?.path,a?.receipt?.path,a?.report?.path].filter(p=>typeof p==='string'&&p.length>0&&!sourcePaths.has(p)));
 }
-// "Candidate or an evidence-only descendant": HEAD descends from the package candidate and every
-// path that differs between the two commits was added or modified and belongs to the bound set.
-// Only an affirmative proof admits; any git failure, deletion, rename, type change or other path refuses.
+// "Candidate or an evidence-only descendant": the recorded candidate tree is the tree of its commit,
+// HEAD is a distinct descendant, and every changed path belongs to the bound set. Only an affirmative
+// proof admits; any git failure, deletion, rename, type change or other path refuses.
 function isEvidenceOnlyDescendant(repoRoot,head,pkg,packagePath){
  try{
   const candidate=pkg.candidate?.commit;
-  if(typeof candidate!=='string'||!COMMIT_ID.test(candidate)||typeof head?.commit!=='string'||!COMMIT_ID.test(head.commit))return false;
+  if(typeof candidate!=='string'||!COMMIT_ID.test(candidate)||typeof head?.commit!=='string'||!COMMIT_ID.test(head.commit)||head.commit===candidate)return false;
+  if(gitText(repoRoot,['rev-parse',candidate+'^{tree}']).trim()!==pkg.candidate?.tree)return false;
   try{gitText(repoRoot,['merge-base','--is-ancestor',candidate,head.commit]);}catch(e){if(e?.status===1)return false;throw e;}
   const bound=boundEvidencePaths(pkg,packagePath),tokens=gitText(repoRoot,['diff-tree','-r','--name-status','-z','--no-renames',candidate,head.commit]).split('\0');
   if(tokens[tokens.length-1]==='')tokens.pop();

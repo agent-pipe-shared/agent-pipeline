@@ -123,6 +123,11 @@ export function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   const nonEmptyTrimmed = (value) => typeof value === "string" && value.trim() !== "";
   const nonEmptyTrimmedNotFlag = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
   const nonEmptyNotFlag = (value) => typeof value === "string" && value !== "" && !value.startsWith("--");
+  const isBoundedRepoRelativePath = (value) => nonEmptyTrimmedNotFlag(value)
+    && Buffer.byteLength(value) <= 4096
+    && !value.includes("\0")
+    && !/^(?:\/|\\|[A-Za-z]:)/u.test(value)
+    && !value.split(/[\\/]/u).includes("..");
   const isRefValue = (value) => typeof value === "string"
     && /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value)
     && !value.includes("..") && !value.includes("//") && !value.endsWith("/") && !value.endsWith(".lock");
@@ -386,6 +391,8 @@ export function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
     "--text-file-sha256": isHexDigest,
     "--text-turn-ref": isClaudeIntakeReference,
     "--answers-json": nonEmptyTrimmedNotFlag,
+    "--answers-file": isBoundedRepoRelativePath,
+    "--answers-file-sha256": isHexDigest,
     "--plan-sha256": isHexDigest,
     "--proof": nonEmptyTrimmedNotFlag,
     "--git-author-name": nonEmptyTrimmedNotFlag,

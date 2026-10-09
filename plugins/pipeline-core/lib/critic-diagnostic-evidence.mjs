@@ -61,6 +61,20 @@ function validateReference(value) {
   if (!exact(value, ["path", "sha256"]) || !SHA.test(value.sha256)) fail("CDI-REFERENCE");
   diagnosticPath(value.path);
 }
+function validateCaptureHeader(text, label, exitCode, candidate) {
+  const prefix = /^command: ([^\r\n]+)\nlabel: ([a-z0-9][a-z0-9-]{0,63})\nexitCode: (0|[1-9][0-9]*)\n/u.exec(text);
+  if (!prefix || prefix[2] !== label || Number(prefix[3]) !== exitCode) return false;
+  let body = text.slice(prefix[0].length);
+  if (!body.startsWith("--- stdout ---\n")) {
+    const identity = /^head: ([a-f0-9]{40})\ntree: ([a-f0-9]{40})\ndirty: (true|false)\n/u.exec(body);
+    if (!identity || identity[1] !== candidate.commit || identity[2] !== candidate.tree) return false;
+    body = body.slice(identity[0].length);
+  }
+  if (!body.startsWith("--- stdout ---\n")) return false;
+  const stderrMarker = "\n--- stderr ---\n";
+  const separator = body.indexOf(stderrMarker, "--- stdout ---\n".length);
+  return separator >= 0;
+}
 export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path) } = {}) {
   if (!exact(value, ["schema", "producer", "assurance", "candidate", "spec", "guardrails", "fullVerify", "targeted", "pending"]) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA || value.producer !== "critic-diagnostic-evidence" || value.assurance !== "captured-process-output-not-host-attested" || !exact(value.candidate, ["commit", "tree"]) || !OID.test(value.candidate.commit) || !OID.test(value.candidate.tree) || value.candidate.commit !== candidate.commit || value.candidate.tree !== candidate.tree) fail("CDI-BINDING");
   validateReference(value.spec);
@@ -82,7 +96,8 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   if (!exact(t, ["label", "status", "exitCode", "log"]) || typeof t.label !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(t.label) || !Number.isInteger(t.exitCode) || t.exitCode < 0 || t.status !== (t.exitCode === 0 ? "passed" : "failed")) fail("CDI-TARGETED");
   validateReference(t.log);
   const log = readArtifact(t.log.path);
-  if (diagnosticDigest(log) !== t.log.sha256 || !log.toString("utf8").startsWith("command: ") || !log.toString("utf8").includes(`\nlabel: ${t.label}\nexitCode: ${t.exitCode}\n--- stdout ---\n`) || !log.toString("utf8").includes("\n--- stderr ---\n")) fail("CDI-DIGEST");
+  const logText = log.toString("utf8");
+  if (diagnosticDigest(log) !== t.log.sha256 || !validateCaptureHeader(logText, t.label, t.exitCode, candidate)) fail("CDI-DIGEST");
   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };
 }

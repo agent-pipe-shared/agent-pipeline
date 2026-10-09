@@ -49,9 +49,10 @@ const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboardi
  * -pubout` process chain without a production seam, and production has no `-passin`. So the two
  * cells that import a key drive the setup step IN-PROCESS through `runHumanApproval`, whose
  * `spawn` dependency is the existing test seam: `passinSpawn` appends `-passin pass:<fixture>` to
- * every OpenSSL call that names a `po-private.pem`, and passes every other spawn through
- * untouched. `homedirFn` keeps the machine plane inside the fixture home, which the spawned CLI
- * reached through the HOME/USERPROFILE rewrite of `childEnvironment()`.
+ * fixture-key public-derivation calls only (`openssl pkey -in <po-private.pem|existing-private.pem|source-private.pem>
+ * -pubout ...`) receive `-passin`; every other spawn remains untouched. `homedirFn` keeps the
+ * machine plane inside the fixture home, which the spawned CLI reached through the HOME/USERPROFILE
+ * rewrite of `childEnvironment()`.
  */
 const KEY_FIXTURE_PASSPHRASE = "onboarding-init-test-fixture-passphrase";
 
@@ -63,9 +64,14 @@ function encryptedKeyPem() {
 function passinSpawn(base = spawnSync) {
   return (executable, args, options) => {
     const list = Array.isArray(args) ? args : [];
-    const namesKey = /(?:^|[\\/])openssl(?:\.exe)?$/iu.test(String(executable)) && !list.includes("-passin")
-      && list.some((entry) => /po-private\.pem$/u.test(String(entry)));
-    return base(executable, namesKey ? [...list, "-passin", `pass:${KEY_FIXTURE_PASSPHRASE}`] : args, options);
+    const inputIndex = list.indexOf("-in");
+    const inputPath = inputIndex >= 0 ? String(list[inputIndex + 1] ?? "") : "";
+    const fixtureKey = /(?:^|[\\/])(?:po-private|existing-private|source-private)\.pem$/iu.test(inputPath);
+    const derivesFixturePublicKey = /(?:^|[\\/])openssl(?:\.exe)?$/iu.test(String(executable))
+      && list[0] === "pkey" && list.includes("-pubout") && fixtureKey && !list.includes("-passin");
+    return base(executable, derivesFixturePublicKey
+      ? [...list, "-passin", `pass:${KEY_FIXTURE_PASSPHRASE}`]
+      : args, options);
   };
 }
 

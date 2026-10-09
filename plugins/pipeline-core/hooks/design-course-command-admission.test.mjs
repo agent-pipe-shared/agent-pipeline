@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync as runFixtureGit } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { main as coordinatorMain } from '../scripts/design-course-coordinator.mjs';
+import { DESIGN_COURSE_RETIRED, RETIRED_DESIGN_ROUTE_HINT } from '../lib/retired-design-codes.mjs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerTestCaseCompletion } from '../lib/test-case-completion.mjs';
@@ -31,7 +32,9 @@ function capture(fn) {
   finally { console.log = beforeLog; console.error = beforeError; }
 }
 export function fixture(profile = 'feature') {
-  const root = mkdtempSync(join(tmpdir(), 'k3-guard-regression-'));
+  const scratch = resolve(pluginRoot, '../../scratch');
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, 'k3-guard-regression-'));
   runFixtureGit('git', ['init', '-q', root], { env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))) });
   const featureId = 'feature-test'; const authoringDispatchId = 'authoring-1';
   const planPath = `specs/${featureId}/prd.md`; const specPath = `specs/${featureId}/spec.md`;
@@ -109,14 +112,29 @@ export function actualGuard(action, root, { ready = false, tty = false } = {}) {
     classifier: isSanctionedLifecycleCommand(render(action), root) });
   return { code, stderr, readinessCalls };
 }
+// These are retained historical command shapes, never producer actions emitted by inspect.
+// Their narrow admission is still security-sensitive; execution must refuse before dependencies.
 export async function advisorAction(f) {
-  const action = inspectState(f).nextAction;
-  const stdout = [];
-  const result = await courseMain(action.argv.slice(1), { stdout: { write: value => stdout.push(value) } }, {
-    readState: () => ({ status: 'ok', state: f.state }), execFileSync: f.execFileSync,
-  });
-  assert.equal(result.status, 'advisor-ready', JSON.stringify(result));
-  return result.nextAction;
+  const argv = [courseScript, '--root', f.root, '--runner', 'codex', '--stage', 'advisor',
+    '--feature-id', f.featureId, '--authoring-dispatch-id', f.authoringDispatchId,
+    '--profile', f.profile, '--output-prefix', `evidence/design-course/${f.featureId}/codex`];
+  for (const name of names) argv.push('--source', name, f.sources[name].path, f.sources[name].sha256);
+  argv.push('--execute');
+  return { executable: process.execPath, argv, implementationAuthority: false };
+}
+async function retired(action, f) {
+  const before = readFileSync(statePath(f.root), 'utf8');
+  let calls = 0; const output = [];
+  const trap = () => { calls++; throw new Error('retired route touched a dependency'); };
+  const io = { stdout: { write: value => output.push(value) }, exitCode: 0 };
+  const result = await courseMain(action.argv.slice(1), io,
+    { readState: trap, execFileSync: trap, spawnSync: trap, buildPackageV2: trap });
+  assert.deepEqual(result, { ok: false, code: DESIGN_COURSE_RETIRED,
+    hint: RETIRED_DESIGN_ROUTE_HINT, implementationAuthority: false });
+  assert.equal(io.exitCode, 2); assert.equal(calls, 0);
+  assert.deepEqual(JSON.parse(output.join('')), result);
+  assert.equal(readFileSync(statePath(f.root), 'utf8'), before);
+  return result;
 }
 function accepted(action, f) {
   assert.equal(isSanctionedLifecycleCommand(render(action), f.root), true, JSON.stringify(action.argv));
@@ -161,32 +179,31 @@ async function laterAction(f, runner, runV2 = false, resumed = false) {
   argv.push('--execute'); return { executable: process.execPath, argv, refs };
 }
 export const cases = [
-  { id: 'K3G001', name: 'actual awaiting-approval inspect emits admitted read-only course action for feature and epic', run() {
+  { id: 'K3G001', name: 'awaiting-approval inspect requests explicit review receipt for feature and epic', run() {
     for (const profile of ['feature', 'epic']) {
       const f = fixture(profile);
       try {
         const observed = inspectState(f);
         assert.equal(observed.status, 'awaiting-approval');
-        assert.deepEqual(observed.nextAction.argv, [courseScript, '--inspect', '--root', f.root, '--runner', 'codex']);
+        assert.equal(observed.nextAction.kind, 'collect-input');
+        assert.equal(observed.nextAction.code, 'DAB-REVIEW-RECEIPT-REQUIRED');
         assert.equal(observed.nextAction.mutation, false);
-        assert.equal(isSanctionedLifecycleCommand(render(observed.nextAction), f.root), true, 'the exact state inspect argv must be classified');
-        const result = actualGuard(observed.nextAction, f.root);
-        assert.equal(result.code, 0, result.stderr);
+        assert.match(observed.nextAction.guidance, /present-plan --review-receipt/u);
+        assert.equal(observed.nextAction.argv, undefined);
       } finally { f.cleanup(); }
     }
   } },
-  { id: 'K3G002', name: 'actual course inspect emits advisor execute action admitted by real guard entry point', async run() {
+  { id: 'K3G002', name: 'course inspect returns exact retirement without authority or state access', async run() {
     const f = fixture();
     try {
-      const action = await advisorAction(f);
-      assert.equal(action.argv.at(-1), '--execute');
-      assert.equal(action.implementationAuthority, false);
-      const result = actualGuard(action, f.root);
-      assert.equal(result.code, 0, result.stderr);
-      assert.equal(isSanctionedLifecycleCommand(render(action), f.root), true);
+      await retired({ argv: [courseScript, '--inspect', '--root', f.root, '--runner', 'codex'] }, f);
+      const output = [];
+      const result = coordinatorMain(['--root', f.root, '--runner', 'codex'], { log: value => output.push(value) });
+      assert.deepEqual(result, { ok: false, code: DESIGN_COURSE_RETIRED, hint: RETIRED_DESIGN_ROUTE_HINT, implementationAuthority: false });
+      assert.deepEqual(JSON.parse(output.join('')), result);
     } finally { f.cleanup(); }
   } },
-  { id: 'K3G003', name: 'working readiness-stage fixed argv is admitted for every supported runner', async run() {
+  { id: 'K3G003', name: 'retained readiness argv stays narrow for every runner and execution is retired', async run() {
     const f = fixture();
     try {
       const advisor = await advisorAction(f);
@@ -204,6 +221,7 @@ export const cases = [
         const result = actualGuard({ executable: process.execPath, argv }, f.root);
         assert.equal(isSanctionedLifecycleCommand(render({ executable: process.execPath, argv }), f.root), true);
         assert.equal(result.code, 0, result.stderr);
+        await retired({ executable: process.execPath, argv }, f);
       }
     } finally { f.cleanup(); }
   } },
@@ -239,7 +257,7 @@ export const cases = [
   { id: 'K3G005', name: 'inspect rejects extra flags and every agent signing shape including run-v2', run() {
     const f = fixture();
     try {
-      const action = inspectState(f).nextAction;
+      const action = { executable: process.execPath, argv: [courseScript, '--inspect', '--root', f.root, '--runner', 'codex'] };
       for (const extra of [['--plugin-root', pluginRoot], ['--execute'], ['--help'], ['--run-v2'], ['--stage', 'advisor'], ['--runner', 'claude']]) {
         assert.equal(actualGuard({ ...action, argv: [...action.argv, ...extra] }, f.root).code, 2);
       }
@@ -250,7 +268,7 @@ export const cases = [
       ]) assert.equal(actualGuard({ executable: process.execPath, argv }, f.root).code, 2);
     } finally { f.cleanup(); }
   } },
-  { id: 'K3G006', name: 'mini and existing package routes remain on present-plan while absent runner stays typed', run() {
+  { id: 'K3G006', name: 'mini keeps present-plan while feature package and runner hints cannot restore the course', run() {
     const mini = fixture('mini');
     try {
       const action = inspectState(mini).nextAction;
@@ -258,27 +276,28 @@ export const cases = [
       else {
         const concrete = action.kind === 'collect-input' ? action.applyAction : action;
         assert.deepEqual(concrete.argv.slice(0, 2), [stateScript, 'present-plan']);
-        assert.equal(concrete.argv.includes(courseScript), false);
       }
     } finally { mini.cleanup(); }
     const f = fixture();
     try {
-      const path = 'evidence/design-workflow-package.json';
-      const action = inspectState(f, { designWorkflowPackagePath: path }).nextAction;
-      const concrete = action.kind === 'collect-input' ? action.applyAction : action;
-      assert.deepEqual(concrete.argv.slice(0, 2), [stateScript, 'present-plan']);
-      assert.deepEqual(concrete.argv.slice(-2), ['--design-workflow-package', path]);
-      const missing = inspectState(f, { runner: undefined, env: {} });
-      assert.equal(missing.nextAction.code, 'DESIGN-COURSE-RUNNER-SELECTION-REQUIRED');
-      assert.equal(missing.nextAction.kind, 'agent-owned-coordination-required');
+      for (const extras of [{ designWorkflowPackagePath: 'evidence/design-workflow-package.json' }, { runner: undefined, env: {} }]) {
+        const observed = inspectState(f, extras);
+        assert.equal(observed.nextAction.code, 'DAB-REVIEW-RECEIPT-REQUIRED');
+        assert.match(observed.nextAction.guidance, /present-plan --review-receipt/u);
+      }
+      const before = readFileSync(statePath(f.root), 'utf8');
+      const result = capture(() => run(['present-plan', '--by', 'Fixture', '--design-workflow-package', 'evidence/design-workflow-package.json'], f.deps));
+      assert.equal(result.code, 2); assert.match(result.stderr, /DWP-PRESENT-RETIRED/u);
+      assert.equal(readFileSync(statePath(f.root), 'utf8'), before);
     } finally { f.cleanup(); }
   } },
-  { id: 'K3G007', name: 'fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result', async run() {
+  { id: 'K3G007', name: 'retained v2 argv stays narrow with curation and resume while execution is retired', async run() {
     const f = fixture();
     try {
       for (const runner of ['claude', 'codex', 'antigravity']) for (const resumed of [false, true]) {
         const action = await laterAction(f, runner, true, resumed);
         accepted(action, f);
+        await retired(action, f);
       }
     } finally { f.cleanup(); }
   } },
@@ -375,72 +394,12 @@ export const cases = [
       }
     } finally { f.cleanup(); }
   } },
-  { id: 'K3G014', name: 'same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request', async run() {
+  { id: 'K3G014', name: 'actual inspect advisor and resumed v2 CLI refuse before dispatch signing or publication', async run() {
     const f = fixture();
     try {
-      const prefix = `evidence/design-course/${f.featureId}/claude`;
-      mkdirSync(join(f.root, `evidence/design-course/${f.featureId}`), { recursive: true });
-      const initial = { featureId: f.featureId, authoringDispatchId: f.authoringDispatchId, initialCandidate: candidate, sources: f.sources };
-      const failure = { schema: 'pipeline.design-advisor-failure.v1', code: 'native-initial-answer-provenance-unavailable',
-        childStarted: false, inputSubmitted: false, attemptCount: 0 };
-      const put = (path, value) => { const bytes = JSON.stringify(value); writeFileSync(join(f.root, path), bytes); return { path, sha256: digest(bytes) }; };
-      const advisorResult = { ok: false, status: 'unavailable-pending-final-approval', code: failure.code, runner: 'claude',
-        profile: f.profile, route: { model: null, effort: null, sourceSha256: 'c'.repeat(64), candidateCommit: candidate.commit },
-        courseBinding: { courseId: 'course-test' }, hostReceipt: null,
-        artifacts: { initial: put(`${prefix}.initial.json`, initial), failure: put(`${prefix}.failure.json`, failure) }, implementationAuthority: false };
-      const stages = [];
-      const dependencies = { readState: () => ({ status: 'ok', state: f.state }),
-        execFileSync: (executable, argv, options) => argv[0] === 'check-ignore' ? '' : f.execFileSync(executable, argv, options),
-        canonicalJson: JSON.stringify,
-        readPreparation: async input => {
-          const value = JSON.parse(readFileSync(join(f.root, input.packagePath), 'utf8'));
-          assert.equal(value.featureId, f.featureId); assert.deepEqual(value.sources, f.sources);
-          assert.equal(value.advisor.status, 'unavailable');
-          return { ok: true, advisorObservation: { candidate, sources: f.sources } };
-        },
-        spawnSync: (executable, argv, options) => {
-          assert.equal(executable, process.execPath); assert.equal(options.shell, false); assert.equal(options.cwd, f.root);
-          if (argv[0] === join(pluginRoot, 'scripts/design-advisory-coordinator.mjs')) {
-            stages.push('advisor'); return { status: 2, signal: null, stdout: JSON.stringify(advisorResult), stderr: '' };
-          }
-          assert.equal(argv[0], join(pluginRoot, 'scripts/runner-design-readiness-bootstrap.mjs'));
-          assert.equal(argv[argv.indexOf('--receipt') + 1], `${prefix}.readiness.json`);
-          assert.equal(argv[argv.indexOf('--advisor-preparation') + 1], `${prefix}.preparation.json`);
-          stages.push('readiness');
-          return { status: 0, signal: null, stdout: JSON.stringify({ ok: true, code: 'DESIGN-READINESS-RECEIPT-PUBLISHED', runner: 'claude',
-            candidate, path: `${prefix}.readiness.json`, dispatchId: 'readiness-1' }), stderr: '' };
-        },
-        buildPackageV2: async input => {
-          assert.equal(input.packagePath, `${prefix}.package.json`); assert.equal(input.readinessPath, `${prefix}.readiness.json`);
-          assert.deepEqual(input.expectedSources, f.sources);
-          return { ok: true, code: 'DWP2-PACKAGE-BUILT', packagePath: input.packagePath, packageSha256: 'e'.repeat(64), candidate,
-            packageRead: { implementationAuthority: false }, advisorStatus: 'unavailable', advisorExceptionRequired: true };
-        },
-        approvalModule: { createDesignWorkflowPackageApprovalRequest: input => {
-          assert.equal(input.planPath, f.sources.prd.path); assert.equal(input.specPath, f.sources.spec.path);
-          assert.equal(JSON.parse(readFileSync(statePath(f.root), 'utf8')).planApproved, false);
-          return { ok: true, packageRead: { implementationAuthority: false, packageSha256: 'e'.repeat(64) },
-            request: { packageSha256: 'e'.repeat(64), approvalIntent: { sha256: 'f'.repeat(64), value: { decision: 'approve' } } } };
-        } },
-      };
-      const invoke = async action => {
-        accepted(action, f);
-        const output = []; const io = { stdout: { write: value => output.push(value) }, exitCode: 0 };
-        const result = await courseMain(action.argv.slice(1), io, dependencies);
-        assert.equal(io.exitCode, 0, JSON.stringify(result)); assert.equal(result.implementationAuthority, false);
-        assert.deepEqual(JSON.parse(output.at(-1)), result); return result;
-      };
-      const inspected = await invoke({ executable: process.execPath, argv: [courseScript, '--inspect', '--root', f.root, '--runner', 'claude'] });
-      const advised = await invoke(inspected.nextAction);
-      assert.equal(advised.status, 'advisor-unavailable-no-child');
-      assert.equal(advised.nextAction.kind, 'agent-authored-unavailability-rationale');
-      const resume = await laterAction(f, 'claude', true, true);
-      const resultIndex = resume.argv.indexOf('--advisor-result');
-      const ref = put(resume.argv[resultIndex + 1], advised.execution.producerResult); resume.argv[resultIndex + 2] = ref.sha256;
-      const final = await invoke(resume);
-      assert.equal(final.status, 'final-po-review-ready'); assert.equal(final.approvalCountBeforeFinalPackage, 0);
-      assert.equal(final.nextAction.kind, 'present-final-design-workflow-package-to-po');
-      assert.deepEqual(stages, ['advisor', 'readiness']);
+      await retired({ argv: [courseScript, '--inspect', '--root', f.root, '--runner', 'claude'] }, f);
+      const advisor = await advisorAction(f); accepted(advisor, f); await retired(advisor, f);
+      const resume = await laterAction(f, 'claude', true, true); accepted(resume, f); await retired(resume, f);
       assert.equal(JSON.parse(readFileSync(statePath(f.root), 'utf8')).planApproved, false);
     } finally { f.cleanup(); }
   } },

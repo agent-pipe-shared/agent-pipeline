@@ -22,6 +22,8 @@ import {
   writeLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import { planInstall as planPreCommitHookInstall, applyInstall as installPreCommitHook } from "./pre-commit-hook-install.mjs";
+import { planInstall as planCommitMsgHookInstall, applyInstall as installCommitMsgHook } from "./commit-msg-hook-install.mjs";
 import { observeAntigravityLoadedTopologyWithWiring } from "../lib/antigravity-topology-refresh-host.mjs";
 import { observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision } from "../lib/governance-scope.mjs";
@@ -33,6 +35,18 @@ function check(name, run) {
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+}
+
+function installMandatoryHooks(root) {
+  const preCommitPlan = planPreCommitHookInstall({ rootDir: root });
+  assert.equal(preCommitPlan.status, "ready", JSON.stringify(preCommitPlan));
+  const preCommit = installPreCommitHook({ rootDir: root });
+  assert.equal(preCommit.status, "installed", JSON.stringify(preCommit));
+
+  const commitMsgPlan = planCommitMsgHookInstall({ rootDir: root });
+  assert.equal(commitMsgPlan.status, "ready", JSON.stringify(commitMsgPlan));
+  const commitMsg = installCommitMsgHook({ rootDir: root });
+  assert.equal(commitMsg.status, "installed", JSON.stringify(commitMsg));
 }
 
 function fixture(provider = "codex") {
@@ -266,6 +280,10 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   const repo = fixture(); t.after(repo.cleanup);
   const activation = planGovernanceScopeDecision({ rootDir: repo.sourceRoot, decision: "enroll", by: "Installed plugin preflight fixture" });
   assert.equal(applyGovernanceScopeDecision(activation, { activate: true, planSha256: activation.planSha256 }).state, "active");
+  // The actual installer and preflight readiness API run against this
+  // disposable Git repository; missing mandatory hooks are separate from the
+  // source-identity condition under test.
+  installMandatoryHooks(repo.sourceRoot);
   const marketplaceRoot = join(repo.base, "marketplace");
   const marketplacePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
   cpSync(repo.sourcePluginRoot, marketplacePluginRoot, { recursive: true });
@@ -286,6 +304,11 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   });
   const direct = inspect(() => { throw new Error("exact registry/cache binding must not consume a receipt"); });
   assert.equal(direct.status, "ready", JSON.stringify(direct));
+  assert.equal(direct.mandatoryHookReadiness.status, "ready", JSON.stringify(direct.mandatoryHookReadiness));
+  assert.deepEqual(direct.mandatoryHookReadiness.required.map(({ id, status }) => ({ id, status })), [
+    { id: "pre-commit-hook", status: "current" },
+    { id: "commit-msg-hook", status: "current" },
+  ]);
   assert.equal(direct.installedPluginAttestation.status, "not-required");
 
   writeFileSync(join(repo.installedPluginRoot, "unexpected-cache-drift.mjs"), "export const drift = true;\n");
@@ -300,6 +323,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   const claudeRepo = fixture("claude"); t.after(claudeRepo.cleanup);
   const claudeActivation = planGovernanceScopeDecision({ rootDir: claudeRepo.sourceRoot, decision: "enroll", by: "Installed plugin preflight fixture" });
   assert.equal(applyGovernanceScopeDecision(claudeActivation, { activate: true, planSha256: claudeActivation.planSha256 }).state, "active");
+  installMandatoryHooks(claudeRepo.sourceRoot);
   // NVA-B8-10: Claude may load directly from the one registered directory
   // marketplace. That is not a source-to-copy installation: the registry's
   // physical marketplace plugin root and the loaded plugin root are the same
@@ -406,6 +430,10 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   const agyImportManifestPath = join(agyRepo.antigravityConfigRoot, "config", "import_manifest.json");
   writeFileSync(agyWorkspaceRegistryPath, `${JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })}\n`);
   writeFileSync(agyImportManifestPath, `${JSON.stringify({ imports: [{ name: "agent-pipeline-core", source: agyRepo.installedPluginRoot }] })}\n`);
+  git(agyRepo.antigravityWorkspaceRoot, ["init", "--initial-branch=feature/fixture"]);
+  git(agyRepo.antigravityWorkspaceRoot, ["add", "."]);
+  git(agyRepo.antigravityWorkspaceRoot, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
+  installMandatoryHooks(agyRepo.antigravityWorkspaceRoot);
   const agyManifestRead = (path) => {
     const value = String(path);
     if (value.endsWith("/plugin.json") && !value.includes("/.codex-plugin/")) {

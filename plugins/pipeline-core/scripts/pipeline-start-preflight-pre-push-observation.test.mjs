@@ -24,6 +24,9 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { applyDecline, applyInstall } from "./pre-push-hook-install.mjs";
+import { applyInstall as installPreCommitHook } from "./pre-commit-hook-install.mjs";
+import { applyInstall as installCommitMsgHook } from "./commit-msg-hook-install.mjs";
+import { assessMandatoryHookReadiness, checkCloneProvisioning, CLONE_PROVISIONING_REPORT_SCHEMA } from "./check-clone-provisioning.mjs";
 import {
   PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
   PRE_PUSH_HOOK_UNSEEN_REMOTE_PUSH_SCHEMA,
@@ -48,6 +51,32 @@ const activeGovernanceScope = ({ rootDir }) => ({
   hintAllowed: false,
 });
 
+
+// Synthetic-root unit cases isolate only the independent mandatory-hook dependency.
+// Both required checks are explicit; the real readiness assessor still gates preflight.
+const currentMandatoryHooks = (rootDir) => ({
+  schema: CLONE_PROVISIONING_REPORT_SCHEMA,
+  status: "ready",
+  checks: [
+    { id: "pre-commit-hook", status: "current", path: join(rootDir, "hooks/pre-commit"), repairAction: null },
+    { id: "commit-msg-hook", status: "current", path: join(rootDir, "hooks/commit-msg"), repairAction: null },
+  ],
+});
+
+// Wired Git cases install the real mandatory hooks after the fixture's initial commit.
+// This helper leaves pre-push untouched, so its absent/foreign/declined state stays real.
+function provisionMandatoryHooks(dir) {
+  for (const install of [installPreCommitHook, installCommitMsgHook]) {
+    const result = install({ rootDir: dir });
+    assert.equal(result.status, "installed", JSON.stringify(result));
+  }
+  const readiness = assessMandatoryHookReadiness(checkCloneProvisioning(dir));
+  assert.equal(readiness.status, "ready", JSON.stringify(readiness));
+  assert.deepEqual(readiness.required.map(({ id, status }) => ({ id, status })), [
+    { id: "pre-commit-hook", status: "current" },
+    { id: "commit-msg-hook", status: "current" },
+  ]);
+}
 
 // Mirrors pipeline-start-preflight-antigravity-hard-enforcement.test.mjs's own
 // `noSelfApplicationGitScriptUrl`: a synthetic scriptUrl under `root` so
@@ -303,6 +332,7 @@ test("installCommand carries the installer's own documented --install verb, an a
 
 test("wired: the ready path is unchanged when the hook is installed-and-current", () => {
   withFreshRepo("wired-ready", (dir) => {
+    provisionMandatoryHooks(dir);
     const install = applyInstall({ rootDir: dir });
     assert.equal(install.status, "installed");
     const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
@@ -327,6 +357,7 @@ test("wired: the ready path is unchanged when the hook is installed-and-current"
 // still fully present and correct.
 test("wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command", () => {
   withFreshRepo("wired-absent", (dir) => {
+    provisionMandatoryHooks(dir);
     const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: {},
       pluginList: pluginList(),
@@ -344,6 +375,7 @@ test("wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- stat
 
 test("wired: a declined repository is ready, and the result still shows the decline with its timestamp", () => {
   withFreshRepo("wired-declined", (dir) => {
+    provisionMandatoryHooks(dir);
     const decline = applyDecline({ rootDir: dir });
     assert.equal(decline.status, "declined");
     const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
@@ -364,6 +396,7 @@ test("wired: a declined repository is ready, and the result still shows the decl
 // NVA-PREPUSHVISIBLE-1: deliberately inverted, same reasoning as the "wired-absent" test above.
 test("wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1)", () => {
   withFreshRepo("wired-foreign", (dir) => {
+    provisionMandatoryHooks(dir);
     const hookPath = execFileSync(
       "git", ["rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-push"],
       { cwd: dir, encoding: "utf8" },
@@ -390,6 +423,7 @@ test("wired: a repository-unresolved cwd (this file's own pre-existing test fixt
     pluginList: pluginList(),
     read: () => manifest,
     cwd,
+    checkCloneProvisioningFn: currentMandatoryHooks,
     scriptUrl: noSelfApplicationGitScriptUrl(cwd),
   });
   assert.equal(Object.hasOwn(result, "prePushHook"), false,
@@ -403,6 +437,7 @@ test("wired: a repository-unresolved cwd (this file's own pre-existing test fixt
 // NVA-PREPUSHVISIBLE-1: deliberately inverted, same reasoning as the two tests above.
 test("wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either", () => {
   withFreshRepo("wired-claude", (dir) => {
+    provisionMandatoryHooks(dir);
     const result = observePipelineStartPreflight({ observeGovernanceScopeFn: activeGovernanceScope,
       env: { CLAUDECODE: "1" },
       pluginList: pluginList(),
@@ -425,6 +460,7 @@ test("wired: an injected observePrePushHookInstallationFn is honored, proving th
     read: () => manifest,
     cwd: dir,
     scriptUrl: noSelfApplicationGitScriptUrl(dir),
+    checkCloneProvisioningFn: currentMandatoryHooks,
     observePrePushHookInstallationFn: (options) => {
       calls.push(options);
       return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "installed-and-current", installed: true, installCommand: null };
@@ -497,6 +533,7 @@ test("observeUnseenPushToRemote: repository-unresolved (no git repo at all) repo
 // a gate on status or the exit code.
 test("wired: an unseen push never gates readiness or the exit code, and is still visible in the result", () => {
   withFreshRepo("wired-unseen", (dir) => {
+    provisionMandatoryHooks(dir);
     const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
     setUpstream(dir, head);
     writeHookLog(dir, [
@@ -519,6 +556,7 @@ test("wired: an unseen push never gates readiness or the exit code, and is still
 
 test("wired: a seen push (in the log) never gates readiness either, status/exit code unaffected", () => {
   withFreshRepo("wired-seen", (dir) => {
+    provisionMandatoryHooks(dir);
     const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
     setUpstream(dir, head);
     writeHookLog(dir, [
@@ -546,6 +584,7 @@ test("wired: an injected observeUnseenPushToRemoteFn is honored, proving the cal
     read: () => manifest,
     cwd: dir,
     scriptUrl: noSelfApplicationGitScriptUrl(dir),
+    checkCloneProvisioningFn: currentMandatoryHooks,
     // The sibling observation is also injected here, as "not-repository-unresolved", purely
     // so this field's own omission condition (which reuses THAT observation's state -- see
     // the wiring comment in pipeline-start-preflight.mjs) does not hide the field for this

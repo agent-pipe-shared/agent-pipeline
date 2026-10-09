@@ -161,6 +161,25 @@ function assertNoLeak(value, forbidden) {
   }
 }
 
+// PX0-AC source-attestation cases exercise origin/identity readiness. Their
+// disposable consumer roots intentionally do not install Git hooks, so inject
+// the complete current clone-provisioning observation that is outside those
+// cases' subject.
+function currentCloneProvisioning(root) {
+  const hooksDir = join(root, ".git", "hooks");
+  return {
+    schema: "pipeline.clone-provisioning-report.v1",
+    status: "ready",
+    checks: [
+      { id: "pre-push-hook", status: "current", path: join(hooksDir, "pre-push"), repairAction: null },
+      { id: "pre-commit-hook", status: "current", path: join(hooksDir, "pre-commit"), repairAction: null },
+      { id: "commit-msg-hook", status: "current", path: join(hooksDir, "commit-msg"), repairAction: null },
+      { id: "po-profile-receipt", status: "present", path: join(root, ".git", "agent-pipeline", "po-gate", "profile-receipt.json"), repairAction: null },
+      { id: "private-state-directory", status: "present", path: join(root, ".git", "agent-pipeline"), repairAction: null },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------- PX0-AC-09
 
 test("PX0-AC-09: a Codex-only consumer with no .claude/settings.json resolves its source from the native Codex registry", () => {
@@ -239,6 +258,7 @@ test("PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness 
       env: {}, cwd: consumer.root, scriptUrl: plugin.scriptUrl,
       read: () => JSON.stringify({ version: VERSION }),
       pluginList: () => JSON.stringify({ installed: [], available: [] }),
+      checkCloneProvisioningFn: currentCloneProvisioning,
       observe: (input) => { observeCalls.push(input); return readyObservation(); },
     });
     assert.equal(result.status, "ready", "readiness required a consumer HEAD");
@@ -485,6 +505,7 @@ test("PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and
       scriptUrl: fixture.scriptUrl,
       read: () => JSON.stringify({ version: VERSION }),
       pluginList: () => JSON.stringify({ installed, available: [] }),
+      checkCloneProvisioningFn: currentCloneProvisioning,
       // The enrolled physical root is now a self-application Git topology.
       // Keep source attestation fixed at ready so this case isolates selection.
       observe: () => readyObservation(),

@@ -5,11 +5,11 @@ import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DEVPLAN_SHELL_DENIAL_CODE, devPlanGateVerdict, hooksDisableSettingsWriteFinding } from "../guard-devplan-policy.mjs";
 import { extractShellWriteTargets } from "../protected-test-paths.mjs";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
-import { SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./constants.mjs";
+import { PIPELINE_STATE_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT } from "./constants.mjs";
 import { isReadOnlyDiagnosticCommand, simpleWords } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
-import { isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+import { isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedLifecycleCommand, observedOnboardingCommandMatch } from "./command-catalogue.mjs";
 
 /**
  * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
@@ -64,9 +64,17 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
       && isExactObservedRunnerPermissionsRepairAction(command, root, dependencies);
     const canonicalSettingsPlanner = toolName === "Bash" && invocation?.script === SETTINGS_ALLOWLIST_MERGE_SCRIPT
       && isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies);
+    const observedReadOnlyOnboardingPlanner = toolName === "Bash" && (() => {
+      const match = observedOnboardingCommandMatch(command, root, dependencies);
+      if (!match || match.action.mutation !== false || match.action.requiresConfirmation !== false) return false;
+      const [script, ...args] = match.action.argv;
+      return script === PIPELINE_STATE_SCRIPT
+        && args.length === 1 && args[0] === "po-authority-rebind-plan";
+    })();
     const opaqueScript = words === null ? null : opaqueScriptExecutionCandidate(words, root);
     if (opaqueScript !== null
       && !(invocation !== null && isSanctionedLifecycleCommand(command, root, dependencies))
+      && !observedReadOnlyOnboardingPlanner
       && !canonicalSettingsWriter && !canonicalSettingsPlanner) {
       targets.push({ candidate: opaqueScript, lane: "opaque-script-execution", forceLifecycleGate: true });
     }

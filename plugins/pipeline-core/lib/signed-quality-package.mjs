@@ -3,15 +3,27 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, parse, posix, relative, resolve, sep, win32 } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, join, parse, posix, relative, resolve, sep, win32 } from "node:path";
 import { canonical, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 
 export const SIGNED_QUALITY_PACKAGE_SCHEMA = "pipeline.signed-quality-package.v1";
 export const QUALITY_PACKAGE_COMMIT_AUTHORIZATION_SCHEMA = "pipeline.signed-quality-package-commit-authorization.v1";
 export const QUALITY_PACKAGE_POLICY_PATH = "project/critical-human-proof.json";
-const FIXTURE_TMP = resolve(dirname(fileURLToPath(import.meta.url)), "../../tmp");
+
+function repositoryScratchDirectory(root) {
+  if (realpathSync(root) !== root) throw new Error("QUALITY-PACKAGE-REPOSITORY-ROOT-INVALID");
+  const scratch = join(root, "scratch");
+  let stat;
+  try { stat = lstatSync(scratch); }
+  catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    mkdirSync(scratch, { mode: 0o700 });
+    stat = lstatSync(scratch);
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory() || realpathSync(scratch) !== scratch) throw new Error("QUALITY-PACKAGE-SCRATCH-INVALID");
+  return scratch;
+}
 
 /** Pure lexical contract only; physicalQualityPackageFile still performs all filesystem admission. */
 export function isCanonicalPhysicalQualityPackagePath(path, pathFlavor = process.platform === "win32" ? "win32" : "posix") {
@@ -352,8 +364,7 @@ export function applyQualityPackage({ repoRoot, packageIntent, proof, trustPolic
   try {
     const head = runGit(root, ["rev-parse", "HEAD"]).trim();
     if (applyToMain && (head !== packageIntent.baseCommit || runGit(root, ["status", "--porcelain"]) !== "")) return fail("QUALITY-PACKAGE-BASE-DRIFT");
-    mkdirSync(FIXTURE_TMP, { recursive: true });
-    worktreeDir = mkdtempSync(join(FIXTURE_TMP, "pipeline-quality-package-")); rmSync(worktreeDir, { recursive: true, force: true });
+    worktreeDir = mkdtempSync(join(repositoryScratchDirectory(root), "pipeline-quality-package-")); rmSync(worktreeDir, { recursive: true, force: true });
     runGit(root, ["worktree", "add", "--detach", worktreeDir, packageIntent.baseCommit]);
     runGit(worktreeDir, ["apply", "--check", "--whitespace=error", "-"], packageIntent.unifiedDiff);
     runGit(worktreeDir, ["apply", "--whitespace=error", "-"], packageIntent.unifiedDiff);

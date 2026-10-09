@@ -16,6 +16,8 @@ import {
 } from "./architecture-entry-readiness.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+// Unrelated entry cases observe a controlled checkpoint history; debt cases supply their own reader.
+const clearCheckpointDebt = () => ({ ok: true, debt: [], resolvedDebt: [] });
 const readyDisposition = () => ({ ok: true, disposition: "approved-scoped", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" });
 
 function fixture() {
@@ -110,7 +112,7 @@ test("a materialized map without a project-owned AGENTS pointer has an actionabl
 test("a PO-deferred adoption reports complete fitness observations without enforcing them", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
-    deps: { checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }) },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }) },
   });
   assert.equal(result.status, "ready", JSON.stringify(result));
   assert.equal(result.fitness.blockingOverallStatus, "deferred");
@@ -172,7 +174,7 @@ test("approved greenfield design defers missing physical surfaces without fabric
     pendingPhysicalSurfaces: ["tests/application.test.mjs"],
     planningSurface: { planPath: "specs/feature/prd.md", paths: ["plugins/pipeline-core/lib/architecture-design.mjs"] } };
   let evaluations = 0;
-  const options = { rootDir: repoRoot, deps: {
+  const options = { rootDir: repoRoot, deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
     inspectArchitectureDesign: () => design,
     evaluateArchitectureFitness: () => { evaluations += 1; throw new Error("not yet executable"); },
   } };
@@ -193,7 +195,7 @@ test("calibration-unavailable class 10 is preserved as report-only while other c
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
     planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
-    deps: {
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
       checkPlanningAdoptionDisposition: readyDisposition,
       evaluateArchitectureFitness: () => ({
         overallStatus: "unavailable",
@@ -215,7 +217,7 @@ test("malformed or incomplete fitness outcomes fail closed", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
     planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
-    deps: {
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
       checkPlanningAdoptionDisposition: readyDisposition,
       evaluateArchitectureFitness: () => ({ overallStatus: "excepted", outcomes: [{ classId: 1, outcome: "excepted" }] }),
     },
@@ -305,7 +307,7 @@ test("a deferred architecture decision remains visible without changing lifecycl
     rootDir: repoRoot,
     planningSurface: { planPath: "specs/architecture-entry.md",
       paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
-    deps: {
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt,
       checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred",
         scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
       inspectDecisions: ({ area }) => ({ area, status: "blocked",

@@ -2107,6 +2107,77 @@
       "file": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs"
+    },
+    {
+      "name": "signed-quality-package-scratch-tests",
+      "file": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "invariantPinned": "Scratch-only signed quality package applies reject invalid packages before temporary allocation or real worktree creation and preserve cache, Scratch, destination, subject, and registration state",
+      "nonOverlapNote": "Independent regression for exact rejection timing and side-effect preservation in scratch-only apply; signature validation and successful package application suites do not pin the no-allocation and no-worktree boundary",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "QPS001",
+          "QPS002",
+          "QPS003",
+          "QPS004",
+          "QPS005",
+          "QPS006",
+          "QPS007",
+          "QPS008",
+          "QPS009",
+          "QPS010",
+          "QPS011",
+          "QPS012",
+          "QPS013"
+        ],
+        "maxBytes": 16384
+      }
+    },
+    {
+      "name": "critic-capture-header-tests",
+      "file": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "invariantPinned": "Critic diagnostic captures preserve and validate identity headers, digest bindings, candidate and source identity, CLI behavior, and diagnostic-only boundaries",
+      "nonOverlapNote": "Independent coverage for the capture header producer and reader contract including malformed extra headers and exact artifact preservation; diagnostic schema and general Verify selection suites do not exercise this capture boundary end to end",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CDH001",
+          "CDH002",
+          "CDH003",
+          "CDH004",
+          "CDH005",
+          "CDH006",
+          "CDH007",
+          "CDH008",
+          "CDH009"
+        ],
+        "maxBytes": 8192
+      }
+    },
+    {
+      "name": "devplan-shell-lane-recovery-tests",
+      "file": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "invariantPinned": "Only the exact currently offered read-only PO authority rebind planner action for the same root and session crosses the draft dev-plan shell lane; mutations, altered actions, stale or foreign observations, malformed readback, and inspection faults remain blocked",
+      "nonOverlapNote": "Independent regression for the narrow draft-shell exception and its refusal matrix; lifecycle command authorization and onboarding action catalogue tests do not pin this exact interaction",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DLR001",
+          "DLR002",
+          "DLR003",
+          "DLR004",
+          "DLR005",
+          "DLR006",
+          "DLR007",
+          "DLR008",
+          "DLR009",
+          "DLR010",
+          "DLR011",
+          "DLR012",
+          "DLR013"
+        ],
+        "maxBytes": 16384
+      }
     }
   ]
 }
