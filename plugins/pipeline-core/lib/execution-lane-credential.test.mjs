@@ -7,6 +7,12 @@
 // "module missing" -- each case imports the module itself, so a missing module is a per-case failure
 // and never a crash of the whole file. Nothing is skipped: the DoD is RED, not "skipped".
 //
+// TR-S2-T2-20261009 extension (Ruling 90, test-only, QG-04): the module now exists (63ba0c32c), so the
+// "module missing" reason above describes the original 131 cases only. The cases added at the end of
+// this file pin the behaviour Ruling 90 accepts from the TR-S2 Critic round (F1, F3-F8, cwd,
+// exemptScripts). Each is RED against that module for a reason stated at its group, except the controls
+// and F8, which are green today by design (F8's behaviour is implemented; it was only unpinned).
+//
 // Corpus coverage (section 3.4 -T pins):
 //   a2 positives (7)   A2-1 .. A2-7   node -e naming po-private.pem; a key-directory pointer path;
 //                                     ~/.ssh/id_ed25519; an APPDATA credential file; python -c;
@@ -36,7 +42,14 @@
 //   2. Result: exactly null when the command is admitted (asserted with strict equality), otherwise an
 //      object { refused: true, code, lane } with code a non-empty string and lane present. The code
 //      NAMES and the lane VALUES are [C] in the note and are deliberately NOT pinned.
-//   3. targets = { keyDirs, credentialRoots, machinePlaneRoots, secretBasenames, homes: { native, wsl } }.
+//   3. targets = { keyDirs, credentialRoots, machinePlaneRoots, secretBasenames, homes: { native, wsl } }
+//      plus three OPTIONAL Ruling 90 inputs, all absent from the default fixture so the original cases keep
+//      their meaning: secretPatterns { suffixes, prefixes } (F3: a closed set of kinds, no regex; mirrors the
+//      passive read policy: the four key-file suffixes p12, pfx, key and pem, and the env-file and id_
+//      prefixes; secretBasenames stays for exact names), cwd (an absolute path: relative path tokens
+//      resolve against it, and a "cd <path>" segment earlier in the same command updates it for later
+//      segments), and exemptScripts (a closed list of repo-relative paths whose content is NOT scanned; the
+//      command line itself still is). An absent optional input means "none".
 //      keyDirs holds BOTH key-directory pointers (one native, one WSL). Entries use either separator, and
 //      the fixture mixes backslash and slash spellings on purpose. The fixture is deep-frozen, so a
 //      classifier that mutates its input faults. Everything is synthetic: a fake user, a fake distro home,
@@ -50,10 +63,14 @@
 //      home"). NORM-HOME-WSL / NORM-HOME-NATIVE isolate the two with a single-home credential set, and
 //      name a non-secret file (.ssh/config) so the secret-basename rule cannot satisfy them on its own.
 //   6. readScript(path) is a synchronous, bounded content reader injected by the caller; it returns a
-//      string or null. The classifier decides which operands to read (the script operand of any
-//      carrier, including the /mnt/<drive>/ spelling of an in-root path). The pins do not constrain the
-//      spelling of the path handed to readScript: the fake reader accepts any spelling of the same file.
-//      What an unreadable script (null) means is NOT pinned (not stated in the note).
+//      string or null. The classifier decides which operands to read: the script operand of any carrier
+//      (including the /mnt/<drive>/ spelling of an in-root path), and, per Ruling 90, a first positional
+//      .ps1 on a PowerShell carrier (F4), the values of node's -r, --require, --import, --loader and
+//      --experimental-loader plus every node file operand (F5), and the carrier a wrapper (sudo, timeout,
+//      env) reaches after its option values (F5). The pins do not constrain the spelling of the path
+//      handed to readScript: the fake reader accepts any spelling of the same file. A reader that returns
+//      null means the script is unreadable and the command is REFUSED (Ruling 76(a); pinned by F8, so it
+//      is no longer "not pinned"). A script listed in targets.exemptScripts is not scanned at all.
 //   7. "node -e naming po-private.pem" (a2) is read through the a3 match rule: the path in the source
 //      has a directory component. A bare basename alone is admitted (section 3.4: rg -n "po-private.pem"
 //      docs/ stays admitted); MATCH-BARE pins that.
@@ -64,8 +81,23 @@
 //      "pure, with no fs and no child_process"). The one case that reads the module source loads
 //      node:fs lazily for that single read; no other case touches the file system.
 //  10. Not pinned (out of scope for this slice, or [C] in the note): the nesting depth bound,
-//      case-folding of Windows paths, dot-dot segments, override routes, and the evaluate.mjs wiring
-//      (those wiring pins belong to the signed tranche).
+//      case-folding of Windows paths, dot-dot segments inside an ABSOLUTE path (relative ones resolve
+//      against cwd and are pinned), override routes, and the evaluate.mjs wiring (those wiring pins belong
+//      to the signed tranche). Also not pinned, per Ruling 90: which scripts the wiring puts in
+//      exemptScripts (the registry in harness/verify-suites.json) and whether the classifier descends
+//      through capture-evidence.mjs into a nested node --test; any spelling of an exempt path other than
+//      the plain repo-relative one; whether a BARE secret basename is resolved against cwd; the attached
+//      preload forms (--import=<file>); the .env.example family of exceptions in the passive policy; and
+//      every cd form other than a plain "cd <path>" segment (cd -, pushd, subshells).
+//  11. (Ruling 90 does not fix it) Pattern matching acts on the BASENAME of a token, bare or
+//      directory-qualified, like the passive read policy, and is case-insensitive like it. The default
+//      fixture carries no secretPatterns, so the bare-name cases above (MATCH-BARE, N3-4) keep their
+//      meaning; the F3 pins pass the patterns explicitly.
+//  12. (extends 8) A present but malformed optional input refuses: a secretPatterns that is not an object
+//      of two arrays, and a cwd that is not an absolute path.
+//  13. (F1) "Token-wise" means every argv token of a PowerShell carrier, including tokens after -Command
+//      and -File and after any positional word. Only the `-`, `/` and `--` prefixes of the
+//      EncodedCommand family are pinned (-e, -ec, -enc, -EncodedC, the full name, any case).
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -718,6 +750,751 @@ defineRows(
       command: "cat ~/.ssh/config",
       targets: makeTargets({ credentialRoots: [bs(SSH_NATIVE)] }),
       tools: BASH,
+    },
+  ],
+  "refused",
+);
+
+// =====================================================================================================
+// TR-S2-T2-20261009 -- Ruling 90 pins (F1, F3-F8, cwd, exemptScripts). Test-only (QG-04): the module fix
+// is the next slice. The reason each group is RED is stated at the group; controls and F8 are green by
+// design (see the header extension note).
+// =====================================================================================================
+
+// --- fixture additions ----------------------------------------------------------------------------
+
+const part = (...pieces) => pieces.join("");
+const letter = (index) => String.fromCharCode(97 + index);
+
+// Secret-file name pieces are assembled at run time (Critic F2), so the new pins leave no literal
+// secret-file spelling in this file's own text.
+const DOT = ".";
+const EXT_P12 = part(DOT, "p1", "2");
+const EXT_PFX = part(DOT, "pf", "x");
+const EXT_KEY = part(DOT, "ke", "y");
+const EXT_PEM = part(DOT, "pe", "m");
+const PREFIX_ENV = part(DOT, "en", "v", DOT);
+const PREFIX_ID = part("i", "d_");
+
+const SECRET_PATTERNS = Object.freeze({
+  suffixes: Object.freeze([EXT_P12, EXT_PFX, EXT_KEY, EXT_PEM]),
+  prefixes: Object.freeze([PREFIX_ENV, PREFIX_ID]),
+});
+const withPatterns = (extra = {}) => makeTargets({ secretPatterns: SECRET_PATTERNS, ...extra });
+const withCwd = (extra = {}) => makeTargets({ cwd: bs(REPO), ...extra });
+
+// A base64 payload that is harmless on its own ("Get-Date" in UTF-16LE); only its flag is under test.
+const B64 = "RwBlAHQALQBEAGEAdABlAA==";
+
+// Relative spellings that lead from REPO (one level below the drive root) to the key store.
+const KEY_DIR_PARTS = KEY_DIR_NATIVE.split("/").slice(1);
+const KEY_DIR_REL = `../${KEY_DIR_PARTS.join("/")}`;
+const KEYSTORE_PARENT_REL = `../${KEY_DIR_PARTS[0]}`;
+const KEY_DIR_LEAF = KEY_DIR_PARTS[1];
+const KEY_BASENAME = KEY_FILE.split("/").pop();
+
+const PS_KEY_SCRIPT = `Get-Content ${bs(KEY_FILE)}\n`;
+const SH_KEY_SCRIPT = `cat ${SSH_NATIVE}/${part(PREFIX_ID, "ed", "25519")}\n`;
+const HARMLESS_PS = "Write-Output 'hello'\n";
+const HARMLESS_SH = "echo hello\n";
+const NULL_READER = () => makeReader({}, { fallback: null });
+
+// --- F1: encoded-command detection is token-wise ---------------------------------------------------
+// RED today: the PowerShell carrier stops scanning flags at the first word without a leading "-" (or at
+// the end of -Command / -File), and a value flag missing from PS_VALUE_FLAGS hides a later -enc.
+
+const ENC_SPELLINGS = ["-e", "-ec", "-enc", "-EncodedC", "-ENCODEDCOMMAND", "/enc", "--EncodedCommand"];
+
+defineRows(
+  "TR-S2-T2 F1: an encoded command is refused wherever its token sits in the carrier's argv",
+  [
+    {
+      id: "F1-1",
+      title: "a value flag outside the carrier's list hides -enc (the Critic's case)",
+      command: `powershell.exe -PSConsoleFile x.psc1 -enc ${B64}`,
+      tools: BOTH,
+    },
+    {
+      id: "F1-2",
+      title: "a positional word before -e",
+      command: `pwsh -NoProfile foo -e ${B64}`,
+      tools: BOTH,
+    },
+    {
+      id: "F1-3",
+      title: "-Command text followed by -e (command-text tokens are argv tokens too)",
+      command: `pwsh -Command Get-Date -e ${B64}`,
+      tools: BOTH,
+    },
+    {
+      id: "F1-4",
+      title: "script arguments after -File (the -File operand does not end the scan)",
+      command: `pwsh -File ok.ps1 -e ${B64}`,
+      tools: BOTH,
+    },
+    ...ENC_SPELLINGS.map((spelling, index) => ({
+      id: `F1-5${letter(index)}`,
+      title: `the spelling ${spelling} behind a positional word`,
+      command: `pwsh -NoProfile foo ${spelling} ${B64}`,
+      tools: BOTH,
+    })),
+    {
+      id: "F1-6a",
+      title: "/enc as the first token (the / prefix)",
+      command: `powershell.exe /enc ${B64}`,
+      tools: BOTH,
+    },
+    {
+      id: "F1-6b",
+      title: "--EncodedCommand as the first token (the -- prefix)",
+      command: `powershell.exe --EncodedCommand ${B64}`,
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F1 controls: harmless PowerShell carriers stay admitted",
+  [
+    {
+      id: "F1-C1",
+      title: "-ExecutionPolicy Bypass -File <harmless script>",
+      command: "powershell.exe -ExecutionPolicy Bypass -File ok.ps1",
+      readScript: () => makeReader({ "ok.ps1": HARMLESS_PS }),
+      tools: BOTH,
+    },
+    {
+      id: "F1-C2",
+      title: "-NoProfile -NoLogo -Command Get-Date",
+      command: "pwsh -NoProfile -NoLogo -Command Get-Date",
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+// --- F3: targets.secretPatterns { suffixes, prefixes } ----------------------------------------------
+// RED today: secret names are an exact-name Set, and the classifier ignores targets.secretPatterns.
+
+defineRows(
+  "TR-S2-T2 F3 positives: a name matching a secret suffix or prefix is a target",
+  [
+    {
+      id: "F3-1",
+      title: "openssl pkeyutl -sign -inkey <a copy with a key-file suffix> (the Critic's case)",
+      command: `openssl pkeyutl -sign -inkey scratch/copy${EXT_PEM}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-2",
+      title: "a directory-qualified file with the .key-style suffix",
+      command: `cat x/server${EXT_KEY}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-3",
+      title: "the PKCS#12 suffix",
+      command: `cat scratch/bundle${EXT_P12}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-4",
+      title: "the PFX suffix",
+      command: `cat scratch/bundle${EXT_PFX}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-5",
+      title: "the env-file prefix on a bare name (assumption 11)",
+      command: `cat ${PREFIX_ENV}production`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-6",
+      title: "the env-file prefix on a directory-qualified name",
+      command: `cat config/${PREFIX_ENV}production`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-7",
+      title: "the id_ prefix on a bare public-key name (assumption 11)",
+      command: `cat ${PREFIX_ID}rsa.pub`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-8",
+      title: "the id_ prefix on a directory-qualified name",
+      command: `cat ssh/${PREFIX_ID}rsa`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-9",
+      title: "suffix matching is case-insensitive (assumption 11)",
+      command: `cat x/SERVER${EXT_KEY.toUpperCase()}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-10",
+      title: "inside a bash -c source",
+      command: `bash -c 'cat x/server${EXT_KEY}'`,
+      targets: withPatterns(),
+      tools: BASH,
+    },
+    {
+      id: "F3-11",
+      title: "inside a node -e source",
+      command: `node -e "require('fs').readFileSync('scratch/copy${EXT_PEM}')"`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F3 controls: names that only resemble a pattern, and empty lists, stay admitted",
+  [
+    {
+      id: "F3-C1",
+      title: "a suffix in the middle of a name is not a suffix",
+      command: `cat notes${EXT_PEM}.txt`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-C2",
+      title: "a name that only starts like the id_ prefix",
+      command: "cat idle_notes.txt",
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-C3",
+      title: "a name that only starts like the env-file prefix",
+      command: "cat docs/environment.md",
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3-C4",
+      title: "empty suffix and prefix lists match nothing",
+      command: `cat x/server${EXT_KEY}`,
+      targets: makeTargets({ secretPatterns: { suffixes: [], prefixes: [] } }),
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+// Assumption 12 (extends 8). RED today: the malformed input is ignored, so the command is admitted.
+defineRows(
+  "TR-S2-T2 F3 malformed: a malformed secretPatterns refuses even for a command that names nothing",
+  [
+    {
+      id: "F3-F1",
+      title: "secretPatterns is not an object",
+      command: "openssl version",
+      targets: makeTargets({ secretPatterns: "not-an-object" }),
+      tools: BASH,
+    },
+    {
+      id: "F3-F2",
+      title: "secretPatterns.suffixes is not an array",
+      command: "openssl version",
+      targets: makeTargets({ secretPatterns: { suffixes: EXT_PEM, prefixes: [] } }),
+      tools: BASH,
+    },
+  ],
+  "refused",
+);
+
+// --- F4: a positional .ps1 on a PowerShell carrier is read -------------------------------------------
+// RED today: the first word without a leading "-" is taken as command text and the script is never read.
+
+defineRows(
+  "TR-S2-T2 F4: pwsh and powershell.exe read a first positional .ps1 as a script",
+  [
+    {
+      id: "F4-1",
+      title: "pwsh <script> without -File (content names the key)",
+      command: "pwsh scratch/x.ps1",
+      readScript: () => makeReader({ "scratch/x.ps1": PS_KEY_SCRIPT }),
+      tools: BOTH,
+    },
+    {
+      id: "F4-2",
+      title: "powershell.exe <script> without -File",
+      command: "powershell.exe scratch/x.ps1",
+      readScript: () => makeReader({ "scratch/x.ps1": PS_KEY_SCRIPT }),
+      tools: BOTH,
+    },
+    {
+      id: "F4-3",
+      title: "the positional .ps1 after other flags",
+      command: "pwsh -NoProfile scratch/x.ps1",
+      readScript: () => makeReader({ "scratch/x.ps1": PS_KEY_SCRIPT }),
+      tools: BOTH,
+    },
+    {
+      id: "F4-4",
+      title: "the .ps1 test is case-insensitive",
+      command: "pwsh scratch/X.PS1",
+      readScript: () => makeReader({ "scratch/X.PS1": PS_KEY_SCRIPT }),
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F4 controls: harmless content and non-script words stay admitted",
+  [
+    {
+      id: "F4-C1",
+      title: "a positional .ps1 with harmless content",
+      command: "pwsh scratch/x.ps1",
+      readScript: () => makeReader({ "scratch/x.ps1": HARMLESS_PS }),
+      tools: BOTH,
+    },
+    {
+      id: "F4-C2",
+      title: "a positional word that is not a .ps1 is command text, never read as a script",
+      command: "pwsh Get-Date",
+      readScript: () => makeReader({}, { fault: new Error("a non-.ps1 positional must not be read") }),
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+// --- F5: node preload values, every node file operand, wrapper seek-forward --------------------------
+// RED today: node skips the preload value, reads only the first file operand, and a wrapper option with a
+// non-numeric value stops the dispatch before the carrier.
+
+const NODE_PRELOAD_FLAGS = ["-r", "--require", "--import", "--loader", "--experimental-loader"];
+const keyHookReader = () => makeReader({ "scratch/hook.mjs": SCRATCH_NAMES_KEY_JS });
+
+defineRows(
+  "TR-S2-T2 F5: every script a carrier executes or preloads is read",
+  [
+    ...NODE_PRELOAD_FLAGS.map((flag, index) => ({
+      id: `F5-1${letter(index)}`,
+      title: `node ${flag} <file>: the preload value is read (content names the key)`,
+      command: `node ${flag} scratch/hook.mjs scratch/main.mjs`,
+      readScript: keyHookReader,
+      tools: BOTH,
+    })),
+    {
+      id: "F5-2",
+      title: "a preload value is read even when -e carries the inline source",
+      command: 'node --import scratch/hook.mjs -e "console.log(1)"',
+      readScript: keyHookReader,
+      tools: BOTH,
+    },
+    {
+      id: "F5-3",
+      title: "the SECOND node file operand is read",
+      command: "node scratch/main.mjs scratch/second.mjs",
+      readScript: () => makeReader({ "scratch/second.mjs": SCRATCH_NAMES_KEY_JS }),
+      tools: BOTH,
+    },
+    {
+      id: "F5-4",
+      title: "sudo -u root bash <script>: the wrapper's option value does not hide the carrier",
+      command: "sudo -u root bash scratch/x.sh",
+      readScript: () => makeReader({ "scratch/x.sh": SH_KEY_SCRIPT }),
+      tools: BASH,
+    },
+    {
+      id: "F5-5",
+      title: "timeout -s KILL 5 node <script>",
+      command: "timeout -s KILL 5 node scratch/x.mjs",
+      readScript: () => makeReader({ "scratch/x.mjs": SCRATCH_NAMES_KEY_JS }),
+      tools: BASH,
+    },
+    {
+      id: "F5-6",
+      title: "env -u NAME node <script>",
+      command: "env -u FIXTURE_NAME node scratch/x.mjs",
+      readScript: () => makeReader({ "scratch/x.mjs": SCRATCH_NAMES_KEY_JS }),
+      tools: BASH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F5 controls: the same shapes with harmless content stay admitted",
+  [
+    {
+      id: "F5-C1",
+      title: "a preload value and a file operand, both harmless",
+      command: "node --import scratch/hook.mjs scratch/main.mjs",
+      tools: BOTH,
+    },
+    {
+      id: "F5-C2",
+      title: "two harmless node file operands",
+      command: "node scratch/main.mjs scratch/second.mjs",
+      tools: BOTH,
+    },
+    {
+      id: "F5-C3",
+      title: "sudo -u root bash <harmless script>",
+      command: "sudo -u root bash scratch/x.sh",
+      readScript: () => makeReader({ "scratch/x.sh": HARMLESS_SH }),
+      tools: BASH,
+    },
+    {
+      id: "F5-C4",
+      title: "timeout -s KILL 5 node <harmless script>",
+      command: "timeout -s KILL 5 node scratch/x.mjs",
+      tools: BASH,
+    },
+  ],
+  "admitted",
+);
+
+// --- F6: bash backslash escapes (Bash tool) ---------------------------------------------------------
+// RED today: the tokenizer reads every backslash as a path separator, so an escaped letter splits the name.
+// The paths are built from the fixture constants; no host path is written out.
+
+defineRows(
+  "TR-S2-T2 F6: under the Bash tool a path is also checked with backslash escapes removed",
+  [
+    {
+      id: "F6-1",
+      title: "an escaped letter at the end of the key-directory name",
+      command: `cat ${KEY_DIR_NATIVE.slice(0, -1)}\\${KEY_DIR_NATIVE.slice(-1)}/x`,
+      tools: BASH,
+    },
+    {
+      id: "F6-2",
+      title: "an escaped letter inside the key store name (the Critic's keyst\\ore spelling)",
+      command: `cat ${KEY_DIR_NATIVE.replace("keystore", "keyst\\ore")}/passphrase.txt`,
+      tools: BASH,
+    },
+    {
+      id: "F6-3",
+      title: "an escaped letter inside a secret basename that has a directory component",
+      command: `cat some/where/${KEY_BASENAME.replace("private", "pri\\vate")}`,
+      tools: BASH,
+    },
+    {
+      id: "F6-4",
+      title: "an escaped letter inside a credential-root directory under ~",
+      command: "cat ~/.s\\sh/config",
+      tools: BASH,
+    },
+    {
+      id: "F6-5",
+      title: "an escaped letter inside a bash -c source",
+      command: `bash -c 'cat ${KEY_DIR_NATIVE.replace("keystore", "keyst\\ore")}/x'`,
+      tools: BASH,
+    },
+  ],
+  "refused",
+);
+
+// --- F7: PowerShell -Name:value ---------------------------------------------------------------------
+// RED today: "-Path:<path>" is one token that starts with "-", so neither the label peel nor the path
+// match ever sees the value.
+
+defineRows(
+  "TR-S2-T2 F7: a PowerShell -Name:value token is split at the first colon and its value is checked",
+  [
+    {
+      id: "F7-1",
+      title: "Get-Content -Path:<key directory file>, unquoted, backslashes",
+      command: `Get-Content -Path:${bs(KEY_DIR_NATIVE)}\\registry.json`,
+      tools: PWSH,
+    },
+    {
+      id: "F7-2",
+      title: "Get-Content -LiteralPath:<key directory file>, unquoted, forward slashes",
+      command: `Get-Content -LiteralPath:${KEY_DIR_NATIVE}/registry.json`,
+      tools: PWSH,
+    },
+    {
+      id: "F7-3",
+      title: "the same inside a pwsh -Command source",
+      command: `pwsh -Command "Get-Content -Path:${bs(KEY_DIR_NATIVE)}\\registry.json"`,
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F7 control: a harmless -Name:value stays admitted",
+  [
+    {
+      id: "F7-C1",
+      title: "Get-Content -Path:docs/readme.md",
+      command: "Get-Content -Path:docs/readme.md",
+      tools: PWSH,
+    },
+  ],
+  "admitted",
+);
+
+// --- F8: an unreadable script refuses (Ruling 76(a)) -------------------------------------------------
+// GREEN today by design: the behaviour is implemented (:394-398) and was only unpinned.
+
+defineRows(
+  "TR-S2-T2 F8: a readScript that returns null refuses",
+  [
+    {
+      id: "F8-1",
+      title: "node <script> with an unreadable script",
+      command: "node scratch/probe.mjs",
+      readScript: NULL_READER,
+      tools: BOTH,
+    },
+    {
+      id: "F8-2",
+      title: "bash <script> with an unreadable script",
+      command: "bash scratch/probe.sh",
+      readScript: NULL_READER,
+      tools: BASH,
+    },
+    {
+      id: "F8-3",
+      title: "python <script> with an unreadable script",
+      command: "python scratch/probe.py",
+      readScript: NULL_READER,
+      tools: BOTH,
+    },
+    {
+      id: "F8-4",
+      title: "powershell.exe -File <script> with an unreadable script",
+      command: "powershell.exe -File scratch/probe.ps1",
+      readScript: NULL_READER,
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 F8 control: an empty script is readable",
+  [
+    {
+      id: "F8-C1",
+      title: "node <script> whose content is the empty string",
+      command: "node scratch/probe.mjs",
+      readScript: () => makeReader({ "scratch/probe.mjs": "" }),
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+// --- cwd: targets.cwd, an absolute path -------------------------------------------------------------
+// RED today: relative tokens never match, because the classifier has no working directory, and a cwd
+// target is ignored. The cd rows name a cd operand that is NOT protected by itself, so the cd operand
+// match cannot satisfy them; only a tracked working directory can.
+
+describe("TR-S2-T2 cwd fixture sanity", () => {
+  test("CWD-0 the relative key-directory spelling leads from the cwd to the key directory", () => {
+    assert.equal(`${REPO.split("/")[0]}/${KEY_DIR_REL.slice(3)}`, KEY_DIR_NATIVE);
+  });
+});
+
+defineRows(
+  "TR-S2-T2 cwd positives: relative tokens resolve against targets.cwd and cd segments update it",
+  [
+    {
+      id: "CWD-1",
+      title: "a ../ path from the cwd into the key directory",
+      command: `cat ${KEY_DIR_REL}/registry.json`,
+      targets: withCwd(),
+      tools: BOTH,
+    },
+    {
+      id: "CWD-2",
+      title: "the same with a forward-slash cwd",
+      command: `cat ${KEY_DIR_REL}/registry.json`,
+      targets: makeTargets({ cwd: REPO }),
+      tools: BOTH,
+    },
+    {
+      id: "CWD-3",
+      title: "PowerShell backslash spelling",
+      command: `Get-Content ${bs(KEY_DIR_REL)}\\registry.json`,
+      targets: withCwd(),
+      tools: PWSH,
+    },
+    {
+      id: "CWD-4",
+      title: "cd to the key store's parent, then a relative path into the key directory",
+      command: `cd ${KEYSTORE_PARENT_REL}; cat ${KEY_DIR_LEAF}/registry.json`,
+      targets: withCwd(),
+      tools: BASH,
+    },
+    {
+      id: "CWD-5",
+      title: "the same joined with &&",
+      command: `cd ${KEYSTORE_PARENT_REL} && cat ${KEY_DIR_LEAF}/registry.json`,
+      targets: withCwd(),
+      tools: BASH,
+    },
+    {
+      id: "CWD-6",
+      title: "two cd segments accumulate",
+      command: `cd ..; cd ${KEY_DIR_PARTS[0]}; cat ${KEY_DIR_LEAF}/registry.json`,
+      targets: withCwd(),
+      tools: BASH,
+    },
+    {
+      id: "CWD-7",
+      title: "PowerShell: cd to the key store's parent, then a relative path",
+      command: `cd ${bs(KEYSTORE_PARENT_REL)}; Get-Content ${KEY_DIR_LEAF}\\registry.json`,
+      targets: withCwd(),
+      tools: PWSH,
+    },
+  ],
+  "refused",
+);
+
+defineRows(
+  "TR-S2-T2 cwd controls: harmless relative paths stay admitted",
+  [
+    {
+      id: "CWD-C1",
+      title: "a relative harmless file",
+      command: "cat docs/readme.md",
+      targets: withCwd(),
+      tools: BOTH,
+    },
+    {
+      id: "CWD-C2",
+      title: "cd into a harmless repo directory, then a relative file",
+      command: "cd docs; cat readme.md",
+      targets: withCwd(),
+      tools: BASH,
+    },
+    {
+      id: "CWD-C3",
+      title: "cd to the key store's parent, then a sibling of the key directory",
+      command: `cd ${KEYSTORE_PARENT_REL}; cat other/notes.txt`,
+      targets: withCwd(),
+      tools: BASH,
+    },
+    {
+      id: "CWD-C4",
+      title: "PowerShell: a relative harmless file",
+      command: "Get-Content docs\\readme.md",
+      targets: withCwd(),
+      tools: PWSH,
+    },
+  ],
+  "admitted",
+);
+
+// Assumption 12 (extends 8). RED today: the malformed cwd is ignored, so the command is admitted.
+defineRows(
+  "TR-S2-T2 cwd malformed: a cwd that is not an absolute path refuses even for a command that names nothing",
+  [
+    {
+      id: "CWD-F1",
+      title: "a relative cwd",
+      command: "openssl version",
+      targets: makeTargets({ cwd: "relative/dir" }),
+      tools: BASH,
+    },
+    {
+      id: "CWD-F2",
+      title: "a non-string cwd",
+      command: "openssl version",
+      targets: makeTargets({ cwd: 42 }),
+      tools: BASH,
+    },
+  ],
+  "refused",
+);
+
+// --- exemptScripts: a closed list of repo-relative paths whose content is not scanned ----------------
+// RED today (EX-1, EX-2 only): node reads the file and scans its content, which names the key. EX-3 .. EX-6
+// are green today and must stay so: the exemption covers the content of the listed file, nothing else.
+
+const EXEMPT_PATH = "plugins/pipeline-core/lib/exempt-fixture.test.mjs";
+const OTHER_PATH = "plugins/pipeline-core/lib/other-fixture.test.mjs";
+const EXEMPT_TARGETS = makeTargets({ exemptScripts: [EXEMPT_PATH] });
+const exemptReader = () =>
+  makeReader({
+    [EXEMPT_PATH]: SCRATCH_NAMES_KEY_JS,
+    [OTHER_PATH]: SCRATCH_NAMES_KEY_JS,
+    [`${EXEMPT_PATH}.bak`]: SCRATCH_NAMES_KEY_JS,
+  });
+
+defineRows(
+  "TR-S2-T2 exemptScripts positives: the content of an exempt path is not scanned",
+  [
+    {
+      id: "EX-1",
+      title: "node --test <exempt path> whose content names a key path",
+      command: `node --test ${EXEMPT_PATH}`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
+    },
+    {
+      id: "EX-2",
+      title: "node <exempt path> (the exemption is by path, not by the --test flag)",
+      command: `node ${EXEMPT_PATH}`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+defineRows(
+  "TR-S2-T2 exemptScripts negatives: the command line and every other file are still scanned",
+  [
+    {
+      id: "EX-3",
+      title: "a key path as an operand on the command line of an exempt run",
+      command: `node --test ${EXEMPT_PATH} ${KEY_FILE}`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
+    },
+    {
+      id: "EX-4",
+      title: "a key path in an option value on the command line of an exempt run",
+      command: `node --test --test-reporter-destination=${KEY_DIR_NATIVE}/out.txt ${EXEMPT_PATH}`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
+    },
+    {
+      id: "EX-5",
+      title: "a non-exempt file with the same content",
+      command: `node --test ${OTHER_PATH}`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
+    },
+    {
+      id: "EX-6",
+      title: "the list is exact: a path that only extends an exempt path is not exempt",
+      command: `node --test ${EXEMPT_PATH}.bak`,
+      targets: EXEMPT_TARGETS,
+      readScript: exemptReader,
+      tools: BOTH,
     },
   ],
   "refused",
