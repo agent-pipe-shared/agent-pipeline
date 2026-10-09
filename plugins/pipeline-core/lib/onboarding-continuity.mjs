@@ -7032,13 +7032,19 @@ export function applyOnboardingIntakeGenerate({
   // Tests with an injected Git/process dependency may provide the matching
   // preparer seam. The CLI has no flag or environment route to this seam; its
   // default path always plans and applies the real repo-local Git setting.
-  const lineEndingApplied = typeof deps.prepareBoundDesignLineEndings === "function"
-    ? deps.prepareBoundDesignLineEndings(lineEndingRequest)
-    : (() => {
-      const lineEndingPlan = planBoundDesignLineEndings(lineEndingRequest);
-      if (!lineEndingPlan.ok) return lineEndingPlan;
-      return applyBoundDesignLineEndings(lineEndingPlan);
-    })();
+  // A host-managed root has no writable repository configuration to prepare:
+  // the host owns Git and the root's `.git` is an empty read-only directory by
+  // design, so the probe would fail closed on a repository that does not
+  // exist. The preparation runs only for a local repository capability.
+  const lineEndingApplied = plan.repositoryCapability !== "local"
+    ? { ok: true, skipped: true }
+    : typeof deps.prepareBoundDesignLineEndings === "function"
+      ? deps.prepareBoundDesignLineEndings(lineEndingRequest)
+      : (() => {
+        const lineEndingPlan = planBoundDesignLineEndings(lineEndingRequest);
+        if (!lineEndingPlan.ok) return lineEndingPlan;
+        return applyBoundDesignLineEndings(lineEndingPlan);
+      })();
   if (!lineEndingApplied.ok) fail("INTAKE-GENERATE-LINE-ENDINGS-REFUSED",
     `design document line-ending preparation failed: ${lineEndingApplied.code}`);
   plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
