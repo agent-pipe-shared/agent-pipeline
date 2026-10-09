@@ -205,7 +205,6 @@ async function symlinkOrSkip(t, target, linkPath, type) {
 // 0o666 whatever was asked, so POSIX mode-bit assertions (and the existing-binding mode predicate) cannot hold there.
 const POSIX_MODE_UNHONOURED_SKIP_REASON = "POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here";
 const POSIX_MODE_HONOURED_SKIP_REASON = "POSIX-MODE-HONOURED: this host honours POSIX mode bits, where the existing-binding mode predicate is correct; the pin applies only to hosts that do not";
-const EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON = `${POSIX_MODE_UNHONOURED_SKIP_REASON}; the (mode & 0o022n) === 0n predicate in readExistingLocalRepositoryFingerprint refuses every binding on such a host (product fault, pinned RED by the WIN-GES-T3 pin until WIN-GES-F4)`;
 let posixModeBitsHonouredProbe;
 function hostHonoursPosixModeBits() {
   posixModeBitsHonouredProbe ??= (async () => {
@@ -1330,7 +1329,15 @@ function existingIdentityFileSnapshot(file) {
   return ['dev','ino','mode','uid','nlink','size','mtimeNs','ctimeNs'].map(key => stat[key]);
 }
 const EXISTING_IDENTITY_BINDING_SCHEMA = 'pipeline.governance-event-repository-binding.v2';
-function existingIdentityFixture(t) {
+// WIN-GES-T4: where the host reports no POSIX mode bits (win32), readExistingLocalRepositoryFingerprint assesses the
+// binding file by its DACL (WIN-GES-F4). A binding fixture is therefore a valid binding only once its directory has been
+// hardened by the module family's own hardener, the way production mints it; nothing here builds an ACL by hand. The file
+// is then created inside the hardened directory and every later mutation rewrites it in place, so its DACL does not move.
+// `harden:false` keeps the default-inherited DACL of os.tmpdir(), this host's own example of a binding that is not private.
+// The two fixture preconditions make a red classify itself: a failed precondition means the hardener cannot produce the
+// fixture here; a refusal that follows a passing precondition is a product finding, not a fixture fault.
+const { hardenWindowsPrivateDirectory: hardenBindingDirectory, assessWindowsPrivatePath: assessBinding } = await import('./windows-private-state.mjs');
+function existingIdentityFixture(t,{harden=true}={}) {
   const root = existingIdentityFs.mkdtempSync(existingIdentityJoin(os.tmpdir(),'existing-identity-fixture-'));
   t.after(()=>existingIdentityFs.rmSync(root,{recursive:true,force:true}));
   execFileSync('git',['init','-q',root]);
@@ -1338,8 +1345,25 @@ function existingIdentityFixture(t) {
   const path = existingIdentityJoin(directory,'repository-binding.json');
   const fingerprint = existingIdentityRandomBytes(32).toString('hex');
   const value = { schema: EXISTING_IDENTITY_BINDING_SCHEMA, repositoryFingerprint:fingerprint, legacyAliases:[], boundAtEpochMs:1 };
-  const seed = input => { existingIdentityFs.mkdirSync(directory,{recursive:true}); existingIdentityFs.writeFileSync(path,JSON.stringify(input ?? value),{mode:0o600}); };
-  return {root,directory,path,fingerprint,value,seed};
+  const hardenOnWin32 = harden && process.platform === 'win32';
+  let prepared = false;
+  const prepare = () => {
+    if (prepared || !hardenOnWin32) return;
+    prepared = true;
+    existingIdentityFs.mkdirSync(directory,{recursive:true});
+    assert.equal(hardenBindingDirectory(directory).status,'secure','fixture precondition: the module family hardener could not harden the binding directory on this host');
+  };
+  const seed = input => {
+    prepare();
+    existingIdentityFs.mkdirSync(directory,{recursive:true});
+    existingIdentityFs.writeFileSync(path,JSON.stringify(input ?? value),{mode:0o600});
+    if (hardenOnWin32) assert.equal(assessBinding(path).status,'secure','fixture precondition: a binding file written into the hardened directory does not assess as secure');
+  };
+  return {root,directory,path,fingerprint,value,prepare,seed};
+}
+const existingIdentityAccepted = async (f,message) => assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),f.fingerprint,message);
+function assertBindingStillPrivate(f) {
+  if (process.platform === 'win32') assert.equal(assessBinding(f.path).status,'secure','the binding DACL is unchanged and still private, so the refusal under test cannot come from the DACL assessment');
 }
 const existingIdentityUnavailable = error => error.code === 'GES-EXISTING-REPOSITORY-BINDING';
 test('existing repository identity: missing identity refuses without creating namespace or binding',async t=>{
@@ -1347,31 +1371,43 @@ test('existing repository identity: missing identity refuses without creating na
   assert.equal(existingIdentityFs.existsSync(existingIdentityJoin(f.root,'.git','agent-pipeline')),false);
 });
 test('existing repository identity: legacy identity refuses without migration or changed bytes',async t=>{
-  const f=existingIdentityFixture(t);f.seed({schema:'pipeline.governance-event-repository-binding.v1',repositoryFingerprint:f.fingerprint,boundAtEpochMs:1});
+  const f=existingIdentityFixture(t);f.seed();await existingIdentityAccepted(f,'control: the hardened v2 binding is accepted before the one mutation');
+  f.seed({schema:'pipeline.governance-event-repository-binding.v1',repositoryFingerprint:f.fingerprint,boundAtEpochMs:1});
   const before=existingIdentityFs.readFileSync(f.path), identityBefore=existingIdentityFileSnapshot(f.path);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
   assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);assert.deepEqual(existingIdentityFileSnapshot(f.path),identityBefore);
 });
 test('existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes',async t=>{
-  if(!await hostHonoursPosixModeBits()){t.skip(EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON);return;}
-  const f=existingIdentityFixture(t);const bound=await mintExistingIdentity({repositoryRoot:f.root});const before=existingIdentityFs.readFileSync(f.path);
+  const f=existingIdentityFixture(t);f.prepare();const bound=await mintExistingIdentity({repositoryRoot:f.root});const before=existingIdentityFs.readFileSync(f.path);
   assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);
   assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
 });
 test('existing repository identity: closed v2 validation rejects schema/digest/alias/epoch drift without modifying binding',async t=>{
+  const f=existingIdentityFixture(t);
   for(const change of [v=>delete v.repositoryFingerprint,v=>v.extra=true,v=>v.repositoryFingerprint='invalid',v=>v.legacyAliases=[v.repositoryFingerprint],
     v=>v.legacyAliases=['a'.repeat(64),'a'.repeat(64)],v=>v.repositoryFingerprint=[v.repositoryFingerprint],
     v=>v.boundAtEpochMs=-1,v=>v.schema='unknown']){
-    const f=existingIdentityFixture(t),value=structuredClone(f.value);change(value);f.seed(value);const before=existingIdentityFs.readFileSync(f.path);
+    f.seed();await existingIdentityAccepted(f,'control: the hardened v2 binding is accepted before each drift');
+    const value=structuredClone(f.value);change(value);f.seed(value);const before=existingIdentityFs.readFileSync(f.path);
     await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
   }
 });
 // WIN-GES-T3: split from the former 'file/root aliases, multiple links and writable binding refuse' case. The hard-link
 // and writable-binding assertions need no symlink privilege and run unconditionally; the two symlink assertions follow
 // as their own case under the SYMLINK-EPERM probe.
-test('existing repository identity: multiple links and writable binding refuse',async t=>{
-  const f=existingIdentityFixture(t);f.seed();
-  const duplicate=existingIdentityJoin(f.directory,'copy');existingIdentityFs.linkSync(f.path,duplicate);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
-  existingIdentityFs.rmSync(duplicate);existingIdentityFs.chmodSync(f.path,0o666);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+// WIN-GES-T4: the hard-link and writable-binding assertions are now two cases, because a writable binding is a POSIX mode
+// and has no win32 form. Each first proves the hardened fixture is accepted, applies the one mutation, and proves the
+// refusal goes away when the mutation is undone, so the named predicate is the one that fired.
+test('existing repository identity: multiple links refuse',async t=>{
+  const f=existingIdentityFixture(t);f.seed();await existingIdentityAccepted(f,'control: the hardened v2 binding is accepted before the hard link is added');
+  const duplicate=existingIdentityJoin(f.directory,'copy');existingIdentityFs.linkSync(f.path,duplicate);assertBindingStillPrivate(f);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  existingIdentityFs.rmSync(duplicate);await existingIdentityAccepted(f,'removing the second link restores acceptance, so the refusal came from the link count');
+});
+const WRITABLE_BINDING_NO_MODE_BITS_SKIP_REASON = `${POSIX_MODE_UNHONOURED_SKIP_REASON}; a writable binding is a POSIX mode, its win32 equivalent (a DACL that is not private) is pinned by the WIN-GES-T4 pin below`;
+test('existing repository identity: writable binding refuses',async t=>{
+  if(!await hostHonoursPosixModeBits()){t.skip(WRITABLE_BINDING_NO_MODE_BITS_SKIP_REASON);return;}
+  const f=existingIdentityFixture(t);f.seed();await existingIdentityAccepted(f,'control: the v2 binding is accepted before it becomes writable');
+  existingIdentityFs.chmodSync(f.path,0o666);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+  existingIdentityFs.chmodSync(f.path,0o600);await existingIdentityAccepted(f,'restoring 0o600 restores acceptance, so the refusal came from the writable mode');
 });
 test('existing repository identity: file/root symlink aliases refuse',async t=>{
   const f=existingIdentityFixture(t);f.seed();const alias=f.root+'-alias';
@@ -1396,12 +1432,25 @@ test('WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened exi
   const bound=await mintExistingIdentity({repositoryRoot:f.root});
   assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound,'a hardened sanctioned v2 binding must be accepted where POSIX mode bits do not exist');
 });
+// WIN-GES-T4 PIN. The win32 equivalent of 'writable binding refuses': the same bytes are accepted in a directory the
+// module family hardener has hardened and refused in the default-inherited os.tmpdir() directory, whose DACL grants more
+// than the owner. The only difference between the two bindings is the DACL. No ACL is built by hand; the unhardened
+// fixture is simply not hardened. Where mode bits are honoured the equivalent is the mode case and this pin is skipped.
+test('WIN-GES-T4 pin: on a host without POSIX mode bits a binding whose DACL is not private refuses while the identical hardened binding is accepted',async t=>{
+  if(await hostHonoursPosixModeBits()){t.skip(POSIX_MODE_HONOURED_SKIP_REASON);return;}
+  const hardened=existingIdentityFixture(t);hardened.seed();await existingIdentityAccepted(hardened,'the hardened binding is accepted');
+  const open=existingIdentityFixture(t,{harden:false});open.seed(hardened.value);
+  assert.deepEqual(existingIdentityFs.readFileSync(open.path),existingIdentityFs.readFileSync(hardened.path),'pin precondition: the two bindings hold identical bytes');
+  assert.notEqual(assessBinding(open.path).status,'secure','pin precondition: the default-inherited DACL of os.tmpdir() must not assess as secure');
+  await assert.rejects(observeExistingIdentity({repositoryRoot:open.root}),existingIdentityUnavailable);
+});
 test('existing repository identity: oversized binding is rejected while preserving exact synthetic bytes',async t=>{
-  const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(f.path,Buffer.alloc(65537,0x20));const before=existingIdentityFs.readFileSync(f.path);
+  const f=existingIdentityFixture(t);f.seed();await existingIdentityAccepted(f,'control: the hardened v2 binding is accepted before it grows past the size bound');
+  existingIdentityFs.writeFileSync(f.path,Buffer.alloc(65537,0x20));const before=existingIdentityFs.readFileSync(f.path);
+  assert.equal(before.length,65537);assertBindingStillPrivate(f);
   await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
 });
 test('existing repository identity: linked worktree observes same common identity; bare repository remains unsupported',async t=>{
-  if(!await hostHonoursPosixModeBits()){t.skip(EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON);return;}
   const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(existingIdentityJoin(f.root,'README'),'synthetic');
   execFileSync('git',['add','README'],{cwd:f.root});
   execFileSync('git',['-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','commit','-qm','fixture'],{cwd:f.root});
