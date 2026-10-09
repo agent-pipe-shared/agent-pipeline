@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: SUL-1.0
 // Verify signal rule: verify-journal.mjs sets PIPELINE_VERIFY_CASE_COMPLETION_FD for
 // suite children. With that variable PRESENT a completion fd write failure is strict
-// (TCC-FD-WRITE). With it ABSENT and the fd write failing because the descriptor does
-// not exist (EBADF), the recorder made by registerTestCaseCompletion becomes a no-op for the rest of the process, so a
-// completion suite runs as a plain single file outside Verify.
+// (TCC-FD-WRITE). With it ABSENT the recorder made by registerTestCaseCompletion is inert from
+// construction: it never opens, writes to or probes descriptor 3 (or any descriptor), whatever that
+// descriptor happens to be, so a completion suite runs as a plain single file outside Verify. A
+// descriptor nobody announced is not ours to write to: under WSL it can be one Node itself owns
+// (EINVAL) and under any runner it can be a foreign writable channel. Case bookkeeping and the static
+// configuration checks still run; only the descriptor writes are skipped. The direct constructor
+// createTestCaseCompletionRecorder is an explicit-descriptor API and is unaffected by the signal.
 import { createHash } from "node:crypto";
 import { writeSync } from "node:fs";
 import test from "node:test";
@@ -102,7 +106,7 @@ export function createTestCaseCompletionRecorder(configuration) {
   return buildRecorder(configuration, false);
 }
 
-function buildRecorder(configuration, plainFileFallback) {
+function buildRecorder(configuration, registrationRoute) {
   if (!exactKeys(configuration, CONFIG_KEYS)) fail("TCC-CONFIG", "completion recorder configuration is not closed");
   const { fd, maxBytes } = configuration;
   const caseIds = structuredClone(configuration.caseIds);
@@ -130,21 +134,14 @@ function buildRecorder(configuration, plainFileFallback) {
   let emittedBytes = 0;
   const disposed = new Map();
   let terminal = false;
-  let inert = false;
+  // The registration route without the Verify signal has no claim on any descriptor: it is inert from
+  // the start, decided once here, before the first write, rather than after a write has already failed.
+  const inert = registrationRoute && !verifySignalled();
   function emit(record) {
     if (inert) return;
     const output = Buffer.from(line(record), "utf8");
     if (emittedBytes + output.length > maxBytes) fail("TCC-OUTPUT-OVERFLOW", "completion stream exceeded its declared bound");
-    try {
-      emittedBytes += writeTestCaseCompletionBytes(fd, output);
-    } catch (error) {
-      // No Verify signal and no such descriptor: plain single-file run, record nothing.
-      if (plainFileFallback && error?.code === "TCC-FD-WRITE" && !verifySignalled() && error.cause?.code === "EBADF") {
-        inert = true;
-        return;
-      }
-      throw error;
-    }
+    emittedBytes += writeTestCaseCompletionBytes(fd, output);
   }
   emit(declared);
 
@@ -212,6 +209,7 @@ export function registerTestCaseCompletion(configuration) {
   if (!exactKeys(configuration, REGISTRATION_KEYS)) fail("TCC-CONFIG", "completion registration configuration is not closed");
   validateCases(configuration.cases);
   const caseIds = configuration.cases.map((entry) => entry.id);
+  // Registration route: inert unless Verify announced the completion descriptor (see the header).
   const recorder = buildRecorder({ fd: configuration.fd, maxBytes: configuration.maxBytes, caseIds }, true);
 
   // Registration is deliberately synchronous. Callback execution may be async,
