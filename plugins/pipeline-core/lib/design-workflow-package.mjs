@@ -697,5 +697,142 @@ export function designWorkflowAdvisorExceptionBinding(packageRead) {
     failureEvidenceSha256: pkg.advisor.failureEvidence.sha256, rationale: pkg.advisor.proposedException.rationale };
 }
 
+// Legacy re-read mode (ADR-0085 C2, decision T): the visible mode name a consumer reports for an approval recorded before
+// the one-review route, verified without the live candidate, a Git repository, the private Advisor course store, host
+// evidence, the revision chain or the readiness file.
+export const DESIGN_WORKFLOW_REREAD_MODE = "DWP2-LEGACY-APPROVED-REREAD";
+const PACKAGE_V2_SCHEMA = "pipeline.design-workflow-package.v2";
+const PACKAGE_V2_SCHEMA_PATH = join(HERE, "../schemas/pipeline.design-workflow-package.v2.json");
+const REREAD_PACKAGE_KEYS = Object.freeze(["schema", "featureId", "authoringDispatchId", "candidate", "sources", "advisor", "readiness", "createdAt"]);
+const V1_ADVISOR_KEYS = Object.freeze(["status", "runner", "nativeAvailable", "receipt", "attemptTrail", "disposition", "exception"]);
+const V2_ANSWERED_ADVISOR_KEYS = Object.freeze(["status", "runner", "profile", "route", "initialContext", "courseBinding", "consultation",
+  "hostReceipt", "receipt", "report", "disposition", "revisions"]);
+const V2_UNAVAILABLE_ADVISOR_KEYS = Object.freeze([...V2_ANSWERED_ADVISOR_KEYS, "failureEvidence", "proposedException"]);
+const V2_COURSE_BINDING_KEYS = Object.freeze(["courseId", "initialContextSha256", "reservationId", "slot", "routeStepSha256"]);
+const V2_EFFORTS = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+
+function nonBlankText(value, maxLength = Infinity) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
+}
+function evidenceReference(value) {
+  return exact(value, ["path", "sha256"]) && typeof value.path === "string" && value.path.length > 0 && SHA256.test(value.sha256 ?? "");
+}
+function rereadV1AdvisorShape(advisor) {
+  if (!exact(advisor, V1_ADVISOR_KEYS) || !["answered", "unavailable"].includes(advisor.status)
+    || !RUNNERS.has(advisor.runner) || typeof advisor.nativeAvailable !== "boolean"
+    || !exact(advisor.receipt, ["path", "sha256"]) || !safeRepoPath(advisor.receipt.path) || !SHA256.test(advisor.receipt.sha256 ?? "")) return false;
+  const trail = advisor.attemptTrail;
+  const trailOk = exact(trail, ["path", "sha256"]) && safeRepoPath(trail.path) && SHA256.test(trail.sha256 ?? "");
+  if (trail !== null && !trailOk) return false;
+  if (advisor.status === "answered") {
+    return exact(advisor.disposition, ["decision", "rationale"]) && ["accept", "decline"].includes(advisor.disposition.decision)
+      && nonBlankText(advisor.disposition.rationale) && advisor.exception === null;
+  }
+  return advisor.disposition === null && trailOk && exact(advisor.exception, ["status", "failureCode", "rationale"])
+    && advisor.exception.status === "proposed" && FAILURES.has(advisor.exception.failureCode) && nonBlankText(advisor.exception.rationale);
+}
+function rereadV2AdvisorShape(advisor) {
+  if (!object(advisor) || (advisor.status !== "answered" && advisor.status !== "unavailable")) return false;
+  const unavailable = advisor.status === "unavailable";
+  if (!exact(advisor, unavailable ? V2_UNAVAILABLE_ADVISOR_KEYS : V2_ANSWERED_ADVISOR_KEYS)
+    || !RUNNERS.has(advisor.runner) || (!unavailable && advisor.runner !== "codex")
+    || !["epic", "feature"].includes(advisor.profile)) return false;
+  const { route, courseBinding } = advisor;
+  const native = advisor.runner !== "codex";
+  if (!exact(route, ["model", "effort", "sourceSha256", "candidateCommit"]) || !SHA256.test(route.sourceSha256 ?? "")
+    || !COMMIT_ID.test(route.candidateCommit ?? "")
+    || !exact(courseBinding, V2_COURSE_BINDING_KEYS) || !ID.test(courseBinding.courseId ?? "") || !ID.test(courseBinding.reservationId ?? "")
+    || !SHA256.test(courseBinding.initialContextSha256 ?? "") || !SHA256.test(courseBinding.routeStepSha256 ?? "")
+    || !Number.isInteger(courseBinding.slot) || !evidenceReference(advisor.initialContext)
+    || !Array.isArray(advisor.revisions) || advisor.revisions.length > 32) return false;
+  if (native ? (route.model !== null || route.effort !== null) : (!nonBlankText(route.model, 128) || !V2_EFFORTS.includes(route.effort))) return false;
+  const hostReceiptOk = exact(advisor.hostReceipt, ["id", "sha256"]) && ID.test(advisor.hostReceipt.id ?? "") && SHA256.test(advisor.hostReceipt.sha256 ?? "");
+  if (!unavailable) return hostReceiptOk && evidenceReference(advisor.receipt) && evidenceReference(advisor.report);
+  const exception = advisor.proposedException;
+  return courseBinding.slot === (native ? 0 : 1) && evidenceReference(advisor.failureEvidence)
+    && advisor.consultation === null && advisor.report === null && advisor.disposition === null
+    && (advisor.receipt === null || evidenceReference(advisor.receipt)) && (advisor.hostReceipt === null || hostReceiptOk)
+    && exact(exception, ["kind", "approval", "oneTime", "rationale"]) && exception.kind === "advisor-unavailable"
+    && exception.approval === "final" && exception.oneTime === true && nonBlankText(exception.rationale, 4096);
+}
+/** The closed package shape (v1 or v2) judged from the package bytes alone; returns a typed code or null. */
+function rereadPackageShapeCode(workflowPackage, packagePath) {
+  const v2 = workflowPackage.schema === PACKAGE_V2_SCHEMA;
+  if (!v2 && workflowPackage.schema !== DESIGN_WORKFLOW_PACKAGE_SCHEMA) return "DWP-PACKAGE-SHAPE";
+  if (!exact(workflowPackage, REREAD_PACKAGE_KEYS)) return "DWP-PACKAGE-SHAPE";
+  try {
+    const schema = JSON.parse(readFileSync(v2 ? PACKAGE_V2_SCHEMA_PATH : PACKAGE_SCHEMA_PATH, "utf8"));
+    if (!validateAgainstSchema(workflowPackage, schema).valid) return v2 ? "DWP2-PACKAGE-SCHEMA" : "DWP-PACKAGE-SCHEMA";
+  } catch { return v2 ? "DWP2-PACKAGE-SCHEMA" : "DWP-PACKAGE-SCHEMA"; }
+  const { advisor, readiness, sources } = workflowPackage;
+  if (!ID.test(workflowPackage.featureId ?? "") || !ID.test(workflowPackage.authoringDispatchId ?? "")
+    || !validCandidate(workflowPackage.candidate) || !validSources(sources) || !validIsoDate(workflowPackage.createdAt)
+    || !exact(readiness, ["path", "sha256", "dispatchId"]) || !safeRepoPath(readiness.path)
+    || !SHA256.test(readiness.sha256 ?? "") || !ID.test(readiness.dispatchId ?? "")
+    || !(v2 ? rereadV2AdvisorShape(advisor) : rereadV1AdvisorShape(advisor))) return "DWP-PACKAGE-SHAPE";
+  const evidence = v2
+    ? [advisor.initialContext, advisor.failureEvidence, advisor.receipt, advisor.report]
+    : [advisor.receipt, advisor.attemptTrail];
+  const paths = [packagePath, ...SOURCE_NAMES.map((name) => sources[name].path), readiness.path,
+    ...evidence.filter((entry) => entry !== undefined && entry !== null).map((entry) => entry.path)];
+  return uniqueRepositoryPaths(paths) ? null : "DWP-PATH-ALIASES";
+}
+
+/**
+ * Legacy re-read of a package already named by a pre-ADR-0085 plan approval (decision T, C2). It verifies exactly:
+ * (1) the package bytes at the recorded path hash to `packageSha256`; (2) the closed v1/v2 package shape; (3) the
+ * package's PRD and Spec references equal the approved digests and the CURRENT file bytes of those two files;
+ * (4) the Advisor-exception binding recomputed from the package fields equals the recorded one; and the feature matches.
+ * It reads the package, the PRD and the Spec and nothing else: no Git repository, no live candidate, no private course
+ * store, no host or readiness evidence. The signature against the trust anchor (C2 item 5) is the caller's check on
+ * the approval record and is deliberately not part of this function. A valid result is not implementation authority.
+ */
+export function rereadApprovedDesignWorkflowPackage({
+  repoRoot,
+  packagePath,
+  packageSha256,
+  featureId,
+  planPath,
+  planSha256,
+  specPath,
+  specSha256,
+  advisorExceptionBinding = null,
+} = {}) {
+  if (typeof repoRoot !== "string" || repoRoot.length === 0 || !safeRepoPath(packagePath)
+    || !SHA256.test(packageSha256 ?? "") || !ID.test(featureId ?? "")
+    || !safeRepoPath(planPath) || !SHA256.test(planSha256 ?? "")
+    || !safeRepoPath(specPath) || !SHA256.test(specSha256 ?? "")) return fail("DWP-APPROVAL-BINDING");
+  const packageBytes = physicalBytes(repoRoot, packagePath, MAX_PACKAGE_BYTES);
+  if (packageBytes === null) return fail("DWP-PACKAGE-PHYSICAL");
+  if (sha(packageBytes) !== packageSha256) return fail("DWP-APPROVAL-DIGEST-DRIFT");
+  let workflowPackage;
+  try { workflowPackage = parseStrictJson(packageBytes); } catch { return fail("DWP-PACKAGE-SHAPE"); }
+  if (!object(workflowPackage)) return fail("DWP-PACKAGE-SHAPE");
+  const shapeCode = rereadPackageShapeCode(workflowPackage, packagePath);
+  if (shapeCode !== null) return fail(shapeCode);
+  if (workflowPackage.featureId !== featureId) return fail("DWP-APPROVAL-FEATURE-MISMATCH");
+  const { prd, spec } = workflowPackage.sources;
+  if (prd.path !== planPath || prd.sha256 !== planSha256 || spec.path !== specPath || spec.sha256 !== specSha256) {
+    return fail("DWP-APPROVAL-PLAN-SPEC-MISMATCH");
+  }
+  for (const source of [prd, spec]) {
+    const current = physicalBytes(repoRoot, source.path, MAX_SOURCE_BYTES);
+    if (current === null) return fail("DWP-SOURCE-PHYSICAL");
+    if (sha(current) !== source.sha256) return fail("DWP-APPROVAL-SOURCE-DRIFT");
+  }
+  const expectedException = designWorkflowAdvisorExceptionBinding({ workflowPackage, packageSha256 });
+  if (canonicalizeJson(expectedException) !== canonicalizeJson(advisorExceptionBinding)) return fail("DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING");
+  return {
+    ok: true,
+    mode: DESIGN_WORKFLOW_REREAD_MODE,
+    packageSha256,
+    packagePath,
+    candidate: cloneFrozenJson(workflowPackage.candidate),
+    workflowPackage: cloneFrozenJson(workflowPackage),
+    approvedBinding: true,
+    implementationAuthority: false,
+  };
+}
+
 /** Structural readiness contract reused by explicit v2 package validation. */
 export function validateDesignReadinessReceipt(receipt) { return validateReadiness(receipt); }
