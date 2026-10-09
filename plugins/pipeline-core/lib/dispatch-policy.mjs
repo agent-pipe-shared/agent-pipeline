@@ -51,7 +51,7 @@ const BUDGETED_ROLES = Object.freeze([
   "goldfish-mechanic",
 ]);
 const DEFAULT_DISPATCH_BASE_CALL_CAP = Object.freeze({
-  critic: 24,
+  critic: 30,
   "goldfish-deep": 45,
   "goldfish-implementor": 40,
   "goldfish-mechanic": 40,

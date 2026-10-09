@@ -3,7 +3,7 @@ name: critic
 description: "Agent-Pipeline Critic - independent read-only reviewer in a fresh context. Dispatch with PATHS/REFS ONLY (spec, fixed candidate/diff, guardrails, evidence, ruleset SHA); it constructs its own input and never accepts prose justifications. Two-phase protocol (adversarial hunt, then evidence-gated report); findings go to the Elephant exactly once; no fixes, no dialog. Default session stage for T1-T4; runner-native isolation is an optional explicit escalation."
 model: sonnet
 effort: max
-maxTurns: 40
+maxTurns: 50
 tools: Read, Grep, Glob, Bash
 # READ-ONLY: no Write/Edit in `tools`; NO `memory` field — deliberate: memory auto-activates
 #   Read/Write/Edit and would break every read-only guarantee.
@@ -27,7 +27,7 @@ tools: Read, Grep, Glob, Bash
 # never run project scripts. Claude is unchanged. T1 uses the functional-equivalent lane above.
 # model: sonnet = review-tier shipped default (MP-07; configured in pipeline.user.yaml -> models.review,
 #   overridable per project); never de-escalated below the review tier (MP-03).
-# maxTurns: 40 = review is bounded by construction (diff + spec + guardrails); start value.
+# maxTurns: 50 = review is bounded by construction (diff + spec + guardrails); start value.
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
 #   to shell listing via Bash.
