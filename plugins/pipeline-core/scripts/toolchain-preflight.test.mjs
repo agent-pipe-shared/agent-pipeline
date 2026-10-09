@@ -24,6 +24,8 @@ import { parseBrowserEvidencePreflightArgs, preflightBrowserEvidence } from "./b
 import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 import * as toolchainModule from "./toolchain-preflight.mjs";
+// TR-J-T3 addition, on its own line: the R7-7e typed-repair case spawns a frozen copy of the plugin root.
+import { cpSync } from "node:fs";
 
 let passed = 0;
 function check(name, fn) { cases.push({ id: `TCP${String(cases.length + 1).padStart(3, "0")}`, name, run: async () => { await fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); } }); }
@@ -584,12 +586,21 @@ check("R7-7e: a missing pre-push hook yields git-hooks repairable; running the t
   await r77WithFixtureRepo(async (repo, env) => {
     const deps = () => ({ [R77_PROBES_DEP]: r77Probes({}, ["git-hooks"]) });
     const hookPath = (name) => join(repo, ".git", "hooks", name);
+    // TR-J-T3 (TOILRES T44/T58): the typed repair installs hooks with the default lib dir of the script it runs, and
+    // the installer inventories that plugin root twice, so a parallel writer into the LIVE tree fails it with
+    // GHS-SOURCE-DRIFT. The finding still names the live script (asserted below); the test spawns a frozen copy of
+    // the plugin root, placed in the fixture directory so r77WithFixtureRepo removes it.
+    const frozenPluginRoot = resolve(repo, "..", "plugin-copy");
+    cpSync(resolve(R77_SCRIPT("toolchain-preflight.mjs"), "..", ".."), frozenPluginRoot, { recursive: true });
+    const frozenScript = join(frozenPluginRoot, "scripts", "toolchain-preflight.mjs");
     const repair = (finding) => {
       assert.equal(finding.repair.requiresConfirmation, false, "the hook repair needs no PO confirmation");
       assert.equal(finding.repair.mutation, true, "installing hooks is a declared mutation");
       assert.equal(finding.repair.argv.some((arg) => resolve(arg).startsWith(join(REPO_ROOT, ".git"))), false, "the repair must never point into the real repository's .git");
-      const run = spawnSync(finding.repair.executable, finding.repair.argv, { cwd: repo, env, encoding: "utf8", shell: false, timeout: 120000 });
-      assert.equal(run.status, 0, `the typed repair must exit 0 (got ${run.status})`);
+      assert.equal(resolve(finding.repair.argv[0]), R77_SCRIPT("toolchain-preflight.mjs"), "the typed repair must name the live toolchain-preflight script");
+      assert.ok(frozenScript.startsWith(frozenPluginRoot) && resolve(frozenScript) !== resolve(finding.repair.argv[0]), "the spawned script must be the frozen copy, not the live one");
+      const run = spawnSync(finding.repair.executable, [frozenScript, ...finding.repair.argv.slice(1)], { cwd: repo, env, encoding: "utf8", shell: false, timeout: 120000 });
+      assert.equal(run.status, 0, `the typed repair must exit 0 (got ${run.status}; stdout tail: ${String(run.stdout).slice(-300)}; stderr tail: ${String(run.stderr).slice(-300)})`);
     };
     const fresh = r77Finding(await r77Report(repo, deps()), "git-hooks");
     r77AssertFinding(fresh, "fresh clone");
