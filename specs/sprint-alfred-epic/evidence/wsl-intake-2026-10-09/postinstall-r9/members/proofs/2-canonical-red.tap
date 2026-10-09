@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: DLR001 currently offered exact read-only rebind planner crosses draft shell lane
+not ok 1 - DLR001 currently offered exact read-only rebind planner crosses draft shell lane
+  ---
+  duration_ms: 3.543833
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-red/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    the exact read-only recovery action must not be blocked as opaque implementation
+    + actual - expected
+    
+    + {
+    +   candidate: '.pipeline-opaque-execution',
+    +   lane: 'opaque-script-execution',
+    +   lifecycleStatus: 'draft',
+    +   reason: 'fixture draft lifecycle',
+    +   verdict: 'block'
+    + }
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual:
+    verdict: 'block'
+    reason: 'fixture draft lifecycle'
+    lifecycleStatus: 'draft'
+    candidate: '.pipeline-opaque-execution'
+    lane: 'opaque-script-execution'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-red/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs:47:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-red/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: DLR002 draft shell refuses changed executable
+ok 2 - DLR002 draft shell refuses changed executable
+  ---
+  duration_ms: 0.426658
+  type: 'test'
+  ...
+# Subtest: DLR003 draft shell refuses changed argv
+ok 3 - DLR003 draft shell refuses changed argv
+  ---
+  duration_ms: 0.20646
+  type: 'test'
+  ...
+# Subtest: DLR004 draft shell refuses unoffered mutation
+ok 4 - DLR004 draft shell refuses unoffered mutation
+  ---
+  duration_ms: 0.243999
+  type: 'test'
+  ...
+# Subtest: DLR005 draft shell refuses hostile published script
+ok 5 - DLR005 draft shell refuses hostile published script
+  ---
+  duration_ms: 0.320739
+  type: 'test'
+  ...
+# Subtest: DLR006 draft shell refuses rejected planner
+ok 6 - DLR006 draft shell refuses rejected planner
+  ---
+  duration_ms: 0.324238
+  type: 'test'
+  ...
+# Subtest: DLR007 draft shell refuses stale action after ready readback
+ok 7 - DLR007 draft shell refuses stale action after ready readback
+  ---
+  duration_ms: 0.260159
+  type: 'test'
+  ...
+# Subtest: DLR008 draft shell refuses foreign-root readback
+ok 8 - DLR008 draft shell refuses foreign-root readback
+  ---
+  duration_ms: 0.262158
+  type: 'test'
+  ...
+# Subtest: DLR009 draft shell refuses wrong-intent readback
+ok 9 - DLR009 draft shell refuses wrong-intent readback
+  ---
+  duration_ms: 0.347339
+  type: 'test'
+  ...
+# Subtest: DLR010 draft shell refuses malformed readback
+ok 10 - DLR010 draft shell refuses malformed readback
+  ---
+  duration_ms: 0.365189
+  type: 'test'
+  ...
+# Subtest: DLR011 draft shell refuses inspection fault
+ok 11 - DLR011 draft shell refuses inspection fault
+  ---
+  duration_ms: 0.277909
+  type: 'test'
+  ...
+# Subtest: DLR012 draft shell refuses matching planner marked mutating
+ok 12 - DLR012 draft shell refuses matching planner marked mutating
+  ---
+  duration_ms: 0.212089
+  type: 'test'
+  ...
+# Subtest: DLR013 draft shell refuses matching planner requiring confirmation
+ok 13 - DLR013 draft shell refuses matching planner requiring confirmation
+  ---
+  duration_ms: 0.290679
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 155.717338

@@ -1,0 +1,14 @@
+{
+  "schema": "alfred.debug-onboarding-cell-run.v1",
+  "cell": "claude/signature",
+  "timeoutSeconds": 110,
+  "status": 1,
+  "signal": null,
+  "error": {
+    "name": "Error",
+    "code": "EPERM",
+    "message": "spawnSync <home>/.local/opt/node-v24.15.0-linux-x64/bin/node EPERM"
+  },
+  "stdout": "",
+  "stderr": ""
+}

@@ -1,0 +1,210 @@
+{
+  "schema": "isolated.critic-header-permanent-regression.v1",
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "originalTestSha256": "ced44d42682d304f3c15acd750082cf4e709e681102c8a2934346f25483a153e",
+  "originalRunSha256": "477401ec65e2b6837bc9932552a92f52f39be3907bfbd1e5fcb9746bd98dbf66",
+  "originalResultsSha256": "9c66f7c8c8f94e30396a5462bab8a39935b5ac61d782ec3401d1f136b826d67e",
+  "postimageSha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4",
+  "fixedReaderSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+  "registrationMetadataSha256": "af0b848974563e3980c19e024030fa76f883471dc994a27f37eec0631d389cfe",
+  "runs": [
+    {
+      "mode": "baseline",
+      "executable": "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+      "argv": [
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/critic-capture-header.test.mjs"
+      ],
+      "cwd": "baseline-host/graph",
+      "directNode": true,
+      "exitCode": 1,
+      "cases": [
+        {
+          "id": "CDH001",
+          "name": "reader accepts an actual failed identity-bearing capture with matching candidate and digest",
+          "disposition": "fail"
+        },
+        {
+          "id": "CDH002",
+          "name": "producer returns honest diagnostic evidence after executing a failed process",
+          "disposition": "fail"
+        },
+        {
+          "id": "CDH003",
+          "name": "digest, label, exit and candidate/source bindings remain closed",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH004",
+          "name": "malformed or extra capture identity headers remain rejected even with recomputed digest",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH005",
+          "name": "selection integrity and diagnostic-only boundary remain checked",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH006",
+          "name": "real producer rejects absent execution, dirty candidate, and existing output without replacing bytes",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH007",
+          "name": "real CLI emits output and repeat invocation preserves both output artifacts",
+          "disposition": "fail"
+        },
+        {
+          "id": "CDH008",
+          "name": "CLI refuses preexisting JSON output before process or log creation",
+          "disposition": "pass"
+        }
+      ],
+      "counts": {
+        "pass": 5,
+        "fail": 3,
+        "skip": 0,
+        "todo": 0
+      },
+      "captures": {
+        "baseline-host/tap": {
+          "sha256": "394d7aa08675d20a71fbb9873959c31e35bffac0bf641591dfe13a0f3310d333",
+          "bytes": 6343
+        },
+        "baseline-host/stderr.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "baseline-host/fd3.jsonl": {
+          "sha256": "61d8c3736e3c3dace7712e78f59547b596bddf418e1c1d3f749be9ad516b598e",
+          "bytes": 1545
+        }
+      },
+      "completion": {
+        "recorderSha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+        "events": 10,
+        "terminal": true
+      },
+      "fixtureCleanup": "empty scratch directory"
+    },
+    {
+      "mode": "fixed",
+      "executable": "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+      "argv": [
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/critic-capture-header.test.mjs"
+      ],
+      "cwd": "fixed-host/graph",
+      "directNode": true,
+      "exitCode": 0,
+      "cases": [
+        {
+          "id": "CDH001",
+          "name": "reader accepts an actual failed identity-bearing capture with matching candidate and digest",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH002",
+          "name": "producer returns honest diagnostic evidence after executing a failed process",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH003",
+          "name": "digest, label, exit and candidate/source bindings remain closed",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH004",
+          "name": "malformed or extra capture identity headers remain rejected even with recomputed digest",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH005",
+          "name": "selection integrity and diagnostic-only boundary remain checked",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH006",
+          "name": "real producer rejects absent execution, dirty candidate, and existing output without replacing bytes",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH007",
+          "name": "real CLI emits output and repeat invocation preserves both output artifacts",
+          "disposition": "pass"
+        },
+        {
+          "id": "CDH008",
+          "name": "CLI refuses preexisting JSON output before process or log creation",
+          "disposition": "pass"
+        }
+      ],
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "captures": {
+        "fixed-host/tap": {
+          "sha256": "7e1d8c863ad8bc7d5599a44ccf7702469de5e79e5a09e43a685ccbd9a5229556",
+          "bytes": 2050
+        },
+        "fixed-host/stderr.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "fixed-host/fd3.jsonl": {
+          "sha256": "c5fc119e0a0162c37afa6ac8d0a4a54eca6d726ac27cc18f5e6e563099e758ee",
+          "bytes": 1545
+        }
+      },
+      "completion": {
+        "recorderSha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+        "events": 10,
+        "terminal": true
+      },
+      "fixtureCleanup": "empty scratch directory"
+    }
+  ],
+  "before": {
+    "sourceHashes": {
+      "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "b5fb09bddb55d7772d5b7dd24fae0cf25cc28926a30f049191fbc94415f0a32f",
+      "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs": "8705a10a774b6195be786f330633ca1f102ee20cbafde1c1a8884c0f593d0198",
+      "plugins/pipeline-core/lib/entrypoint.mjs": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8",
+      "plugins/pipeline-core/lib/verify-selection.mjs": "a7fa8b684a3c8e3a36bc01c759109bacb3ffa1d73927a90a248e4eab1b543064",
+      "plugins/pipeline-core/scripts/capture-evidence.mjs": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+      "plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs": "557b33ff8ed97666f2f28bc8b1b7d3b91d9d0416e8ec8b43b71722f7fc93bd5e",
+      "plugins/pipeline-core/lib/test-case-completion.mjs": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237"
+    },
+    "status": "",
+    "index": "110af471df3f5d998941f819f22ea96286383812a8aa95bf2cf4256af094ad5f",
+    "candidate": "e87ac5f1d7071570636719a60b1649004c6e7955"
+  },
+  "after": {
+    "sourceHashes": {
+      "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "b5fb09bddb55d7772d5b7dd24fae0cf25cc28926a30f049191fbc94415f0a32f",
+      "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs": "8705a10a774b6195be786f330633ca1f102ee20cbafde1c1a8884c0f593d0198",
+      "plugins/pipeline-core/lib/entrypoint.mjs": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8",
+      "plugins/pipeline-core/lib/verify-selection.mjs": "a7fa8b684a3c8e3a36bc01c759109bacb3ffa1d73927a90a248e4eab1b543064",
+      "plugins/pipeline-core/scripts/capture-evidence.mjs": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+      "plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs": "557b33ff8ed97666f2f28bc8b1b7d3b91d9d0416e8ec8b43b71722f7fc93bd5e",
+      "plugins/pipeline-core/lib/test-case-completion.mjs": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237"
+    },
+    "status": "",
+    "index": "110af471df3f5d998941f819f22ea96286383812a8aa95bf2cf4256af094ad5f",
+    "candidate": "e87ac5f1d7071570636719a60b1649004c6e7955"
+  },
+  "unchanged": true,
+  "limitations": [
+    "Focused isolated regression only; no native provenance, whole Verify, or acceptance claim.",
+    "Baseline negative-header cases can reject before repaired header grammar; fixed-reader run exercises those controls after valid capture admission.",
+    "No signature protocol is invented; Verify selection closed shape and digest are tested.",
+    "Registration metadata is a proposal; registry unchanged."
+  ]
+}

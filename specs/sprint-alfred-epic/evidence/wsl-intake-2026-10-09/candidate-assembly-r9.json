@@ -1,0 +1,256 @@
+{
+  "schema": "alfred.candidate-assembly.v9",
+  "baseCommit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "mirror": "scratch/alfred-postinstall-assembly-r9-20261009/b",
+  "assembler": "scratch/assemble-alfred-postinstall-r9.mjs",
+  "targets": [
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sourceSha256": "d6ab8b735fb3745b6bb980047250cbc99b7ca02d761c6ee9ebde0b658cd62128",
+      "postimageSha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-01.mjs",
+          "inputSha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+          "author": "materializer_scratch_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "sourceSha256": "ddd890c3f6f38456231811c718c4aed5b1a9cbcdbd9f0fee4a244f380443b3fa",
+      "postimageSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-02.mjs",
+          "inputSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+          "author": "onboarding_answer_validators_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "sourceSha256": "b5fb09bddb55d7772d5b7dd24fae0cf25cc28926a30f049191fbc94415f0a32f",
+      "postimageSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-03.mjs",
+          "inputSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+          "author": "critic_capture_header_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sourceSha256": "86a409b78c935a5694a72136608b3969360606c7ad5e65b11738f5d506da0556",
+      "postimageSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-04.mjs",
+          "inputSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+          "author": "legacy_candidate_tree_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "sourceSha256": "307e290cacb0a74c4c15c68519608f5e80008c2093ac70a4528d319364c6751a",
+      "postimageSha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-05.mjs",
+          "inputSha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+          "author": "recovery_draft_lane_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "sourceSha256": "914a2d13e0fe16f12aff8ef5685a12d0e3cf066a550f9e8a49ac535fbc448241",
+      "postimageSha256": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-06.mjs",
+          "inputSha256": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989",
+          "author": "isolated_journal_schema_fix_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "sourceSha256": "8dc5efc5b2631744d8d4baa6527e4ce9c8b3fda01053cb31773fef3d1cef2c9e",
+      "postimageSha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-07.mjs",
+          "inputSha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+          "author": "retired_design_fixture_reconcile_r2"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "sourceSha256": "f57ebca750c3f39af8e6f66ef412fa247657f8b61527e520d813370be55f31f0",
+      "postimageSha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-08.mjs",
+          "inputSha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+          "author": "architecture_debt_fixture_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "sourceSha256": "054abbf0366f9e21907dcb4dbfcb936eae33bb9262fc6ad9c8af6313ceffca0d",
+      "postimageSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-09.mjs",
+          "inputSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+          "author": "bootstrap_prepush_fixture_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "sourceSha256": "067fed725e54a02757ee685643a53e02fb46c070b62e30489880363ff85e3d73",
+      "postimageSha256": "1e94747e89becd06a089198e8feaed1d26c3057325660965d77c290f5cf03c51",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-10.mjs",
+          "inputSha256": "1e94747e89becd06a089198e8feaed1d26c3057325660965d77c290f5cf03c51",
+          "author": "bootstrap_remaining_fixtures_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "sourceSha256": "5593234093a5fcd800dbbff6a05bf45f45bd0d23e259bd528e3c643bf3312f54",
+      "postimageSha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-11.mjs",
+          "inputSha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17",
+          "author": "bootstrap_remaining_fixtures_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "sourceSha256": "6a58628d4a606481652083493ed18bf1d81a6bf1f260457ba2ff7420037952c9",
+      "postimageSha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-12.mjs",
+          "inputSha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60",
+          "author": "bootstrap_remaining_fixtures_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "sourceSha256": "f1be590533ad381cbbd342babeb194c5ee77caa7c4045c1c4323b433cc65a0d5",
+      "postimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-13.mjs",
+          "inputSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "author": "onboarding_encrypted_fixture_reconcile_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "sourceSha256": null,
+      "postimageSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-14.mjs",
+          "inputSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+          "author": "materializer_permanent_regression_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "sourceSha256": null,
+      "postimageSha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-15.mjs",
+          "inputSha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4",
+          "author": "critic_header_permanent_regression_r1"
+        }
+      ]
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "sourceSha256": null,
+      "postimageSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-16.mjs",
+          "inputSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+          "author": "recovery_draft_lane_red_r1"
+        }
+      ]
+    },
+    {
+      "target": "harness/verify-suites.json",
+      "sourceSha256": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237",
+      "postimageSha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0",
+      "changed": true,
+      "operations": [
+        {
+          "kind": "full-postimage",
+          "source": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-17.json",
+          "inputSha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0",
+          "author": "r9_regression_registry_append_r1"
+        }
+      ]
+    }
+  ],
+  "assertionBytesPreserved": true,
+  "patchApplicationVerified": true,
+  "recompositionNeeded": false,
+  "manifestPath": "scratch/alfred-r9-members-final.json",
+  "manifestSha256": "e59bbdddf9093dbe203e77cb136adae9795909b6c2ce25cb318bc4f000c87bf6",
+  "packagePatchSha256": "37dd6ee0e78cac00994b5949d36b8df9aa83be2b5179328bd69eaa77ace168cd",
+  "status": "assembled-focused-validation-pending",
+  "sourceIntegration": false,
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}

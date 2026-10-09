@@ -1,0 +1,15 @@
+{
+  "schema": "alfred.verify-owner-settlement.v1",
+  "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+  "ownerDead": true,
+  "knownSuiteProcessesGone": true,
+  "result": {
+    "status": "retired",
+    "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+    "drainedRunDirectory": false,
+    "retainedSealedRun": true
+  },
+  "sealedTerminalSha256": "d4973cfdf59fa3f5f5db2b7e2322e759974216e349c2c103f65bb5d2247b8f89",
+  "sealedEvidencePreserved": true,
+  "qualificationUnchanged": "failed; two suites interrupted"
+}

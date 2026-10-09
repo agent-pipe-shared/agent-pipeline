@@ -1,0 +1,38 @@
+{
+  "assurance": "production-contract-with-scratch-fixtures-no-native-attestation",
+  "command": "node scratch/alfred-isolated-journal-schema-fix-r1-20261009/reproduce.mjs",
+  "captureWasAgainst": "temporarily modified production module before explicit restoration; stale read after restoration",
+  "exitCode": 1,
+  "signal": null,
+  "launchError": null,
+  "original22UnchangedArchiveSha256": "9a4aabda6c73ca85bc94119942a671b81a02ac94c93fe5fb319bba77c5cbe823",
+  "fullTestPostimageSha256": "14df2278c1b6331ab687e6cf51bbad85fb648062dfdf7c59e9928010a37a9450",
+  "regressionAppendSha256": "6ae9e75303a0f84cbd40bdf4698fdfc964357e6fc30c18b37ff366e662b8408d",
+  "captureSha256": "240b843cfd5ddce3b90ca1ee8ad3edd84f7d843be9d3917188702521f85d3282",
+  "productionSources": {
+    "plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs": "9a4aabda6c73ca85bc94119942a671b81a02ac94c93fe5fb319bba77c5cbe823",
+    "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs": "756d135465a753010f5890033a2bf25bd0e0db0f12b6f80f6fe78bf1bed02fe1",
+    "plugins/pipeline-core/scripts/codex-isolated-critic-journal.schema.json": "691c48f22a91b00b1864927a4413c067ab9984c2899a2eeadd2fafa1af3213eb",
+    "plugins/pipeline-core/scripts/codex-isolated-critic-request.schema.json": "38e96eff26b345099c92321a1ce5c9e3391e746cfb2fd7cf18cb09af33ceb887",
+    "plugins/pipeline-core/lib/schema-lite.mjs": "2996e60c0be463987ececd89392f413fb870b533ad05a63f48fdebdf90cf5a2c"
+  },
+  "fixtureChanges": [
+    "imports route to production sources",
+    "fixtures retained under assigned repository scratch",
+    "after callbacks check retained fixture directories"
+  ],
+  "counts": [
+    "ℹ tests 31",
+    "ℹ pass 28",
+    "ℹ fail 3",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0"
+  ],
+  "schemaReferenceDetails": [
+    "$.claims.briefingBounded: unresolved $ref JSON pointer",
+    "$.claims.inputConfined: unresolved $ref JSON pointer",
+    "$.claims.technicallyIsolatedReadOnly: unresolved $ref JSON pointer",
+    "$.claims.verdictIntegrity: unresolved $ref JSON pointer"
+  ]
+}

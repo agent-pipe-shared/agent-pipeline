@@ -1,0 +1,56 @@
+{
+  "originalCount": 181,
+  "postimageCount": 183,
+  "appendedCount": 2,
+  "bytePrefixPreservedBeforeAppendSeam": true,
+  "originalRowsDeepIdenticalAndOrdered": true,
+  "loaderSchemaAccepted": true,
+  "appendedRows": [
+    {
+      "name": "signed-quality-package-scratch-tests",
+      "file": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "caseIds": [
+        "QPS001",
+        "QPS002",
+        "QPS003",
+        "QPS004",
+        "QPS005",
+        "QPS006",
+        "QPS007",
+        "QPS008",
+        "QPS009",
+        "QPS010",
+        "QPS011",
+        "QPS012",
+        "QPS013"
+      ],
+      "maxBytes": 16384
+    },
+    {
+      "name": "critic-capture-header-tests",
+      "file": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "caseIds": [
+        "CDH001",
+        "CDH002",
+        "CDH003",
+        "CDH004",
+        "CDH005",
+        "CDH006",
+        "CDH007",
+        "CDH008"
+      ],
+      "maxBytes": 8192
+    }
+  ],
+  "sourceSha256": [
+    {
+      "source": "scratch/alfred-materializer-permanent-regression-r1-20261009/signed-quality-package-scratch.test.mjs",
+      "sha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3"
+    },
+    {
+      "source": "scratch/alfred-critic-header-permanent-regression-r1-20261009/postimage/plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "sha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4"
+    }
+  ],
+  "postimageSha256": "1404257d570edaaf145ba4378c88d833b5517cff14731e1e221bb22e1c3934c1"
+}

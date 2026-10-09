@@ -1,0 +1,31 @@
+✔ a freshly written lock naming the current version is observed, with no warning (3.526574ms)
+✔ no lock file at all is not observed, with a clear warning naming GEMINI.md (0.692197ms)
+✔ no .git directory at all is not observed and never throws (0.524168ms)
+✔ a lock older than the freshness window is not observed, same as absent (2.11788ms)
+✔ a lock exactly at the freshness window boundary still counts as observed (inclusive) (1.987241ms)
+✔ the freshest of several session locks decides observed, even when older ones are stale (2.600089ms)
+✔ a future mtime is never trusted as evidence of freshness (1.836362ms)
+✔ a directory entry under run/ that is not a session-* name is ignored (1.769132ms)
+✔ scanning a session directory that turns out to hold no lock file at all does not throw (1.789392ms)
+✔ an injected scan failure folds into not-observed rather than throwing (fail-open) (0.246159ms)
+✔ a fresh lock naming a DIFFERENT version is not observed, exactly like an absent lock (2.385609ms)
+✔ a fresh lock with NO version field at all (an older-build body) is not observed (2.330389ms)
+✔ a fresh, version-matching lock alongside an older-build unversioned one still resolves observed via the matching entry (2.591989ms)
+✔ no currentVersion supplied at all means nothing can ever match, even a fresh version-carrying lock (2.056081ms)
+✔ an unparseable lock body (corrupted, not JSON) is not observed rather than throwing (2.03368ms)
+✔ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (263.882356ms)
+✔ the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready (10.891332ms)
+✔ the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed (12.679583ms)
+✔ the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed (12.149306ms)
+✔ wiring passes the preflight's own resolved version as currentVersion, not a second independently-derived one (478.645203ms)
+✔ a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready (890.518957ms)
+✔ a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready (990.736173ms)
+✔ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (5.729124ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2710.558152

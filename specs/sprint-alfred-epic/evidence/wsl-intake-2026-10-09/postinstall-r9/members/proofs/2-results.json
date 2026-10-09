@@ -1,0 +1,49 @@
+{
+  "schema": "alfred.recovery-draft-lane-red.v1",
+  "seamOnly": true,
+  "command": [
+    "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "--test",
+    "--test-isolation=none",
+    "--test-reporter=tap",
+    "<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/devplan-shell-lane-recovery.test.mjs"
+  ],
+  "exitCode": 1,
+  "completed": true,
+  "passingControls": 12,
+  "failingRegressions": 1,
+  "postimages": {
+    "devplan-shell-lane-recovery.test.mjs": "3abe2537d0370395a3e8dd7726f6a01b4469e438d1669c54514a139263643b96",
+    "capture.mjs": "7cb66248e95c1bbe771c1d33da9276a2e1d42c97442297632267bb0cc7983def",
+    "actual-red.tap": "a4013a28cbf89926aa14e3669bab08610ab84124f3c4d85015200aacbba6da5c"
+  },
+  "sourceHashes": {
+    "lib/guard/devplan-shell-lane.mjs": "307e290cacb0a74c4c15c68519608f5e80008c2093ac70a4528d319364c6751a",
+    "lib/guard/command-catalogue.mjs": "c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed",
+    "hooks/guard-lifecycle-recovery-contract.test.mjs": "bd9a334207ccd5b49015a277adef037c41ef15d4a7478f7d91059c1525cfa3a9"
+  },
+  "priorCommittedIntegrationObservation": {
+    "rerun": false,
+    "terminal": false,
+    "candidate": {
+      "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+      "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+    },
+    "suite": "lifecycle-recovery-contract-tests",
+    "exitCode": 1,
+    "sourceReceiptSha256": "f62223e8af3940be9d783e01acf68447f3ca782acc3954c4690b055007af2115",
+    "sourceLogSha256": "ad363e625209ef9075417d6bd1a98eabb0f76e614ca3362e18ea476ff98a0b73",
+    "sanitizedLog": {
+      "path": "lifecycle-recovery-contract-tests.log",
+      "sha256": "4633aa4bd252bc0ce5ecbe2cdf3e1f9500d4374a2faa432a78b8bd29acafce16"
+    },
+    "caseCompletion": null,
+    "diagnostics": [
+      "✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)",
+      "ℹ fail 1",
+      "✖ failing tests:",
+      "✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)",
+      "  AssertionError [ERR_ASSERTION]: po_authority_rebind_writer_unavailable"
+    ]
+  }
+}

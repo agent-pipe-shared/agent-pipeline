@@ -1,0 +1,10 @@
+{
+  "schema": "alfred.focused-onboarding-attempt.v1",
+  "attempt": "first host focused claude/signature run",
+  "status": "timed-out",
+  "timeoutSeconds": 110,
+  "exit": 1,
+  "candidateQualified": false,
+  "reason": "The runner initially targeted plugins/pipeline-core/scripts/onboarding-init.test.mjs instead of the scratch postimage; retained as a failed setup attempt and excluded from postimage qualification.",
+  "capturedToolOutput": "{\"schema\":\"alfred.focused-onboarding-cell-run.v1\",\"cell\":\"claude/signature\",\"timeoutSeconds\":110,\"timedOut\":true,\"exit\":1,\"passed\":false}"
+}

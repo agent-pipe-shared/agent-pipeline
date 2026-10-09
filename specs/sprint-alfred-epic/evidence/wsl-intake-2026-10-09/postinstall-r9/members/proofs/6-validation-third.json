@@ -1,0 +1,59 @@
+{
+  "originalCount": 181,
+  "previousPostimageCount": 183,
+  "postimageCount": 184,
+  "appendedCount": 1,
+  "all181OriginalRowsPreservedAndOrdered": true,
+  "priorTwoRowsPreservedAndOrdered": true,
+  "priorPostimageBytePrefixPreservedBeforeAppendSeam": true,
+  "actualLoaderSchemaAccepted": true,
+  "addedRow": {
+    "name": "devplan-shell-lane-recovery-tests",
+    "file": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+    "invariantPinned": "Only the exact currently offered read-only PO authority rebind planner action for the same root and session crosses the draft dev-plan shell lane; mutations, altered actions, stale or foreign observations, malformed readback, and inspection faults remain blocked",
+    "nonOverlapNote": "Independent regression for the narrow draft-shell exception and its refusal matrix; lifecycle command authorization and onboarding action catalogue tests do not pin this exact interaction",
+    "caseCompletion": {
+      "schema": "pipeline.verify-case-completion-policy.v1",
+      "caseIds": [
+        "DLR001",
+        "DLR002",
+        "DLR003",
+        "DLR004",
+        "DLR005",
+        "DLR006",
+        "DLR007",
+        "DLR008",
+        "DLR009",
+        "DLR010",
+        "DLR011",
+        "DLR012",
+        "DLR013"
+      ],
+      "maxBytes": 16384
+    }
+  },
+  "metadataPath": "scratch/alfred-recovery-draft-lane-red-r1-20261009/registration-metadata.json",
+  "metadata": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "DLR001",
+      "DLR002",
+      "DLR003",
+      "DLR004",
+      "DLR005",
+      "DLR006",
+      "DLR007",
+      "DLR008",
+      "DLR009",
+      "DLR010",
+      "DLR011",
+      "DLR012",
+      "DLR013"
+    ],
+    "maxBytes": 16384
+  },
+  "sourcePath": "scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-postimage.mjs",
+  "sourceSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+  "postimagePath": "scratch/alfred-r9-regression-registry-r1-20261009/verify-suites-3.json",
+  "postimageSha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0"
+}

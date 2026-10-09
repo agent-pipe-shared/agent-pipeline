@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "DLR001",
+    "DLR002",
+    "DLR003",
+    "DLR004",
+    "DLR005",
+    "DLR006",
+    "DLR007",
+    "DLR008",
+    "DLR009",
+    "DLR010",
+    "DLR011",
+    "DLR012",
+    "DLR013"
+  ],
+  "maxBytes": 16384
+}

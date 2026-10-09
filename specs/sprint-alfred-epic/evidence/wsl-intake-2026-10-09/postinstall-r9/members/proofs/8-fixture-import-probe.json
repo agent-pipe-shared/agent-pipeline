@@ -1,0 +1,58 @@
+{
+  "schema": "alfred.encrypted-fixture-import-probe.v1",
+  "status": "passed",
+  "fixtureNames": [
+    "po-private.pem",
+    "existing-private.pem",
+    "source-private.pem"
+  ],
+  "imports": [
+    {
+      "command": [
+        "pkey",
+        "-in",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/po-private.pem",
+        "-pubout",
+        "-out",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+      ],
+      "passinAppended": true,
+      "targetDirectoryMode": "0700",
+      "existingParentMode": "0755",
+      "importedBytesSha256": "36a1ed950752587b613282c02e43b491f1e91e4bc2aee60af17522a2e602d9d8"
+    },
+    {
+      "command": [
+        "pkey",
+        "-in",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/existing-private.pem",
+        "-pubout",
+        "-out",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+      ],
+      "passinAppended": true,
+      "targetDirectoryMode": "0700",
+      "existingParentMode": "0755",
+      "importedBytesSha256": "a6078219f646423ce63c4629a7fefcb797d9f0c129257c2c5bbbd9d474f04a77"
+    },
+    {
+      "command": [
+        "pkey",
+        "-in",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/source-private.pem",
+        "-pubout",
+        "-out",
+        "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+      ],
+      "passinAppended": true,
+      "targetDirectoryMode": "0700",
+      "existingParentMode": "0755",
+      "importedBytesSha256": "1529273506355f1ebae970c5edd418b91d3a512b3b55142bf542095a5c229fd8"
+    }
+  ],
+  "independentSeam": {
+    "unmatchedFixtureAndNonDerivationCallsLeftUnchanged": true,
+    "interactiveProcess": false
+  },
+  "fixtureMaterial": "Generated in memory and written only under this disposable scratch fixture; removed at completion."
+}

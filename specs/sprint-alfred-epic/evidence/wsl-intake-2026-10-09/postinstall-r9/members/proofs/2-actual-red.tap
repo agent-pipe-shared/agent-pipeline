@@ -1,0 +1,119 @@
+TAP version 13
+# Subtest: currently offered exact read-only rebind planner crosses draft shell lane
+not ok 1 - currently offered exact read-only rebind planner crosses draft shell lane
+  ---
+  duration_ms: 3.291157
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/devplan-shell-lane-recovery.test.mjs:43:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    the exact read-only recovery action must not be blocked as opaque implementation
+    + actual - expected
+    
+    + {
+    +   candidate: '.pipeline-opaque-execution',
+    +   lane: 'opaque-script-execution',
+    +   lifecycleStatus: 'draft',
+    +   reason: 'fixture draft lifecycle',
+    +   verdict: 'block'
+    + }
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual:
+    verdict: 'block'
+    reason: 'fixture draft lifecycle'
+    lifecycleStatus: 'draft'
+    candidate: '.pipeline-opaque-execution'
+    lane: 'opaque-script-execution'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/devplan-shell-lane-recovery.test.mjs:50:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: draft shell refuses changed executable
+ok 2 - draft shell refuses changed executable
+  ---
+  duration_ms: 0.365816
+  type: 'test'
+  ...
+# Subtest: draft shell refuses changed argv
+ok 3 - draft shell refuses changed argv
+  ---
+  duration_ms: 0.209738
+  type: 'test'
+  ...
+# Subtest: draft shell refuses unoffered mutation
+ok 4 - draft shell refuses unoffered mutation
+  ---
+  duration_ms: 0.179938
+  type: 'test'
+  ...
+# Subtest: draft shell refuses hostile published script
+ok 5 - draft shell refuses hostile published script
+  ---
+  duration_ms: 0.240767
+  type: 'test'
+  ...
+# Subtest: draft shell refuses rejected planner
+ok 6 - draft shell refuses rejected planner
+  ---
+  duration_ms: 0.198807
+  type: 'test'
+  ...
+# Subtest: draft shell refuses stale action after ready readback
+ok 7 - draft shell refuses stale action after ready readback
+  ---
+  duration_ms: 0.154908
+  type: 'test'
+  ...
+# Subtest: draft shell refuses foreign-root readback
+ok 8 - draft shell refuses foreign-root readback
+  ---
+  duration_ms: 0.216537
+  type: 'test'
+  ...
+# Subtest: draft shell refuses wrong-intent readback
+ok 9 - draft shell refuses wrong-intent readback
+  ---
+  duration_ms: 0.327025
+  type: 'test'
+  ...
+# Subtest: draft shell refuses malformed readback
+ok 10 - draft shell refuses malformed readback
+  ---
+  duration_ms: 0.284856
+  type: 'test'
+  ...
+# Subtest: draft shell refuses inspection fault
+ok 11 - draft shell refuses inspection fault
+  ---
+  duration_ms: 0.225637
+  type: 'test'
+  ...
+# Subtest: draft shell refuses matching planner marked mutating
+ok 12 - draft shell refuses matching planner marked mutating
+  ---
+  duration_ms: 0.167958
+  type: 'test'
+  ...
+# Subtest: draft shell refuses matching planner requiring confirmation
+ok 13 - draft shell refuses matching planner requiring confirmation
+  ---
+  duration_ms: 0.124299
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 140.968968

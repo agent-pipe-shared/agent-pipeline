@@ -1,0 +1,37 @@
+{
+  "postimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+  "diff": {
+    "path": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/diff.txt",
+    "sha256": "4992ae77e6f9fbc3b5c18a67e6ed8ea8e1103ace3b334e784c5fc5f16d8bd5c0"
+  },
+  "capture": {
+    "path": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/capture.json",
+    "sha256": "9446a380bbfa7df76ede14e6233e9f2a4096eac08b9944a33858ea6d8929fbb0"
+  },
+  "report": {
+    "task": "receipt6c608b23751a5871c85b9e7873635bd6e1afe204ff7e8734f7575a1eb3ffc2b6",
+    "sourcePath": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+    "sourceSha256": "f1be590533ad381cbbd342babeb194c5ee77caa7c4045c1c4323b433cc65a0d5",
+    "sourceUnchangedFromAssignedPreimage": true,
+    "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+    "preflight": "ready; Goldfish left the returned onboarding-init action unexecuted",
+    "roleBootstrap": "unavailable: MODEL-ROLE-SESSION-IDENTITY-CONFLICT",
+    "guardAuditRecovery": "verify-audit attempted after a denied diagnostic but returned HGO-GIT/EPERM; no override or alternate recovery was attempted",
+    "candidate": "Scratch-only postimage; no source, history, receipt, cache key, transcript, private key directory, or production passphrase seam was changed."
+  },
+  "validation": {
+    "postimageSyntax": "passed",
+    "actualFixtureImports": "passed for po-private.pem, existing-private.pem, and source-private.pem; real generated disposable encrypted keys, bounded OpenSSL spawn timeout 20000ms",
+    "modeChecks": "passed: target key directory 0700; existing parent 0755 preserved",
+    "seamBounds": "passed: unmatched key name and non-derivation command receive no -passin; independent seam invocation launches no process",
+    "focusedExistingSuiteCells": "passed: Claude/signature, Codex/signature, Antigravity/signature, and standalone existing-key-reuse; each had a 110-second hard timeout",
+    "priorRed": "existing suite interruption record reports onboarding-init.test.mjs at 2259 seconds waiting on encrypted fixture OpenSSL child; no full-suite pass claim",
+    "no0755Expectation": "source suite contains no 0755 assertion; existing assertions are unchanged in postimage"
+  },
+  "limitations": [
+    "The postimage is scratch-only; the copied test graph used symlinks for its declared imports and left the source tree unchanged.",
+    "A previous full verify run was interrupted; verify-journal.test.mjs also lacked a terminal receipt, so unrelated suite status remains unknown.",
+    "The first discarded preimage host timeout may have left disposable test fixtures under /tmp because the suite was terminated before its cleanup hook; it did not access an actual key directory.",
+    "No actual key directory was read. Fixture material was generated in memory and removed after the probe."
+  ]
+}

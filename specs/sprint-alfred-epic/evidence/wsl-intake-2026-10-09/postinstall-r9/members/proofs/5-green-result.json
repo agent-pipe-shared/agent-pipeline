@@ -1,0 +1,31 @@
+{
+  "assurance": "scratch-isolated-source-overlay-with-production-schema-lite-and-scratch-fixtures-no-native-attestation",
+  "command": "node scratch/alfred-isolated-journal-schema-fix-r1-20261009/green-reproduce.mjs",
+  "equivalentTestCommand": "node --test --test-isolation=none --test-reporter=spec scratch/alfred-isolated-journal-schema-fix-r1-20261009/isolated-test/full-test-postimage.test.mjs",
+  "exitCode": 0,
+  "signal": null,
+  "launchError": null,
+  "originalFullTestPostimageSha256": "14df2278c1b6331ab687e6cf51bbad85fb648062dfdf7c59e9928010a37a9450",
+  "routedFullTestPostimageSha256": "fe38cc91f51eb6e6205ce648439952113fe70fa8bac3ba5984166fddc7ffe644",
+  "original22ArchiveSha256": "9a4aabda6c73ca85bc94119942a671b81a02ac94c93fe5fb319bba77c5cbe823",
+  "regressionAppendSha256": "6ae9e75303a0f84cbd40bdf4698fdfc964357e6fc30c18b37ff366e662b8408d",
+  "captureSha256": "12fafdbed26812f8828d163cc1b33e96ba6c0ec21ef9a6a311ac17e0aa1303bc",
+  "isolatedSourceGraph": {
+    "isolated/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989",
+    "isolated/plugins/pipeline-core/scripts/codex-isolated-critic-journal.schema.json": "691c48f22a91b00b1864927a4413c067ab9984c2899a2eeadd2fafa1af3213eb",
+    "isolated/plugins/pipeline-core/scripts/codex-isolated-critic-request.schema.json": "38e96eff26b345099c92321a1ce5c9e3391e746cfb2fd7cf18cb09af33ceb887",
+    "isolated/plugins/pipeline-core/scripts/codex-isolated-critic-receipt.schema.json": "82dac425edb258628ceaeb88f501bdb96e255c47401c83a38a96a4621bea1ddf",
+    "isolated/plugins/pipeline-core/scripts/codex-isolated-critic-claims.schema.json": "a3a35cd29be59ace859c95cde15965a5bae955a779d17aed7cdb201720c42024",
+    "isolated/plugins/pipeline-core/lib/schema-lite.mjs": "2996e60c0be463987ececd89392f413fb870b533ad05a63f48fdebdf90cf5a2c",
+    "isolated-test/full-test-postimage.test.mjs": "fe38cc91f51eb6e6205ce648439952113fe70fa8bac3ba5984166fddc7ffe644",
+    "isolated-test/original-22-isolated.test.mjs": "e5f907d1f6cb5a1d3a1b1001bae98d1e1c2e97c6d3cbaab0aa7412b5d6937eb7"
+  },
+  "counts": [
+    "ℹ tests 31",
+    "ℹ pass 31",
+    "ℹ fail 0",
+    "ℹ cancelled 0",
+    "ℹ skipped 0",
+    "ℹ todo 0"
+  ]
+}

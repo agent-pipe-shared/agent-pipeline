@@ -1,0 +1,21 @@
+{
+  "schema": "alfred.recovery-draft-lane-fix-green.v1",
+  "command": [
+    "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "--test",
+    "--test-isolation=none",
+    "--test-reporter=tap",
+    "<repo-root>/scratch/alfred-recovery-draft-lane-fix-r1-20261009/graph/scratch/alfred-recovery-draft-lane-red-r1-20261009/devplan-shell-lane-recovery.test.mjs"
+  ],
+  "completed": true,
+  "passing": 13,
+  "failing": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "postimages": {
+    "source": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+    "unchangedTest": "3abe2537d0370395a3e8dd7726f6a01b4469e438d1669c54514a139263643b96",
+    "tap": "a51aee306991397334180fec1a5139ee6673ddc1446f56d3578ba5fe53a9d613"
+  }
+}

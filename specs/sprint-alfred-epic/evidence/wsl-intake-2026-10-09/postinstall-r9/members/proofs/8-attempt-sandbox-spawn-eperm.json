@@ -1,0 +1,8 @@
+{
+  "schema": "alfred.focused-onboarding-attempt.v1",
+  "attempt": "sandbox focused claude/signature runner",
+  "status": "blocked",
+  "candidateQualified": false,
+  "reason": "Node spawnSync was denied with EPERM before tests started.",
+  "capturedToolOutput": "{\"schema\":\"alfred.debug-onboarding-cell-run.v1\",\"cell\":\"claude/signature\",\"timeoutSeconds\":110,\"status\":1,\"signal\":null,\"error\":{\"name\":\"Error\",\"code\":\"EPERM\",\"message\":\"spawnSync <home>/.local/opt/node-v24.15.0-linux-x64/bin/node EPERM\"}}"
+}

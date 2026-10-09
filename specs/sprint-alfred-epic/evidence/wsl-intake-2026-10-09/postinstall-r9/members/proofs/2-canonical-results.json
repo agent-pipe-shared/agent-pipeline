@@ -1,0 +1,85 @@
+{
+  "schema": "alfred.canonical-recovery-regression-check.v1",
+  "intendedPath": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+  "policy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "DLR001",
+      "DLR002",
+      "DLR003",
+      "DLR004",
+      "DLR005",
+      "DLR006",
+      "DLR007",
+      "DLR008",
+      "DLR009",
+      "DLR010",
+      "DLR011",
+      "DLR012",
+      "DLR013"
+    ],
+    "maxBytes": 16384
+  },
+  "results": [
+    {
+      "name": "canonical-red",
+      "command": [
+        "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+        "--test",
+        "--test-isolation=none",
+        "--test-reporter=tap",
+        "<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-red/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs"
+      ],
+      "exitCode": 1,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0d69ccef27e95e65cdc9458bc833bae93abe1330d0a29575677484e399d7aa29",
+        "caseSetSha256": "ac7501dc987a15db253c2fc25cc682c9c7247787b63b8818e2d862ad98b5a7b2",
+        "dispositionsSha256": "6bb1e1691ef66e3e613d6e1b56e48551d4f600e8185395b27eac4c444d44404e",
+        "declaredCount": 13,
+        "disposedCount": 13,
+        "counts": {
+          "pass": 12,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "sourceSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "completionSha256": "44f8ba93181b21759b400c758d537d53033b165555be822fd05dbad32cab1777",
+      "tapSha256": "806923eabe93376af1817d5d09634f5ee86bcefe694e0b54e7e1ed71477ebfda",
+      "productSourceSha256": "307e290cacb0a74c4c15c68519608f5e80008c2093ac70a4528d319364c6751a"
+    },
+    {
+      "name": "canonical-green",
+      "command": [
+        "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+        "--test",
+        "--test-isolation=none",
+        "--test-reporter=tap",
+        "<repo-root>/scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-green/plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs"
+      ],
+      "exitCode": 0,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0d69ccef27e95e65cdc9458bc833bae93abe1330d0a29575677484e399d7aa29",
+        "caseSetSha256": "ac7501dc987a15db253c2fc25cc682c9c7247787b63b8818e2d862ad98b5a7b2",
+        "dispositionsSha256": "ad8529e8d0f4d15a794b5822cef4412bccd4b6a12ce317e5a8adadddf530531f",
+        "declaredCount": 13,
+        "disposedCount": 13,
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "sourceSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "completionSha256": "d4eeaec52c6ebf2f38e65fb16f20ae3247872f2634a897e3a6e2491814f53f9a",
+      "tapSha256": "52068101437e74040dc32440c31228408ae689fd4d81cfd827d0b8ffa5a37bf9",
+      "productSourceSha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4"
+    }
+  ]
+}

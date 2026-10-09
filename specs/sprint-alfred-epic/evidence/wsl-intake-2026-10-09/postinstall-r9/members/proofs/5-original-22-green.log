@@ -1,0 +1,30 @@
+✔ Critic policy permits autonomous review after its plan and Critic-boundary gates (0.903466ms)
+✔ all four owned schemas parse and close their root vocabulary (0.976786ms)
+✔ request binds exact ordered physical inputs and rejects closed-schema drift (8.636703ms)
+✔ request materialization rejects symlinks (1.824233ms)
+✔ request materialization rejects hard links without requiring symlink capability (1.727572ms)
+✔ journal begins before model start and enforces the lifecycle vocabulary (11.05969ms)
+✔ heartbeat, PID liveness and noisy output are not semantic progress (9.603668ms)
+✔ stream budgets are fixed at one MiB per stream (3.317895ms)
+✔ verdict bytes make retries impossible and success requires validated binding (13.460321ms)
+✔ invalid or misbound verdict can terminate only as verdict-schema-error (7.313327ms)
+✔ verdict schema-error is forbidden before verdict-received (2.721398ms)
+✔ cleanup decisions rebind boot, PID, start identity and process group (1.700693ms)
+✔ cleanup ownership refusal dominates the requested terminal (2.978927ms)
+✔ journal replay is idempotent, hash-chained and CAS guarded (3.848673ms)
+✔ an injected CAS race is detected before replacement (2.20349ms)
+✔ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (7.310858ms)
+✔ crash after verdict-file write still forbids a second model run (2.28508ms)
+✔ unconfirmed directory durability fails closed when the receipt artifact is published (3.052777ms)
+✔ claims require evidence exactly for proven or disproven states (0.204189ms)
+✔ receipt sanitizer rejects private paths, accounts and remotes (3.384516ms)
+✔ file persistence uses mode 0600 and refuses a torn postimage (18.262469ms)
+✔ verdict validator closes nested vocabulary and exact request bindings (1.504003ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 121.372786

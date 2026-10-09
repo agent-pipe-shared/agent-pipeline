@@ -1,0 +1,31 @@
+command: node --test scratch/alfred-legacy-candidate-tree-fix-r1-20261009/public-graph/plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs
+label: legacy-candidate-descendant
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (437.177401ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (429.050053ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (310.638742ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (273.494672ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (279.857198ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (288.806804ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (273.041306ms)
+✔ EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain) (455.692891ms)
+✔ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream) (346.111389ms)
+✔ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (276.982266ms)
+✔ EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control) (518.531845ms)
+✔ EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader (72.690637ms)
+✔ EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (49.802681ms)
+✔ EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (55.646846ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4272.482363
+
+--- stderr ---

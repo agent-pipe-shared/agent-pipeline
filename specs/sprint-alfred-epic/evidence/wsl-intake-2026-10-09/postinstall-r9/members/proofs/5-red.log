@@ -1,0 +1,100 @@
+✔ Critic policy permits autonomous review after its plan and Critic-boundary gates (4.197057ms)
+✔ all four owned schemas parse and close their root vocabulary (0.977038ms)
+✔ request binds exact ordered physical inputs and rejects closed-schema drift (8.745058ms)
+✔ request materialization rejects symlinks (1.813477ms)
+✔ request materialization rejects hard links without requiring symlink capability (1.702598ms)
+✔ journal begins before model start and enforces the lifecycle vocabulary (9.281621ms)
+✔ heartbeat, PID liveness and noisy output are not semantic progress (7.637552ms)
+✔ stream budgets are fixed at one MiB per stream (2.852023ms)
+✖ verdict bytes make retries impossible and success requires validated binding (9.980032ms)
+✔ invalid or misbound verdict can terminate only as verdict-schema-error (6.902191ms)
+✔ verdict schema-error is forbidden before verdict-received (2.555817ms)
+✔ cleanup decisions rebind boot, PID, start identity and process group (1.730677ms)
+✔ cleanup ownership refusal dominates the requested terminal (2.812264ms)
+✔ journal replay is idempotent, hash-chained and CAS guarded (4.105157ms)
+✔ an injected CAS race is detected before replacement (1.985594ms)
+✔ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (7.162258ms)
+✔ crash after verdict-file write still forbids a second model run (1.684388ms)
+✖ unconfirmed directory durability fails closed when the receipt artifact is published (3.853141ms)
+✔ claims require evidence exactly for proven or disproven states (0.191438ms)
+✖ receipt sanitizer rejects private paths, accounts and remotes (2.878493ms)
+✔ file persistence uses mode 0600 and refuses a torn postimage (17.673184ms)
+✔ verdict validator closes nested vocabulary and exact request bindings (1.336693ms)
+✔ regression: a physically validated request creates and reloads a prepared journal (2.173732ms)
+✔ independent negative control: candidate additional vocabulary (1.54481ms)
+✔ independent negative control: process missing required PID (1.280594ms)
+✔ independent negative control: input item additional vocabulary (1.311073ms)
+✔ independent negative control: nonintegral process PID (1.353763ms)
+✔ independent negative control: candidate digest shape (1.747607ms)
+✔ independent negative control: fixed nested budget (1.241684ms)
+✔ independent negative control: ordered input digest binding (1.264333ms)
+✔ independent negative control: owned verdict schema binding (1.448002ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 28
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.254401
+
+✖ failing tests:
+
+test at scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:393:1
+✖ verdict bytes make retries impossible and success requires validated binding (9.980032ms)
+  IsolatedCriticContractError: receipt does not match its closed schema
+      at fail (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:128:9)
+      at validateLite (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:165:22)
+      at validateReceipt (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:975:3)
+      at buildReceipt (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:970:3)
+      at TestContext.<anonymous> (file://<repo>/scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:412:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'F3-SCHEMA',
+    details: [ '$.claims.briefingBounded: unresolved $ref JSON pointer', '$.claims.inputConfined: unresolved $ref JSON pointer', '$.claims.technicallyIsolatedReadOnly: unresolved $ref JSON pointer', '$.claims.verdictIntegrity: unresolved $ref JSON pointer' ]
+  }
+
+test at scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:535:1
+✖ unconfirmed directory durability fails closed when the receipt artifact is published (3.853141ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    Comparison {
+  +   code: 'F3-SCHEMA'
+  -   code: 'F3-PERSISTENCE-DURABILITY'
+    }
+  
+      at TestContext.<anonymous> (file://<repo>/scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:540:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [IsolatedCriticContractError],
+    expected: [Object],
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:557:1
+✖ receipt sanitizer rejects private paths, accounts and remotes (2.878493ms)
+  IsolatedCriticContractError: receipt does not match its closed schema
+      at fail (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:128:9)
+      at validateLite (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:165:22)
+      at validateReceipt (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:975:3)
+      at buildReceipt (file://<repo>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:970:3)
+      at TestContext.<anonymous> (file://<repo>/scratch/alfred-isolated-journal-schema-fix-r1-20261009/full-test-postimage.test.mjs:561:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'F3-SCHEMA',
+    details: [ '$.claims.briefingBounded: unresolved $ref JSON pointer', '$.claims.inputConfined: unresolved $ref JSON pointer', '$.claims.technicallyIsolatedReadOnly: unresolved $ref JSON pointer', '$.claims.verdictIntegrity: unresolved $ref JSON pointer' ]
+  }

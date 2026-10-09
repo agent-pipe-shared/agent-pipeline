@@ -1,0 +1,18 @@
+command: node --test scratch/alfred-legacy-candidate-tree-fix-r1-20261009/public-graph/plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs
+label: legacy-candidate-v2
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+✔ RC12C001 genuine initial consultation survives an advised committed revision and fresh final Readiness, while forged bindings fail (136426.619486ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 136596.673183
+
+--- stderr ---

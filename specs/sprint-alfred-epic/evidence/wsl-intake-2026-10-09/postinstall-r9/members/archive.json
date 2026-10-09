@@ -1,0 +1,405 @@
+{
+  "schema": "alfred.postinstall-member-archive.v1",
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "members": [
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-01.mjs",
+      "sha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+      "author": "materializer_scratch_fix_r1",
+      "originalInput": "scratch/alfred-materializer-scratch-fix-r1-20261009/signed-quality-package.mjs",
+      "bytes": 25013
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-02.mjs",
+      "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "author": "onboarding_answer_validators_fix_r1",
+      "originalInput": "scratch/alfred-onboarding-answer-validators-fix-r1-20261009/repo/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "bytes": 26630
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-03.mjs",
+      "sha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "author": "critic_capture_header_fix_r1",
+      "originalInput": "scratch/alfred-critic-capture-header-fix-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "bytes": 7730
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-04.mjs",
+      "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "author": "legacy_candidate_tree_fix_r1",
+      "originalInput": "scratch/alfred-legacy-candidate-tree-fix-r1-20261009/design-workflow-package-v2.mjs",
+      "bytes": 31090
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-05.mjs",
+      "sha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+      "author": "recovery_draft_lane_fix_r1",
+      "originalInput": "scratch/alfred-recovery-draft-lane-fix-r1-20261009/graph/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "bytes": 13825
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-06.mjs",
+      "sha256": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989",
+      "author": "isolated_journal_schema_fix_r1",
+      "originalInput": "scratch/alfred-isolated-journal-schema-fix-r1-20261009/isolated/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "bytes": 53547
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-07.mjs",
+      "sha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "author": "retired_design_fixture_reconcile_r2",
+      "originalInput": "scratch/alfred-retired-design-fixture-r2-20261009/design-course-command-admission.test.mjs",
+      "bytes": 32252
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-08.mjs",
+      "sha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "author": "architecture_debt_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-architecture-debt-fixture-r1-20261009/architecture-entry-readiness.test.mjs",
+      "bytes": 18190
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-09.mjs",
+      "sha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "author": "bootstrap_prepush_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-prepush-fixture-r1-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "bytes": 28870
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-10.mjs",
+      "sha256": "1e94747e89becd06a089198e8feaed1d26c3057325660965d77c290f5cf03c51",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r1-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "bytes": 23495
+    },
+    {
+      "target": "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-11.mjs",
+      "sha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r1-20261009/postimage/plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "bytes": 25850
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-12.mjs",
+      "sha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r1-20261009/postimage/plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "bytes": 32882
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-13.mjs",
+      "sha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+      "author": "onboarding_encrypted_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/onboarding-init.test.postimage.mjs",
+      "bytes": 121692
+    },
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-14.mjs",
+      "sha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "author": "materializer_permanent_regression_r1",
+      "originalInput": "scratch/alfred-materializer-permanent-regression-r1-20261009/signed-quality-package-scratch.test.mjs",
+      "bytes": 13600
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-15.mjs",
+      "sha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4",
+      "author": "critic_header_permanent_regression_r1",
+      "originalInput": "scratch/alfred-critic-header-permanent-regression-r1-20261009/postimage/plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "bytes": 11339
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-16.mjs",
+      "sha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "author": "recovery_draft_lane_red_r1",
+      "originalInput": "scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-postimage.mjs",
+      "bytes": 5017
+    },
+    {
+      "target": "harness/verify-suites.json",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-17.json",
+      "sha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0",
+      "author": "r9_regression_registry_append_r1",
+      "originalInput": "scratch/alfred-r9-regression-registry-r1-20261009/verify-suites-3.json",
+      "bytes": 100152
+    }
+  ],
+  "evidence": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/1-registration-metadata.json",
+      "sourceSha256": "af0b848974563e3980c19e024030fa76f883471dc994a27f37eec0631d389cfe",
+      "archivedSha256": "af0b848974563e3980c19e024030fa76f883471dc994a27f37eec0631d389cfe"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/1-report.md",
+      "sourceSha256": "448f609902324b735a8e9b4c27e5a2cbb60378e65c52608615cf759bd450b8fe",
+      "archivedSha256": "448f609902324b735a8e9b4c27e5a2cbb60378e65c52608615cf759bd450b8fe"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/1-run-summary.json",
+      "sourceSha256": "3d590ee8deff8b13c445f9c7e1dd8a3588c81f7e1a7c05a57108b449978d934d",
+      "archivedSha256": "4bb3458f77425f428ba8ba67e7951bc3f0a5d9c9f9663688e61fe027ad2240ff"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-actual-red.tap",
+      "sourceSha256": "a4013a28cbf89926aa14e3669bab08610ab84124f3c4d85015200aacbba6da5c",
+      "archivedSha256": "9be16fcad35952784813ce146c208b419651aa9886738bb2599f72bac1633613"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-canonical-green.tap",
+      "sourceSha256": "52068101437e74040dc32440c31228408ae689fd4d81cfd827d0b8ffa5a37bf9",
+      "archivedSha256": "52068101437e74040dc32440c31228408ae689fd4d81cfd827d0b8ffa5a37bf9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-canonical-red.tap",
+      "sourceSha256": "806923eabe93376af1817d5d09634f5ee86bcefe694e0b54e7e1ed71477ebfda",
+      "archivedSha256": "3ccc09ecb2a02364d5ff0e55ed1c1831d7be50e157c169c34bebe2e685147daf"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-canonical-report.md",
+      "sourceSha256": "fc50e81014c898f6bcf36eb0d248006bf18ee7454b084ea1c22fc80def1a5400",
+      "archivedSha256": "fc50e81014c898f6bcf36eb0d248006bf18ee7454b084ea1c22fc80def1a5400"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-canonical-results.json",
+      "sourceSha256": "515f475d74f36d6d97c65a3000ef937246a5c173e7b0c81ff35ebdf8e3ce65bd",
+      "archivedSha256": "1cb72a38f1f4cbdede1e6e159ea78745f50c6d2873bf1e72b72ae6ff7cc34894"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-registration-metadata.json",
+      "sourceSha256": "3eb6d73d088457f57fc38ef440b2f7b68a04d113168f8a59121846678bf159cd",
+      "archivedSha256": "3eb6d73d088457f57fc38ef440b2f7b68a04d113168f8a59121846678bf159cd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-report.md",
+      "sourceSha256": "59413d5cf70ec430e682a639ad26d0e7dd266fad5bf7ba43cf2f8686196cdb5a",
+      "archivedSha256": "59413d5cf70ec430e682a639ad26d0e7dd266fad5bf7ba43cf2f8686196cdb5a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/2-results.json",
+      "sourceSha256": "7488798df0fbb435adb919b229c7b80928fc67ede5013120a8bb255105a2f4cc",
+      "archivedSha256": "b9bc68e593f0b123db77d17c534453e8201901f89acd5315d9bda058fd150a9c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/3-baseline-focus-results.json",
+      "sourceSha256": "11f9740b3ca0655ee16bb0f62f5f1c13571147454057def202d4cb35b879735f",
+      "archivedSha256": "fc0981138640ee44802398c7fb2daf817540946ce595df04bee2e2a1dcdf51dd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/3-green.tap",
+      "sourceSha256": "a51aee306991397334180fec1a5139ee6673ddc1446f56d3578ba5fe53a9d613",
+      "archivedSha256": "a51aee306991397334180fec1a5139ee6673ddc1446f56d3578ba5fe53a9d613"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/3-report.md",
+      "sourceSha256": "19d18bece2c93ac65f65c13e719757ef0013b227c756533f4e467ed6faef77ef",
+      "archivedSha256": "19d18bece2c93ac65f65c13e719757ef0013b227c756533f4e467ed6faef77ef"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/3-results.json",
+      "sourceSha256": "9d9243571aca2e084918e60521f7b12af6258c413f3f01e5bbc00ee0c8220f51",
+      "archivedSha256": "fb40cc5438227e0bb74159d05b24e3ea5e7b32b22bd02c803a0f53aefca7bb9f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/4-red.log",
+      "sourceSha256": "50203155aa4caadb9b3288a247d3940d3e35df835203a51fc2274171333eaee8",
+      "archivedSha256": "50203155aa4caadb9b3288a247d3940d3e35df835203a51fc2274171333eaee8"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/4-report.md",
+      "sourceSha256": "45202a0c4c9573c91d30b4424ae5b0982ddbb0231661a3887c9cfdfe9432fcfd",
+      "archivedSha256": "45202a0c4c9573c91d30b4424ae5b0982ddbb0231661a3887c9cfdfe9432fcfd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/4-result.json",
+      "sourceSha256": "a5955e3962dc58a22b3314d4d3d2e9a2ce19ad17f833dd9bc1de8cd13489db6b",
+      "archivedSha256": "a5955e3962dc58a22b3314d4d3d2e9a2ce19ad17f833dd9bc1de8cd13489db6b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-green-result.json",
+      "sourceSha256": "cd1fbd9c4c7920eba8572bec53b7eecc16a5ee37a9a74046bb68beea71b10711",
+      "archivedSha256": "cd1fbd9c4c7920eba8572bec53b7eecc16a5ee37a9a74046bb68beea71b10711"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-green.log",
+      "sourceSha256": "12fafdbed26812f8828d163cc1b33e96ba6c0ec21ef9a6a311ac17e0aa1303bc",
+      "archivedSha256": "12fafdbed26812f8828d163cc1b33e96ba6c0ec21ef9a6a311ac17e0aa1303bc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-original-22-green-result.json",
+      "sourceSha256": "ea863d5d485c7482b3b2be8b15bf19de2c98f24ecf3be43bba82504a01dbdb03",
+      "archivedSha256": "ea863d5d485c7482b3b2be8b15bf19de2c98f24ecf3be43bba82504a01dbdb03"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-original-22-green.log",
+      "sourceSha256": "97a1563cd841f3c5823386045418d846d1e2db2c2598985f1168b69f7e19e83c",
+      "archivedSha256": "97a1563cd841f3c5823386045418d846d1e2db2c2598985f1168b69f7e19e83c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-red.log",
+      "sourceSha256": "240b843cfd5ddce3b90ca1ee8ad3edd84f7d843be9d3917188702521f85d3282",
+      "archivedSha256": "240b843cfd5ddce3b90ca1ee8ad3edd84f7d843be9d3917188702521f85d3282"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-report.md",
+      "sourceSha256": "711c2434ec3cc8916285de2e35bf8f92e5de7c0f80c3e57906ce8ffa196d9ea7",
+      "archivedSha256": "711c2434ec3cc8916285de2e35bf8f92e5de7c0f80c3e57906ce8ffa196d9ea7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/5-result.json",
+      "sourceSha256": "99863d2214ee22f837b2b3d47ed1bcc01681b930fbbfee3001a221ab68b64584",
+      "archivedSha256": "99863d2214ee22f837b2b3d47ed1bcc01681b930fbbfee3001a221ab68b64584"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/6-validation-third.json",
+      "sourceSha256": "ec4a6bfe5f166092a73a43ceb7caa622bca0e5c0a1e0bf9c4785fa1108b6735f",
+      "archivedSha256": "ec4a6bfe5f166092a73a43ceb7caa622bca0e5c0a1e0bf9c4785fa1108b6735f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/6-validation.json",
+      "sourceSha256": "6ce020e39de683684699b9b42bd4bb3bc89076ebb618ac0cd291b6ef9e1ec08d",
+      "archivedSha256": "6ce020e39de683684699b9b42bd4bb3bc89076ebb618ac0cd291b6ef9e1ec08d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/6-verify-suites-3.json",
+      "sourceSha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0",
+      "archivedSha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/6-verify-suites.json",
+      "sourceSha256": "1404257d570edaaf145ba4378c88d833b5517cff14731e1e221bb22e1c3934c1",
+      "archivedSha256": "1404257d570edaaf145ba4378c88d833b5517cff14731e1e221bb22e1c3934c1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/7-bootstrap-source-attestation-acceptance.postimage.host.log",
+      "sourceSha256": "c169c90366530da2952e4110fe9553414b4cb91a6750472a0b8955e9cdd65041",
+      "archivedSha256": "d8b8a1f95a2ac32c341f130a22b830408f4c475d6bcc784f39a3a1a00951fb1d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/7-bootstrap-source-attestation-acceptance.source.host.log",
+      "sourceSha256": "023b3c2a60a7e32d3585fe7eb6485cfc82b5dc6321fb026bc0a7aad75d659f99",
+      "archivedSha256": "933dbaadeb19ae37327b4c1d7aac163d44a2cd9383f3f94d9e0a1139dc0b0410"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/7-pipeline-start-preflight-antigravity-hard-enforcement.postimage.green.log",
+      "sourceSha256": "2a5c47f8ba84788abd158ad49bba2b72b371a7244c1d908ac832d157a0bf2bcf",
+      "archivedSha256": "2a5c47f8ba84788abd158ad49bba2b72b371a7244c1d908ac832d157a0bf2bcf"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/7-report.md",
+      "sourceSha256": "6142d9492dcaf7ca1d2bc0d51d747c77e2da66e40a8c237f7281a5e6df3b7211",
+      "archivedSha256": "6142d9492dcaf7ca1d2bc0d51d747c77e2da66e40a8c237f7281a5e6df3b7211"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-attempt-original-source-host-timeout.json",
+      "sourceSha256": "7c23d62627abd8225f75376a8e77e56fc4f6b5e6e9ae68cc02af8302acbbce19",
+      "archivedSha256": "7c23d62627abd8225f75376a8e77e56fc4f6b5e6e9ae68cc02af8302acbbce19"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-attempt-sandbox-spawn-eperm.json",
+      "sourceSha256": "bc5ba17d6e54993e68e413560fb16367a7709774ffc30126bd4a64a54d877c36",
+      "archivedSha256": "cb827f23111b587eefdcce9f33bacae0f5d5f1918033bf008f4d6af2e0ec6ffb"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-capture.json",
+      "sourceSha256": "9446a380bbfa7df76ede14e6233e9f2a4096eac08b9944a33858ea6d8929fbb0",
+      "archivedSha256": "70d5daba341e61969627fb9c985964f3b85c280004baa783abdc2f227f7d5bc4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-debug-cell.json",
+      "sourceSha256": "3fc7a50f2474aa8d0ac87c46160ad5d8f82405a525bda119349bb8db382def7c",
+      "archivedSha256": "869b73ec536ab2bbe948e12c47744a0479302436ff503dbd488db141474481ca"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-diff.txt",
+      "sourceSha256": "4992ae77e6f9fbc3b5c18a67e6ed8ea8e1103ace3b334e784c5fc5f16d8bd5c0",
+      "archivedSha256": "4992ae77e6f9fbc3b5c18a67e6ed8ea8e1103ace3b334e784c5fc5f16d8bd5c0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-fixture-import-probe.json",
+      "sourceSha256": "ac32c6b8c0293c24177b64d62558e3420b4ab353afa1c637648c344499fe402e",
+      "archivedSha256": "fb12aaed4b3b3aa550a9d179aa9bb71eab87e47e8b4aefcdb646a852e6bb1c5d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-antigravity-signature.json",
+      "sourceSha256": "0a7f05ffa1174e7375244ac86f476446443b23dcb8e92a380a70e9b045702064",
+      "archivedSha256": "0a7f05ffa1174e7375244ac86f476446443b23dcb8e92a380a70e9b045702064"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-antigravity-signature.log",
+      "sourceSha256": "46132f2c6726ec4de1af407c422ce08cc25dab7456e2f15fa46518d0e77eb5af",
+      "archivedSha256": "46132f2c6726ec4de1af407c422ce08cc25dab7456e2f15fa46518d0e77eb5af"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-claude-signature.json",
+      "sourceSha256": "9f8e4b20f366586df943b48a3110c17fc024847f4777b20a393a75b8d680f4c9",
+      "archivedSha256": "9f8e4b20f366586df943b48a3110c17fc024847f4777b20a393a75b8d680f4c9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-claude-signature.log",
+      "sourceSha256": "a83483f3e925e23187a83b3e179f76ef6b8a4f4e4258c13ba4aedb64188c6a5f",
+      "archivedSha256": "a83483f3e925e23187a83b3e179f76ef6b8a4f4e4258c13ba4aedb64188c6a5f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-codex-signature.json",
+      "sourceSha256": "83d21ea9f24bc95a3b7893bd072fe6471eae2d2fc7ca0b09631f604a55e64463",
+      "archivedSha256": "83d21ea9f24bc95a3b7893bd072fe6471eae2d2fc7ca0b09631f604a55e64463"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-codex-signature.log",
+      "sourceSha256": "21b3c22e2ab2be52bb477d68fa5a55884ce86fdb05f75f5395eeac8958c714ef",
+      "archivedSha256": "21b3c22e2ab2be52bb477d68fa5a55884ce86fdb05f75f5395eeac8958c714ef"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-existing-key-reuse.json",
+      "sourceSha256": "cada96d130792436f67fa533cfe94f2891b448c595a14339e0f862e4471f743b",
+      "archivedSha256": "cada96d130792436f67fa533cfe94f2891b448c595a14339e0f862e4471f743b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-focused-existing-key-reuse.log",
+      "sourceSha256": "1febff59b3bed0870d13c8d004438c5957f5a73f82f724c16997c1740d1ef7ff",
+      "archivedSha256": "1febff59b3bed0870d13c8d004438c5957f5a73f82f724c16997c1740d1ef7ff"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/8-report.json",
+      "sourceSha256": "e0a56304e84a1474addf7de1c2c28ece385d083bc7f87cb8da9e9ec390574b0f",
+      "archivedSha256": "e0a56304e84a1474addf7de1c2c28ece385d083bc7f87cb8da9e9ec390574b0f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/legacy-descendant.txt",
+      "sourceSha256": "279121b0d74bc1a8b06d081421a4e2e29da688ee5a11be6fa178c4cf24f183f6",
+      "archivedSha256": "279121b0d74bc1a8b06d081421a4e2e29da688ee5a11be6fa178c4cf24f183f6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/legacy-v2.txt",
+      "sourceSha256": "1a5169b15278874488b08a977ae275efdd1a0c8d1ccf5f1cdc096834e9cdd0ca",
+      "archivedSha256": "1a5169b15278874488b08a977ae275efdd1a0c8d1ccf5f1cdc096834e9cdd0ca"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/proofs/verify-owner-settlement.json",
+      "sourceSha256": "2c90dc1402502aa9ee094b4f125d1ce50a6ef6a3931f6996535bc24b30307780",
+      "archivedSha256": "2c90dc1402502aa9ee094b4f125d1ce50a6ef6a3931f6996535bc24b30307780"
+    }
+  ],
+  "sourceIntegration": false,
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}

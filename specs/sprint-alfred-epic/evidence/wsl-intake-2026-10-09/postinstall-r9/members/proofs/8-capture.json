@@ -1,0 +1,176 @@
+{
+  "schema": "alfred.encrypted-fixture-validation-capture.v1",
+  "red": {
+    "sourcePredicate": "passinSpawn only matched po-private.pem; existing-private.pem and source-private.pem were unmatched encrypted fixture inputs.",
+    "baselineInterruption": {
+      "schema": "alfred.verify-suite-timeout-intervention.v1",
+      "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+      "outerVerifyStopped": false,
+      "qualification": "failed/interrupted suites; no PASS claim",
+      "action": "SIGTERM-owned-detached-suite-groups",
+      "suites": [
+        {
+          "file": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+          "reason": "encrypted fixture OpenSSL child has waited over 30 minutes without passin; observed PID201548",
+          "elapsedSeconds": 2259,
+          "startId": "60498",
+          "pid": 172594
+        },
+        {
+          "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+          "reason": "suite exceeded 30 minutes; no live child process and no terminal receipt",
+          "elapsedSeconds": 1901,
+          "startId": "96319",
+          "pid": 303382
+        }
+      ]
+    },
+    "baselineRecordSha256": "dc61bf1d07d2415d6340325b9d6ce60ef37bef7e2f328897c0c4efcd913e8bd5",
+    "baselineLogSha256": "7c596a35b5aa0f12f13da94268525a75b655e9437a32a01879a1045063284d5c",
+    "baselineLogPath": "scratch/alfred-full-verify-terminal-r8-20261009/onboarding-init-tests.log"
+  },
+  "green": {
+    "fixtureImportProbe": {
+      "schema": "alfred.encrypted-fixture-import-probe.v1",
+      "status": "passed",
+      "fixtureNames": [
+        "po-private.pem",
+        "existing-private.pem",
+        "source-private.pem"
+      ],
+      "imports": [
+        {
+          "command": [
+            "pkey",
+            "-in",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/po-private.pem",
+            "-pubout",
+            "-out",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+          ],
+          "passinAppended": true,
+          "targetDirectoryMode": "0700",
+          "existingParentMode": "0755",
+          "importedBytesSha256": "36a1ed950752587b613282c02e43b491f1e91e4bc2aee60af17522a2e602d9d8"
+        },
+        {
+          "command": [
+            "pkey",
+            "-in",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/existing-private.pem",
+            "-pubout",
+            "-out",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+          ],
+          "passinAppended": true,
+          "targetDirectoryMode": "0700",
+          "existingParentMode": "0755",
+          "importedBytesSha256": "a6078219f646423ce63c4629a7fefcb797d9f0c129257c2c5bbbd9d474f04a77"
+        },
+        {
+          "command": [
+            "pkey",
+            "-in",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss/source-private.pem",
+            "-pubout",
+            "-out",
+            "<repo-root>/scratch/alfred-onboarding-encrypted-fixture-r1-20261009/fixture-probe-R9yWss<host-path>"
+          ],
+          "passinAppended": true,
+          "targetDirectoryMode": "0700",
+          "existingParentMode": "0755",
+          "importedBytesSha256": "1529273506355f1ebae970c5edd418b91d3a512b3b55142bf542095a5c229fd8"
+        }
+      ],
+      "independentSeam": {
+        "unmatchedFixtureAndNonDerivationCallsLeftUnchanged": true,
+        "interactiveProcess": false
+      },
+      "fixtureMaterial": "Generated in memory and written only under this disposable scratch fixture; removed at completion."
+    },
+    "focusedSuiteRuns": [
+      {
+        "name": "claude-signature",
+        "result": {
+          "schema": "alfred.focused-onboarding-cell-run.v1",
+          "cell": "claude/signature",
+          "executedTestSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "canonicalPostimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "timeoutSeconds": 110,
+          "timedOut": false,
+          "exit": 0,
+          "passed": true
+        },
+        "logPath": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/focused-claude-signature.log"
+      },
+      {
+        "name": "codex-signature",
+        "result": {
+          "schema": "alfred.focused-onboarding-cell-run.v1",
+          "cell": "codex/signature",
+          "executedTestSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "canonicalPostimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "timeoutSeconds": 110,
+          "timedOut": false,
+          "exit": 0,
+          "passed": true
+        },
+        "logPath": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/focused-codex-signature.log"
+      },
+      {
+        "name": "antigravity-signature",
+        "result": {
+          "schema": "alfred.focused-onboarding-cell-run.v1",
+          "cell": "antigravity/signature",
+          "executedTestSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "canonicalPostimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "timeoutSeconds": 110,
+          "timedOut": false,
+          "exit": 0,
+          "passed": true
+        },
+        "logPath": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/focused-antigravity-signature.log"
+      },
+      {
+        "name": "existing-key-reuse",
+        "result": {
+          "schema": "alfred.focused-onboarding-cell-run.v1",
+          "cell": "existing-key-reuse",
+          "executedTestSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "canonicalPostimageSha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+          "timeoutSeconds": 110,
+          "timedOut": false,
+          "exit": 0,
+          "passed": true
+        },
+        "logPath": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/focused-existing-key-reuse.log"
+      }
+    ]
+  },
+  "runnerFriction": {
+    "sandboxLaunch": {
+      "status": "blocked",
+      "code": "EPERM",
+      "detail": "nested Node spawn denied by sandbox"
+    },
+    "firstHostAttempt": {
+      "status": "timed-out",
+      "timeoutSeconds": 110,
+      "detail": "accidentally used the unchanged source test instead of the postimage; excluded from candidate qualification"
+    },
+    "correctedHostAttempt": {
+      "status": "passed",
+      "detail": "focused matrix and standalone cases ran from scratch postimage copy graph"
+    },
+    "retainedAttempts": [
+      "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/attempt-sandbox-spawn-eperm.json",
+      "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/attempt-original-source-host-timeout.json"
+    ],
+    "candidateLabels": "Claude/Codex/Antigravity are fixture matrix cases only; no native runner or effective-model attestation is claimed.",
+    "guardRecovery": {
+      "status": "failed",
+      "detail": "The prescribed guard-human-override.mjs verify-audit returned HGO-GIT: repository identity unavailable (rev-parse --show-toplevel, EPERM); no human override was attempted."
+    },
+    "cleanup": "The discarded preimage host attempt used the test suite's default /tmp before TMPDIR was redirected. Its SIGTERM watchdog may have skipped suite cleanup; any residue would be disposable encrypted test fixtures, not an actual key directory. Corrected candidate runs kept temporary roots under this scratch directory."
+  }
+}

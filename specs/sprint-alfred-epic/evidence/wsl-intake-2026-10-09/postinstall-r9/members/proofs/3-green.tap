@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: currently offered exact read-only rebind planner crosses draft shell lane
+ok 1 - currently offered exact read-only rebind planner crosses draft shell lane
+  ---
+  duration_ms: 2.887833
+  type: 'test'
+  ...
+# Subtest: draft shell refuses changed executable
+ok 2 - draft shell refuses changed executable
+  ---
+  duration_ms: 0.410265
+  type: 'test'
+  ...
+# Subtest: draft shell refuses changed argv
+ok 3 - draft shell refuses changed argv
+  ---
+  duration_ms: 0.232557
+  type: 'test'
+  ...
+# Subtest: draft shell refuses unoffered mutation
+ok 4 - draft shell refuses unoffered mutation
+  ---
+  duration_ms: 0.186218
+  type: 'test'
+  ...
+# Subtest: draft shell refuses hostile published script
+ok 5 - draft shell refuses hostile published script
+  ---
+  duration_ms: 0.394415
+  type: 'test'
+  ...
+# Subtest: draft shell refuses rejected planner
+ok 6 - draft shell refuses rejected planner
+  ---
+  duration_ms: 0.279747
+  type: 'test'
+  ...
+# Subtest: draft shell refuses stale action after ready readback
+ok 7 - draft shell refuses stale action after ready readback
+  ---
+  duration_ms: 0.221497
+  type: 'test'
+  ...
+# Subtest: draft shell refuses foreign-root readback
+ok 8 - draft shell refuses foreign-root readback
+  ---
+  duration_ms: 0.218087
+  type: 'test'
+  ...
+# Subtest: draft shell refuses wrong-intent readback
+ok 9 - draft shell refuses wrong-intent readback
+  ---
+  duration_ms: 0.363145
+  type: 'test'
+  ...
+# Subtest: draft shell refuses malformed readback
+ok 10 - draft shell refuses malformed readback
+  ---
+  duration_ms: 0.285026
+  type: 'test'
+  ...
+# Subtest: draft shell refuses inspection fault
+ok 11 - draft shell refuses inspection fault
+  ---
+  duration_ms: 0.190988
+  type: 'test'
+  ...
+# Subtest: draft shell refuses matching planner marked mutating
+ok 12 - draft shell refuses matching planner marked mutating
+  ---
+  duration_ms: 0.231437
+  type: 'test'
+  ...
+# Subtest: draft shell refuses matching planner requiring confirmation
+ok 13 - draft shell refuses matching planner requiring confirmation
+  ---
+  duration_ms: 0.143458
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 157.795071

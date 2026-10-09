@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.recovery-draft-lane-baseline-focus.v1",
+  "candidate": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "sourceSha256": "307e290cacb0a74c4c15c68519608f5e80008c2093ac70a4528d319364c6751a",
+  "testSha256": "fd929e318f42a2c12f614afa48f9e89d49f19af627efd05356530f5376a05641",
+  "command": [
+    "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "--test",
+    "--test-isolation=none",
+    "--test-name-pattern=DEVPLANSHELL",
+    "scratch/alfred-recovery-draft-lane-fix-r1-20261009/baseline/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+  ],
+  "exitCode": 1,
+  "completed": true,
+  "tests": 5,
+  "pass": 1,
+  "fail": 4,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "passingCases": [
+    "DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane"
+  ],
+  "failingCases": [
+    {
+      "name": "DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted",
+      "assertion": "admitted a shell write: printf x > src/app.js",
+      "location": "guard-lifecycle-ready.test.mjs:8012",
+      "actual": 0,
+      "expected": 2
+    },
+    {
+      "name": "DEVPLANSHELL-5: indirect script/package writes and the hook-disable setting are covered independently of the Claude harness",
+      "assertion": "Expected values to be strictly equal",
+      "location": "guard-lifecycle-ready.test.mjs:8045",
+      "actual": 0,
+      "expected": 2
+    },
+    {
+      "name": "DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not",
+      "assertion": "admitted a PowerShell write: Set-Content src/app.js \"x\"",
+      "location": "guard-lifecycle-ready.test.mjs:8171",
+      "actual": 0,
+      "expected": 2
+    },
+    {
+      "name": "DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command",
+      "assertion": "a classifier fault must block, not admit",
+      "location": "guard-lifecycle-ready.test.mjs:8200",
+      "actual": 0,
+      "expected": 2
+    }
+  ]
+}

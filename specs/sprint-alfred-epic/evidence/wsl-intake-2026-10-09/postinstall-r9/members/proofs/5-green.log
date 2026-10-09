@@ -1,0 +1,39 @@
+✔ Critic policy permits autonomous review after its plan and Critic-boundary gates (0.930936ms)
+✔ all four owned schemas parse and close their root vocabulary (1.067635ms)
+✔ request binds exact ordered physical inputs and rejects closed-schema drift (8.216211ms)
+✔ request materialization rejects symlinks (1.760862ms)
+✔ request materialization rejects hard links without requiring symlink capability (1.686532ms)
+✔ journal begins before model start and enforces the lifecycle vocabulary (9.672736ms)
+✔ heartbeat, PID liveness and noisy output are not semantic progress (8.014373ms)
+✔ stream budgets are fixed at one MiB per stream (3.061816ms)
+✔ verdict bytes make retries impossible and success requires validated binding (12.613251ms)
+✔ invalid or misbound verdict can terminate only as verdict-schema-error (7.579084ms)
+✔ verdict schema-error is forbidden before verdict-received (2.628518ms)
+✔ cleanup decisions rebind boot, PID, start identity and process group (1.677163ms)
+✔ cleanup ownership refusal dominates the requested terminal (3.087736ms)
+✔ journal replay is idempotent, hash-chained and CAS guarded (3.985212ms)
+✔ an injected CAS race is detected before replacement (2.168299ms)
+✔ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (7.243787ms)
+✔ crash after verdict-file write still forbids a second model run (2.05274ms)
+✔ unconfirmed directory durability fails closed when the receipt artifact is published (2.904096ms)
+✔ claims require evidence exactly for proven or disproven states (0.173489ms)
+✔ receipt sanitizer rejects private paths, accounts and remotes (3.172396ms)
+✔ file persistence uses mode 0600 and refuses a torn postimage (17.09766ms)
+✔ verdict validator closes nested vocabulary and exact request bindings (1.428314ms)
+✔ regression: a physically validated request creates and reloads a prepared journal (2.391769ms)
+✔ independent negative control: candidate additional vocabulary (1.516653ms)
+✔ independent negative control: process missing required PID (1.221374ms)
+✔ independent negative control: input item additional vocabulary (1.248374ms)
+✔ independent negative control: nonintegral process PID (1.250674ms)
+✔ independent negative control: candidate digest shape (1.223784ms)
+✔ independent negative control: fixed nested budget (1.227785ms)
+✔ independent negative control: ordered input digest binding (1.434904ms)
+✔ independent negative control: owned verdict schema binding (1.235414ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125.992426

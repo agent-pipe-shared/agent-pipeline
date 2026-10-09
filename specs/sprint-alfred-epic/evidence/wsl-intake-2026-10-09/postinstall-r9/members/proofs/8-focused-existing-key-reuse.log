@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: signature anchor reuses a key already at the canonical directory path without importing or replacing it
+ok 1 - signature anchor reuses a key already at the canonical directory path without importing or replacing it
+  ---
+  duration_ms: 1156.335614
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1345.671645
