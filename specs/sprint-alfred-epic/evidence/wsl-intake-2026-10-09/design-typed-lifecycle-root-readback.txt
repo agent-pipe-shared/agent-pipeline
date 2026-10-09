@@ -1,0 +1,254 @@
+command: node scratch/typed-denial-root-capture.mjs
+label: typed-lifecycle-denial-root-readback
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{"command":"node --test --test-isolation=none --test-reporter=tap <snapshot>/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs","label":"hooks/guard-devplan-design-approval.test.mjs"}
+TAP version 13
+# Subtest: C1 admit  v8 chat record under configured chat
+ok 1 - C1 admit  v8 chat record under configured chat
+  ---
+  duration_ms: 483.655901
+  type: 'test'
+  ...
+# Subtest: C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+ok 2 - C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+  ---
+  duration_ms: 369.46543
+  type: 'test'
+  ...
+# Subtest: C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+ok 3 - C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+  ---
+  duration_ms: 366.549285
+  type: 'test'
+  ...
+# Subtest: C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+ok 4 - C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+  ---
+  duration_ms: 374.460422
+  type: 'test'
+  ...
+# Subtest: C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+ok 5 - C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+  ---
+  duration_ms: 386.587807
+  type: 'test'
+  ...
+# Subtest: C6 admit  mini profile with both design keys null and no design artifact
+ok 6 - C6 admit  mini profile with both design keys null and no design artifact
+  ---
+  duration_ms: 365.989125
+  type: 'test'
+  ...
+# Subtest: C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+ok 7 - C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+  ---
+  duration_ms: 1104.844327
+  type: 'test'
+  ...
+# Subtest: FX1 fixture: the signature proof verifies against the committed matching anchor
+ok 8 - FX1 fixture: the signature proof verifies against the committed matching anchor
+  ---
+  duration_ms: 218.040033
+  type: 'test'
+  ...
+# Subtest: TA1 refuse signature with missing policy anchors and name the setup remedy
+ok 9 - TA1 refuse signature with missing policy anchors and name the setup remedy
+  ---
+  duration_ms: 541.682507
+  type: 'test'
+  ...
+# Subtest: TA2 refuse signature with empty policy anchors and name the setup remedy
+ok 10 - TA2 refuse signature with empty policy anchors and name the setup remedy
+  ---
+  duration_ms: 530.083084
+  type: 'test'
+  ...
+# Subtest: TA3 refuse a self-generated signing key outside the committed anchor set
+ok 11 - TA3 refuse a self-generated signing key outside the committed anchor set
+  ---
+  duration_ms: 528.146217
+  type: 'test'
+  ...
+# Subtest: FX2 fixture: the configured mode resolves from the committed user config
+ok 12 - FX2 fixture: the configured mode resolves from the committed user config
+  ---
+  duration_ms: 640.64431
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5934.115052
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/guard-devplan-design-approval.test.mjs","exitCode":0,"signal":null,"error":null}
+{"command":"node --test --test-isolation=none --test-reporter=tap <snapshot>/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","label":"hooks/guard-devplan-design-approval-v7.test.mjs"}
+TAP version 13
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+not ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 433.951417
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-typed-denial-root-r1/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"ok":false,"code":"DWP2-PACKAGE-SCHEMA"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    buildLiveShapedV7Fixture (file://<repo-root>/scratch/alfred-typed-denial-root-r1/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:211:10)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-typed-denial-root-r1/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:273:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 588.264901
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/guard-devplan-design-approval-v7.test.mjs","exitCode":1,"signal":null,"error":null}
+{"command":"node --test --test-isolation=none --test-reporter=tap <snapshot>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs","label":"scripts/design-approval-route.e2e.test.mjs"}
+TAP version 13
+# Subtest: route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+ok 1 - route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+  ---
+  duration_ms: 1119.254169
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# Subtest: route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+ok 2 - route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+  ---
+  duration_ms: 0.40142
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# approve-plan exit 0; stderr: 
+# Subtest: route 3: the boundary library admits the approved v8 record
+ok 3 - route 3: the boundary library admits the approved v8 record
+  ---
+  duration_ms: 35.043832
+  type: 'test'
+  ...
+# designAdvisoryAdmission: {"ok":true,"id":"b55c27328fa0a614872eddde787d6aef75cfa2b3fbc1962047325d36def8a287","mode":"approved-design-signature"}
+# Subtest: route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+ok 4 - route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+  ---
+  duration_ms: 0.10054
+  type: 'test'
+  ...
+# Subtest: decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+ok 5 - decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+  ---
+  duration_ms: 673.61258
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP2-INFLIGHT-PRESENTATION-RETIRED: use present-plan --review-receipt
+# Subtest: retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+ok 6 - retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+  ---
+  duration_ms: 658.185642
+  type: 'test'
+  ...
+# present-plan exit 2; stderr: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+# Subtest: retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+ok 7 - retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+  ---
+  duration_ms: 644.464929
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP-APPROVAL-REQUEST-RETIRED: use present-plan --review-receipt
+# Subtest: retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+ok 8 - retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 142.096239
+  type: 'test'
+  ...
+# design-advisory-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+ok 9 - retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 28.527602
+  type: 'test'
+  ...
+# design-advisory-admission.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 10 - retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 22.609209
+  type: 'test'
+  ...
+# design-course-session.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 11 - retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 20.673133
+  type: 'test'
+  ...
+# design-course-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 12 - retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 139.580811
+  type: 'test'
+  ...
+# runner-design-readiness-bootstrap.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+ok 13 - retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+  ---
+  duration_ms: 0.473049
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3509.078932
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"scripts/design-approval-route.e2e.test.mjs","exitCode":0,"signal":null,"error":null}
+{"command":"node <snapshot>/plugins/pipeline-core/hooks/typed-denial.probe.mjs","label":"hooks/typed-denial.probe.mjs"}
+{"observation":"direct-boundary-and-lifecycle","boundary":{"ok":false,"code":"DAA-DESIGN-APPROVAL-BINDING-DRIFT"},"lifecycle":{"ok":false,"code":"PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED","status":"awaiting-approval","phase":"implementation","nextAction":"reopen-design","submissionCurrent":true,"approvalCurrent":false}}
+{"observation":"relative-in-root","hook":{"code":2,"stderr":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.\n"},"policy":{"verdict":"block","reason":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.","feature":"authority-feature","planPath":"specs/feature/prd.md","lifecycleStatus":"awaiting-approval"},"shell":{"exitCode":2,"stderr":"BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.\nDetected as a shell write to a dev-plan-gated path (lane: write-command).\nWhy: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\nA genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above."}}
+{"observation":"absolute-in-root","hook":{"code":2,"stderr":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: /tmp/guard-devplan-v8-daStft/src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.\n"},"policy":{"verdict":"block","reason":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: /tmp/guard-devplan-v8-daStft/src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.","feature":"authority-feature","planPath":"specs/feature/prd.md","lifecycleStatus":"awaiting-approval"},"shell":{"exitCode":2,"stderr":"BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature \"authority-feature\" lifecycle is \"awaiting-approval\".\nPlan: specs/feature/prd.md\nFile: /tmp/guard-devplan-v8-daStft/src/foo.ts\nWhy: [guard-devplan] implementation requires a valid design approval (DAA-DESIGN-APPROVAL-BINDING-DRIFT).\nCurrent design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.\nDetected as a shell write to a dev-plan-gated path (lane: write-command).\nWhy: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\nA genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above."}}
+{"observation":"typed-denial-probe","passed":true}
+ℹ tests 0
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 781.127945
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/typed-denial.probe.mjs","exitCode":0,"signal":null,"error":null}
+{"schema":"pipeline.immutable-test-hashes.v1","files":[{"path":"hooks/guard-devplan-design-approval.test.mjs","before":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199","anchor":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199","after":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199"},{"path":"hooks/guard-devplan-design-approval-v7.test.mjs","before":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1","anchor":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1","after":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1"},{"path":"scripts/design-approval-route.e2e.test.mjs","before":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f","anchor":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f","after":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f"}]}
+{"schema":"pipeline.bounded-typed-denial-verification.v1","passed":true,"legacy":"RED","runs":[{"path":"hooks/guard-devplan-design-approval.test.mjs","exitCode":0,"signal":null,"error":null},{"path":"hooks/guard-devplan-design-approval-v7.test.mjs","exitCode":1,"signal":null,"error":null},{"path":"scripts/design-approval-route.e2e.test.mjs","exitCode":0,"signal":null,"error":null},{"path":"hooks/typed-denial.probe.mjs","exitCode":0,"signal":null,"error":null}]}
+
+--- stderr ---

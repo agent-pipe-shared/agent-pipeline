@@ -1,0 +1,264 @@
+command: node scratch/schema-ref-t3-capture.mjs
+label: ALFRED-SCHEMA-REF-T3-20261009
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+INPUT_BASE_SHA256 {"scratch/alfred-candidate-assembly-20261009-r4/b/plugins/pipeline-core/lib/schema-lite.mjs":"6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2","scratch/alfred-candidate-assembly-20261009-r4/b/plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs":"3e5e7073657e9071602c10af9f748b861946450c3126c998904b3c4578f75613","specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite-alternatives.test.mjs":"d7a4639996f4054b992cbc2a4496d5f5f524354080e023307e55287cf71dae90"}
+PRESERVATION original seven cases and assertions byte-identical; only new cases and subprocess import appended
+COMMAND node scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs; explicit inherited FD3; completion signal present
+TAP_BEGIN
+✔ SC-ALTERNATIVES-ACCEPT each exact closed alternative accepts (0.982019ms)
+✔ SC-ALTERNATIVES-AMBIGUOUS a value matching more than one branch refuses under oneOf (0.185499ms)
+✔ SC-ALTERNATIVES-CLOSED unmatched, mixed, and unknown-key objects refuse (0.19936ms)
+✔ SC-ALTERNATIVES-MALFORMED malformed oneOf declarations refuse (0.21214ms)
+✔ SC-ALTERNATIVES-NESTED-ARRAY oneOf is enforced in nested properties and array items (0.813199ms)
+✔ SC-ALTERNATIVES-Z-REGRESSION schemas without oneOf retain type required and additionalProperties behavior (0.146669ms)
+✔ SC-ALTERNATIVES-ZZ-MATCH a value matching no alternative refuses (0.21419ms)
+✖ SC-REF-CYCLE cyclic local references terminate and refuse within a bounded subprocess (19.624892ms)
+✖ SC-REF-DISJOINT exactly one disjoint referenced branch accepts each valid alternative (0.33482ms)
+✖ SC-REF-LOCAL local defs references enforce type required enum and closed objects (0.273799ms)
+✖ SC-REF-NESTED root definitions stay available through properties array items and extra values (0.23051ms)
+✖ SC-REF-NULLABLE referenced object containing nullable referenced receipt accepts null and evidence (0.2605ms)
+✖ SC-REF-OVERLAP overlapping referenced branches refuse when both match (0.187419ms)
+✖ SC-REF-POINTER local JSON pointer decoding preserves escaped definition names (0.18772ms)
+✖ SC-REF-UNRESOLVED unresolved and non-schema local reference targets fail closed (0.21802ms)
+✖ SC-REF-UNSUPPORTED external unsupported and malformed reference declarations fail closed (0.368319ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 7
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.04281
+
+✖ failing tests:
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-CYCLE cyclic local references terminate and refuse within a bounded subprocess (19.624892ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:137:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-DISJOINT exactly one disjoint referenced branch accepts each valid alternative (0.33482ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:146:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-LOCAL local defs references enforce type required enum and closed objects (0.273799ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:158:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-NESTED root definitions stay available through properties array items and extra values (0.23051ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:171:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-NULLABLE referenced object containing nullable referenced receipt accepts null and evidence (0.2605ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:183:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-OVERLAP overlapping referenced branches refuse when both match (0.187419ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:193:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-POINTER local JSON pointer decoding preserves escaped definition names (0.18772ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:203:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-UNRESOLVED unresolved and non-schema local reference targets fail closed (0.21802ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:212:18)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:218:5
+✖ SC-REF-UNSUPPORTED external unsupported and malformed reference declarations fail closed (0.368319ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/scratch/schema-ref-t3-red-mirror/schema-lite-alternatives.test.mjs:223:18)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/schema-ref-t3-red-mirror/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+TAP_END
+STDERR_BEGIN
+STDERR_END
+FD3_BEGIN
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["SC-ALTERNATIVES-ACCEPT","SC-ALTERNATIVES-AMBIGUOUS","SC-ALTERNATIVES-CLOSED","SC-ALTERNATIVES-MALFORMED","SC-ALTERNATIVES-NESTED-ARRAY","SC-ALTERNATIVES-Z-REGRESSION","SC-ALTERNATIVES-ZZ-MATCH","SC-REF-CYCLE","SC-REF-DISJOINT","SC-REF-LOCAL","SC-REF-NESTED","SC-REF-NULLABLE","SC-REF-OVERLAP","SC-REF-POINTER","SC-REF-UNRESOLVED","SC-REF-UNSUPPORTED"],"caseCount":16,"caseSetSha256":"72a82e1fbaa2d8b196357054573206362a3784a79e3701c9c7b37d4a7e872d65"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-ACCEPT","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-AMBIGUOUS","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-CLOSED","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-MALFORMED","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-NESTED-ARRAY","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-Z-REGRESSION","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-ALTERNATIVES-ZZ-MATCH","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-CYCLE","ordinal":7,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-DISJOINT","ordinal":8,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-LOCAL","ordinal":9,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-NESTED","ordinal":10,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-NULLABLE","ordinal":11,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-OVERLAP","ordinal":12,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-POINTER","ordinal":13,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-UNRESOLVED","ordinal":14,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"SC-REF-UNSUPPORTED","ordinal":15,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":16,"disposedCount":16,"caseIds":["SC-ALTERNATIVES-ACCEPT","SC-ALTERNATIVES-AMBIGUOUS","SC-ALTERNATIVES-CLOSED","SC-ALTERNATIVES-MALFORMED","SC-ALTERNATIVES-NESTED-ARRAY","SC-ALTERNATIVES-Z-REGRESSION","SC-ALTERNATIVES-ZZ-MATCH","SC-REF-CYCLE","SC-REF-DISJOINT","SC-REF-LOCAL","SC-REF-NESTED","SC-REF-NULLABLE","SC-REF-OVERLAP","SC-REF-POINTER","SC-REF-UNRESOLVED","SC-REF-UNSUPPORTED"],"caseSetSha256":"72a82e1fbaa2d8b196357054573206362a3784a79e3701c9c7b37d4a7e872d65","dispositionsSha256":"78ed67205f6ac7c20e965658806dc77530c5befa7e5c30c0145b83367f4b5ed7","counts":{"pass":7,"fail":9,"skip":0,"todo":0}}
+FD3_END
+PRODUCT_EXIT 1 SIGNAL null
+INPUT_POST_SHA256 {"scratch/alfred-candidate-assembly-20261009-r4/b/plugins/pipeline-core/lib/schema-lite.mjs":"6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2","scratch/alfred-candidate-assembly-20261009-r4/b/plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs":"3e5e7073657e9071602c10af9f748b861946450c3126c998904b3c4578f75613","specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite-alternatives.test.mjs":"d7a4639996f4054b992cbc2a4496d5f5f524354080e023307e55287cf71dae90"}
+REACHED_ASSERTIONS [{"id":"SC-ALTERNATIVES-ACCEPT","disposition":"pass"},{"id":"SC-ALTERNATIVES-AMBIGUOUS","disposition":"pass"},{"id":"SC-ALTERNATIVES-CLOSED","disposition":"pass"},{"id":"SC-ALTERNATIVES-MALFORMED","disposition":"pass"},{"id":"SC-ALTERNATIVES-NESTED-ARRAY","disposition":"pass"},{"id":"SC-ALTERNATIVES-Z-REGRESSION","disposition":"pass"},{"id":"SC-ALTERNATIVES-ZZ-MATCH","disposition":"pass"},{"id":"SC-REF-CYCLE","disposition":"fail"},{"id":"SC-REF-DISJOINT","disposition":"fail"},{"id":"SC-REF-LOCAL","disposition":"fail"},{"id":"SC-REF-NESTED","disposition":"fail"},{"id":"SC-REF-NULLABLE","disposition":"fail"},{"id":"SC-REF-OVERLAP","disposition":"fail"},{"id":"SC-REF-POINTER","disposition":"fail"},{"id":"SC-REF-UNRESOLVED","disposition":"fail"},{"id":"SC-REF-UNSUPPORTED","disposition":"fail"}]
+DIAGNOSTIC_EXIT 0; product suite RED; all 16 real cases disposed; 7 retained cases green; no setup failures; immutable base/post hashes match; independent review pending; PO acceptance open
+
+--- stderr ---

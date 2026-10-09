@@ -16,6 +16,54 @@ to an earlier candidate. Finish the reviewable package before asking for its
 digest-bound human signature. The earlier signature cannot authorize a new
 intent. No push, tag or public release is requested.
 
+## Current closing wave — 2026-10-09, 16:53 CEST
+
+Final R6 assembly:69 mapped members,67 changed, no unresolved assembly/behavior
+findings or input drift. All20 bounded behavior suites exit0, including full
+migration-v3 60 cases, onboarding300, approval-route50, new E2E13, boundary12,
+anchored v7 lanes, reference16, both binding suites and frozen rebind3 with its
+unchanged historical inspect TODO. Preserve that TODO, do not call it verified.
+Actual case completion is separately captured in candidate-completion-r6.json
+and .txt with PIPELINE_VERIFY_CASE_COMPLETION_FD=3 explicitly announced.
+The earlier R6/F5 plain invocations passed assertions but did not announce FD3;
+their empty channels cannot be treated as completion receipts.
+
+Registry F6 passed real suite registration820 and case completion static checks
+787 tests/317 registry entries. Inventory proposal retains the actual old
+sourceBaseline:101 missing-baseline surfaces (69 pre-existing+32 new) need
+post-import baseline binding and independent evidence, not fabricated future
+commit refs. Formal batched Critic/admission and final frozen signing contract
+are still pending; no human signature or installed candidate is claimed.
+
+### Previous closing-wave observations
+
+HEAD is 38f2fc513767796d5ae254de1fdde20c953011c4. The complete new approval
+route reaches all13 E2E cases and passes; command admission passes13 cases.
+The independently reconciled onboarding fixture corpus now passes300/300 with
+real DECLARED/DISPOSED/TERMINAL FD3 records. Pool bounds/live occupancy and
+the preserved six-case pool suite pass; the assembled Git classifier passes469.
+These are proposal/mirror measurements, not installed-candidate qualification.
+
+Complete R4 assembly preserves59 mapped members (57 changed), exact added-line
+patch subsumption and independent test postimage bytes. It exposes22 of50
+legacy approval-route failures: exclusive oneOf needs real nested local $ref
+resolution. The frozen rebind fixture has been independently updated without
+changing its three security assertions; its setup has the same schema defect.
+The typed binding-drift lifecycle denial needs narrow hook/policy integration;
+the existing strong lifecycle validator remains fail-closed. Haiku legacy
+migration needs the exact missing native projection alias. These final fixes
+are separate owned proposals, not permission to weaken the guards or tests.
+
+Four actual completion adapters are authored but their first verification
+launch failed before assertions because Node child isolation did not inherit
+FD3. Their static checker passed; a complete real-FD3 rerun is pending. Actual
+registration/inventory reconciliation and one batched Critic remain pending.
+The existing four Reader rounds cannot bind the current document candidate;
+record that release-documentation limitation explicitly, never invent a fifth
+review or fabricate a terminal record. No new intent is signed or installed.
+
+The earlier sections below are historical recovery notes, not current readiness.
+
 Latest completed wave: F14's unchanged eight bootstrap/acknowledgement cases
 now all pass in the parked assembled proposal. Critic budget proposals pass
 all sixteen explicit checkpoint/closing pins and the complete preserved suite

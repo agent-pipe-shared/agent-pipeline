@@ -1,0 +1,454 @@
+command: node scratch/alfred-completion-t2-verify.mjs
+label: ALFRED-COMPLETION-ADAPTER-T2-20261009
+exitCode: 2
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+SCOPED ACTUAL STATIC CHECKER {"ok":true,"findings":[],"registeredCount":4,"vulnerableCount":4,"registryCount":4}
+REAL baseline TAP plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs EXIT 0
+✔ CANDBIND-a implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (415.573966ms)
+✔ CANDBIND-b the default (strict) read of the same package still refuses a HEAD that moved past the candidate (329.420596ms)
+✔ CANDBIND-c the host verifier's supplemental Advisor re-read stays strict by default once HEAD moved past the candidate (281.54774ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1175.693752
+
+
+REAL baseline FD3 plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs
+
+REAL adapted TAP plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs EXIT 1
+file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs:154:1 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+      at buildRecorder (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:146:3)
+      at registerTestCaseCompletion (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:213:20)
+      at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs:154:1 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs (138.427885ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143.062025
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs:1:1
+✖ plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs (138.427885ms)
+  'test failed'
+
+
+REAL adapted FD3 plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs
+
+REAL baseline TAP plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs EXIT 0
+✔ CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false) (409.009843ms)
+✔ CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate (312.428359ms)
+✔ CANDBINDX-c the host verifier's Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default (312.17327ms)
+✔ CANDBINDX-d (diagnostic) the Codex branch's re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts (261.834436ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1443.369433
+
+
+REAL baseline FD3 plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs
+
+REAL adapted TAP plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs EXIT 1
+file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:178:1 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+      at buildRecorder (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:146:3)
+      at registerTestCaseCompletion (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:213:20)
+      at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:178:1 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs (132.67404ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 137.182831
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs:1:1
+✖ plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs (132.67404ms)
+  'test failed'
+
+
+REAL adapted FD3 plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs
+
+REAL baseline TAP plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs EXIT 0
+▶ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ✔ control: live-shaped v7 record, course store present -> both lanes admit (green today) (229.443475ms)
+  ✔ target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today) (182.508446ms)
+✔ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (976.177239ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1154.238834
+
+
+REAL baseline FD3 plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs
+
+REAL adapted TAP plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs EXIT 1
+file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:297:1 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+      at buildRecorder (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:146:3)
+      at registerTestCaseCompletion (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:213:20)
+      at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:297:1 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs (157.500474ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 162.213174
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:1:1
+✖ plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs (157.500474ms)
+  'test failed'
+
+
+REAL adapted FD3 plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs
+
+REAL baseline TAP plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs EXIT 1
+file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:83
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:132:42 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+      at buildRecorder (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:146:3)
+      at registerTestCaseCompletion (file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:213:20)
+      at file://<repo-root>/scratch/alfred-completion-t2-public-graph/baseline/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:132:42 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs (143.728563ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 148.572952
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:1:1
+✖ plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs (143.728563ms)
+  'test failed'
+
+
+REAL baseline FD3 plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs
+
+REAL adapted TAP plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs EXIT 1
+file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83
+    const wrapped = new Error("completion descriptor is missing or unwritable", { cause: error });
+                    ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+    ... 2 lines matching cause stack trace ...
+    at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:133:3 {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:144:21)
+      at buildRecorder (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:146:3)
+      at registerTestCaseCompletion (file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/lib/test-case-completion.mjs:213:20)
+      at file://<repo-root>/scratch/alfred-completion-t2-public-graph/adapted/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:133:3 {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs (144.927778ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 149.729497
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:1:1
+✖ plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs (144.927778ms)
+  'test failed'
+
+
+REAL adapted FD3 plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs
+
+REAL COMPLETION VERIFICATION {
+  "staticResult": {
+    "ok": true,
+    "findings": [],
+    "registeredCount": 4,
+    "vulnerableCount": 4,
+    "registryCount": 4
+  },
+  "results": [
+    {
+      "descriptor": {
+        "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+        "caseIds": [
+          "CANDBIND-a",
+          "CANDBIND-b",
+          "CANDBIND-c"
+        ],
+        "fd": 3,
+        "maxBytes": 65536,
+        "originalCallbackSha256": [
+          "5da8a8972f6f2b3188eac4db7f749ee29fba64198f9128e49d6f8c726e9ed5fe",
+          "1035224322c55b9cbb8a335815eff7ae776d2700ff6a13553f9e97b5dcf50b0d",
+          "e575984d475532d2cfdfe372754ff195ab47a9825122511dbb3cad4b2f3e6a24"
+        ],
+        "sourceSha256": "494ac46c1451164c33b23ca8de84fe99e902d5bf2e2d82c0402e037af1c643ac",
+        "postimageSha256": "693c72fa8aebdeb63eee1295eb24f938e1d3b7389707bfde7dc3e4264d144b4c"
+      },
+      "baseline": {
+        "exit": 0,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": null,
+        "failedNames": []
+      },
+      "adapted": {
+        "exit": 1,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": "VERIFY-CASE-COMPLETION-BOUNDS",
+        "failedNames": []
+      },
+      "preservedFailures": true
+    },
+    {
+      "descriptor": {
+        "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+        "caseIds": [
+          "CANDBINDX-a",
+          "CANDBINDX-b",
+          "CANDBINDX-c",
+          "CANDBINDX-d"
+        ],
+        "fd": 3,
+        "maxBytes": 65536,
+        "originalCallbackSha256": [
+          "b46885dd3841777656fbe89b0a07fd158b1663cbdbbf211b9a6920f8af0926fd",
+          "71be9735df48e86758f7abbecd8b24439e7875140efbd207ec9442c401e53f58",
+          "b6e9ce827a94baa4445cc71294a163d44e928e45c625269972abc5fd4c1d6fbe",
+          "4c877b2a1fae9fc6e69d18d57d556df16caf96df0755fd3f583d6b452dc7af02"
+        ],
+        "sourceSha256": "5a75078576a5f826e18117f4cb162079f87f791d8b76861633dcbeb4869993a6",
+        "postimageSha256": "80be24f43f81826139df848729e0c0dd76801265f81636d216c27c67da0e8b47"
+      },
+      "baseline": {
+        "exit": 0,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": null,
+        "failedNames": []
+      },
+      "adapted": {
+        "exit": 1,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": "VERIFY-CASE-COMPLETION-BOUNDS",
+        "failedNames": []
+      },
+      "preservedFailures": true
+    },
+    {
+      "descriptor": {
+        "file": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+        "caseIds": [
+          "V7APPROVAL001"
+        ],
+        "fd": 3,
+        "maxBytes": 65536,
+        "newRegistrationIdentity": true,
+        "originalName": "v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))",
+        "originalCallbackSha256": [
+          "32cd7ed8765c9a559ff40c398b81691b1d93c81f6900d65f83cc2c7c1a978de6"
+        ],
+        "sourceSha256": "521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1",
+        "postimageSha256": "7f60305f726d7d8f155cd71bb49519bde2823b31224b57ee9a3f0e6abf041270"
+      },
+      "baseline": {
+        "exit": 0,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": null,
+        "failedNames": []
+      },
+      "adapted": {
+        "exit": 1,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": "VERIFY-CASE-COMPLETION-BOUNDS",
+        "failedNames": []
+      },
+      "preservedFailures": true
+    },
+    {
+      "descriptor": {
+        "file": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+        "caseIds": [
+          "DAGA001",
+          "DAGA002",
+          "DAGA003",
+          "DAGA004",
+          "DAGA005",
+          "DAGA006",
+          "DAGA007",
+          "DAGA008",
+          "DAGA009",
+          "DAGA010",
+          "DAGA011",
+          "DAGA012",
+          "DAGA013"
+        ],
+        "fd": 3,
+        "maxBytes": 65536,
+        "sourceSha256": "81d315c71e820294518298ec7811247b673d9e8ab95ebe189ad71b53f9b6f212",
+        "postimageSha256": "e21b33f9b28e521088048571d5094acf34108b19a6032fef26892c6c8c5d27c0",
+        "change": "brace/newline registration normalization only"
+      },
+      "baseline": {
+        "exit": 1,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": "VERIFY-CASE-COMPLETION-BOUNDS",
+        "failedNames": []
+      },
+      "adapted": {
+        "exit": 1,
+        "signal": null,
+        "setupError": null,
+        "fd3Bytes": 0,
+        "attestation": null,
+        "completionError": "VERIFY-CASE-COMPLETION-BOUNDS",
+        "failedNames": []
+      },
+      "preservedFailures": true
+    }
+  ],
+  "callbackBytesPreserved": true,
+  "assertionFailureSetsPreserved": true,
+  "allRealCompletionComplete": false,
+  "reviewPending": true,
+  "poAcceptancePending": true
+}
+
+--- stderr ---

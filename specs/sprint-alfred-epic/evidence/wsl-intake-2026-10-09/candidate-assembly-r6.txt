@@ -1,0 +1,128 @@
+command: node scratch/alfred-candidate-assemble-r6-20261009.mjs scratch/alfred-candidate-assembly-20261009-r6 specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r6.json
+label: candidate-source-final-recomposition-r6
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.candidate-assembly.v6",
+  "status": "assembled-review-pending",
+  "baseCommit": "38f2fc513767796d5ae254de1fdde20c953011c4",
+  "mirror": "scratch/alfred-candidate-assembly-20261009-r6/b",
+  "output": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r6.json",
+  "targets": 69,
+  "changedTargets": 67,
+  "postconditions": {
+    "pipelineStateDrift": true,
+    "pipelineStateRebind": true,
+    "kernelAddition": true
+  },
+  "assertionBytesPreserved": true,
+  "recompositionNeeded": false,
+  "unresolved": [],
+  "behavior": [
+    {
+      "target": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/runtime-projection-v2.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/schema-lite.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "exitCode": 0,
+      "error": null
+    }
+  ]
+}
+
+--- stderr ---

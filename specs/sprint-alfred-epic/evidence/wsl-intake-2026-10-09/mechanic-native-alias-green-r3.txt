@@ -1,0 +1,419 @@
+command: node scratch/verify-ALFRED-MECH-ALIAS-F5.mjs
+label: ALFRED-MECH-ALIAS-F5-20261009
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{"inputHashes":[{"path":"plugins/pipeline-core/config/runtime-projection-v2-owned-keys.json","sha256":"8365b931da56d4025133e05542840d382f28bf6ed8298d56532a2900a397d10a"},{"path":"setup.mjs","sha256":"19c9ea659f59424026cad3d419134c81fdf75c7dcf37e4c178d8ef7776ad7096"},{"path":"plugins/pipeline-core/lib/runtime-projection-v2.mjs","sha256":"c6c4fdc81cdb2046cbd3f8e5a99839b7044479fe51d836b3da27970eac33efcd"},{"path":"plugins/pipeline-core/lib/runtime-projection-v2.test.mjs","sha256":"d5cd5ce90ffc67df337de53f34ee01f94bcac68f9ac6898038e096d9f2b7d2bb"},{"path":"plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs","sha256":"9c4e423f2605dd0d9c85d99ce55db68bb4becde00755fb11fca7e7055eb841db"},{"path":"plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs","sha256":"85024ebe8caeb39fe033c3ed6d215cc69d109729f78072def25257132e430d55"}],"postimage":{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/config/runtime-projection-v2-owned-keys.json","baseSha256":"8365b931da56d4025133e05542840d382f28bf6ed8298d56532a2900a397d10a","postSha256":"52992dcf2c12ef6779ded09740b00d67b03aaac2ada93c64f924976f3b3ee128"},"overlays":[{"path":"lib/runner-profile-migration-v2.mjs","sha256":"c8a4792da6ac6672b48c127b3234feb573aa6d114e95a6db317f3a8acceb30c5"},{"path":"scripts/pipeline-user-v2.schema.json","sha256":"b48bf92d3093686a1fd103efba2ef9baf93f0cebdcbb2a5d101f731703c005a3"},{"path":"config/routing-authority.json","sha256":"4db7f19aed7fcd3b2289a7f2db2bf030794f247cc40281e088546fee92f50585"},{"path":"config/runner-mappings.json","sha256":"cbc1315e7f410f6ba6a13ac97f3c6407f5de431ce8784765efd764186f5a7963"}],"scope":"one exact native haiku mapping; no live projection applied"}
+{"kind":"baseline","label":"baseline-full-v2","command":["node","--test-reporter=tap","plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs"],"exitCode":1,"setupError":null,"failures":["FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:","FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:","FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:","FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:","FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:","FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')","FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:","FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:","FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:","FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:","FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:","FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:","FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:","FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:"],"completionChannel":"suite has no completion registration"}
+--- baseline-full-v2 TAP/stdout ---
+FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  v0: exact historical Public opus and sonnet aliases are closed compatibility spellings
+FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning
+PASS  v2: original source bytes stay exact; inspect and plan do not mutate
+FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  inspect and plan: a live lock blocks parsing without reclamation
+PASS  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply
+FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')
+FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+PASS  apply: every rename-after-effect fault rolls all targets back without false success
+FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    0,
+-   0,
+    1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+PASS  path safety: .claude/settings.json symlink fails closed
+PASS  path safety: .claude/pipeline.yaml symlink fails closed
+PASS  path safety: .codex/config.toml symlink fails closed
+PASS  path safety: .codex/agents/implementor.toml symlink fails closed
+PASS  path safety: .codex/agents/critic.toml symlink fails closed
+PASS  path safety: pipeline.user.yaml symlink fails closed
+PASS  path safety: .claude parent symlink fails closed before an outside write
+PASS  path safety: .codex parent symlink fails closed before an outside write
+FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+
+--- baseline-full-v2 stderr ---
+
+16 failure(s):
+- v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: preserved Claude routes and exact Codex routes never claim effective identities: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: accepted Terra aliases become requested frozen selectors without an effective-model claim: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: current Astra and Luna selectors reconcile to frozen V2 cells: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- inspect and plan: no journal means no transient lock or persistent write: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- apply: forged or mutated public plans fail closed before any write: Cannot set properties of undefined (setting 'path')
+- apply: writes only declared targets, commits source last, and preserves I2 unowned bytes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+- apply: post-rename journal durability failure rolls back cleanly and permits a later plan: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+- recovery: a crash during rollback retains proof until a later inspect can clean it: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+- apply: staged write fault leaves bytes intact and never reports success: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+- recovery: durable interruption restores preimages before parsing and corrupt journals fail closed: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- recovery: a journal cannot widen the frozen I2 ownership boundary: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    0,
+-   0,
+    1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+- historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+
+--- baseline-full-v2 FD3 ---
+
+{"kind":"candidate","label":"candidate-full-v2","command":["node","--test-reporter=tap","plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs"],"exitCode":0,"setupError":null,"failures":[],"completionChannel":"suite has no completion registration"}
+--- candidate-full-v2 TAP/stdout ---
+PASS  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent
+PASS  v0: exact historical Public opus and sonnet aliases are closed compatibility spellings
+PASS  v1: preserved Claude routes and exact Codex routes never claim effective identities
+PASS  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell
+PASS  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell
+PASS  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim
+PASS  v1: current Astra and Luna selectors reconcile to frozen V2 cells
+PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning
+PASS  v2: original source bytes stay exact; inspect and plan do not mutate
+PASS  inspect and plan: no journal means no transient lock or persistent write
+PASS  inspect and plan: a live lock blocks parsing without reclamation
+PASS  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply
+PASS  apply: forged or mutated public plans fail closed before any write
+PASS  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes
+PASS  apply: every rename-after-effect fault rolls all targets back without false success
+PASS  apply: post-rename journal durability failure rolls back cleanly and permits a later plan
+PASS  recovery: a crash during rollback retains proof until a later inspect can clean it
+PASS  apply: staged write fault leaves bytes intact and never reports success
+PASS  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed
+PASS  recovery: a journal cannot widen the frozen I2 ownership boundary
+PASS  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful
+PASS  path safety: .claude/settings.json symlink fails closed
+PASS  path safety: .claude/pipeline.yaml symlink fails closed
+PASS  path safety: .codex/config.toml symlink fails closed
+PASS  path safety: .codex/agents/implementor.toml symlink fails closed
+PASS  path safety: .codex/agents/critic.toml symlink fails closed
+PASS  path safety: pipeline.user.yaml symlink fails closed
+PASS  path safety: .claude parent symlink fails closed before an outside write
+PASS  path safety: .codex parent symlink fails closed before an outside write
+PASS  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration
+
+30 migration v2 contract test(s) passed.
+
+--- candidate-full-v2 stderr ---
+setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected pipeline.user.v2 is an accepted one-way V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+
+--- candidate-full-v2 FD3 ---
+
+{"kind":"baseline","label":"baseline-RPM19-RPM51","command":["node","--test-reporter=tap","--test-name-pattern=^RPM(19|51) ","plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs"],"exitCode":1,"setupError":null,"failures":["not ok 1 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract","not ok 2 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"],"completionChannel":"FD3 captured"}
+--- baseline-RPM19-RPM51 TAP/stdout ---
+TAP version 13
+# Subtest: RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+not ok 1 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+  ---
+  duration_ms: 16.989766
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:813:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+not ok 2 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 5.364442
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    undefined !== 'v1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'v1'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1722:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-native-alias-f5-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    node:internal/test_runner/test:1133:31
+    node:internal/process/task_queues:150:7
+    AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:147:8)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 32.648374
+
+--- baseline-RPM19-RPM51 stderr ---
+
+--- baseline-RPM19-RPM51 FD3 ---
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["RPM01","RPM02","RPM03","RPM04","RPM05","RPM06","RPM07","RPM08","RPM09","RPM10","RPM11","RPM12","RPM13","RPM14","RPM15","RPM16","RPM17","RPM18","RPM19","RPM20","RPM21","RPM22","RPM23","RPM24","RPM25","RPM26","RPM27","RPM28","RPM29","RPM30","RPM31","RPM32","RPM33","RPM34","RPM35","RPM36","RPM37","RPM38","RPM39","RPM40","RPM41","RPM42","RPM43","RPM44","RPM45","RPM46","RPM47","RPM48","RPM49","RPM50","RPM51","RPM52","RPM53","RPM54","RPM55","RPM56","RPM57","RPM58","RPM59","RPM60"],"caseCount":60,"caseSetSha256":"40002af6b75c67d96c2e292cdd4ea849354f3dd4cd34a59b89c4b82a7e414c28"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM19","ordinal":18,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM51","ordinal":50,"disposition":"fail"}
+
+{"kind":"candidate","label":"candidate-RPM19-RPM51","command":["node","--test-reporter=tap","--test-name-pattern=^RPM(19|51) ","plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs"],"exitCode":0,"setupError":null,"failures":[],"completionChannel":"FD3 captured"}
+--- candidate-RPM19-RPM51 TAP/stdout ---
+TAP version 13
+# Subtest: RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+ok 1 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+  ---
+  duration_ms: 51.549118
+  type: 'test'
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+ok 2 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 17.021357
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 78.893929
+
+--- candidate-RPM19-RPM51 stderr ---
+
+--- candidate-RPM19-RPM51 FD3 ---
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["RPM01","RPM02","RPM03","RPM04","RPM05","RPM06","RPM07","RPM08","RPM09","RPM10","RPM11","RPM12","RPM13","RPM14","RPM15","RPM16","RPM17","RPM18","RPM19","RPM20","RPM21","RPM22","RPM23","RPM24","RPM25","RPM26","RPM27","RPM28","RPM29","RPM30","RPM31","RPM32","RPM33","RPM34","RPM35","RPM36","RPM37","RPM38","RPM39","RPM40","RPM41","RPM42","RPM43","RPM44","RPM45","RPM46","RPM47","RPM48","RPM49","RPM50","RPM51","RPM52","RPM53","RPM54","RPM55","RPM56","RPM57","RPM58","RPM59","RPM60"],"caseCount":60,"caseSetSha256":"40002af6b75c67d96c2e292cdd4ea849354f3dd4cd34a59b89c4b82a7e414c28"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM19","ordinal":18,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM51","ordinal":50,"disposition":"pass"}
+
+{"kind":"candidate","label":"candidate-full-runtime-projection-v2","command":["node","--test-reporter=tap","plugins/pipeline-core/lib/runtime-projection-v2.test.mjs"],"exitCode":0,"setupError":null,"failures":[],"completionChannel":"suite has no completion registration"}
+--- candidate-full-runtime-projection-v2 TAP/stdout ---
+PASS  physical containment: host paths use path semantics and reject escapes
+PASS  baseline reader: a missing valid V2 target remains an explicit absent baseline
+PASS  compiler: valid intent produces a deterministic, byte-preserving ready plan
+PASS  compiler: changed Codex baselines report decisions 3 and 10 without activation
+PASS  compiler: projected unchanged baselines are a repeatable no-change plan
+PASS  compiler: quoted unowned YAML key immediately after modelRouting remains byte-exact
+PASS  compiler invalid baselines: absent owned YAML baseline fails closed
+PASS  compiler invalid baselines: duplicate owned YAML block fails closed
+PASS  compiler invalid baselines: malformed owned YAML block fails closed
+PASS  compiler invalid baselines: missing owned TOML key fails closed
+PASS  compiler invalid baselines: duplicate owned TOML key fails closed
+PASS  compiler invalid baselines: malformed owned TOML value fails closed
+PASS  compiler invalid baselines: trailing token after owned TOML scalar fails closed
+PASS  compiler: ordinary TOML trailing comments remain valid and reparsable
+PASS  compiler: invalid intent stops before baseline access or target planning
+PASS  compiler: only the committed owned-key boundary may drive planning
+PASS  CLI: redacts bytes by default, exposes them only on request, and never writes
+PASS  CLI: complete YAML intent produces a redacted ready plan without writes
+PASS  CLI: malformed or invalid YAML intent fails before baseline planning
+PASS  CLI: argument and unreadable-source failures are explicit and non-writing
+PASS  importing the V2 projector never reads the owned-key manifest from disk
+
+21/21 cases passed.
+
+--- candidate-full-runtime-projection-v2 stderr ---
+
+--- candidate-full-runtime-projection-v2 FD3 ---
+
+{"summary":{"baselineV2Exit":1,"candidateV2Exit":0,"addedFailures":[],"baselineFocusExit":1,"candidateFocusExit":0,"projectionExit":0,"negative":{"ok":false,"source":"pipeline.user.v2","errors":[{"path":"$.routing.duties.mechanic.claude.selector.value","code":"enum","message":"value is not one of the registered values: fable, opus, sonnet, haiku","repair":"use a registered value"}]},"negativePlan":{"schema":"pipeline.runtime-projection-plan.v2","status":"invalid-intent","source":"pipeline.user.v2","diagnostics":[{"path":"$.schema","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.language","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.agent_runtime","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.runners","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.routing","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.usage","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.autonomy","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$.gates","code":"required","message":"required property is missing","repair":"add the required property"},{"path":"$","code":"additional_property","message":"object is closed and contains an unregistered property","repair":"remove the unregistered property"}],"decisionConflicts":[],"requiresExplicitActivation":true,"targets":[]},"inputHashesUnchanged":true,"review":"pending","poAcceptance":"pending"}}
+
+--- stderr ---

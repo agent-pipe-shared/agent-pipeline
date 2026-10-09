@@ -1,0 +1,314 @@
+command: node scratch/onboarding-compose-verify-20261009.mjs
+label: onboarding-composed-preserved-regressions
+exitCode: 1
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+INPUT_HASHES [{"path":"plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","sha256":"ccc4d2f650b5a40b17770134e2c378d713b36c4028950b88b0365cea4b2203ae"},{"path":"plugins/pipeline-core/lib/onboarding-continuity.test.mjs","sha256":"76e7b84b05e468a80274b8af671289a19148ca14ac8bd85c17e3f80653804387"},{"path":"plugins/pipeline-core/scripts/project-onboarding-v3.mjs","sha256":"b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71"},{"path":"plugins/pipeline-core/lib/project-onboarding-v3.mjs","sha256":"d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3"},{"path":"plugins/pipeline-core/lib/onboarding-continuity.mjs","sha256":"a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d"},{"path":"plugins/pipeline-core/lib/continuity-state.mjs","sha256":"4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77"},{"path":"plugins/pipeline-core/scripts/pipeline-state.mjs","sha256":"3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795"},{"path":"plugins/pipeline-core/scripts/continuity-state.schema.json","sha256":"b3c51a274f3534bb935241924ff78215b555b6daee7341f66bac5ed2fa82f877"},{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"plugins/pipeline-core/lib/architecture-design.mjs","sha256":"2ca715d8789dcdcf2890e7ee5578c9b6ed413bcb7c985d271dcf45cff54061e6"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/project-onboarding-v3.mjs","sha256":"c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/project-onboarding-v3.mjs","sha256":"e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.mjs","sha256":"512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/continuity-state.mjs","sha256":"43845ab88ba6c99fa2c075805e1e8dedd2a4169498e5ef2376d713d11275998a"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/continuity-state.schema.json","sha256":"281217053aebf3272430fc927e04f79b96160d6b5346b4b26894d39a49405091"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","sha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"}]
+EIGHT_CASE_NAMES ["planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement","planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor","applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay","planOnboardingBootstrapBind: requires an existing intake checkpoint","planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated","planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)","applyOnboardingBootstrapBind: activation is required","a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)"]
+RUN {"stage":"baseline","argv":["--test","--test-isolation=none","--test-reporter=tap","<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs"],"exitCode":1,"signal":null}
+TAP version 13
+# Subtest: BAM001 finished chat fixture reaches the real chat planner without a trust anchor
+ok 1 - BAM001 finished chat fixture reaches the real chat planner without a trust anchor
+  ---
+  duration_ms: 38.101353
+  type: 'test'
+  ...
+# Subtest: BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture
+not ok 2 - BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture
+  ---
+  duration_ms: 46.217871
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE: signature acknowledgement requires a valid configured PO signing-key directory
+    
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs:89:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: BAM003 signature configuration with no anchor refuses instead of downgrading to chat
+ok 3 - BAM003 signature configuration with no anchor refuses instead of downgrading to chat
+  ---
+  duration_ms: 44.244838
+  type: 'test'
+  ...
+# Subtest: BAM004 both configured modes preserve explicit activation
+ok 4 - BAM004 both configured modes preserve explicit activation
+  ---
+  duration_ms: 49.683863
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 3
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 312.795976
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["BAM001","BAM002","BAM003","BAM004"],"caseCount":4,"caseSetSha256":"059f0d7d6b32c13198c9024587c3096ffaf2f2dc4bc509f874a2b219615bd805"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM001","ordinal":0,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM002","ordinal":1,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM003","ordinal":2,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM004","ordinal":3,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":4,"disposedCount":4,"caseIds":["BAM001","BAM002","BAM003","BAM004"],"caseSetSha256":"059f0d7d6b32c13198c9024587c3096ffaf2f2dc4bc509f874a2b219615bd805","dispositionsSha256":"112cc6b79c85d771d13bb37d9be7649b954635af051b5d0fb764ba8efc235daa","counts":{"pass":3,"fail":1,"skip":0,"todo":0}}]
+RUN {"stage":"baseline","argv":["--test","--test-isolation=none","--test-reporter=tap","--test-name-pattern","^OBC[0-9]+ (planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement|planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor|applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay|planOnboardingBootstrapBind: requires an existing intake checkpoint|planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated|planOnboardingBootstrapBind: refuses once already bound \\(not absent-pristine\\)|applyOnboardingBootstrapBind: activation is required|a coordinator-sourced binding satisfies the PO plan gate's current contract \\(SSd point 1\\))$","<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs"],"exitCode":0,"signal":null}
+TAP version 13
+# Subtest: OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+ok 1 - OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+  ---
+  duration_ms: 449.980421
+  type: 'test'
+  ...
+# Subtest: OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+ok 2 - OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+  ---
+  duration_ms: 187.805192
+  type: 'test'
+  ...
+# Subtest: OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+ok 3 - OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+  ---
+  duration_ms: 205.038695
+  type: 'test'
+  ...
+# Subtest: OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+ok 4 - OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+  ---
+  duration_ms: 11.250174
+  type: 'test'
+  ...
+# Subtest: OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+ok 5 - OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+  ---
+  duration_ms: 72.638086
+  type: 'test'
+  ...
+# Subtest: OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+ok 6 - OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+  ---
+  duration_ms: 189.257623
+  type: 'test'
+  ...
+# Subtest: OBC270 applyOnboardingBootstrapBind: activation is required
+ok 7 - OBC270 applyOnboardingBootstrapBind: activation is required
+  ---
+  duration_ms: 153.611376
+  type: 'test'
+  ...
+# Subtest: OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+ok 8 - OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+  ---
+  duration_ms: 186.616959
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1617.178772
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["OBC001","OBC002","OBC003","OBC004","OBC005","OBC006","OBC007","OBC008","OBC009","OBC010","OBC011","OBC012","OBC013","OBC014","OBC015","OBC016","OBC017","OBC018","OBC019","OBC020","OBC021","OBC022","OBC023","OBC024","OBC025","OBC026","OBC027","OBC028","OBC029","OBC030","OBC031","OBC032","OBC033","OBC034","OBC035","OBC036","OBC037","OBC038","OBC039","OBC040","OBC041","OBC042","OBC043","OBC044","OBC045","OBC046","OBC047","OBC048","OBC049","OBC050","OBC051","OBC052","OBC053","OBC054","OBC055","OBC056","OBC057","OBC058","OBC059","OBC060","OBC061","OBC062","OBC063","OBC064","OBC065","OBC066","OBC067","OBC068","OBC069","OBC070","OBC071","OBC072","OBC073","OBC074","OBC075","OBC076","OBC077","OBC078","OBC079","OBC080","OBC081","OBC082","OBC083","OBC084","OBC085","OBC086","OBC087","OBC088","OBC089","OBC090","OBC091","OBC092","OBC093","OBC094","OBC095","OBC096","OBC097","OBC098","OBC099","OBC100","OBC101","OBC102","OBC103","OBC104","OBC105","OBC106","OBC107","OBC108","OBC109","OBC110","OBC111","OBC112","OBC113","OBC114","OBC115","OBC116","OBC117","OBC118","OBC119","OBC120","OBC121","OBC122","OBC123","OBC124","OBC125","OBC126","OBC127","OBC128","OBC129","OBC130","OBC131","OBC132","OBC133","OBC134","OBC135","OBC136","OBC137","OBC138","OBC139","OBC140","OBC141","OBC142","OBC143","OBC144","OBC145","OBC146","OBC147","OBC148","OBC149","OBC150","OBC151","OBC152","OBC153","OBC154","OBC155","OBC156","OBC157","OBC158","OBC159","OBC160","OBC161","OBC162","OBC163","OBC164","OBC165","OBC166","OBC167","OBC168","OBC169","OBC170","OBC171","OBC172","OBC173","OBC174","OBC175","OBC176","OBC177","OBC178","OBC179","OBC180","OBC181","OBC182","OBC183","OBC184","OBC185","OBC186","OBC187","OBC188","OBC189","OBC190","OBC191","OBC192","OBC193","OBC194","OBC195","OBC196","OBC197","OBC198","OBC199","OBC200","OBC201","OBC202","OBC203","OBC204","OBC205","OBC206","OBC207","OBC208","OBC209","OBC210","OBC211","OBC212","OBC213","OBC214","OBC215","OBC216","OBC217","OBC218","OBC219","OBC220","OBC221","OBC222","OBC223","OBC224","OBC225","OBC226","OBC227","OBC228","OBC229","OBC230","OBC231","OBC232","OBC233","OBC234","OBC235","OBC236","OBC237","OBC238","OBC239","OBC240","OBC241","OBC242","OBC243","OBC244","OBC245","OBC246","OBC247","OBC248","OBC249","OBC250","OBC251","OBC252","OBC253","OBC254","OBC255","OBC256","OBC257","OBC258","OBC259","OBC260","OBC261","OBC262","OBC263","OBC264","OBC265","OBC266","OBC267","OBC268","OBC269","OBC270","OBC271","OBC272","OBC273","OBC274","OBC275","OBC276","OBC277","OBC278","OBC279","OBC280","OBC281","OBC282","OBC283","OBC284","OBC285","OBC286","OBC287","OBC288","OBC289","OBC290","OBC291","OBC292","OBC293","OBC294","OBC295","OBC296","OBC297","OBC298","OBC299","OBC300"],"caseCount":300,"caseSetSha256":"6a827a066a76be0d5ceab6a9325f2fcf5ed5291fe398ebfcd3c9ab6741ec591d"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC264","ordinal":263,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC265","ordinal":264,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC266","ordinal":265,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC267","ordinal":266,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC268","ordinal":267,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC269","ordinal":268,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC270","ordinal":269,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC271","ordinal":270,"disposition":"pass"}]
+RUN {"stage":"combined","argv":["--test","--test-isolation=none","--test-reporter=tap","<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs"],"exitCode":0,"signal":null}
+TAP version 13
+# Subtest: BAM001 finished chat fixture reaches the real chat planner without a trust anchor
+ok 1 - BAM001 finished chat fixture reaches the real chat planner without a trust anchor
+  ---
+  duration_ms: 37.925035
+  type: 'test'
+  ...
+# Subtest: BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture
+ok 2 - BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture
+  ---
+  duration_ms: 50.761978
+  type: 'test'
+  ...
+# Subtest: BAM003 signature configuration with no anchor refuses instead of downgrading to chat
+ok 3 - BAM003 signature configuration with no anchor refuses instead of downgrading to chat
+  ---
+  duration_ms: 47.810009
+  type: 'test'
+  ...
+# Subtest: BAM004 both configured modes preserve explicit activation
+ok 4 - BAM004 both configured modes preserve explicit activation
+  ---
+  duration_ms: 50.496952
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 326.759662
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["BAM001","BAM002","BAM003","BAM004"],"caseCount":4,"caseSetSha256":"059f0d7d6b32c13198c9024587c3096ffaf2f2dc4bc509f874a2b219615bd805"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM001","ordinal":0,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM002","ordinal":1,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM003","ordinal":2,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"BAM004","ordinal":3,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":4,"disposedCount":4,"caseIds":["BAM001","BAM002","BAM003","BAM004"],"caseSetSha256":"059f0d7d6b32c13198c9024587c3096ffaf2f2dc4bc509f874a2b219615bd805","dispositionsSha256":"66a74bbea20527e5d8b776aab794946d211bcade1d4074f5ea727dd38b231d93","counts":{"pass":4,"fail":0,"skip":0,"todo":0}}]
+RUN {"stage":"combined","argv":["--test","--test-isolation=none","--test-reporter=tap","--test-name-pattern","^OBC[0-9]+ (planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement|planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor|applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay|planOnboardingBootstrapBind: requires an existing intake checkpoint|planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated|planOnboardingBootstrapBind: refuses once already bound \\(not absent-pristine\\)|applyOnboardingBootstrapBind: activation is required|a coordinator-sourced binding satisfies the PO plan gate's current contract \\(SSd point 1\\))$","<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs"],"exitCode":1,"signal":null}
+TAP version 13
+# Subtest: OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+ok 1 - OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+  ---
+  duration_ms: 435.693695
+  type: 'test'
+  ...
+# Subtest: OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+not ok 2 - OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+  ---
+  duration_ms: 131.856538
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'complete the generated PRD and specification before acknowledgement'
+  code: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  name: 'KickoffError'
+  stack: |-
+    fail (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:266:9)
+    bootstrapAcknowledgementPlan (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7371:5)
+    planOnboardingBootstrapAcknowledgementChat (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7622:16)
+    bootstrapBindReadyRoot (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4307:27)
+    file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4346:31
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+  ...
+# Subtest: OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+not ok 3 - OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+  ---
+  duration_ms: 145.189621
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'complete the generated PRD and specification before acknowledgement'
+  code: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  name: 'KickoffError'
+  stack: |-
+    fail (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:266:9)
+    bootstrapAcknowledgementPlan (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7371:5)
+    planOnboardingBootstrapAcknowledgementChat (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7622:16)
+    bootstrapBindReadyRoot (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4307:27)
+    file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4381:20
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+  ...
+# Subtest: OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+ok 4 - OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+  ---
+  duration_ms: 11.54637
+  type: 'test'
+  ...
+# Subtest: OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+ok 5 - OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+  ---
+  duration_ms: 72.864569
+  type: 'test'
+  ...
+# Subtest: OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+not ok 6 - OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+  ---
+  duration_ms: 132.331745
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'complete the generated PRD and specification before acknowledgement'
+  code: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  name: 'KickoffError'
+  stack: |-
+    fail (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:266:9)
+    bootstrapAcknowledgementPlan (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7371:5)
+    planOnboardingBootstrapAcknowledgementChat (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7622:16)
+    bootstrapBindReadyRoot (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4307:27)
+    file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4410:20
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+  ...
+# Subtest: OBC270 applyOnboardingBootstrapBind: activation is required
+not ok 7 - OBC270 applyOnboardingBootstrapBind: activation is required
+  ---
+  duration_ms: 132.831329
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'complete the generated PRD and specification before acknowledgement'
+  code: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  name: 'KickoffError'
+  stack: |-
+    fail (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:266:9)
+    bootstrapAcknowledgementPlan (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7371:5)
+    planOnboardingBootstrapAcknowledgementChat (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7622:16)
+    bootstrapBindReadyRoot (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4307:27)
+    file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4417:20
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+  ...
+# Subtest: OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+not ok 8 - OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+  ---
+  duration_ms: 135.366813
+  type: 'test'
+  location: '<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'complete the generated PRD and specification before acknowledgement'
+  code: 'BOOTSTRAP-ACK-PLACEHOLDER-CONTENT'
+  name: 'KickoffError'
+  stack: |-
+    fail (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:266:9)
+    bootstrapAcknowledgementPlan (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7371:5)
+    planOnboardingBootstrapAcknowledgementChat (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.mjs:7622:16)
+    bootstrapBindReadyRoot (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4307:27)
+    file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4430:20
+    Object.run (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:107:13)
+    TestContext.<anonymous> (file://<repo-root>/scratch/onboarding-composed-graph-20261009-fd3/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 3
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1367.659493
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["OBC001","OBC002","OBC003","OBC004","OBC005","OBC006","OBC007","OBC008","OBC009","OBC010","OBC011","OBC012","OBC013","OBC014","OBC015","OBC016","OBC017","OBC018","OBC019","OBC020","OBC021","OBC022","OBC023","OBC024","OBC025","OBC026","OBC027","OBC028","OBC029","OBC030","OBC031","OBC032","OBC033","OBC034","OBC035","OBC036","OBC037","OBC038","OBC039","OBC040","OBC041","OBC042","OBC043","OBC044","OBC045","OBC046","OBC047","OBC048","OBC049","OBC050","OBC051","OBC052","OBC053","OBC054","OBC055","OBC056","OBC057","OBC058","OBC059","OBC060","OBC061","OBC062","OBC063","OBC064","OBC065","OBC066","OBC067","OBC068","OBC069","OBC070","OBC071","OBC072","OBC073","OBC074","OBC075","OBC076","OBC077","OBC078","OBC079","OBC080","OBC081","OBC082","OBC083","OBC084","OBC085","OBC086","OBC087","OBC088","OBC089","OBC090","OBC091","OBC092","OBC093","OBC094","OBC095","OBC096","OBC097","OBC098","OBC099","OBC100","OBC101","OBC102","OBC103","OBC104","OBC105","OBC106","OBC107","OBC108","OBC109","OBC110","OBC111","OBC112","OBC113","OBC114","OBC115","OBC116","OBC117","OBC118","OBC119","OBC120","OBC121","OBC122","OBC123","OBC124","OBC125","OBC126","OBC127","OBC128","OBC129","OBC130","OBC131","OBC132","OBC133","OBC134","OBC135","OBC136","OBC137","OBC138","OBC139","OBC140","OBC141","OBC142","OBC143","OBC144","OBC145","OBC146","OBC147","OBC148","OBC149","OBC150","OBC151","OBC152","OBC153","OBC154","OBC155","OBC156","OBC157","OBC158","OBC159","OBC160","OBC161","OBC162","OBC163","OBC164","OBC165","OBC166","OBC167","OBC168","OBC169","OBC170","OBC171","OBC172","OBC173","OBC174","OBC175","OBC176","OBC177","OBC178","OBC179","OBC180","OBC181","OBC182","OBC183","OBC184","OBC185","OBC186","OBC187","OBC188","OBC189","OBC190","OBC191","OBC192","OBC193","OBC194","OBC195","OBC196","OBC197","OBC198","OBC199","OBC200","OBC201","OBC202","OBC203","OBC204","OBC205","OBC206","OBC207","OBC208","OBC209","OBC210","OBC211","OBC212","OBC213","OBC214","OBC215","OBC216","OBC217","OBC218","OBC219","OBC220","OBC221","OBC222","OBC223","OBC224","OBC225","OBC226","OBC227","OBC228","OBC229","OBC230","OBC231","OBC232","OBC233","OBC234","OBC235","OBC236","OBC237","OBC238","OBC239","OBC240","OBC241","OBC242","OBC243","OBC244","OBC245","OBC246","OBC247","OBC248","OBC249","OBC250","OBC251","OBC252","OBC253","OBC254","OBC255","OBC256","OBC257","OBC258","OBC259","OBC260","OBC261","OBC262","OBC263","OBC264","OBC265","OBC266","OBC267","OBC268","OBC269","OBC270","OBC271","OBC272","OBC273","OBC274","OBC275","OBC276","OBC277","OBC278","OBC279","OBC280","OBC281","OBC282","OBC283","OBC284","OBC285","OBC286","OBC287","OBC288","OBC289","OBC290","OBC291","OBC292","OBC293","OBC294","OBC295","OBC296","OBC297","OBC298","OBC299","OBC300"],"caseCount":300,"caseSetSha256":"6a827a066a76be0d5ceab6a9325f2fcf5ed5291fe398ebfcd3c9ab6741ec591d"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC264","ordinal":263,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC265","ordinal":264,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC266","ordinal":265,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC267","ordinal":266,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC268","ordinal":267,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC269","ordinal":268,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC270","ordinal":269,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC271","ordinal":270,"disposition":"fail"}]
+RESULT {"mirror":"scratch/onboarding-composed-graph-20261009-fd3","runs":[{"stage":"baseline","path":"scripts/bootstrap-acknowledgement-mode.test.mjs","exitCode":1,"counts":{"pass":3,"fail":1},"completion":"terminal required"},{"stage":"baseline","path":"lib/onboarding-continuity.test.mjs","exitCode":0,"counts":{"pass":8,"fail":0},"completion":"filtered suite: declaration contains full corpus; eight disposed, no terminal expected"},{"stage":"combined","path":"scripts/bootstrap-acknowledgement-mode.test.mjs","exitCode":0,"counts":{"pass":4,"fail":0},"completion":"terminal required"},{"stage":"combined","path":"lib/onboarding-continuity.test.mjs","exitCode":1,"counts":{"pass":3,"fail":5},"completion":"filtered suite: declaration contains full corpus; eight disposed, no terminal expected"}],"assertionBytesUnchanged":true,"inputHashesUnchanged":true,"review":"pending","poAcceptance":"open","scratchCorrection":{"priorSetup":"default isolated Node test process did not inherit FD3: TCC-FD-WRITE EINVAL","priorAssertionsReached":0,"correction":"--test-isolation=none","productionOrTestEdits":0}}
+
+--- stderr ---

@@ -59,7 +59,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { fileURLToPath } from "node:url";
 
 import { advisorHostFixture } from "../lib/codex-advisor-host.fixture.mjs";
@@ -265,7 +265,8 @@ async function buildLiveShapedV7Fixture(t) {
   return { root, storeDir, reread };
 }
 
-test("v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))", async (t) => {
+const cases = [
+  { id: "V7APPROVAL001", name: "v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))", run: async (t) => {
   if (process.platform === "win32") {
     t.skip("win32: advisorHostFixture needs the linux-only codex-design-readiness-host-store (CRHS-INPUT); run via WSL: wsl.exe -e bash -lc \"cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs\"");
     return;
@@ -290,4 +291,7 @@ test("v7 plan approval with an Advisor-unavailable exception: devplan boundary w
     assert.equal(direct.code, 0, `target (note section 17): Edit lane admits without a course store; exit ${direct.code}; ${today}; stderr: ${direct.stderr}`);
     assert.equal(shell.exitCode, 0, `target (note section 17): Bash lane admits without a course store; exit ${shell.exitCode}; ${today}; stderr: ${shell.stderr}`);
   });
-});
+} },
+];
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

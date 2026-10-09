@@ -1,0 +1,117 @@
+command: node scratch/kernel-doc-f-20261009.mjs
+label: ALFRED-KERNEL-DOC-F-20261009-immutable-kernel10
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "baseSha256": "13187bb97bd27d1332599a16711c5d7a3227530984da115045247cc0e451b536",
+  "postSha256": "fb68cb9a6071a0a5730fa509ef0eaea283b82589ebede4e4c905e7bbd765eab0",
+  "inputs": [
+    {
+      "path": "docs/guard-maintenance-window-threat-model.md",
+      "sha256": "13187bb97bd27d1332599a16711c5d7a3227530984da115045247cc0e451b536"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "sha256": "f0a897d5fe38e7f54bfe7bd812f997a75c647f0d92a5e8eccd970bed471cc933"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard-maintenance-window.mjs",
+      "sha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-approval-binding.mjs",
+      "sha256": "c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-consistency-check.mjs",
+      "sha256": "fef6007f58166a60e52d045e0d75b6d6a96c62f5840bf0e7c311e7a2b956f6b9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-receipt.mjs",
+      "sha256": "6c93e923bec8c32489bce0e07bdcd39d82401c0902732c17884c3d0cff4e12a0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/rebind-approval.mjs",
+      "sha256": "6367c5055b82f36148826215bc450da4786e73e46dd700dc493dc620740e425c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/retired-design-codes.mjs",
+      "sha256": "ca1c9f524e97bc3d75d342930ee78b18d107b643a98cbe30f3b6f40b743fec4b"
+    }
+  ],
+  "shippedProsePreserved": true,
+  "graphFileCount": 1962,
+  "graphSha256": "0a839d1a15b849fa5a480ad93b0e7e69e35da3d379a16c0319d7dafccb750cd4",
+  "mirror": "scratch/kernel-doc-f-public-Kny1b5"
+}
+--- docs/guard-maintenance-window-threat-model.md
++++ specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md
+@@ -513,6 +513,17 @@
+ executes in that module's process, so it is protected through both the project
+ and the installed-plugin anchors for the same reason as the dependencies above.
+ 
++The approved design-flow closure additionally protects, in kernel-array order,
++`lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
++`lib/design-review-receipt.mjs`, `lib/rebind-approval.mjs`, and
++`lib/retired-design-codes.mjs`. The imported binding, consistency and receipt
++modules validate the approval subject, current source digests, review chain and
++complete open-finding set. The imported legacy rebind module rechecks bound
++artifacts, candidate ancestry and the existing final approval; the shared
++retirement module supplies typed refusals with no implementation authority.
++These delegates execute with kernel authority, so a maintenance window cannot
++rewrite their decisions while leaving the importing authority reader intact.
++
+ This source closure does not establish protected-source delivery, independent
+ review, native qualification or activation.
+ 
+
+{"command":["node","--test","--test-reporter=tap","plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs"],"status":0,"signal":null,"error":null,"completionFd3":"","completionFd3Observed":true,"note":"Unchanged kernel suite declares no FD3 receipt; empty FD3 is reported without fabricating completion evidence."}
+TAP version 13
+# PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+# PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+# PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+# PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+# PASS GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry
+# PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+# PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+# PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+# PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+# PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+# guard-maintenance-window-kernel-closure: 10 passed, 0 failed
+# Subtest: plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+ok 1 - plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+  ---
+  duration_ms: 269.672408
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 274.264406
+
+{
+  "reachedAssertions": {
+    "passes": 10,
+    "failures": 0
+  },
+  "ownInputDrift": [],
+  "concurrentPackageDrift": [],
+  "sourceTestBytesUnchanged": true,
+  "scope": [
+    "specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md",
+    "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/design-kernel-doc-closure.txt"
+  ],
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}
+
+--- stderr ---
+

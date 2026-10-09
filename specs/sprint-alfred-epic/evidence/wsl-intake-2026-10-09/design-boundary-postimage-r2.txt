@@ -1,0 +1,331 @@
+command: node scratch/design-boundary-f2-verify.mjs
+label: ALFRED-DESIGN-BOUNDARY-F2-20261009
+exitCode: 1
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+Input hashes: [{"path":"plugins/pipeline-core/lib/guard-devplan-policy.mjs","sha256":"ee4726c2f441c150da22604bdfb8b66bce458d1f049253c07bd21cfd3bcd8221"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs","sha256":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs","sha256":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1"},{"path":"plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs","sha256":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f"}]
+Stage: immutable boundary suites
+TAP version 13
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+not ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 442.37302
+  type: 'test'
+  location: '<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"ok":false,"code":"DWP2-PACKAGE-SCHEMA"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    buildLiveShapedV7Fixture (file://<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:211:10)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:273:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: C1 admit  v8 chat record under configured chat
+ok 2 - C1 admit  v8 chat record under configured chat
+  ---
+  duration_ms: 494.875233
+  type: 'test'
+  ...
+# Subtest: C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+ok 3 - C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+  ---
+  duration_ms: 382.670715
+  type: 'test'
+  ...
+# Subtest: C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+ok 4 - C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+  ---
+  duration_ms: 370.313336
+  type: 'test'
+  ...
+# Subtest: C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+not ok 5 - C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+  ---
+  duration_ms: 373.282496
+  type: 'test'
+  location: '<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:335:1'
+  failureType: 'testCodeFailure'
+  error: 'C4: the refusal must name DAA-DESIGN-APPROVAL-BINDING-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/design-boundary-f2-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:349:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+ok 6 - C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+  ---
+  duration_ms: 379.012698
+  type: 'test'
+  ...
+# Subtest: C6 admit  mini profile with both design keys null and no design artifact
+ok 7 - C6 admit  mini profile with both design keys null and no design artifact
+  ---
+  duration_ms: 362.671025
+  type: 'test'
+  ...
+# Subtest: C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+ok 8 - C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+  ---
+  duration_ms: 1106.346701
+  type: 'test'
+  ...
+# Subtest: FX1 fixture: the signature proof verifies against the committed matching anchor
+ok 9 - FX1 fixture: the signature proof verifies against the committed matching anchor
+  ---
+  duration_ms: 216.026149
+  type: 'test'
+  ...
+# Subtest: TA1 refuse signature with missing policy anchors and name the setup remedy
+ok 10 - TA1 refuse signature with missing policy anchors and name the setup remedy
+  ---
+  duration_ms: 521.493082
+  type: 'test'
+  ...
+# Subtest: TA2 refuse signature with empty policy anchors and name the setup remedy
+ok 11 - TA2 refuse signature with empty policy anchors and name the setup remedy
+  ---
+  duration_ms: 519.292713
+  type: 'test'
+  ...
+# Subtest: TA3 refuse a self-generated signing key outside the committed anchor set
+ok 12 - TA3 refuse a self-generated signing key outside the committed anchor set
+  ---
+  duration_ms: 541.958261
+  type: 'test'
+  ...
+# Subtest: FX2 fixture: the configured mode resolves from the committed user config
+ok 13 - FX2 fixture: the configured mode resolves from the committed user config
+  ---
+  duration_ms: 633.944671
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 11
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5956.975512
+FD3 completion: {"label":"immutable boundary suites","status":1,"signal":null,"fd3":"{\"status\":1,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","spawnError":null}
+Stage: immutable all13 route E2E
+TAP version 13
+# Subtest: route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+ok 1 - route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+  ---
+  duration_ms: 1122.760005
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# Subtest: route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+ok 2 - route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+  ---
+  duration_ms: 0.406885
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# approve-plan exit 0; stderr: 
+# Subtest: route 3: the boundary library admits the approved v8 record
+ok 3 - route 3: the boundary library admits the approved v8 record
+  ---
+  duration_ms: 40.809567
+  type: 'test'
+  ...
+# designAdvisoryAdmission: {"ok":true,"id":"b55c27328fa0a614872eddde787d6aef75cfa2b3fbc1962047325d36def8a287","mode":"approved-design-signature"}
+# Subtest: route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+ok 4 - route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+  ---
+  duration_ms: 0.108299
+  type: 'test'
+  ...
+# Subtest: decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+ok 5 - decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+  ---
+  duration_ms: 651.372671
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP2-INFLIGHT-PRESENTATION-RETIRED: use present-plan --review-receipt
+# Subtest: retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+ok 6 - retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+  ---
+  duration_ms: 651.127424
+  type: 'test'
+  ...
+# present-plan exit 2; stderr: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+# Subtest: retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+ok 7 - retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+  ---
+  duration_ms: 658.838689
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP-APPROVAL-REQUEST-RETIRED: use present-plan --review-receipt
+# Subtest: retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+ok 8 - retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 149.007613
+  type: 'test'
+  ...
+# design-advisory-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+ok 9 - retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 28.510306
+  type: 'test'
+  ...
+# design-advisory-admission.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 10 - retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 22.935683
+  type: 'test'
+  ...
+# design-course-session.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 11 - retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 22.128185
+  type: 'test'
+  ...
+# design-course-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+ok 12 - retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 141.319129
+  type: 'test'
+  ...
+# runner-design-readiness-bootstrap.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+# Subtest: retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+ok 13 - retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+  ---
+  duration_ms: 0.608222
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3544.119198
+FD3 completion: {"label":"immutable all13 route E2E","status":0,"signal":null,"fd3":"{\"status\":0,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","spawnError":null}
+Source and immutable test hashes unchanged.
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard-devplan-policy.mjs
+index da48353be..91d9285d6 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard-devplan-policy.mjs
+@@ -35,7 +35,7 @@ import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+ import { gateConfig, loadManifest } from "./manifest.mjs";
+-import { CURRENT_APPROVAL_SCHEMA, derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
++import { CURRENT_APPROVAL_SCHEMA, derivePlanLifecycle, validCurrentPlanApproval } from "./plan-spec-state-v2.mjs";
+ import {
+   LEGACY_STATE,
+   NEUTRAL_STATE,
+@@ -52,11 +52,13 @@ import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-appr
+ import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
+ import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
+ import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
+-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
++import { readHumanApprovalMode, verifyAgainstTrustAnchors, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
++
++import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
+ 
+ // The v7 approval record is verified through the re-read of its package. The lib
+ // constant for this schema is not exported, so the literal is local; a v8 record
+-// keeps falling through to the pre-v7 branch until its own branch lands.
++// is verified separately against its stored U3 binding.
+ const V7_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
+ 
+ // Validate before hashing: the final authority reader must never read a state-
+@@ -105,6 +107,43 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
+     const planSha256 = advisorPackageSha256(root, planPath);
+     const specSha256 = advisorPackageSha256(root, specPath);
+     const approval = state?.planApproval;
++    if (approval?.schema === "pipeline.plan-approval.v8") {
++      if (state?.planApproved !== true) return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
++      const binding = approval.designApprovalBinding;
++      const record = approval.designApproval;
++      if (state?.planSubmission?.profile === "mini") {
++        return validCurrentPlanApproval(approval) && binding === null && record === null
++          ? { ok: true, id: "mini-no-design-approval", mode: "not-required" }
++          : { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
++      }
++      const checked = validateDesignApprovalBinding(binding);
++      if (!checked.ok || checked.bindingSha256 !== record?.bindingSha256 || binding.featureId !== featureId)
++        return { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
++      if (!["feature", "epic"].includes(state?.planSubmission?.profile)
++        || !validCurrentPlanApproval(approval) || record.approvedBy !== approval.approvedBy)
++        return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
++      if (readHumanApprovalMode(root).mode === "signature" && record.mode === "chat")
++        return { ok: false, code: "DAA-PO-APPROVAL-MODE-MISMATCH" };
++      if (record.mode === "signature") {
++        const trust = readCriticalHumanProofPolicy(root);
++        if (!trust.ok) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-POLICY" };
++        const anchors = trust.trustAnchors ?? (trust.trustAnchor === null ? [] : [trust.trustAnchor]);
++        if (anchors.length === 0) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP" };
++        const verified = verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors, proof: record.proof });
++        if (!verified.verified) return { ok: false, code: `DAA-${verified.code ?? "PO-APPROVAL-PROOF-INVALID"}` };
++        if (verified.proofSha256 !== record.proofSha256) return { ok: false, code: "DAA-PO-APPROVAL-RECORD-DRIFT" };
++      }
++      const sources = binding.sources;
++      if (sources.prd.path !== planPath || sources.spec.path !== specPath)
++        return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
++      try {
++        for (const source of [sources.prd, sources.spec, ...sources.companions]) {
++          if (advisorPackageSha256(root, source.path) !== source.sha256)
++            return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
++        }
++      } catch { return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" }; }
++      return { ok: true, id: checked.bindingSha256, mode: `approved-design-${record.mode}` };
++    }
+     if (approval?.schema === V7_APPROVAL_SCHEMA && state?.planApproved === true) {
+       if (state?.planSubmission?.profile === "mini"
+         && approval.designWorkflowPackagePath === null
+@@ -207,13 +246,16 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
+ }
+ 
+ export function designAdvisoryRemediation(code) {
+-  return [
+-    `[guard-devplan] implementation requires a valid private design Advisor transaction (${code}).`,
+-    "Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,",
+-    "complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.",
+-    "Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.",
+-    "An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.",
+-  ].join("\n");
++  const prefix = `[guard-devplan] implementation requires a valid design approval (${code}).`;
++  if (code === "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP") return [prefix,
++    "Complete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode."].join("\n");
++  const contentDrift = ["DAA-DESIGN-SOURCE-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DAA-DWP-APPROVAL-SOURCE-DRIFT", "DAA-DWP-APPROVAL-PLAN-SPEC-MISMATCH"];
++  if (contentDrift.includes(code)) return [prefix,
++    "Current design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
++  return [prefix,
++    "Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.",
++    "Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution."].join("\n");
++
+ }
+ 
+ 
+Boundary postimage sha256: 8bccb99267677a81fb1475dd3c3ddfab0e2409a1604cbac7961748b8074368ea
+
+--- stderr ---

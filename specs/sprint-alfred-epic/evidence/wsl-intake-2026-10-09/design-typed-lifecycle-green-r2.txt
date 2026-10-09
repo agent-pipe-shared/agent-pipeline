@@ -1,0 +1,146 @@
+command: node scratch/design-typed-r2-verify.mjs
+label: ALFRED-DESIGN-TYPED-F2-20261009
+exitCode: 1
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{"command":"node --test <snapshot>/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs","label":"hooks/guard-devplan-design-approval.test.mjs"}
+✔ C1 admit  v8 chat record under configured chat (488.112764ms)
+✔ C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode) (365.423555ms)
+✔ C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH (367.620143ms)
+✔ C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT (367.516573ms)
+✔ C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT (365.060307ms)
+✔ C6 admit  mini profile with both design keys null and no design artifact (358.924825ms)
+✔ C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control (1123.760699ms)
+✔ FX1 fixture: the signature proof verifies against the committed matching anchor (217.965173ms)
+✔ TA1 refuse signature with missing policy anchors and name the setup remedy (535.605656ms)
+✔ TA2 refuse signature with empty policy anchors and name the setup remedy (532.95802ms)
+✔ TA3 refuse a self-generated signing key outside the committed anchor set (539.148551ms)
+✔ FX2 fixture: the configured mode resolves from the committed user config (645.123492ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5960.740394
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/guard-devplan-design-approval.test.mjs","exitCode":0,"signal":null,"error":null}
+{"command":"node --test <snapshot>/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","label":"hooks/guard-devplan-design-approval-v7.test.mjs"}
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (414.150987ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 590.225419
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:268:1
+✖ v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c)) (414.150987ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP2-PACKAGE-SCHEMA"}
+  
+  false !== true
+  
+      at buildLiveShapedV7Fixture (file://<repo-root>/scratch/design-typed-r2-snapshot/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:211:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/design-typed-r2-snapshot/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:273:14)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/guard-devplan-design-approval-v7.test.mjs","exitCode":1,"signal":null,"error":null}
+{"command":"node --test <snapshot>/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs","label":"scripts/design-approval-route.e2e.test.mjs"}
+✔ route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (1130.451519ms)
+ℹ present-plan exit 0; stderr: 
+✔ route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record (0.36428ms)
+ℹ present-plan exit 0; stderr: 
+ℹ approve-plan exit 0; stderr: 
+✔ route 3: the boundary library admits the approved v8 record (34.28838ms)
+ℹ designAdvisoryAdmission: {"ok":true,"id":"b55c27328fa0a614872eddde787d6aef75cfa2b3fbc1962047325d36def8a287","mode":"approved-design-signature"}
+✔ route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.09601ms)
+✔ decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (655.212658ms)
+ℹ approve-plan exit 2; stderr: DWP2-INFLIGHT-PRESENTATION-RETIRED: use present-plan --review-receipt
+✔ retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (648.244428ms)
+ℹ present-plan exit 2; stderr: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+✔ retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (670.372087ms)
+ℹ approve-plan exit 2; stderr: DWP-APPROVAL-REQUEST-RETIRED: use present-plan --review-receipt
+✔ retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (150.391368ms)
+ℹ design-advisory-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (32.161325ms)
+ℹ design-advisory-admission.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (23.557447ms)
+ℹ design-course-session.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (20.482981ms)
+ℹ design-course-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (139.780783ms)
+ℹ runner-design-readiness-bootstrap.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (0.56269ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3557.408365
+
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"scripts/design-approval-route.e2e.test.mjs","exitCode":0,"signal":null,"error":null}
+{"command":"node <snapshot>/plugins/pipeline-core/hooks/typed-denial.probe.mjs","label":"hooks/typed-denial.probe.mjs"}
+
+file://<repo-root>/scratch/design-typed-r2-snapshot/plugins/pipeline-core/hooks/typed-denial.probe.mjs:349
+  const shellDenial = {exitCode:shell.exitCode,stderr:shell.stderr.split('
+                                                                         ^
+
+SyntaxError: Invalid or unexpected token
+    at compileSourceTextModule (node:internal/modules/esm/utils:318:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:90:18)
+    at #translate (node:internal/modules/esm/loader:451:20)
+    at afterLoad (node:internal/modules/esm/loader:507:29)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:512:12)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:555:36)
+    at afterResolve (node:internal/modules/esm/loader:603:52)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:609:12)
+    at node:internal/modules/esm/loader:628:32
+    at TracingChannel.tracePromise (node:diagnostics_channel:362:14)
+
+Node.js v24.15.0
+
+{"schema":"pipeline.bounded-verification-completion.v1","path":"hooks/typed-denial.probe.mjs","exitCode":1,"signal":null,"error":null}
+{"schema":"pipeline.immutable-test-hashes.v1","files":[{"path":"hooks/guard-devplan-design-approval.test.mjs","before":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199","anchor":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199","after":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199"},{"path":"hooks/guard-devplan-design-approval-v7.test.mjs","before":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1","anchor":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1","after":"521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1"},{"path":"scripts/design-approval-route.e2e.test.mjs","before":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f","anchor":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f","after":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f"}]}
+
+--- stderr ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: direct/fullhook/shell diagnostic must pass
+
+1 !== 0
+
+    at file://<repo-root>/scratch/design-typed-r2-verify.mjs:77:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

@@ -1,0 +1,77 @@
+command: node scratch/alfred-candidate-assemble-r4-20261009.mjs scratch/alfred-candidate-assembly-20261009-r4 specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r4.json
+label: candidate-complete-integration-r4
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.candidate-assembly.v4",
+  "status": "assembled-debt-pending",
+  "baseCommit": "38f2fc513767796d5ae254de1fdde20c953011c4",
+  "mirror": "scratch/alfred-candidate-assembly-20261009-r4/b",
+  "output": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r4.json",
+  "targets": 59,
+  "changedTargets": 57,
+  "postconditions": {
+    "pipelineStateDrift": true,
+    "pipelineStateRebind": true,
+    "kernelAddition": true
+  },
+  "assertionBytesPreserved": true,
+  "recompositionNeeded": false,
+  "unresolved": [
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "reason": "Fixture present-plan assertion failed; downstream rebind behavior not reached"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "reason": "Reached behavior assertions RED; inspect exact captured output"
+    }
+  ],
+  "behavior": [
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "exitCode": 1,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "exitCode": 1,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "exitCode": 0,
+      "error": null
+    }
+  ]
+}
+
+--- stderr ---

@@ -1,0 +1,684 @@
+command: node scratch/reader-terminal-audit.mjs
+label: reader-terminal-existing-evidence-audit
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.reader-terminal-audit-observations.v1",
+  "candidate": "3dc9beac66d3067105945d9affab2a93fab91797",
+  "rounds": [
+    {
+      "id": "round-20260923a",
+      "reviewedIdentityEvidence": "phase-two abbreviated candidate, uniquely resolved by Git",
+      "snapshot": {
+        "schema": "pipeline.doc-reader-docset-snapshot.v1",
+        "candidateCommit": "9e1851d41e50888ba7b3d76c080ab78da39f23af",
+        "featureId": "sprint-alfred-epic",
+        "coverage": [
+          {
+            "path": "GEMINI.md",
+            "sha256": "d1a50a2426a30fde3f1fbb707c6b2a6bafd3d89c3e078a1897190b727bc0d28b"
+          },
+          {
+            "path": "PIPELINE_FLOW.md",
+            "sha256": "b119c0756d72319cbeca402baa730c03dbc8f128ccf8012fa2d440f618c85542"
+          },
+          {
+            "path": "README.md",
+            "sha256": "9169025aa866c61cd20a5875815beeea8ce514b243b70bca24d0de473cb1cd2e"
+          },
+          {
+            "path": "SETUP.md",
+            "sha256": "a95274e9900c485e6de2e3b4a828c813d6e03c6a05c642b8d3752ae1b3f3f5c5"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "d32604baac58d733d48cfa9c150599999de20103a0bf2fa12f4d00fc0574cc49"
+          },
+          {
+            "path": "docs/audit-and-evidence.md",
+            "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+          },
+          {
+            "path": "docs/audit-bundles.md",
+            "sha256": "e8a213a4c8e66eab8be9c9c2494250ac42160aefb28910fcf1a7d41cb28c7985"
+          },
+          {
+            "path": "docs/cost-and-measurement.md",
+            "sha256": "ac9503eb809e77b620aa8e02fedd8cd27d18b856cf373efd1a07c24857f61967"
+          },
+          {
+            "path": "docs/enforcement.md",
+            "sha256": "3099a23337847527fd3c8314806b1f385bd2c74ed4fed78442eef913dc12e606"
+          },
+          {
+            "path": "docs/overview.md",
+            "sha256": "47c4b3191dff64f0b2ee4f48bfb561a4be91abfd3f172cfe824c3841c8d7aee4"
+          },
+          {
+            "path": "docs/parallel-work.md",
+            "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+          },
+          {
+            "path": "docs/security-controls.md",
+            "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+          },
+          {
+            "path": "docs/sprint-alfred-completion-report.md",
+            "sha256": "6e4d34de1244716e3f184fdcfdffa8b974e2889a4226d64bf2b71b4aecca6bc5"
+          },
+          {
+            "path": "docs/usage.md",
+            "sha256": "2d6f7463189333e636f2a9973466083aa06c5fe6dcabee9703c6386d7b0d94c3"
+          },
+          {
+            "path": "docs/v3-consumer-onboarding.md",
+            "sha256": "2817ffc89ea42b25b2041e0c8c73df90e6f11182955ff57239be157b54c4457d"
+          }
+        ],
+        "inputs": {
+          "capabilityInventorySha256": "eff56223ec70f4f9a63255ed06a39ce4bd3a7742c3e1edfe025d822505bdae92",
+          "governanceSha256": "67b6ae15481e1cb582572da3c182fce7f00608d20e3f4037202749b3dd7f4616",
+          "readerProtocolSha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17"
+        },
+        "docsetSha256": "3c9150c6d55a781ea859772f51914f49d1fa89d7d59709cd9bde8bcf4227a3ed",
+        "assurance": "committed-state-and-evidence-presence-only",
+        "tree": "e948c2b681be842f2bac0ca9edbc3f05a120faa8"
+      },
+      "reports": [
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-one/round-20260923a.md",
+          "sha256": "fee972f3bf1c384ae216e96a146548902610d94f27aa0a76b099a7fea64bb013",
+          "changes": [
+            "18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761"
+          ],
+          "additions": [
+            "18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761"
+          ],
+          "firstPublicationSha256": "fee972f3bf1c384ae216e96a146548902610d94f27aa0a76b099a7fea64bb013",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-two/round-20260923a.md",
+          "sha256": "b129784ced7e4d153f5708f7aab3337e9474137f02656a0925b34c46a6495528",
+          "changes": [
+            "18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761"
+          ],
+          "additions": [
+            "18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761"
+          ],
+          "firstPublicationSha256": "b129784ced7e4d153f5708f7aab3337e9474137f02656a0925b34c46a6495528",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        }
+      ]
+    },
+    {
+      "id": "round-20260924a",
+      "reviewedIdentityEvidence": "explicit report candidate",
+      "snapshot": {
+        "schema": "pipeline.doc-reader-docset-snapshot.v1",
+        "candidateCommit": "e11caafa749725b98a7830c81a6ce2b49d415fa9",
+        "featureId": "sprint-alfred-epic",
+        "coverage": [
+          {
+            "path": "GEMINI.md",
+            "sha256": "705a196d546495fbf86e2d26f2c00ae4253724e8bcf6141a35edf8c2c0d9df67"
+          },
+          {
+            "path": "PIPELINE_FLOW.de.md",
+            "sha256": "358254726409af34dcbc3f80b09c811bde0fb80ac79aa6a302effe4f58ec8719"
+          },
+          {
+            "path": "PIPELINE_FLOW.md",
+            "sha256": "35a6b64d77271878b9ab674cc6ec27282caf32437c17641bf248ea9cc55b4cf5"
+          },
+          {
+            "path": "README.md",
+            "sha256": "8a1760b4b9584e57caec7e940747792ccd73b1e02aa259724f68f74867e27ca3"
+          },
+          {
+            "path": "SETUP.md",
+            "sha256": "d8b8395c77e6449a5ea68b1f40ff5baf359d3d91639cf46ceaae5c3a8c72ef0a"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "6dfdbafff42aadf1705a57175f82a0db2b8fdd4bba463d5160380cb496c476f4"
+          },
+          {
+            "path": "docs/audit-and-evidence.md",
+            "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+          },
+          {
+            "path": "docs/audit-bundles.md",
+            "sha256": "e8a213a4c8e66eab8be9c9c2494250ac42160aefb28910fcf1a7d41cb28c7985"
+          },
+          {
+            "path": "docs/cost-and-measurement.md",
+            "sha256": "ac9503eb809e77b620aa8e02fedd8cd27d18b856cf373efd1a07c24857f61967"
+          },
+          {
+            "path": "docs/enforcement.md",
+            "sha256": "3099a23337847527fd3c8314806b1f385bd2c74ed4fed78442eef913dc12e606"
+          },
+          {
+            "path": "docs/overview.md",
+            "sha256": "47c4b3191dff64f0b2ee4f48bfb561a4be91abfd3f172cfe824c3841c8d7aee4"
+          },
+          {
+            "path": "docs/parallel-work.md",
+            "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+          },
+          {
+            "path": "docs/security-controls.md",
+            "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+          },
+          {
+            "path": "docs/sprint-alfred-completion-report.md",
+            "sha256": "6e4d34de1244716e3f184fdcfdffa8b974e2889a4226d64bf2b71b4aecca6bc5"
+          },
+          {
+            "path": "docs/usage.md",
+            "sha256": "2d6f7463189333e636f2a9973466083aa06c5fe6dcabee9703c6386d7b0d94c3"
+          },
+          {
+            "path": "docs/v3-consumer-onboarding.md",
+            "sha256": "a3705e580bb312b7391e4c4f73120c7526bed632b5bef75f26f346b311f524a8"
+          }
+        ],
+        "inputs": {
+          "capabilityInventorySha256": "ea7c81bde92de2bf93fd57bd4273ae976edddea2a5f66dcb4d2e5f17a4850114",
+          "governanceSha256": "67b6ae15481e1cb582572da3c182fce7f00608d20e3f4037202749b3dd7f4616",
+          "readerProtocolSha256": "976e2fadec35bc5b702f60a9d0cdfef361a2bfa6e60a992b85042ec343787f9a"
+        },
+        "docsetSha256": "346b042c7490f4687327b008b2d25474e47c61b269c83b690635ad41dcd3a2c1",
+        "assurance": "committed-state-and-evidence-presence-only",
+        "tree": "8a7dfbc9cddbe68d63234c004fe9ac1fa55a100b"
+      },
+      "reports": [
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-one/round-20260924a.md",
+          "sha256": "3a2020fae76533aa4377387a2637f72bdba4118a927fc175e142e5089d373066",
+          "changes": [
+            "b10a5b7c3a124e109f585560f81cae8ba7c47535"
+          ],
+          "additions": [
+            "b10a5b7c3a124e109f585560f81cae8ba7c47535"
+          ],
+          "firstPublicationSha256": "3a2020fae76533aa4377387a2637f72bdba4118a927fc175e142e5089d373066",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-two/round-20260924a.md",
+          "sha256": "56f94c47e68d92bb350e3da71c55074068da91ddc494d3fe6b81e5205d73ff69",
+          "changes": [
+            "b10a5b7c3a124e109f585560f81cae8ba7c47535"
+          ],
+          "additions": [
+            "b10a5b7c3a124e109f585560f81cae8ba7c47535"
+          ],
+          "firstPublicationSha256": "56f94c47e68d92bb350e3da71c55074068da91ddc494d3fe6b81e5205d73ff69",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        }
+      ]
+    },
+    {
+      "id": "round-20260927a",
+      "reviewedIdentityEvidence": "handover latest snapshot, not explicit report identity",
+      "snapshot": {
+        "schema": "pipeline.doc-reader-docset-snapshot.v1",
+        "candidateCommit": "1f1b5ed603e1046de602479cb0066a0548b271ed",
+        "featureId": "sprint-alfred-epic",
+        "coverage": [
+          {
+            "path": "GEMINI.md",
+            "sha256": "7f619f7fe6664b30e5802d68d14b5b55cb3a3fab5b318ddf9a977aae81fa25b3"
+          },
+          {
+            "path": "PIPELINE_FLOW.de.md",
+            "sha256": "dfef4b7eaf28205afc0761705528eb9de9f1394d964b1ab325fe23760071e43b"
+          },
+          {
+            "path": "PIPELINE_FLOW.md",
+            "sha256": "d60d5fc54e765b3a976a785886c68a01b6d8707241a5e597dbaffb4c0a4bf4f5"
+          },
+          {
+            "path": "README.md",
+            "sha256": "953dbc9d9b371131254077aa720b0fb42b1681b5a127bc33d9b574970b19efad"
+          },
+          {
+            "path": "SETUP.md",
+            "sha256": "0b7fa4be64233762b47a2f3318994a917ee2a97feafa676a99965c04e5974da1"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "8a1eeff32620b9be7761440e4e2f9afa032b79ba5088d907c762896fb64252a3"
+          },
+          {
+            "path": "docs/audit-and-evidence.md",
+            "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+          },
+          {
+            "path": "docs/audit-bundles.md",
+            "sha256": "df93c5f146a3900fa11507b8b0012a54f92a781757682dfca6e5643a42152c7a"
+          },
+          {
+            "path": "docs/cost-and-measurement.md",
+            "sha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7"
+          },
+          {
+            "path": "docs/enforcement.md",
+            "sha256": "f0bac9e368e746e523153cbb07e097bd0a1458efb45db87ee6e8fe94ba987a03"
+          },
+          {
+            "path": "docs/overview.md",
+            "sha256": "9e157a3cb73e70ca9fc9283f6bb91c762075074800d6fb9c0d3ac41cf7c9568d"
+          },
+          {
+            "path": "docs/parallel-work.md",
+            "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+          },
+          {
+            "path": "docs/security-controls.md",
+            "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+          },
+          {
+            "path": "docs/sprint-alfred-completion-report.md",
+            "sha256": "5eba343153fc31fcfb372d608fa77810d18acbb3bc561f05ed8c77d4094dcae8"
+          },
+          {
+            "path": "docs/usage.md",
+            "sha256": "4ad2b3cdb8981d74ec56b46e1b2951660d76ff5466f1f3907d7f383c1e60859e"
+          },
+          {
+            "path": "docs/v3-consumer-onboarding.md",
+            "sha256": "6203340dfafaabc1428a0ae266bc03660d48baa2311b12b7317a96a96a488169"
+          }
+        ],
+        "inputs": {
+          "capabilityInventorySha256": "c2ac42e0d62ad86453c284ddc6b70728492d29f89cfc382ae78af9706943f140",
+          "governanceSha256": "eacee03a1b02a4750505bfb3188d35f1417c7de8cdc758237693a9ad66a12cd6",
+          "readerProtocolSha256": "01bb5dff079dc0240a1fcef0c43088e3dfe7cefac3dafcee41726e6566554914"
+        },
+        "docsetSha256": "282a3d9c1997d98010b3dd5595d3ae6ebafda9466bd537a8d18579e01be9398c",
+        "assurance": "committed-state-and-evidence-presence-only",
+        "tree": "554246449eaea3e0ea97bbff80fc61828b80d0ba"
+      },
+      "reports": [
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-one/round-20260927a.md",
+          "sha256": "c41b8254758c0b656d64a43881412da3a50bddc86429b892a94b455d8c8a4bec",
+          "changes": [
+            "e8ad0b0fca7676c8503f744f4853ce4a17ae14f1"
+          ],
+          "additions": [
+            "e8ad0b0fca7676c8503f744f4853ce4a17ae14f1"
+          ],
+          "firstPublicationSha256": "c41b8254758c0b656d64a43881412da3a50bddc86429b892a94b455d8c8a4bec",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-two/round-20260927a.md",
+          "sha256": "329f37a656732a160bf38fc570810ef4c4420bb37371b905865e296d1bfcc39d",
+          "changes": [
+            "e8ad0b0fca7676c8503f744f4853ce4a17ae14f1"
+          ],
+          "additions": [
+            "e8ad0b0fca7676c8503f744f4853ce4a17ae14f1"
+          ],
+          "firstPublicationSha256": "329f37a656732a160bf38fc570810ef4c4420bb37371b905865e296d1bfcc39d",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        }
+      ]
+    },
+    {
+      "id": "round-20260927b",
+      "reviewedIdentityEvidence": "explicit report candidate",
+      "snapshot": {
+        "schema": "pipeline.doc-reader-docset-snapshot.v1",
+        "candidateCommit": "c3ff4084872ff5351b37e0438a932573479fb3c3",
+        "featureId": "sprint-alfred-epic",
+        "coverage": [
+          {
+            "path": "GEMINI.md",
+            "sha256": "7f619f7fe6664b30e5802d68d14b5b55cb3a3fab5b318ddf9a977aae81fa25b3"
+          },
+          {
+            "path": "PIPELINE_FLOW.de.md",
+            "sha256": "eff5d4332a3df7bee37a9f8c138b911404580a1c5fa9f73a013c88e7d5dd4ded"
+          },
+          {
+            "path": "PIPELINE_FLOW.md",
+            "sha256": "32fab4169d94061276189ef0f262a48973f2fcc01931a68403bff35df4d752a4"
+          },
+          {
+            "path": "README.md",
+            "sha256": "515e9e20c19a4fa3d901439dec2be1f30699a13cd33ff87550d5e764081b93dd"
+          },
+          {
+            "path": "SETUP.md",
+            "sha256": "0b7fa4be64233762b47a2f3318994a917ee2a97feafa676a99965c04e5974da1"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "8a1eeff32620b9be7761440e4e2f9afa032b79ba5088d907c762896fb64252a3"
+          },
+          {
+            "path": "docs/audit-and-evidence.md",
+            "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+          },
+          {
+            "path": "docs/audit-bundles.md",
+            "sha256": "df93c5f146a3900fa11507b8b0012a54f92a781757682dfca6e5643a42152c7a"
+          },
+          {
+            "path": "docs/cost-and-measurement.md",
+            "sha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7"
+          },
+          {
+            "path": "docs/enforcement.md",
+            "sha256": "f0bac9e368e746e523153cbb07e097bd0a1458efb45db87ee6e8fe94ba987a03"
+          },
+          {
+            "path": "docs/overview.md",
+            "sha256": "9e157a3cb73e70ca9fc9283f6bb91c762075074800d6fb9c0d3ac41cf7c9568d"
+          },
+          {
+            "path": "docs/parallel-work.md",
+            "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+          },
+          {
+            "path": "docs/security-controls.md",
+            "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+          },
+          {
+            "path": "docs/sprint-alfred-completion-report.md",
+            "sha256": "2073bda72596b00c44e0b1b5527f772af153696d1449c0ea67c362cfc236bd37"
+          },
+          {
+            "path": "docs/usage.md",
+            "sha256": "4ad2b3cdb8981d74ec56b46e1b2951660d76ff5466f1f3907d7f383c1e60859e"
+          },
+          {
+            "path": "docs/v3-consumer-onboarding.md",
+            "sha256": "6203340dfafaabc1428a0ae266bc03660d48baa2311b12b7317a96a96a488169"
+          }
+        ],
+        "inputs": {
+          "capabilityInventorySha256": "c2ac42e0d62ad86453c284ddc6b70728492d29f89cfc382ae78af9706943f140",
+          "governanceSha256": "eacee03a1b02a4750505bfb3188d35f1417c7de8cdc758237693a9ad66a12cd6",
+          "readerProtocolSha256": "01bb5dff079dc0240a1fcef0c43088e3dfe7cefac3dafcee41726e6566554914"
+        },
+        "docsetSha256": "25cc0a319ac951f06a4ef21ba213b482f1b626a187a4c97a631ca14beea17c34",
+        "assurance": "committed-state-and-evidence-presence-only",
+        "tree": "8012e767dfd3e4729adbe6ae3b4ddbf03a9f6c48"
+      },
+      "reports": [
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-one/round-20260927b.md",
+          "sha256": "e3a04c1c123f17bec1ba2bdf28b7992f2015e3a82f06feffa24578932090998e",
+          "changes": [
+            "ae6e23352a30030e4ea80e1379162f65b09f9e9a"
+          ],
+          "additions": [
+            "ae6e23352a30030e4ea80e1379162f65b09f9e9a"
+          ],
+          "firstPublicationSha256": "e3a04c1c123f17bec1ba2bdf28b7992f2015e3a82f06feffa24578932090998e",
+          "publicationDeclaration": "path-normalized; rawSha256 not declared in public report"
+        },
+        {
+          "path": "specs/sprint-alfred-epic/evidence/reader-review/phase-two/round-20260927b.md",
+          "sha256": "683251e9c6fcbe55955bc029f2014bf4274e2d64167b304ad289365aa5f45b10",
+          "changes": [
+            "ae6e23352a30030e4ea80e1379162f65b09f9e9a"
+          ],
+          "additions": [
+            "ae6e23352a30030e4ea80e1379162f65b09f9e9a"
+          ],
+          "firstPublicationSha256": "683251e9c6fcbe55955bc029f2014bf4274e2d64167b304ad289365aa5f45b10",
+          "publicationDeclaration": "no raw/path-normalized declaration in public report"
+        }
+      ]
+    }
+  ],
+  "correctionIntervals": [
+    {
+      "afterRound": 1,
+      "lower": "9e1851d41e50888ba7b3d76c080ab78da39f23af",
+      "upper": "e11caafa749725b98a7830c81a6ce2b49d415fa9",
+      "commits": [
+        "18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761",
+        "e11caafa749725b98a7830c81a6ce2b49d415fa9"
+      ]
+    },
+    {
+      "afterRound": 2,
+      "lower": "e11caafa749725b98a7830c81a6ce2b49d415fa9",
+      "upper": "1f1b5ed603e1046de602479cb0066a0548b271ed",
+      "commits": [
+        "e2713f8c7c0001adb046e718f2f7e5b38b0ccc5d",
+        "01602d9e4f1287d62508ec6ef669210721e77a70",
+        "b10a5b7c3a124e109f585560f81cae8ba7c47535",
+        "f6ee2e97c7207ccb11feeafbb6ad8d0d0937fd3e",
+        "ef471b03f5115e9cf6317bce3e3f0fd73534402c",
+        "15c963efe044ac98be96b67c756f538acdb043d7"
+      ]
+    },
+    {
+      "afterRound": 3,
+      "lower": "1f1b5ed603e1046de602479cb0066a0548b271ed",
+      "upper": "c3ff4084872ff5351b37e0438a932573479fb3c3",
+      "commits": [
+        "d2df7b61ddb287b392fcddfe90a5db2b0d4334c9"
+      ]
+    },
+    {
+      "afterRound": 4,
+      "lower": "c3ff4084872ff5351b37e0438a932573479fb3c3",
+      "upper": "641b6d17dc00ee0d657febef435a072595c888e8",
+      "commits": [
+        "641b6d17dc00ee0d657febef435a072595c888e8"
+      ]
+    }
+  ],
+  "ownerSource": {
+    "path": "specs/sprint-alfred-epic/evidence/reader-review/course-decision-request-2026-09-27.md",
+    "sha256": "24b40227c16a9438704a375e08f5b6ad0bbb4b327bffd9b02a3da45fb592db8f",
+    "changes": [
+      "641b6d17dc00ee0d657febef435a072595c888e8",
+      "ae6e23352a30030e4ea80e1379162f65b09f9e9a"
+    ]
+  },
+  "terminalSnapshot": {
+    "schema": "pipeline.doc-reader-docset-snapshot.v1",
+    "candidateCommit": "641b6d17dc00ee0d657febef435a072595c888e8",
+    "featureId": "sprint-alfred-epic",
+    "coverage": [
+      {
+        "path": "GEMINI.md",
+        "sha256": "7f619f7fe6664b30e5802d68d14b5b55cb3a3fab5b318ddf9a977aae81fa25b3"
+      },
+      {
+        "path": "PIPELINE_FLOW.de.md",
+        "sha256": "dc98c7416893321e6ef07f98398a476994bd672c9179b0f4030290734fb86d42"
+      },
+      {
+        "path": "PIPELINE_FLOW.md",
+        "sha256": "a5dea7a0d12464a65355bd69029416e59db5bb8df39e0689e23360905aee7682"
+      },
+      {
+        "path": "README.md",
+        "sha256": "515e9e20c19a4fa3d901439dec2be1f30699a13cd33ff87550d5e764081b93dd"
+      },
+      {
+        "path": "SETUP.md",
+        "sha256": "6dce4277e967616a1f99eff1dcf42307fc43d657d22d0a7042af95ddcca27c72"
+      },
+      {
+        "path": "docs/README.md",
+        "sha256": "8a1eeff32620b9be7761440e4e2f9afa032b79ba5088d907c762896fb64252a3"
+      },
+      {
+        "path": "docs/audit-and-evidence.md",
+        "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+      },
+      {
+        "path": "docs/audit-bundles.md",
+        "sha256": "df93c5f146a3900fa11507b8b0012a54f92a781757682dfca6e5643a42152c7a"
+      },
+      {
+        "path": "docs/cost-and-measurement.md",
+        "sha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7"
+      },
+      {
+        "path": "docs/enforcement.md",
+        "sha256": "f0bac9e368e746e523153cbb07e097bd0a1458efb45db87ee6e8fe94ba987a03"
+      },
+      {
+        "path": "docs/overview.md",
+        "sha256": "9e157a3cb73e70ca9fc9283f6bb91c762075074800d6fb9c0d3ac41cf7c9568d"
+      },
+      {
+        "path": "docs/parallel-work.md",
+        "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+      },
+      {
+        "path": "docs/security-controls.md",
+        "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+      },
+      {
+        "path": "docs/sprint-alfred-completion-report.md",
+        "sha256": "2073bda72596b00c44e0b1b5527f772af153696d1449c0ea67c362cfc236bd37"
+      },
+      {
+        "path": "docs/usage.md",
+        "sha256": "07fd8ce7b7b49fd21e4c7bc602201c3de06187a7c8f4b10f834846fb2cc96762"
+      },
+      {
+        "path": "docs/v3-consumer-onboarding.md",
+        "sha256": "4f05ecced76a34b323622780cad4835f50bca32176b8ec4164416d4941f5077b"
+      }
+    ],
+    "inputs": {
+      "capabilityInventorySha256": "c2ac42e0d62ad86453c284ddc6b70728492d29f89cfc382ae78af9706943f140",
+      "governanceSha256": "eacee03a1b02a4750505bfb3188d35f1417c7de8cdc758237693a9ad66a12cd6",
+      "readerProtocolSha256": "01bb5dff079dc0240a1fcef0c43088e3dfe7cefac3dafcee41726e6566554914"
+    },
+    "docsetSha256": "68234a63f33f959a479916acd42c4d2bd6d047927f6d28e365595cd7da3f62cd",
+    "assurance": "committed-state-and-evidence-presence-only"
+  },
+  "candidateSnapshot": {
+    "schema": "pipeline.doc-reader-docset-snapshot.v1",
+    "candidateCommit": "3dc9beac66d3067105945d9affab2a93fab91797",
+    "featureId": "sprint-alfred-epic",
+    "coverage": [
+      {
+        "path": "GEMINI.md",
+        "sha256": "7f619f7fe6664b30e5802d68d14b5b55cb3a3fab5b318ddf9a977aae81fa25b3"
+      },
+      {
+        "path": "PIPELINE_FLOW.de.md",
+        "sha256": "dc98c7416893321e6ef07f98398a476994bd672c9179b0f4030290734fb86d42"
+      },
+      {
+        "path": "PIPELINE_FLOW.md",
+        "sha256": "a5dea7a0d12464a65355bd69029416e59db5bb8df39e0689e23360905aee7682"
+      },
+      {
+        "path": "README.md",
+        "sha256": "515e9e20c19a4fa3d901439dec2be1f30699a13cd33ff87550d5e764081b93dd"
+      },
+      {
+        "path": "SETUP.md",
+        "sha256": "8eb72ed70c27d616d11ba54e2a8949db1e2f154cec7d2de3c7e1d3a0d0bd62d2"
+      },
+      {
+        "path": "docs/README.md",
+        "sha256": "8a1eeff32620b9be7761440e4e2f9afa032b79ba5088d907c762896fb64252a3"
+      },
+      {
+        "path": "docs/audit-and-evidence.md",
+        "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b"
+      },
+      {
+        "path": "docs/audit-bundles.md",
+        "sha256": "df93c5f146a3900fa11507b8b0012a54f92a781757682dfca6e5643a42152c7a"
+      },
+      {
+        "path": "docs/cost-and-measurement.md",
+        "sha256": "e100a04e64e99db2d2dd2c4ce948bc7d20c7f9e647513567328f582fdad53dc7"
+      },
+      {
+        "path": "docs/enforcement.md",
+        "sha256": "d3a5f01789f0a8e48e4dcf31f305d2acd8cc1291fb0f8a4012f7e59e843fcf28"
+      },
+      {
+        "path": "docs/overview.md",
+        "sha256": "9e157a3cb73e70ca9fc9283f6bb91c762075074800d6fb9c0d3ac41cf7c9568d"
+      },
+      {
+        "path": "docs/parallel-work.md",
+        "sha256": "01989da7a7227468eac94c4fd598b0635a9f52ca0c4607abb6015bef7f1ae795"
+      },
+      {
+        "path": "docs/security-controls.md",
+        "sha256": "62bbc36d8d0986c7abeeee272e3be0f93915b1a586806bcaa785393d1d13640a"
+      },
+      {
+        "path": "docs/sprint-alfred-completion-report.md",
+        "sha256": "2d4a18461af76b1368bdd87a7bf506450fb0cc59ed518796d85179ea1142644c"
+      },
+      {
+        "path": "docs/usage.md",
+        "sha256": "07fd8ce7b7b49fd21e4c7bc602201c3de06187a7c8f4b10f834846fb2cc96762"
+      },
+      {
+        "path": "docs/v3-consumer-onboarding.md",
+        "sha256": "4f05ecced76a34b323622780cad4835f50bca32176b8ec4164416d4941f5077b"
+      }
+    ],
+    "inputs": {
+      "capabilityInventorySha256": "4d9ca2df2486c9deb4cc6b89d25a8506254dc0824ee390e67cae95b2fa1430c2",
+      "governanceSha256": "23bec3bf912551449c6b7e8282e6aa977b90566352cc655a678a331d4f5d7e73",
+      "readerProtocolSha256": "b9bd4e731787ff89bbb231886fe58d1890b114299f1d10b77f8ae9585c91b532"
+    },
+    "docsetSha256": "8c4341454340982bcbaa9d7ac9d91a018c74ed5b2ce679b29e317841f8e60a9c",
+    "assurance": "committed-state-and-evidence-presence-only"
+  },
+  "postTerminalChanges": [
+    "26fef9e7d26be3d59b7e609c1dad9dd04c747b4d",
+    "75d7d3335352cc42cfa6d156d24fc615ce146409",
+    "15722ce6ad62423b5de486adca5a8392798d1490",
+    "99078ef5e54666d5a5f44dc9b9905f55d9f4e79d",
+    "96ccb175e401d7e2d44a19eacb710594958e9a78",
+    "c0d6f166b8df53088c283fc089d1f47dddc2875c",
+    "303af023388f9dcc6c16279bdac4cd5216c4349b",
+    "b7c660282e168051455fab83c37c7261a83cc71d",
+    "ba27ad36ab9b5000944fbc0df63347027a6ebe7a",
+    "e727a9893735d666b44c8e5a93974d02661b22bb",
+    "1bd1d7bf6b089a5bfbbdaeb2151b389332bb32c5",
+    "8c1364cc89635180b18b332e6032959cd9965403",
+    "866be213923ce36ce105322bfa4ab7805b58a2fb",
+    "101ed4ef59913d796d1f9fe88db0ca25c06f28ab",
+    "380eb7faa7c0ce6357f0e87bcfc30933b8b02a8f",
+    "1cc1d16d9f9d630d7dec660b70bdc1d6176e2fce",
+    "392dfab7800931ad506262ad16f4b13b2ef22285",
+    "d585b9c9eaa880d08786c4692941c736ec5c6387"
+  ],
+  "checker": {
+    "schema": "pipeline.doc-reader-binding-check.v1",
+    "status": "failed",
+    "candidateCommit": "3dc9beac66d3067105945d9affab2a93fab91797",
+    "featureId": "sprint-alfred-epic",
+    "reviewedCommit": null,
+    "docsetSha256": null,
+    "findings": [
+      "BINDING specs/sprint-alfred-epic/evidence/reader-review/record.json is missing or not a regular blob"
+    ],
+    "assurance": "committed-state-and-evidence-presence-only"
+  }
+}
+ASSERTIONS PASSED: historical snapshots recomputed; all eight public reports equal unique first publication; absent binding RED observed. No reader readiness asserted.
+
+--- stderr ---

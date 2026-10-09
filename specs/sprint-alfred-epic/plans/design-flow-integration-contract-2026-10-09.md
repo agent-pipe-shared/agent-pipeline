@@ -47,3 +47,10 @@ Acceptance: independent immutable route/boundary/security pins, complete
 source assembly, registration, one batched independent Critic and applicable
 Verify before presenting the digest-bound package. A setup failure is never
 PASS. All durable evidence must be tracked. Nothing is signed or installed yet.
+
+Assembly mapping: tranche-1 is root-relative; tranche-2 lib/hooks/scripts/config/
+agents members are beneath plugins/pipeline-core. The existing tranche-2
+policies/model-policy.md maps to the actual root policies/model-policy.md.
+The parked tranche-1/docs kernel threat model maps to its existing root doc.
+Preserve patch inputs as inventory; full postimages subsuming their exact added
+lines take precedence and must never receive the same patch twice.

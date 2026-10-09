@@ -1,0 +1,75 @@
+command: node scratch/report-ALFRED-MECH-MIGRATION-F-20261009.mjs
+label: ALFRED-MECH-MIGRATION-F-20261009-blocked-registry-premise
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "dispatchId": "ALFRED-MECH-MIGRATION-F-20261009",
+  "disposition": "blocked-contract-source-contradiction",
+  "loadedRegistry": "plugins/pipeline-core/config/runner-profiles-v2.json",
+  "loadedSchema": "plugins/pipeline-core/scripts/pipeline-user-v2.schema.json",
+  "selectorClaudeEnum": [
+    "fable",
+    "opus",
+    "sonnet"
+  ],
+  "baselineValidation": {
+    "ok": true,
+    "source": "pipeline.user.v2",
+    "errors": []
+  },
+  "exactHaikuMediumValidation": {
+    "ok": false,
+    "source": "pipeline.user.v2",
+    "errors": [
+      {
+        "path": "$.routing.duties.mechanic.claude.selector.value",
+        "code": "enum",
+        "message": "value is not one of the registered values: fable, opus, sonnet",
+        "repair": "use a registered value"
+      }
+    ]
+  },
+  "inputHashes": [
+    {
+      "path": "plugins/pipeline-core/lib/runner-profiles-v2.mjs",
+      "sha256": "3c041dab267d86e3548b2728f0a519b7b09ff8d14e7c95fc8ffaf7edb8598e47"
+    },
+    {
+      "path": "plugins/pipeline-core/config/runner-profiles-v2.json",
+      "sha256": "0f402ff5e47bc8a3cac0600585453e3bca231604dcca6e86b3a27baecdc54c29"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-user-v2.schema.json",
+      "sha256": "43abdbd342a53dc02bc6f3768f531d41aa33b5f95450452ade5277a60f42db4c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+      "sha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a"
+    },
+    {
+      "path": "scratch/contract-ALFRED-MECH-MIGRATION-F-20261009.md",
+      "sha256": "e1a7965d656da6cfaa17a51e4834fcf0a877f4a2c5f205b089dc5cfacae5f63f"
+    }
+  ],
+  "implementationChanges": [],
+  "reachedAssertions": [
+    "loaded V2 baseline validation",
+    "exact Haiku/medium V2 selector validation"
+  ],
+  "unrunChecks": [
+    "RPM19",
+    "RPM51",
+    "full migration-v2 baseline/candidate regression"
+  ],
+  "committed": "nothing committed",
+  "independentReview": "pending",
+  "poAcceptance": "pending",
+  "nextBriefingAdjustments": [
+    "Authorize and supply registered V2 schema compatibility postimage, or revise the already-registered premise; reader-only scope cannot make Haiku schema-valid."
+  ]
+}
+
+--- stderr ---

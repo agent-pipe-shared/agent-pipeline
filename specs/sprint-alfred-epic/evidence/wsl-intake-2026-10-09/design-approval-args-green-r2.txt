@@ -1,0 +1,489 @@
+command: node scratch/verify-design-args-f2.mjs
+label: ALFRED-DESIGN-ARGS-F2-20261009
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+COMMAND node --test-reporter=tap plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs
+TAP version 13
+# Subtest: DAGA001 present admits one explicit existing review receipt
+ok 1 - DAGA001 present admits one explicit existing review receipt
+  ---
+  duration_ms: 4.678324
+  type: 'test'
+  ...
+# Subtest: DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+ok 2 - DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+  ---
+  duration_ms: 2.625603
+  type: 'test'
+  ...
+# Subtest: DAGA003 mini presentation admits plain bounded attribution
+ok 3 - DAGA003 mini presentation admits plain bounded attribution
+  ---
+  duration_ms: 2.14238
+  type: 'test'
+  ...
+# Subtest: DAGA004 approve admits the exact physically contained regular Scratch request
+ok 4 - DAGA004 approve admits the exact physically contained regular Scratch request
+  ---
+  duration_ms: 2.771891
+  type: 'test'
+  ...
+# Subtest: DAGA005 preserve existing inspect submit phase and approval branches
+ok 5 - DAGA005 preserve existing inspect submit phase and approval branches
+  ---
+  duration_ms: 2.691262
+  type: 'test'
+  ...
+# Subtest: DAGA006 reject third and duplicate review receipt paths
+ok 6 - DAGA006 reject third and duplicate review receipt paths
+  ---
+  duration_ms: 2.197409
+  type: 'test'
+  ...
+# Subtest: DAGA007 reject missing duplicate blank oversize and flag-form attribution
+ok 7 - DAGA007 reject missing duplicate blank oversize and flag-form attribution
+  ---
+  duration_ms: 2.709852
+  type: 'test'
+  ...
+# Subtest: DAGA008 reject unknown duplicate request and spliced flag forms
+ok 8 - DAGA008 reject unknown duplicate request and spliced flag forms
+  ---
+  duration_ms: 2.646713
+  type: 'test'
+  ...
+# Subtest: DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+ok 9 - DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+  ---
+  duration_ms: 2.658523
+  type: 'test'
+  ...
+# Subtest: DAGA010 reject unsafe request paths and invalid digest basenames
+ok 10 - DAGA010 reject unsafe request paths and invalid digest basenames
+  ---
+  duration_ms: 2.811281
+  type: 'test'
+  ...
+# Subtest: DAGA011 reject receipt symlinks and physical parent escapes
+ok 11 - DAGA011 reject receipt symlinks and physical parent escapes
+  ---
+  duration_ms: 3.237665
+  type: 'test'
+  ...
+# Subtest: DAGA012 reject request symlinks parent escape directory and multiple links
+ok 12 - DAGA012 reject request symlinks parent escape directory and multiple links
+  ---
+  duration_ms: 5.74324
+  type: 'test'
+  ...
+# Subtest: DAGA013 new flags do not widen unrelated commands or foreign script admission
+ok 13 - DAGA013 new flags do not widen unrelated commands or foreign script admission
+  ---
+  duration_ms: 2.278458
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47.821887
+
+EXIT 0
+FD3
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["DAGA001","DAGA002","DAGA003","DAGA004","DAGA005","DAGA006","DAGA007","DAGA008","DAGA009","DAGA010","DAGA011","DAGA012","DAGA013"],"caseCount":13,"caseSetSha256":"dc24a97269b60610d4b43454173ad763861a334a8183ed0559274190d32da6b9"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA011","ordinal":10,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA012","ordinal":11,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DAGA013","ordinal":12,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":13,"disposedCount":13,"caseIds":["DAGA001","DAGA002","DAGA003","DAGA004","DAGA005","DAGA006","DAGA007","DAGA008","DAGA009","DAGA010","DAGA011","DAGA012","DAGA013"],"caseSetSha256":"dc24a97269b60610d4b43454173ad763861a334a8183ed0559274190d32da6b9","dispositionsSha256":"017559cbf1beb5caa371e18ce25735e82ff16650662dac9858d70c07d946d0cf","counts":{"pass":13,"fail":0,"skip":0,"todo":0}}
+
+COMMAND node --test --test-reporter=tap harness/scripts/check-consumer-safe-paths.test.mjs
+TAP version 13
+# check-consumer-safe-paths: fixture and repository checks passed
+# Subtest: a fixture naming a source-only path fails
+ok 1 - a fixture naming a source-only path fails
+  ---
+  duration_ms: 0.662001
+  type: 'test'
+  ...
+# Subtest: a clean fixture passes
+ok 2 - a clean fixture passes
+  ---
+  duration_ms: 0.480693
+  type: 'test'
+  ...
+# Subtest: an allowlisted occurrence passes
+ok 3 - an allowlisted occurrence passes
+  ---
+  duration_ms: 0.161188
+  type: 'test'
+  ...
+# Subtest: a stale allowlist entry (never matches) is itself reported
+ok 4 - a stale allowlist entry (never matches) is itself reported
+  ---
+  duration_ms: 0.182917
+  type: 'test'
+  ...
+# Subtest: multiple prefix hits on one line each produce a finding
+ok 5 - multiple prefix hits on one line each produce a finding
+  ---
+  duration_ms: 0.158768
+  type: 'test'
+  ...
+# Subtest: SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+ok 6 - SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+  ---
+  duration_ms: 0.124428
+  type: 'test'
+  ...
+# Subtest: every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+ok 7 - every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+  ---
+  duration_ms: 0.345135
+  type: 'test'
+  ...
+# Subtest: current repository passes with the real ALLOWLIST (AC-11)
+ok 8 - current repository passes with the real ALLOWLIST (AC-11)
+  ---
+  duration_ms: 79.875706
+  type: 'test'
+  ...
+# Subtest: real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+ok 9 - real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+  ---
+  duration_ms: 5.196497
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 133.543793
+
+EXIT 0
+COMMAND node --test-reporter=tap plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
+TAP version 13
+# Subtest: K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic
+ok 1 - K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic
+  ---
+  duration_ms: 456.615694
+  type: 'test'
+  ...
+# Subtest: K3G002 actual course inspect emits advisor execute action admitted by real guard entry point
+not ok 2 - K3G002 actual course inspect emits advisor execute action admitted by real guard entry point
+  ---
+  duration_ms: 223.569395
+  type: 'test'
+  location: '<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is partial.
+    Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+    A narrow diagnosis lane stays admitted while status is partial: creating the repository's own scratch directory and writing exactly scratch/incident-report.md via Write or Edit.
+    
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:185:14)
+    async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: K3G003 working readiness-stage fixed argv is admitted for every supported runner
+ok 3 - K3G003 working readiness-stage fixed argv is admitted for every supported runner
+  ---
+  duration_ms: 632.504059
+  type: 'test'
+  ...
+# Subtest: K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv
+ok 4 - K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv
+  ---
+  duration_ms: 4585.644016
+  type: 'test'
+  ...
+# Subtest: K3G005 inspect rejects extra flags and every agent signing shape including run-v2
+ok 5 - K3G005 inspect rejects extra flags and every agent signing shape including run-v2
+  ---
+  duration_ms: 1649.082297
+  type: 'test'
+  ...
+# Subtest: K3G006 mini and existing package routes remain on present-plan while absent runner stays typed
+ok 6 - K3G006 mini and existing package routes remain on present-plan while absent runner stays typed
+  ---
+  duration_ms: 48.613529
+  type: 'test'
+  ...
+# Subtest: K3G007 fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result
+ok 7 - K3G007 fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result
+  ---
+  duration_ms: 1261.502524
+  type: 'test'
+  ...
+# Subtest: K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor
+ok 8 - K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor
+  ---
+  duration_ms: 3043.991141
+  type: 'test'
+  ...
+# Subtest: K3G009 run-v2 rejects extra signing collision and stale or foreign curation references
+ok 9 - K3G009 run-v2 rejects extra signing collision and stale or foreign curation references
+  ---
+  duration_ms: 3436.226529
+  type: 'test'
+  ...
+# Subtest: K3G010 physical source and preparation aliases never gain admission
+ok 10 - K3G010 physical source and preparation aliases never gain admission
+  ---
+  duration_ms: 621.660293
+  type: 'test'
+  ...
+# Subtest: K3G011 source and current submission changes invalidate previously emitted commands
+not ok 11 - K3G011 source and current submission changes invalidate previously emitted commands
+  ---
+  duration_ms: 23.465504
+  type: 'test'
+  location: '<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    ["<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/scripts/design-course-session.mjs","--root","/tmp/k3-guard-regression-fp0UBt","--runner","codex","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/codex","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    accepted (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:46)
+    async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair
+ok 12 - K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair
+  ---
+  duration_ms: 2257.30372
+  type: 'test'
+  ...
+# Subtest: K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags
+ok 13 - K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags
+  ---
+  duration_ms: 659.220972
+  type: 'test'
+  ...
+# Subtest: K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request
+not ok 14 - K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request
+  ---
+  duration_ms: 216.701201
+  type: 'test'
+  location: '<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    ["<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/scripts/design-course-session.mjs","--root","/tmp/k3-guard-regression-tKoaow","--runner","claude","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/claude","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    accepted (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    invoke (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:427:9)
+    Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:434:29)
+    async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: K3G015 trusted approve-push chat argv reaches the real guard under committed global policy
+ok 15 - K3G015 trusted approve-push chat argv reaches the real guard under committed global policy
+  ---
+  duration_ms: 126.67827
+  type: 'test'
+  ...
+# Subtest: K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv
+ok 16 - K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv
+  ---
+  duration_ms: 4579.841416
+  type: 'test'
+  ...
+# Subtest: K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval
+ok 17 - K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval
+  ---
+  duration_ms: 1485.75891
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 14
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 25318.216043
+
+EXIT 1
+FD3
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["K3G001","K3G002","K3G003","K3G004","K3G005","K3G006","K3G007","K3G008","K3G009","K3G010","K3G011","K3G012","K3G013","K3G014","K3G015","K3G016","K3G017"],"caseCount":17,"caseSetSha256":"8df7afde6a6af39502d50aea85a23b734207c140692977b12cb9bc403a193351"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G002","ordinal":1,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G011","ordinal":10,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G012","ordinal":11,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G013","ordinal":12,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G014","ordinal":13,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G015","ordinal":14,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G016","ordinal":15,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"K3G017","ordinal":16,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":17,"disposedCount":17,"caseIds":["K3G001","K3G002","K3G003","K3G004","K3G005","K3G006","K3G007","K3G008","K3G009","K3G010","K3G011","K3G012","K3G013","K3G014","K3G015","K3G016","K3G017"],"caseSetSha256":"8df7afde6a6af39502d50aea85a23b734207c140692977b12cb9bc403a193351","dispositionsSha256":"8d3f4fd5e2ecc694a6ae5f425acfd86942a749c6c4a7c449cf14145e0816d7a2","counts":{"pass":14,"fail":3,"skip":0,"todo":0}}
+
+NARROW DIFF
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/sanctioned-args-scripts.mjs
+index 400d31817..cc8b40d03 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/sanctioned-args-scripts.mjs
+@@ -2,7 +2,7 @@
+ // Guard module "sanctioned-args-scripts" (layer 2), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
+ import { isPhysicalScratchTarget } from "../physical-scratch-boundary.mjs";
+-import { existsSync } from "node:fs";
++import { existsSync, lstatSync, realpathSync } from "node:fs";
+ import { basename, isAbsolute, join, resolve } from "node:path";
+ import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
+ import { USER_SOURCE_PATH, readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
+@@ -334,6 +334,26 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
+   return rebindApply && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
+ }
+ 
++// Review receipts must be existing regular files reached without physical aliases.
++function designReviewReceiptPath(value, root) {
++  if (typeof value !== "string" || value.length === 0
++    || Buffer.byteLength(value, "utf8") > 500 || isAbsolute(value)
++    || /[\\:\x00-\x1f\x7f]/u.test(value) || !value.endsWith(".json")) return false;
++  const parts = value.split("/");
++  if (parts.some(part => part === "" || part === "." || part === "..")) return false;
++  try {
++    let current = realpathSync(root);
++    if (!lstatSync(current).isDirectory()) return false;
++    for (let index = 0; index < parts.length; index += 1) {
++      current = join(current, parts[index]);
++      const stat = lstatSync(current);
++      if (stat.isSymbolicLink() || realpathSync(current) !== current
++        || (index < parts.length - 1 ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)) return false;
++    }
++    return true;
++  } catch { return false; }
++}
++
+ export function sanctionedPipelineStateArgs(args, root) {
+   // `inspect` is a pure read of the current working tree and intentionally has no
+   // `--root` override; the caller must run it from the repository it is inspecting.
+@@ -385,7 +405,28 @@ export function sanctionedPipelineStateArgs(args, root) {
+       && args[3] === "--profile" && new Set(["epic", "feature", "mini"]).has(args[4])
+       && args.length === 5;
+   }
++  if (args[0] === "present-plan") {
++    if (args[1] !== "--by" || !validBy(args[2]) || args[2].startsWith("--")
++      || ![3, 5, 7].includes(args.length)) return false;
++    const receipts = new Set();
++    for (let index = 3; index < args.length; index += 2) {
++      if (args[index] !== "--review-receipt" || receipts.has(args[index + 1])
++        || !designReviewReceiptPath(args[index + 1], root)) return false;
++      receipts.add(args[index + 1]);
++    }
++    return true;
++  }
+   if (args[0] === "approve-plan") {
++    if (args[3] === "--design-approval-request") {
++      const requestPath = args[4];
++      if (args.length !== 5 || args[1] !== "--by" || !validBy(args[2])
++        || args[2].startsWith("--")
++        || !/^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u.test(requestPath ?? "")) return false;
++      try {
++        return isPhysicalScratchTarget(requestPath, { rootDir: root })
++          && lstatSync(resolve(root, requestPath)).isFile();
++      } catch { return false; }
++    }
+     const attributedLegacy = args[1] === "--by" && validBy(args[2]) && args.length === 3;
+     const bootstrapReceipt = args[1] === "--bootstrap-acknowledgement-receipt"
+       && /^scratch\/bootstrap-plan-acknowledgement-receipt-[a-f0-9]{64}\.json$/u.test(args[2] ?? "")
+
+{"schema":"design-approval-args-green-check.v1","acceptancePassed":true,"cases":["DAGA001","DAGA002","DAGA003","DAGA004","DAGA005","DAGA006","DAGA007","DAGA008","DAGA009","DAGA010","DAGA011","DAGA012","DAGA013"],"assertionExit":0,"completion":{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":13,"disposedCount":13,"caseIds":["DAGA001","DAGA002","DAGA003","DAGA004","DAGA005","DAGA006","DAGA007","DAGA008","DAGA009","DAGA010","DAGA011","DAGA012","DAGA013"],"caseSetSha256":"dc24a97269b60610d4b43454173ad763861a334a8183ed0559274190d32da6b9","dispositionsSha256":"017559cbf1beb5caa371e18ce25735e82ff16650662dac9858d70c07d946d0cf","counts":{"pass":13,"fail":0,"skip":0,"todo":0}},"consumerSafePathsExit":0,"historicalCourseExit":1,"historicalCourseCompletion":{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":17,"disposedCount":17,"caseIds":["K3G001","K3G002","K3G003","K3G004","K3G005","K3G006","K3G007","K3G008","K3G009","K3G010","K3G011","K3G012","K3G013","K3G014","K3G015","K3G016","K3G017"],"caseSetSha256":"8df7afde6a6af39502d50aea85a23b734207c140692977b12cb9bc403a193351","dispositionsSha256":"8d3f4fd5e2ecc694a6ae5f425acfd86942a749c6c4a7c449cf14145e0816d7a2","counts":{"pass":14,"fail":3,"skip":0,"todo":0}},"historicalDebt":"Retired design-course fixture prefix expectations reported separately; no changes authorized.","immutableSourceSha256":{"plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs":"505e64749efa191e10e0522298d74908a8656f164eb7bfdee6412d7f53ebb1d9","plugins/pipeline-core/lib/guard/command-catalogue.mjs":"c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs":"81d315c71e820294518298ec7811247b673d9e8ab95ebe189ad71b53f9b6f212","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs":"8dc5efc5b2631744d8d4baa6527e4ce9c8b3fda01053cb31773fef3d1cef2c9e","plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"},"baseSha256":"505e64749efa191e10e0522298d74908a8656f164eb7bfdee6412d7f53ebb1d9","postimageSha256":"49d3ab05d33e1e4c4440f945234ae70c575b52c543e597dd16fee38be0e931af","diffSha256":"6181c5d56fd146e0225d2feaafeaa777d0a87b97f6e7121595143e7057c13b39","independentReview":"pending","poAcceptance":"open"}
+
+--- stderr ---
+
+
+K3G002: AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is partial.
+Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+A narrow diagnosis lane stays admitted while status is partial: creating the repository's own scratch directory and writing exactly scratch/incident-report.md via Write or Edit.
+
+
+2 !== 0
+
+    at Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:185:14)
+    at async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G011: AssertionError [ERR_ASSERTION]: ["<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/scripts/design-course-session.mjs","--root","/tmp/k3-guard-regression-fp0UBt","--runner","codex","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/codex","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+
+false !== true
+
+    at accepted (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    at Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:46)
+    at async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G014: AssertionError [ERR_ASSERTION]: ["<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/scripts/design-course-session.mjs","--root","/tmp/k3-guard-regression-tKoaow","--runner","claude","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/claude","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+
+false !== true
+
+    at accepted (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    at invoke (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:427:9)
+    at Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:434:29)
+    at async Object.run (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/scratch/design-args-f2-public-N2HSet/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+

@@ -1,0 +1,50 @@
+command: node scratch/report-ALFRED-MECH-ALIAS-F3-20261009.mjs
+label: ALFRED-MECH-ALIAS-F3-20261009-setup-block
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "dispatchId": "ALFRED-MECH-ALIAS-F3-20261009",
+  "outcome": "blocked",
+  "reason": "Immutable migration suites import ../../../setup.mjs; the authorized public R4 snapshot lacks setup.mjs and the closed exhaustive context does not authorize the checkout copy.",
+  "snapshotEntries": [
+    ".claude-plugin",
+    "docs",
+    "harness",
+    "plugins",
+    "policies"
+  ],
+  "snapshotHasSetup": false,
+  "testInputs": [
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+      "sha256": "9c4e423f2605dd0d9c85d99ce55db68bb4becde00755fb11fca7e7055eb841db",
+      "setupImport": [
+        "import { run as setupRun } from \"../../../setup.mjs\";"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "sha256": "85024ebe8caeb39fe033c3ed6d215cc69d109729f78072def25257132e430d55",
+      "setupImport": [
+        "import { buildDefaultAnswers, renderPipelineYaml, renderUserYaml } from \"../../../setup.mjs\";"
+      ]
+    }
+  ],
+  "sourceManifestSha256": "8365b931da56d4025133e05542840d382f28bf6ed8298d56532a2900a397d10a",
+  "reachedAssertions": [],
+  "setupFailure": true,
+  "manifestWritten": false,
+  "committed": "nothing committed",
+  "verification": "not verifiable: RPM19/RPM51, full V2 delta, runtime projection suite, and unknown-alias negative not run after the stop condition",
+  "independentReview": "pending",
+  "poAcceptance": "pending",
+  "nextBriefingAdjustments": [
+    "Explicitly authorize the real setup.mjs dependency or provide a complete public snapshot containing it."
+  ],
+  "refusal": "One read command with regex alternation was refused as GUARD-READ-COMMAND-UNSUPPORTED; no override or protected-path bypass attempted."
+}
+
+--- stderr ---

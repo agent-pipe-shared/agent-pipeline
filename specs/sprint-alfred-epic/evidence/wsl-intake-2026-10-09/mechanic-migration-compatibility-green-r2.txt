@@ -1,0 +1,883 @@
+command: node scratch/report-ALFRED-MECH-MIGRATION-F2.mjs
+label: ALFRED-MECH-MIGRATION-F2-20261009-scope-block
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "dispatchId": "ALFRED-MECH-MIGRATION-F2-20261009",
+  "outcome": "blocked",
+  "diagnosis": {
+    "schema": "pipeline.runner-profile-migration-plan.v3",
+    "status": "invalid-source",
+    "source": "pipeline.user.yaml",
+    "diagnostics": [
+      {
+        "path": "$.routing.goldfish_mechanic",
+        "code": "unsupported_native_selector",
+        "message": "Claude selector has no declared native target projection",
+        "repair": "obtain an approved I2 owned-key manifest update"
+      }
+    ],
+    "requiresExplicitActivation": true,
+    "targets": [],
+    "changes": []
+  },
+  "stop": "I2 native projection mapping rejects exact haiku; its owned manifest is outside the two parked reader/schema outputs",
+  "committed": "nothing committed",
+  "implementationChanges": [
+    "exact V0_MODELS haiku",
+    "exact directRoute Claude haiku selector",
+    "exact selectorClaude enum haiku"
+  ],
+  "scratchCorrection": "One negative fixture literal correction; original setup assertion failed because generated YAML scalar was unquoted. A later auxiliary diagnostic rerun encountered EEXIST; no retry mutation or second setup correction performed.",
+  "deviation": "Initial briefing read used default sandbox; every subsequent shell command used require_escalated.",
+  "independentReview": "pending",
+  "poAcceptance": "pending"
+}
+{"narrowDiff":"lib/runner-profile-migration-v2.mjs","exitCode":1}
+diff --git a/plugins/pipeline-core/lib/runner-profile-migration-v2.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/runner-profile-migration-v2.mjs
+index b0c66dd77..4f23126c6 100644
+--- a/plugins/pipeline-core/lib/runner-profile-migration-v2.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/runner-profile-migration-v2.mjs
+@@ -57,6 +57,7 @@ const V0_MODELS = new Map([
+   // They are exact compatibility spellings, not an open alias namespace.
+   ["opus", { kind: "alias", value: "opus" }],
+   ["sonnet", { kind: "alias", value: "sonnet" }],
++  ["haiku", { kind: "alias", value: "haiku" }],
+ ]);
+ const PROFILE_IDS = ["design", "feature", "mini"];
+ const PHASE_IDS = ["design_phase", "execution_phase", "advisory"];
+@@ -286,7 +287,7 @@ function directRoute(value, path, expectedRunner, diagnostics, { advisory = fals
+     return null;
+   }
+   const allowedSelectors = expectedRunner === "claude"
+-    ? [["alias", "fable"], ["alias", "opus"], ["alias", "sonnet"]]
++    ? [["alias", "fable"], ["alias", "opus"], ["alias", "sonnet"], ["alias", "haiku"]]
+     : [["model-id", "gpt-5.6-sol"], ["model-id", "gpt-5.6-terra"], ["model-id", "gpt-6-astra"], ["model-id", "gpt-5.6-luna"], ["alias", "terra"]];
+   if (!allowedSelectors.some(([kind, selector]) => value.selector.kind === kind && value.selector.value === selector)) {
+     diagnostics.push(diagnostic(`${path}.selector`, "unknown_selector", "direct route selector is not registered", "use a supported requested selector"));
+
+
+{"narrowDiff":"scripts/pipeline-user-v2.schema.json","exitCode":1}
+diff --git a/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-user-v2.schema.json
+index f96607a29..4d3afc8bb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-user-v2.schema.json
+@@ -144,7 +144,7 @@
+       "additionalProperties": false,
+       "properties": {
+         "kind": { "const": "alias" },
+-        "value": { "enum": ["fable", "opus", "sonnet"] }
++        "value": { "enum": ["fable", "opus", "sonnet", "haiku"] }
+       }
+     },
+     "selectorCodex": {
+
+
+command: node scratch/verify-ALFRED-MECH-MIGRATION-F2.mjs
+label: ALFRED-MECH-MIGRATION-F2-20261009
+exitCode: 1
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "inputHashes": [
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+      "sha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-user-v2.schema.json",
+      "sha256": "43abdbd342a53dc02bc6f3768f531d41aa33b5f95450452ade5277a60f42db4c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+      "sha256": "9c4e423f2605dd0d9c85d99ce55db68bb4becde00755fb11fca7e7055eb841db"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "sha256": "85024ebe8caeb39fe033c3ed6d215cc69d109729f78072def25257132e430d55"
+    },
+    {
+      "path": "plugins/pipeline-core/config/runner-profiles-v2.json",
+      "sha256": "0f402ff5e47bc8a3cac0600585453e3bca231604dcca6e86b3a27baecdc54c29"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profiles-v2.mjs",
+      "sha256": "3c041dab267d86e3548b2728f0a519b7b09ff8d14e7c95fc8ffaf7edb8598e47"
+    },
+    {
+      "path": "setup.mjs",
+      "sha256": "19c9ea659f59424026cad3d419134c81fdf75c7dcf37e4c178d8ef7776ad7096"
+    }
+  ],
+  "postimages": [
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/runner-profile-migration-v2.mjs",
+      "baseSha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a",
+      "postSha256": "c8a4792da6ac6672b48c127b3234feb573aa6d114e95a6db317f3a8acceb30c5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-user-v2.schema.json",
+      "baseSha256": "43abdbd342a53dc02bc6f3768f531d41aa33b5f95450452ade5277a60f42db4c",
+      "postSha256": "b48bf92d3093686a1fd103efba2ef9baf93f0cebdcbb2a5d101f731703c005a3"
+    }
+  ],
+  "carriedConfigHashes": [
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/config/routing-authority.json",
+      "sha256": "4db7f19aed7fcd3b2289a7f2db2bf030794f247cc40281e088546fee92f50585"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/config/runner-mappings.json",
+      "sha256": "cbc1315e7f410f6ba6a13ac97f3c6407f5de431ce8784765efd764186f5a7963"
+    }
+  ],
+  "changes": {
+    "reader": [
+      "add exact V0 haiku alias",
+      "add exact direct Claude haiku alias"
+    ],
+    "schema": [
+      "add exact selectorClaude haiku enum member"
+    ]
+  }
+}
+
+{"label":"baseline-full-v2","command":["<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","--test-reporter=tap","plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs"],"exitCode":1,"setupError":false,"failures":["FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:","FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:","FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:","FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:","FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:","FAIL  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply -- Expected values to be strictly equal:","FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')","FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:","FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:","FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:","FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:","FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:","FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:","FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:","FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:"],"reachedCount":30,"fd3Events":[]}
+FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  v0: exact historical Public opus and sonnet aliases are closed compatibility spellings
+FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning
+PASS  v2: original source bytes stay exact; inspect and plan do not mutate
+FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+PASS  inspect and plan: a live lock blocks parsing without reclamation
+FAIL  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'invalid-baseline'
+           ^
+
+FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')
+FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+PASS  apply: every rename-after-effect fault rolls all targets back without false success
+FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+-   0,
+-   0,
+    1,
++   1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+PASS  path safety: .claude/settings.json symlink fails closed
+PASS  path safety: .claude/pipeline.yaml symlink fails closed
+PASS  path safety: .codex/config.toml symlink fails closed
+PASS  path safety: .codex/agents/implementor.toml symlink fails closed
+PASS  path safety: .codex/agents/critic.toml symlink fails closed
+PASS  path safety: pipeline.user.yaml symlink fails closed
+PASS  path safety: .claude parent symlink fails closed before an outside write
+PASS  path safety: .codex parent symlink fails closed before an outside write
+FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+
+17 failure(s):
+- v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: preserved Claude routes and exact Codex routes never claim effective identities: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: accepted Terra aliases become requested frozen selectors without an effective-model claim: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- v1: current Astra and Luna selectors reconcile to frozen V2 cells: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- inspect and plan: no journal means no transient lock or persistent write: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+- baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'invalid-baseline'
+           ^
+
+- apply: forged or mutated public plans fail closed before any write: Cannot set properties of undefined (setting 'path')
+- apply: writes only declared targets, commits source last, and preserves I2 unowned bytes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+- apply: post-rename journal durability failure rolls back cleanly and permits a later plan: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+- recovery: a crash during rollback retains proof until a later inspect can clean it: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+- apply: staged write fault leaves bytes intact and never reports success: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+- recovery: durable interruption restores preimages before parsing and corrupt journals fail closed: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- recovery: a journal cannot widen the frozen I2 ownership boundary: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+-   0,
+-   0,
+    1,
++   1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+- historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-source'
+- 'ready'
+
+
+FD3
+
+
+{"label":"candidate-full-v2","command":["<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","--test-reporter=tap","plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs"],"exitCode":1,"setupError":false,"failures":["FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:","FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:","FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:","FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:","FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:","FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:","FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')","FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:","FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:","FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:","FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:","FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:","FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:","FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:","FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:"],"reachedCount":30,"fd3Events":[]}
+FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  v0: exact historical Public opus and sonnet aliases are closed compatibility spellings
+FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  source classification: malformed, unknown, wrong-runner, unsupported, and duplicate legacy routes fail before planning
+PASS  v2: original source bytes stay exact; inspect and plan do not mutate
+FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+PASS  inspect and plan: a live lock blocks parsing without reclamation
+PASS  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply
+FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')
+FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+PASS  apply: every rename-after-effect fault rolls all targets back without false success
+FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    0,
+-   0,
+    1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+PASS  path safety: .claude/settings.json symlink fails closed
+PASS  path safety: .claude/pipeline.yaml symlink fails closed
+PASS  path safety: .codex/config.toml symlink fails closed
+PASS  path safety: .codex/agents/implementor.toml symlink fails closed
+PASS  path safety: .codex/agents/critic.toml symlink fails closed
+PASS  path safety: pipeline.user.yaml symlink fails closed
+PASS  path safety: .claude parent symlink fails closed before an outside write
+PASS  path safety: .codex parent symlink fails closed before an outside write
+FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+
+16 failure(s):
+- v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: preserved Claude routes and exact Codex routes never claim effective identities: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: accepted Terra aliases become requested frozen selectors without an effective-model claim: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- v1: current Astra and Luna selectors reconcile to frozen V2 cells: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- inspect and plan: no journal means no transient lock or persistent write: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+- apply: forged or mutated public plans fail closed before any write: Cannot set properties of undefined (setting 'path')
+- apply: writes only declared targets, commits source last, and preserves I2 unowned bytes: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'applied'
+
+- apply: post-rename journal durability failure rolls back cleanly and permits a later plan: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rolled-back'
+
+- recovery: a crash during rollback retains proof until a later inspect can clean it: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'rollback-failed'
+
+- apply: staged write fault leaves bytes intact and never reports success: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'apply-failed'
+
+- recovery: durable interruption restores preimages before parsing and corrupt journals fail closed: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- recovery: a journal cannot widen the frozen I2 ownership boundary: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-plan'
+- 'interrupted'
+     ^
+
+- CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    0,
+-   0,
+    1,
++   1,
++   1,
++   1
+-   0,
+-   0
+  ]
+
+- historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration: Expected values to be strictly equal:
++ actual - expected
+
++ 'invalid-baseline'
+- 'ready'
+
+
+FD3
+
+
+{"label":"candidate-inherited-RPM19-RPM51","command":["<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","--test-reporter=tap","--test-name-pattern=RPM(19|51)","plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs"],"exitCode":1,"setupError":false,"failures":["not ok 1 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract","not ok 2 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"],"reachedCount":2,"fd3Events":[{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["RPM01","RPM02","RPM03","RPM04","RPM05","RPM06","RPM07","RPM08","RPM09","RPM10","RPM11","RPM12","RPM13","RPM14","RPM15","RPM16","RPM17","RPM18","RPM19","RPM20","RPM21","RPM22","RPM23","RPM24","RPM25","RPM26","RPM27","RPM28","RPM29","RPM30","RPM31","RPM32","RPM33","RPM34","RPM35","RPM36","RPM37","RPM38","RPM39","RPM40","RPM41","RPM42","RPM43","RPM44","RPM45","RPM46","RPM47","RPM48","RPM49","RPM50","RPM51","RPM52","RPM53","RPM54","RPM55","RPM56","RPM57","RPM58","RPM59","RPM60"],"caseCount":60,"caseSetSha256":"40002af6b75c67d96c2e292cdd4ea849354f3dd4cd34a59b89c4b82a7e414c28"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM19","ordinal":18,"disposition":"fail"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM51","ordinal":50,"disposition":"fail"}]}
+TAP version 13
+# Subtest: RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+not ok 1 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+  ---
+  duration_ms: 20.155513
+  type: 'test'
+  location: '<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:813:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+not ok 2 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 7.920266
+  type: 'test'
+  location: '<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    undefined !== 'v1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'v1'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1722:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/migration-F2-graphs-corrected/candidate/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    node:internal/test_runner/test:1133:31
+    node:internal/process/task_queues:150:7
+    AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:147:8)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 37.337209
+
+FD3
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["RPM01","RPM02","RPM03","RPM04","RPM05","RPM06","RPM07","RPM08","RPM09","RPM10","RPM11","RPM12","RPM13","RPM14","RPM15","RPM16","RPM17","RPM18","RPM19","RPM20","RPM21","RPM22","RPM23","RPM24","RPM25","RPM26","RPM27","RPM28","RPM29","RPM30","RPM31","RPM32","RPM33","RPM34","RPM35","RPM36","RPM37","RPM38","RPM39","RPM40","RPM41","RPM42","RPM43","RPM44","RPM45","RPM46","RPM47","RPM48","RPM49","RPM50","RPM51","RPM52","RPM53","RPM54","RPM55","RPM56","RPM57","RPM58","RPM59","RPM60"],"caseCount":60,"caseSetSha256":"40002af6b75c67d96c2e292cdd4ea849354f3dd4cd34a59b89c4b82a7e414c28"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM19","ordinal":18,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"RPM51","ordinal":50,"disposition":"fail"}
+
+{
+  "summary": {
+    "passed": false,
+    "baselineExitCode": 1,
+    "candidateExitCode": 1,
+    "baselineFailures": [
+      "FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:",
+      "FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:",
+      "FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:",
+      "FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:",
+      "FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:",
+      "FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:",
+      "FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:",
+      "FAIL  baseline gate: invalid source precedes baseline access; missing or malformed baselines never apply -- Expected values to be strictly equal:",
+      "FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')",
+      "FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:",
+      "FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:",
+      "FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:",
+      "FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:",
+      "FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:",
+      "FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:",
+      "FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:",
+      "FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:"
+    ],
+    "candidateFailures": [
+      "FAIL  v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent -- Expected values to be strictly equal:",
+      "FAIL  v1: preserved Claude routes and exact Codex routes never claim effective identities -- Expected values to be strictly equal:",
+      "FAIL  historical v1 seed: I3 reconciles its Sol/xhigh independent Critic to the frozen same-runner v2 cell -- Expected values to be strictly equal:",
+      "FAIL  v1: a valid legacy Codex route reconciles to its frozen same-runner v2 cell -- Expected values to be strictly equal:",
+      "FAIL  v1: accepted Terra aliases become requested frozen selectors without an effective-model claim -- Expected values to be strictly equal:",
+      "FAIL  v1: current Astra and Luna selectors reconcile to frozen V2 cells -- Expected values to be strictly equal:",
+      "FAIL  inspect and plan: no journal means no transient lock or persistent write -- Expected values to be strictly equal:",
+      "FAIL  apply: forged or mutated public plans fail closed before any write -- Cannot set properties of undefined (setting 'path')",
+      "FAIL  apply: writes only declared targets, commits source last, and preserves I2 unowned bytes -- Expected values to be strictly equal:",
+      "FAIL  apply: post-rename journal durability failure rolls back cleanly and permits a later plan -- Expected values to be strictly equal:",
+      "FAIL  recovery: a crash during rollback retains proof until a later inspect can clean it -- Expected values to be strictly equal:",
+      "FAIL  apply: staged write fault leaves bytes intact and never reports success -- Expected values to be strictly equal:",
+      "FAIL  recovery: durable interruption restores preimages before parsing and corrupt journals fail closed -- Expected values to be strictly equal:",
+      "FAIL  recovery: a journal cannot widen the frozen I2 ownership boundary -- Expected values to be strictly equal:",
+      "FAIL  CLI: inspect, plan, activation, apply, and error exits are JSON and never falsely successful -- Expected values to be strictly deep-equal:",
+      "FAIL  historical v2 lifecycle: routing check accepts v2 while normal setup requires one-way V3 migration -- Expected values to be strictly equal:"
+    ],
+    "addedFailures": [],
+    "focusedExitCode": 1,
+    "focusPassed": false,
+    "unknownSelectorNegative": {
+      "schema": "pipeline.runner-profile-migration-plan.v2",
+      "status": "invalid-source",
+      "source": "pipeline.user.yaml",
+      "diagnostics": [
+        {
+          "path": "$.routing.duties.mechanic.selector",
+          "code": "unknown_selector",
+          "message": "direct route selector is not registered",
+          "repair": "use a supported requested selector"
+        }
+      ],
+      "requiresExplicitActivation": true,
+      "root": "<repo-root>/scratch/migration-F2-graphs-corrected/candidate/negative-fixture",
+      "targets": [],
+      "changes": []
+    },
+    "controls": [
+      {
+        "name": "exact unknown Claude selector",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.selector.value",
+              "code": "enum",
+              "message": "value is not one of the registered values: fable, opus, sonnet, haiku",
+              "repair": "use a registered value"
+            }
+          ]
+        }
+      },
+      {
+        "name": "wrong Claude selector kind",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.selector.kind",
+              "code": "const",
+              "message": "value is not the required registered value",
+              "repair": "use the registered value"
+            }
+          ]
+        }
+      },
+      {
+        "name": "unknown Claude effort",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.effort",
+              "code": "enum",
+              "message": "value is not one of the registered values: low, medium, high, xhigh, max",
+              "repair": "use a registered value"
+            }
+          ]
+        }
+      },
+      {
+        "name": "unavailable policy alteration",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.unavailable",
+              "code": "enum",
+              "message": "value is not one of the registered values: defer, mapped-fallback",
+              "repair": "use a registered value"
+            },
+            {
+              "path": "$.routing.duties.mechanic.claude",
+              "code": "one_of",
+              "message": "value must match exactly one approved contract shape",
+              "repair": "supply one complete state-specific shape"
+            }
+          ]
+        }
+      },
+      {
+        "name": "evidence alteration",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.evidence",
+              "code": "const",
+              "message": "value is not the required registered value",
+              "repair": "use the registered value"
+            }
+          ]
+        }
+      },
+      {
+        "name": "unknown cell field",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude",
+              "code": "additional_property",
+              "message": "object is closed and contains an unregistered property",
+              "repair": "remove the unregistered property"
+            }
+          ]
+        }
+      },
+      {
+        "name": "frozen capability state",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.claude.state",
+              "code": "frozen_mapping",
+              "message": "value differs from the frozen I0 registry",
+              "repair": "use the committed registered cell or obtain a PO-approved I0 contract update"
+            }
+          ]
+        }
+      },
+      {
+        "name": "paired Codex selector alteration",
+        "result": {
+          "ok": false,
+          "source": "pipeline.user.v2",
+          "errors": [
+            {
+              "path": "$.routing.duties.mechanic.codex.selector.value",
+              "code": "frozen_mapping",
+              "message": "value differs from the frozen I0 registry",
+              "repair": "use the committed registered cell or obtain a PO-approved I0 contract update"
+            }
+          ]
+        }
+      }
+    ],
+    "inputHashesUnchanged": true,
+    "frozenRegistryUnchanged": true,
+    "independentReview": "pending",
+    "poAcceptance": "pending"
+  }
+}
+
+--- stderr ---
+
+
+--- stderr ---

@@ -1,0 +1,5088 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import {main as markerOnboardingCliMain} from "../scripts/project-onboarding-v3.mjs";
+import {isSanctionedLifecycleCommand, evaluateLifecycleReadyGuard} from "../hooks/guard-lifecycle-ready.mjs";
+import {ProjectOnboardingReadyError} from "./project-onboarding-ready-gate.mjs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
+
+import {
+  createPoGateProfileReceipt,
+  derivePoGateRepositoryFingerprint,
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+  poGateProfileProjectionPaths,
+  poGateProfileReceiptPath,
+  serializePoGateProfileReceipt,
+  validatePoGateAuthority,
+  validatePoGateProfileForRepository,
+} from "./po-gate-authority.mjs";
+import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+import { registeredCriticExportPolicy, registeredRouting } from "./runner-profiles-v3.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
+import { validateContinuityState } from "./continuity-state.mjs";
+import { mkdtempTestScratch as createTestScratch } from "./test-tmpdir.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+
+import {
+  KICKOFF_FAULT_STAGES,
+  KICKOFF_PROMOTION_PLAN_SCHEMA,
+  KICKOFF_PROMOTION_APPLY_SCHEMA,
+  INTAKE_CHECKPOINT_SCHEMA,
+  INTAKE_CONSENT_APPLY_SCHEMA,
+  INTAKE_CAPTURE_APPLY_SCHEMA,
+  INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
+  INTAKE_GENERATE_PLAN_SCHEMA,
+  INTAKE_GENERATE_APPLY_SCHEMA,
+  intakeDesignDirname,
+  applyOnboardingBootstrapBind,
+  applyOnboardingBootstrapAcknowledgement,
+  planOnboardingBootstrapBind,
+  planOnboardingIntakeSpecMarker,
+  applyOnboardingIntakeSpecMarker,
+  planOnboardingBootstrapAcknowledgementChat,
+  applyOnboardingContinuityRepair,
+  applyOnboardingIntakeCapture,
+  applyOnboardingIntakeConsent,
+  applyOnboardingIntakeDesignQuestions,
+  applyOnboardingIntakeGenerate,
+  planOnboardingIntakeGenerate,
+  applyOnboardingKickoff,
+  applyOnboardingKickoffPromotion,
+  applyOnboardingKickoffPromotionCleanupRecovery,
+  bindEphemeralPrivateCleanup,
+  bindOnboardingSessionCleanup,
+  classifyOnboardingContinuity,
+  nextActionSection,
+  planOnboardingContinuityRepair,
+  planOnboardingKickoff,
+  planOnboardingKickoffPromotion,
+  planOnboardingKickoffPromotionCleanupRecovery,
+  readOnboardingIntakeCheckpoint,
+  observeOnboardingEnrollmentHistory,
+  readOnboardingIntakeMaterialInput,
+  readOnboardingSessionCleanupBinding,
+  reconstructOnboardingKickoffPlan,
+  reconstructOnboardingKickoffPromotionPlan,
+  releaseOnboardingSessionCleanup,
+  replaceNextActionSection,
+  resolveIntakeCheckpointPaths,
+  syncStateMdNextAction,
+  validateKickoffGoal,
+} from "./onboarding-continuity.mjs";
+import { devNull } from "node:os";
+
+const cases = [];
+let activeScratchRoots = null;
+
+function mkdtempTestScratch(prefix, base) {
+  const root = base === undefined
+    ? createTestScratch(prefix)
+    : createTestScratch(prefix, base);
+  activeScratchRoots?.add(root);
+  return root;
+}
+
+function check(name, fn) {
+  const id = `OBC${String(cases.length + 1).padStart(3, "0")}`;
+  cases.push({ id, name, run: async () => {
+    const priorScratchRoots = activeScratchRoots;
+    const ownedScratchRoots = new Set();
+    activeScratchRoots = ownedScratchRoots;
+    try {
+      await fn();
+    } finally {
+      activeScratchRoots = priorScratchRoots;
+      for (const root of [...ownedScratchRoots].sort((a, b) => b.length - a.length)) {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  } });
+}
+
+function fixture(name, { handover, neutral = false } = {}) {
+  const root = mkdtempTestScratch(`onboarding continuity ${name} `);
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  if (neutral) {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+  }
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  const calibration = {
+    project: "fixture",
+    verify: "node verify.mjs",
+    autonomy: "bounded",
+    branchModel: "local",
+    worktree: "supported",
+    stakes: "high",
+    constraints: [],
+    ...(handover === undefined ? {} : { handover }),
+  };
+  writeFileSync(join(root, neutral ? "project" : ".claude", "pipeline.json"),
+    `${JSON.stringify(calibration, null, 2)}\n`);
+  return root;
+}
+function inventory(root) {
+  const entries = [];
+  const visit = (dir, relative = "") => {
+    for (const name of readdirSync(dir).sort()) {
+      const child = join(dir, name);
+      const rel = relative ? `${relative}/${name}` : name;
+      entries.push(Buffer.from(`${rel}\0`));
+      if (lstatSync(child).isDirectory()) visit(child, rel);
+    }
+  };
+  visit(root);
+  return Buffer.concat(entries);
+}
+
+function targetBytes(root, plan) {
+  const privateHistory = join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const paths = {
+    state: join(root, plan.targets.state.path),
+    handover: join(root, plan.targets.handover.path),
+    prd: join(root, plan.targets.prd.path),
+    spec: join(root, plan.targets.spec.path),
+    history: privateHistory,
+  };
+  return {
+    paths,
+    bytes: Object.fromEntries(Object.entries(paths).map(([key, path]) => [
+      key,
+      existsSync(path) ? readFileSync(path) : null,
+    ])),
+  };
+}
+
+function expectKickoffError(code, fn) {
+  assert.throws(fn, (error) => error?.code === code);
+}
+
+function digest(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sharedCloseEvidenceDamage(root, { secondPath = null, missing = false } = {}) {
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "closed"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "closed handover\n");
+  const evidencePath = "specs/closed/shared-close-evidence.md";
+  const otherPath = secondPath ?? evidencePath;
+  const currentEvidence = Buffer.from("current close evidence\n", "utf8");
+  if (!missing) writeFileSync(join(root, evidencePath), currentEvidence);
+  if (otherPath !== evidencePath) writeFileSync(join(root, otherPath), "other current evidence\n");
+  const closedAt = "2026-09-06T12:00:00.000Z";
+  const entries = ["older-feature", "newer-feature"].map((id, index) => {
+    const resultPath = `specs/closed/${id}-result.md`;
+    const resultBytes = Buffer.from(`${id} result\n`, "utf8");
+    writeFileSync(join(root, resultPath), resultBytes);
+    const path = index === 0 ? evidencePath : otherPath;
+    return {
+      id,
+      planPath: `specs/${id}/prd.md`,
+      phaseAtClose: "implementation",
+      closedAt: index === 0 ? "2026-09-06T11:00:00.000Z" : closedAt,
+      closedBy: "PO",
+      forCommit: null,
+      continuityClose: {
+        schema: "pipeline.continuity-close.v0",
+        featureId: id,
+        expectedRevision: index + 1,
+        result: { path: resultPath, sha256: digest(resultBytes) },
+        closeEvidence: {
+          path,
+          sha256: index === 0 ? digest("superseded close evidence\n") : digest(path === evidencePath ? currentEvidence : "other current evidence\n"),
+        },
+      },
+    };
+  });
+  const state = {
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: closedAt,
+    closedFeatures: entries,
+  };
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  return { statePath, evidencePath, currentEvidence };
+}
+
+check("pristine requires all three continuity sources to be absent", () => {
+  const root = fixture("pristine");
+  assert.deepEqual(classifyOnboardingContinuity({ rootDir: root }), {
+    status: "absent-pristine",
+    stateSha256: null,
+    handoverSha256: null,
+    historySha256: null,
+  });
+});
+
+for (const [name, bytes] of [["empty", ""], ["manual", "# manually created\n"]]) {
+  check(`${name} handover without machine state is damaged`, () => {
+    const root = fixture(`handover-${name}`);
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), bytes);
+    const result = classifyOnboardingContinuity({ rootDir: root });
+    assert.equal(result.status, "damaged");
+    assert.equal(result.stateSha256, null);
+    assert.match(result.handoverSha256, /^[a-f0-9]{64}$/u);
+  });
+}
+
+check("custom configured handover is observed instead of docs/state.md", () => {
+  const root = fixture("custom-handover", { handover: "notes/project state.md" });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "docs-state-decoy.md"), "decoy\n");
+  writeFileSync(join(root, "notes", "project state.md"), "configured\n");
+  const result = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(result.status, "damaged");
+  assert.match(result.handoverSha256, /^[a-f0-9]{64}$/u);
+});
+
+// Regression for pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string:
+// an ADR-0066 Decision 5 `{ path, maxBytes }` object-shaped `handover` key
+// must resolve via its `.path`, the same dual-shape `handover-rotation.mjs`'s
+// `resolveHandoverConfig()` already supports, not throw KICKOFF-PATH-UNSAFE
+// (observed live as a session-stranding `continuity-observation-unavailable`
+// readiness class) when handed straight to `safeRelativePath()`.
+check("object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable", () => {
+  const root = fixture("object-handover", { handover: { path: "notes/project state.md", maxBytes: 30000 } });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "notes", "project state.md"), "configured\n");
+  const result = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(result.status, "damaged");
+  assert.match(result.handoverSha256, /^[a-f0-9]{64}$/u);
+});
+
+check("object-shaped configured handover without a usable .path still fails unavailable", () => {
+  const root = fixture("object-handover-no-path", { handover: { maxBytes: 30000 } });
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+});
+
+check("present inactive state is damaged rather than pristine", () => {
+  const root = fixture("inactive-state");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), '{"schema":"pipeline.state.v0"}\n');
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("writer-shaped closed state is a valid feature re-entry boundary", () => {
+  const root = fixture("closed-feature-transition");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+});
+
+check("a current closed entry keeps its compact audit reference observable without weakening historical entries", () => {
+  const root = fixture("closed-audit-reference");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: "a".repeat(40),
+      auditReference: {
+        schema: "pipeline.feature-close-audit-reference.v1",
+        auditPlanSha256: "a".repeat(64),
+        auditReceiptSha256: "b".repeat(64),
+        criticVerifyLifecycleId: "c".repeat(64),
+        criticVerifyLifecycleReceiptSha256: "d".repeat(64),
+        outputPath: `audit-bundles/previous-feature/${"a".repeat(40)}`,
+      },
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+check("writer-shaped unapproved design state remains valid before continuity initialization", () => {
+  const root = fixture("design-feature-transition");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: {
+      id: "next-feature",
+      planPath: "specs/next/prd.md",
+      phase: "design",
+    },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "design-unbound");
+});
+
+check("inactive and design transition lookalikes remain damaged", () => {
+  const root = fixture("transition-lookalikes");
+  const closed = {
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T07:59:59.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+  };
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify(closed)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  closed.closedFeatures[0].closedAt = closed.updatedAt;
+  closed.planApproval = {};
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify(closed)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "next-feature", planPath: "specs/next/prd.md", phase: "implementation" },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  })}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "next-feature", planPath: "../outside.md", phase: "design" },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  })}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("writer-shaped discard state is a valid feature re-entry boundary", () => {
+  const root = fixture("discard-feature-transition");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard after a real kickoff" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const before = JSON.parse(readFileSync(statePath, "utf8"));
+  const discardedAt = "2026-07-29T09:00:00.000Z";
+  writeFileSync(statePath, `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    discardedFeatures: [{
+      id: before.activeFeature.id,
+      planPath: before.activeFeature.planPath,
+      phaseAtDiscard: before.activeFeature.phase,
+      discardedAt,
+      discardedBy: "PO",
+      reason: "abandoned before implementation",
+      forCommit: null,
+    }],
+    planApproved: false,
+    updatedAt: discardedAt,
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+check("writer-shaped discard state with a prior closed feature remains valid", () => {
+  const root = fixture("discard-after-closed-transition");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard after an earlier close" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const before = JSON.parse(readFileSync(statePath, "utf8"));
+  const discardedAt = "2026-07-29T09:05:00.000Z";
+  writeFileSync(statePath, `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    closedFeatures: [{
+      id: "earlier-feature",
+      planPath: "specs/earlier/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+    discardedFeatures: [{
+      id: before.activeFeature.id,
+      planPath: before.activeFeature.planPath,
+      phaseAtDiscard: before.activeFeature.phase,
+      discardedAt,
+      discardedBy: "PO",
+      reason: "abandoned after a prior close",
+      forCommit: null,
+    }],
+    planApproved: false,
+    updatedAt: discardedAt,
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+// The projection above accepted a discard as the latest transaction from the
+// start; the cleanup OBSERVER did not, and that asymmetry was a dead end. A
+// consumer project hit it live 2026-08-28 (incident report S56, B6): a
+// discard-feature left readiness at `partial`, every pipeline script on that
+// repository was refused, and the refusal named a recovery command that was
+// itself refused. Both shapes are asserted here -- with a prior close (the
+// state the consumer actually had) and without one (where `closedFeatures` is
+// absent entirely and the release-proof scan has nothing to iterate).
+check("a discard as the latest transaction is observable by the cleanup reader, not only by the projection", () => {
+  for (const [name, closedFeatures] of [["discard-cleanup-after-close", [{
+    id: "earlier-feature",
+    planPath: "specs/earlier/prd.md",
+    phaseAtClose: "implementation",
+    closedAt: "2026-07-29T08:00:00.000Z",
+    closedBy: "PO",
+    forCommit: null,
+  }]], ["discard-cleanup-only", undefined]]) {
+    const root = fixture(name);
+    const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard is a normal outcome" });
+    applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+    const statePath = join(root, ".claude", "pipeline-state.json");
+    const before = JSON.parse(readFileSync(statePath, "utf8"));
+    const discardedAt = "2026-07-29T09:10:00.000Z";
+    const state = {
+      schema: "pipeline.state.v0",
+      discardedFeatures: [{
+        id: before.activeFeature.id,
+        planPath: before.activeFeature.planPath,
+        phaseAtDiscard: before.activeFeature.phase,
+        discardedAt,
+        discardedBy: "PO",
+        reason: "abandoned before implementation",
+        forCommit: null,
+      }],
+      planApproved: false,
+      updatedAt: discardedAt,
+    };
+    if (closedFeatures !== undefined) state.closedFeatures = closedFeatures;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid",
+      `${name}: the projection already accepted this shape and must keep doing so`);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.notEqual(binding.status, "damaged",
+      `${name}: a discard must never make the repository unobservable -- that is the dead end`);
+    assert.equal(binding.sessionCleanup, null,
+      `${name}: nothing is bound after a discard, which is not the same as unreadable`);
+  }
+});
+
+function baseDiscardEntry() {
+  return {
+    id: "abandoned-feature",
+    planPath: "specs/abandoned/prd.md",
+    phaseAtDiscard: "implementation",
+    discardedAt: "2026-07-29T09:00:00.000Z",
+    discardedBy: "PO",
+    reason: "superseded",
+    forCommit: null,
+  };
+}
+
+function archivedPlanCancellation(featureId = "abandoned-feature") {
+  return {
+    schema: "pipeline.plan-cancellation.v1",
+    featureId,
+    submissionSha256: "a".repeat(64),
+    cancelledBy: "PO",
+    cancelledAt: "2026-07-29T08:58:00.000Z",
+  };
+}
+
+function archivedMixedPlanRecovery(featureId = "abandoned-feature") {
+  return {
+    schema: "pipeline.plan-mixed-state-recovery.v1",
+    featureId,
+    submissionSha256: "b".repeat(64),
+    approvalSha256: "c".repeat(64),
+    invalidationSha256: "d".repeat(64),
+    recoveredBy: "PO",
+    recoveredAt: "2026-07-29T08:59:00.000Z",
+    reason: "retire mixed plan history",
+  };
+}
+
+check("discard transition accepts exact feature-bound archived plan receipts", () => {
+  const root = fixture("discard-archived-plan-receipts");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{
+      ...baseDiscardEntry(),
+      planCancellation: archivedPlanCancellation(),
+      planMixedStateRecovery: archivedMixedPlanRecovery(),
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+check("discard transition rejects malformed or foreign archived plan receipts", () => {
+  for (const [name, mutate] of [
+    ["cancellation-feature", (entry) => { entry.planCancellation.featureId = "foreign-feature"; }],
+    ["mixed-feature", (entry) => { entry.planMixedStateRecovery.featureId = "foreign-feature"; }],
+    ["cancellation-extra-key", (entry) => { entry.planCancellation.extra = true; }],
+    ["mixed-extra-key", (entry) => { entry.planMixedStateRecovery.extra = true; }],
+  ]) {
+    const root = fixture(`discard-archived-plan-receipts-${name}`);
+    const entry = { ...baseDiscardEntry(), planCancellation: archivedPlanCancellation(), planMixedStateRecovery: archivedMixedPlanRecovery() };
+    mutate(entry);
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0", planApproved: false,
+      updatedAt: "2026-07-29T09:00:00.000Z", discardedFeatures: [entry],
+    }, null, 2)}\n`);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged", name);
+  }
+});
+
+check("discard transition with a stale updatedAt remains damaged", () => {
+  const root = fixture("discard-stale-updated-at");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:01.000Z",
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry with an extra key remains damaged", () => {
+  const root = fixture("discard-extra-key");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{ ...baseDiscardEntry(), unexpected: true }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry missing a required key remains damaged", () => {
+  const root = fixture("discard-missing-key");
+  const entry = baseDiscardEntry();
+  delete entry.reason;
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [entry],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with planApproved true remains damaged", () => {
+  const root = fixture("discard-plan-approved");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with continuity still present remains damaged", () => {
+  const root = fixture("discard-continuity-present");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    continuity: {},
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with an empty discardedFeatures array remains damaged", () => {
+  const root = fixture("discard-empty-array");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry whose planPath escapes the project root remains damaged", () => {
+  const root = fixture("discard-path-escape");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{ ...baseDiscardEntry(), planPath: "../outside.md" }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("orphan continuity and invalid active feature are damaged", () => {
+  const root = fixture("orphan-state");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    continuity: {},
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "", planPath: "docs/state.md", phase: "design" },
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("malformed state is unavailable and retains no invented digest", () => {
+  const root = fixture("malformed-state");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), "{broken");
+  const result = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(result.status, "unavailable");
+  assert.match(result.stateSha256, /^[a-f0-9]{64}$/u);
+});
+
+check("mode-unreadable state is unavailable", () => {
+  const root = fixture("state-unreadable");
+  const path = join(root, ".claude", "pipeline-state.json");
+  writeFileSync(path, '{"schema":"pipeline.state.v0"}\n');
+  chmodSync(path, 0o000);
+  try {
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+  } finally {
+    chmodSync(path, 0o600);
+  }
+});
+
+check("machine-state symlink is unavailable", () => {
+  const root = fixture("state-symlink");
+  writeFileSync(join(root, "state-target.json"), '{"schema":"pipeline.state.v0"}\n');
+  symlinkSync(join(root, "state-target.json"), join(root, ".claude", "pipeline-state.json"));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+});
+
+check("project-root symlink is unavailable", () => {
+  const actual = fixture("root-symlink-actual");
+  const parent = mkdtempTestScratch("onboarding continuity root link ");
+  const linked = join(parent, "linked root");
+  symlinkSync(actual, linked);
+  assert.equal(classifyOnboardingContinuity({ rootDir: linked }).status, "unavailable");
+});
+
+check("private history without machine state is damaged", () => {
+  const root = fixture("history-only");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  writeFileSync(join(directory, "continuity-history.json"),
+    JSON.stringify(plan.targets.history.value), { mode: 0o600 });
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("malformed private history is unavailable with its observed digest", () => {
+  const root = fixture("history-malformed");
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  writeFileSync(join(directory, "continuity-history.json"), "{}\n", { mode: 0o600 });
+  const result = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(result.status, "unavailable");
+  assert.match(result.historySha256, /^[a-f0-9]{64}$/u);
+});
+
+check("non-private history mode is unavailable", () => {
+  const root = fixture("history-mode");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  const path = join(directory, "continuity-history.json");
+  writeFileSync(path, JSON.stringify(plan.targets.history.value), { mode: 0o644 });
+  chmodSync(path, 0o644);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+});
+
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so a bare POSIX mode-bit comparison is meaningless there
+// and previously failed closed unconditionally (backlog/items/2026-08-18-
+// windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md). These checks
+// inject `platform: "win32"` plus a stubbed DACL assessor to prove the win32
+// branch is what now decides the outcome, not the bare mode bits.
+//
+// Note on the directory half of this check: `resolvePrivate()` (this file)
+// delegates to `codex-onboarding-runtime.mjs`'s own already-correct
+// `assurePrivateDirectory`, which on POSIX auto-repairs (`chmodSync(path,
+// 0o700)`) an insecure directory it observes -- so a POSIX-insecure directory
+// mode can never actually reach this file's own inline check on a real POSIX
+// host in the first place; that check is a redundant belt-and-braces
+// duplicate for the directory case specifically. The history FILE has no such
+// auto-repair anywhere upstream, so its insecure-mode POSIX regression is
+// exercised directly above ("non-private history mode is unavailable").
+check("win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed", () => {
+  const root = fixture("win32-directory-secure");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  // Exactly what the old bare `(mode & 0o777) !== 0o600` comparison would
+  // have failed closed on unconditionally.
+  writeFileSync(join(directory, "continuity-history.json"), JSON.stringify(plan.targets.history.value), { mode: 0o644 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: () => ({ status: "secure" }),
+  });
+  assert.notEqual(result.status, "unavailable");
+  assert.equal(result.status, "damaged"); // no machine state yet, mirrors "private history without machine state is damaged"
+});
+
+check("win32: an insecure DACL assessment on the private directory still fails closed", () => {
+  const root = fixture("win32-directory-insecure");
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: () => ({ status: "insecure" }),
+  });
+  assert.equal(result.status, "unavailable");
+});
+
+check("win32: a secure directory but an insecure history-file DACL assessment still fails closed", () => {
+  const root = fixture("win32-history-insecure");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  writeFileSync(join(directory, "continuity-history.json"), JSON.stringify(plan.targets.history.value), { mode: 0o600 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: (path) => ({ status: path === directory ? "secure" : "insecure" }),
+  });
+  assert.equal(result.status, "unavailable");
+});
+
+for (const [name, handover] of [
+  ["escape", "../outside.md"],
+  ["absolute", "/tmp/outside.md"],
+  ["backslash", "docs\\state.md"],
+]) {
+  check(`unsafe ${name} handover path is unavailable`, () => {
+    const root = fixture(`unsafe-${name}`, { handover });
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+  });
+}
+
+check("handover symlink is unavailable", () => {
+  const root = fixture("handover-symlink");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "target.md"), "target\n");
+  symlinkSync(join(root, "target.md"), join(root, "docs", "state.md"));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+});
+
+check("mode-unreadable handover is unavailable even for privileged test runners", () => {
+  const root = fixture("handover-unreadable");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  const path = join(root, "docs", "state.md");
+  writeFileSync(path, "private\n");
+  chmodSync(path, 0o000);
+  try {
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+  } finally {
+    chmodSync(path, 0o600);
+  }
+});
+
+check("goal validation trims UTF-8 and preserves shell metacharacters as data", () => {
+  assert.equal(validateKickoffGoal("  build $(touch nope); `echo nope` & keep spaces  "),
+    "build $(touch nope); `echo nope` & keep spaces");
+  assert.equal(validateKickoffGoal("ä".repeat(80)).length, 80);
+});
+
+for (const [name, goal] of [
+  ["blank", " \n\t "],
+  ["NUL", "valid\0invalid"],
+  ["multiple lines", "short goal\nfull design"],
+  ["over 160 bytes", "x".repeat(161)],
+  ["UTF-8 over 160 bytes", "ä".repeat(81)],
+]) {
+  check(`goal rejects ${name}`, () => {
+    expectKickoffError("KICKOFF-GOAL-INVALID", () => validateKickoffGoal(goal));
+  });
+}
+
+check("160-byte goal is accepted exactly", () => {
+  assert.equal(Buffer.byteLength(validateKickoffGoal("x".repeat(160)), "utf8"), 160);
+});
+
+check("kickoff plan is deterministic, closed, valid, and read-only", () => {
+  const root = fixture("plan-read-only", { handover: "notes/state with spaces.md" });
+  const before = [...inventory(root)];
+  const first = planOnboardingKickoff({
+    rootDir: root,
+    goal: "Ship safe onboarding; never run $(touch nope)",
+    onboardingScript: "/plugin/project-onboarding-v3.mjs",
+  });
+  const second = planOnboardingKickoff({
+    rootDir: root,
+    goal: "  Ship safe onboarding; never run $(touch nope)  ",
+    onboardingScript: "/plugin/project-onboarding-v3.mjs",
+  });
+  const after = [...inventory(root)];
+  assert.deepEqual(first, second);
+  assert.deepEqual(after, before);
+  assert.equal(existsSync(join(root, "nope")), false);
+  assert.deepEqual(Object.keys(first).sort(), [
+    "applyAction", "calibration", "goal", "goalSha256", "language", "nextAction", "onboardingScript",
+    "planSha256", "repositoryCapability", "root", "runner", "schema", "targets",
+    "transactionSha256",
+  ]);
+  assert.equal(first.runner, "codex");
+  assert.equal(first.language, "en");
+  assert.deepEqual(first.applyAction.argv, [
+    "/plugin/project-onboarding-v3.mjs", "kickoff", "apply", "--root", root,
+    "--goal", first.goal, "--language", "en", "--runner", "codex", "--plan-sha256", first.planSha256, "--activate",
+  ]);
+  assert.equal(first.applyAction.mutation, true);
+  assert.equal(first.applyAction.requiresConfirmation, true);
+  // NVA-H-LASTBUILDERS: the generic guided driver reads ONLY `nextAction`,
+  // never `applyAction` -- same sibling convention as the promotion plans
+  // (NVA-F-PROMOTIONACTION) and the intake-generate plan (NVA-D-PLANACTION).
+  assert.deepEqual(first.nextAction, first.applyAction);
+  assert.deepEqual(first.applyAction.expected, {
+    schema: "pipeline.project-onboarding.v4",
+    statuses: ["ready"],
+  });
+  assert.equal(first.targets.state.value.schema, "pipeline.state.v0");
+  assert.equal(first.targets.state.value.continuity.schema, "pipeline.continuity.v0");
+  assert.notEqual(first.targets.state.value.continuity.authority.prd.path,
+    first.targets.handover.path);
+  assert.notEqual(first.targets.state.value.continuity.authority.spec.path,
+    first.targets.handover.path);
+  assert.equal(first.targets.state.value.continuity.authority.prd.path,
+    first.targets.prd.path);
+  assert.equal(first.targets.state.value.continuity.authority.spec.path,
+    first.targets.spec.path);
+  assert.notEqual(first.targets.prd.path, first.targets.spec.path);
+  assert.match(first.targets.prd.content, /^<!-- po-language: en -->$/mu);
+});
+
+check("kickoff resolves the PO language from a neutral runtime manifest", () => {
+  const root = fixture("neutral-language", { neutral: true });
+  writeFileSync(join(root, "pipeline.user.yaml"), "language:\n  human_facing: de\n");
+  writeFileSync(join(root, "project", "pipeline.yaml"), "language:\n  human_facing: de\n");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Ein neutrales Projekt starten" });
+  assert.match(plan.targets.prd.content, /^<!-- po-language: de -->$/mu);
+});
+
+check("apply requires activation and the exact plan digest", () => {
+  const root = fixture("apply-auth");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  expectKickoffError("KICKOFF-ACTIVATION-REQUIRED", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: false,
+  }));
+  expectKickoffError("KICKOFF-PLAN-DIGEST", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: "f".repeat(64),
+    activate: true,
+  }));
+  assert.deepEqual(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+check("apply is calibration-CAS bound and writes nothing after drift", () => {
+  const root = fixture("plan-drift");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const calibrationPath = join(root, ".claude", "pipeline.json");
+  writeFileSync(calibrationPath, `${readFileSync(calibrationPath, "utf8")}\n`);
+  expectKickoffError("KICKOFF-CAS-DRIFT", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(existsSync(join(root, ".claude", "pipeline-state.json")), false);
+  assert.equal(existsSync(join(root, "docs", "state.md")), false);
+});
+
+check("apply rejects apply-metadata drift even when the top-level digest field is unchanged", () => {
+  const root = fixture("action-drift");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const tampered = structuredClone(plan);
+  tampered.applyAction.argv[0] = "/tmp/foreign-onboarding.mjs";
+  expectKickoffError("KICKOFF-PLAN-INVALID", () => applyOnboardingKickoff({
+    plan: tampered,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+// NVA-H-LASTBUILDERS: the goal-bound kickoff plan is the first of the last
+// two `planSha256 = canonicalSha256(...)` sites in this module to gain a
+// `nextAction` sibling -- same convention already covered above (the
+// "kickoff plan is deterministic..." check's key-list and nextAction
+// assertions) and by NVA-F-PROMOTIONACTION for the promotion plans.
+check("apply rejects a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-drift");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const tampered = structuredClone(plan);
+  tampered.nextAction.argv.push("--bogus");
+  expectKickoffError("KICKOFF-PLAN-INVALID", () => applyOnboardingKickoff({
+    plan: tampered,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+check("reconstructOnboardingKickoffPlan (replay): the reconstructed goal-bound plan also publishes nextAction identical to applyAction (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-replay");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPlan({ rootDir: root, goal: "Create a product" });
+  assert.deepEqual(replayed.nextAction, replayed.applyAction);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingKickoff: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("kickoff-nextaction-digest-stability");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  // Same key set `planBinding()` (onboarding-continuity.mjs, private) projects
+  // out of the plan -- deliberately neither `planSha256` nor
+  // `applyAction`/`nextAction`. Recomputing the digest from exactly this
+  // projection proves planSha256 does not depend on nextAction's presence or value.
+  const binding = {
+    schema: plan.schema, root: plan.root, repositoryCapability: plan.repositoryCapability,
+    goal: plan.goal, goalSha256: plan.goalSha256, language: plan.language, calibration: plan.calibration,
+    targets: plan.targets, transactionSha256: plan.transactionSha256, onboardingScript: plan.onboardingScript,
+    runner: plan.runner,
+  };
+  assert.equal(sha256CanonicalJson(binding), plan.planSha256,
+    "planSha256 must be derivable from the transaction-bound fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+// NVA-H-LASTBUILDERS: the kickoff-promotion cleanup recovery plan is the
+// second and last of the seven `planSha256 = canonicalSha256(...)` sites to
+// gain a `nextAction` sibling. Unlike the kickoff and promotion plans above,
+// `applyOnboardingKickoffPromotionCleanupRecovery` never accepts a
+// caller-supplied plan object -- it takes only `rootDir` and
+// `expectedPlanSha256` and always re-derives its own plan internally, the
+// same "self-re-deriving apply" shape `applyOnboardingIntakeGenerate`
+// already has (NVA-D-PLANACTION). There is therefore no dedicated
+// exact-key-set validator for this plan's shape to extend, and no
+// caller-supplied `nextAction` for a mismatch-refusal test to exercise --
+// both are architecturally absent for this builder exactly as they already
+// are for the intake-generate builder. The non-ready branches keep their own
+// coverage above (extended "legacy promotion cleanup mismatch ... fails
+// closed" loop) and below ("not-applicable").
+check("planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS)", () => {
+  const seed = promotionSeed("lastbuilders-recovery-fresh", { privatized: true, bumpRevision: false });
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.deepEqual(plan.nextAction, plan.applyAction);
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+  // Same key set `kickoffPromotionCleanupRecoveryPlanCore` (private) returns
+  // as `core` -- deliberately neither `planSha256` nor `applyAction`/`nextAction`/`status`.
+  const core = {
+    schema: plan.schema, root: plan.root, stateSha256: plan.stateSha256, historySha256: plan.historySha256,
+    revision: plan.revision, feature: plan.feature, binding: plan.binding, sessionCleanupScript: plan.sessionCleanupScript,
+  };
+  assert.equal(sha256CanonicalJson(core), plan.planSha256,
+    "planSha256 must be derivable from the core fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+check("planOnboardingKickoffPromotionCleanupRecovery: a not-applicable result carries neither applyAction nor nextAction nor planSha256 (NVA-H-LASTBUILDERS)", () => {
+  const root = fixture("lastbuilders-recovery-not-applicable");
+  const result = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: root });
+  assert.equal(result.status, "not-applicable");
+  assert.equal("applyAction" in result, false);
+  assert.equal("nextAction" in result, false);
+  assert.equal("planSha256" in result, false);
+});
+
+check("pre-existing initial authority artifact blocks plan without overwriting it", () => {
+  const root = fixture("authority-collision");
+  const baseline = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const path = join(root, baseline.targets.prd.path);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, "user content\n");
+  expectKickoffError("KICKOFF-NOT-PRISTINE", () => planOnboardingKickoff({
+    rootDir: root,
+    goal: "Create a product",
+  }));
+  assert.equal(readFileSync(path, "utf8"), "user content\n");
+});
+
+check("apply creates exact state, configured handover, private history, and immediate valid readback", () => {
+  const root = fixture("apply-valid", { handover: "notes/project state.md" });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  const result = applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(result.status, "applied");
+  assert.equal(result.mutated, true);
+  assert.equal(result.readback.code, "CS-STATUS-ACTIVE");
+  assert.equal(result.readback.continuity.status, "valid");
+  assert.equal(result.continuity.status, "valid");
+  assert.equal(lstatSync(join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json")).mode & 0o777, 0o600);
+  assert.deepEqual(readFileSync(join(root, ".claude", "pipeline-state.json")),
+    Buffer.from(`${JSON.stringify(plan.targets.state.value, null, 2)}\n`, "utf8"));
+  assert.deepEqual(readFileSync(join(root, "notes", "project state.md")),
+    Buffer.from(plan.targets.handover.content, "utf8"));
+  assert.deepEqual(readFileSync(join(root, plan.targets.prd.path)),
+    Buffer.from(plan.targets.prd.content, "utf8"));
+  assert.deepEqual(readFileSync(join(root, plan.targets.spec.path)),
+    Buffer.from(plan.targets.spec.content, "utf8"));
+});
+
+check("cleanup descriptor bind and release use exact state CAS without touching other fields", () => {
+  const root = fixture("cleanup-binding");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Bind cleanup safely" });
+  applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const beforeState = JSON.parse(readFileSync(statePath, "utf8"));
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  const tuple = {
+    sessionId: "session-cleanup-bind-01",
+    descriptorSha256: "a".repeat(64),
+  };
+  const bound = bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: tuple,
+    deps: { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
+  });
+  assert.equal(bound.status, "bound");
+  assert.equal(bound.mutated, true);
+  assert.equal(bound.revision, before.revision + 1);
+  assert.deepEqual(bound.sessionCleanup, tuple);
+  const boundState = JSON.parse(readFileSync(statePath, "utf8"));
+  assert.deepEqual(
+    { ...boundState, continuity: undefined },
+    { ...beforeState, continuity: undefined },
+  );
+
+  const replay = bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: tuple,
+  });
+  assert.equal(replay.status, "reused");
+  assert.equal(replay.mutated, false);
+  expectKickoffError("SESSION-CLEANUP-BIND-CAS", () => bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: {
+      sessionId: "session-cleanup-other-02",
+      descriptorSha256: "b".repeat(64),
+    },
+  }));
+
+  const released = releaseOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: bound.stateSha256,
+    expectedRevision: bound.revision,
+    sessionCleanup: tuple,
+    deps: { randomUUID: () => "22222222-2222-4222-8222-222222222222" },
+  });
+  assert.equal(released.status, "released");
+  assert.equal(released.mutated, true);
+  assert.equal(released.revision, bound.revision + 1);
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+});
+
+check("bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state", () => {
+  const root = fixture("ephemeral-cleanup-neutral", { neutral: true });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the ephemeral cleanup binding route" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const statePath = join(root, "project", "pipeline-state.json");
+  const beforeBytes = readFileSync(statePath);
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  const tuple = { sessionId: "ephemeral-session-01", descriptorSha256: "c".repeat(64) };
+  const bound = bindEphemeralPrivateCleanup({ rootDir: root, sessionCleanup: tuple });
+  assert.equal(bound.status, "bound");
+  assert.equal(bound.storage, "private-runtime");
+  assert.deepEqual(bound.sessionCleanup, tuple);
+  // The tracked authority file never moved: the write landed under .git/agent-pipeline/**.
+  assert.deepEqual(readFileSync(statePath), beforeBytes);
+  assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, tuple);
+});
+
+check("bindEphemeralPrivateCleanup refuses a non-neutral (legacy .claude/) state -- it never writes tracked authority state on a session-less caller's behalf", () => {
+  const root = fixture("ephemeral-cleanup-legacy");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the legacy-tier refusal" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const beforeBytes = readFileSync(statePath);
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  expectKickoffError("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", () => bindEphemeralPrivateCleanup({
+    rootDir: root,
+    sessionCleanup: { sessionId: "ephemeral-session-02", descriptorSha256: "d".repeat(64) },
+  }));
+  assert.deepEqual(readFileSync(statePath), beforeBytes);
+});
+
+check("bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound", () => {
+  const root = fixture("ephemeral-cleanup-already-bound", { neutral: true });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Exercise the already-bound refusal" });
+  applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: { sessionId: "real-session-01", descriptorSha256: "e".repeat(64) },
+  });
+  expectKickoffError("SESSION-CLEANUP-EPHEMERAL-NOT-APPLICABLE", () => bindEphemeralPrivateCleanup({
+    rootDir: root,
+    sessionCleanup: { sessionId: "ephemeral-session-03", descriptorSha256: "f".repeat(64) },
+  }));
+});
+
+check("bounded repair normalizes only the invalid active-turn resume pair", () => {
+  const root = fixture("repair-active-resume");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Repair active resume" });
+  applyOnboardingKickoff({
+    plan: kickoff,
+    expectedPlanSha256: kickoff.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const historyPath = join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.continuity.resume = {
+    mode: "resume-on-next-turn",
+    sourceRevision: 0,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const historyBefore = readFileSync(historyPath);
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "normalize-active-resume");
+  assert.equal(plan.target.value.continuity.resume.mode, "immediate");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+  assert.deepEqual(readFileSync(historyPath), historyBefore);
+});
+
+check("shared close-evidence damage is diagnosed and repaired without changing evidence bytes", () => {
+  const root = fixture("repair-shared-close-evidence");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const stateBefore = readFileSync(damaged.statePath);
+  const originalState = JSON.parse(stateBefore);
+  const evidenceBefore = readFileSync(join(root, damaged.evidencePath));
+  const classified = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(classified.status, "damaged");
+  assert.equal(classified.diagnosis.status, "repairable");
+  assert.equal(classified.diagnosis.path, damaged.evidencePath);
+  assert.equal(classified.diagnosis.claimants.length, 2);
+  assert.deepEqual(classified.diagnosis.claimants.map((claimant) => claimant.status), ["mismatching", "matching"]);
+  assert.equal(classified.diagnosis.claimants[0].jsonPointer,
+    "/closedFeatures/0/continuityClose/closeEvidence");
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "repair-shared-close-evidence-path");
+  assert.equal(plan.diagnosis.observedSha256, digest(evidenceBefore));
+  assert.deepEqual(planOnboardingContinuityRepair({ rootDir: root }), plan,
+    "read-only replanning must bind the identical repair postimage");
+  assert.equal(plan.target.afterSha256, digest(`${JSON.stringify(plan.target.value, null, 2)}\n`));
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+  assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), evidenceBefore,
+    "repair must leave the shared evidence bytes unchanged");
+  const repaired = JSON.parse(readFileSync(damaged.statePath, "utf8"));
+  assert.equal(repaired.closedFeatures[0].continuityClose, undefined);
+  assert.equal(repaired.closedFeatures[1].continuityClose.closeEvidence.sha256, digest(evidenceBefore));
+  assert.equal(repaired.stateRepairs.length, 1);
+  assert.equal(repaired.stateRepairs[0].planSha256, plan.planSha256);
+  assert.equal(repaired.stateRepairs[0].stateBeforeSha256, digest(stateBefore));
+  assert.equal(repaired.stateRepairs[0].sourceUpdatedAt, originalState.updatedAt);
+  assert.deepEqual(repaired.stateRepairs[0].affectedFeatureIds, ["newer-feature", "older-feature"]);
+  assert.equal(repaired.stateRepairs[0].quarantinedAssertions[0].formerAssertion.closeEvidence.sha256,
+    digest("superseded close evidence\n"));
+  assert.deepEqual(repaired.stateRepairs[0].quarantinedAssertions[0].formerAssertion,
+    originalState.closedFeatures[0].continuityClose);
+  delete originalState.closedFeatures[0].continuityClose;
+  assert.deepEqual({ ...repaired, stateRepairs: undefined }, { ...originalState, stateRepairs: undefined },
+    "only mismatching assertions and the appended audit record may change");
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+});
+
+check("shared evidence repair keeps the sole matching claimant regardless of age and quarantines every mismatch", () => {
+  const root = fixture("repair-shared-multiple-losers");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const state = JSON.parse(readFileSync(damaged.statePath));
+  state.closedFeatures[0].continuityClose.closeEvidence.sha256 = digest(damaged.currentEvidence);
+  state.closedFeatures[1].continuityClose.closeEvidence.sha256 = digest("outdated second proof\n");
+  const third = structuredClone(state.closedFeatures[1]);
+  third.id = "third-feature";
+  third.continuityClose.featureId = third.id;
+  state.closedFeatures.push(third);
+  writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const repaired = JSON.parse(readFileSync(damaged.statePath));
+  assert.deepEqual(repaired.closedFeatures[0], state.closedFeatures[0]);
+  assert.equal(repaired.closedFeatures[1].continuityClose, undefined);
+  assert.equal(repaired.closedFeatures[2].continuityClose, undefined);
+  assert.deepEqual(repaired.stateRepairs[0].affectedFeatureIds, ["older-feature", "newer-feature", "third-feature"]);
+  assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence);
+});
+
+check("shared close-evidence repair refuses missing, unrelated, and ambiguous evidence", () => {
+  const missingRoot = fixture("repair-shared-close-missing");
+  sharedCloseEvidenceDamage(missingRoot, { missing: true });
+  const missing = planOnboardingContinuityRepair({ rootDir: missingRoot });
+  assert.equal(missing.status, "unsupported");
+  assert.equal(missing.code, "CONTINUITY-REPAIR-EVIDENCE-MISSING");
+
+  const unrelatedRoot = fixture("repair-shared-close-unrelated");
+  const unrelated = sharedCloseEvidenceDamage(unrelatedRoot);
+  writeFileSync(join(unrelatedRoot, "specs", "closed", "newer-feature-result.md"), "drifted result\n");
+  const unrelatedPlan = planOnboardingContinuityRepair({ rootDir: unrelatedRoot });
+  assert.equal(unrelatedPlan.status, "unsupported");
+  assert.equal(unrelatedPlan.code, "CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID");
+
+  const ambiguousRoot = fixture("repair-shared-close-ambiguous");
+  const ambiguous = sharedCloseEvidenceDamage(ambiguousRoot);
+  const state = JSON.parse(readFileSync(ambiguous.statePath, "utf8"));
+  state.closedFeatures.push(structuredClone(state.closedFeatures[1]));
+  state.closedFeatures[2].id = "third-feature";
+  state.closedFeatures[2].continuityClose.featureId = "third-feature";
+  state.closedFeatures[2].continuityClose.closeEvidence.sha256 = digest(ambiguous.currentEvidence);
+  writeFileSync(ambiguous.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const ambiguousPlan = planOnboardingContinuityRepair({ rootDir: ambiguousRoot });
+  assert.equal(ambiguousPlan.status, "unsupported");
+  assert.equal(ambiguousPlan.code, "CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS");
+});
+
+check("shared evidence diagnosis refuses zero matching claims, multiple groups, and independent stale claims", () => {
+  for (const variant of ["zero-matches", "multiple-groups", "independent-stale"]) {
+    const root = fixture(`repair-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const state = JSON.parse(readFileSync(damaged.statePath));
+    if (variant === "zero-matches") {
+      state.closedFeatures[1].continuityClose.closeEvidence.sha256 = digest("unmatched proof\n");
+    } else {
+      writeFileSync(join(root, "specs/closed/other-evidence.md"), "other proof\n");
+      for (let index = 0; index < (variant === "multiple-groups" ? 2 : 1); index += 1) {
+        const extra = structuredClone(state.closedFeatures[1]);
+        extra.id = `extra-${index}`;
+        extra.continuityClose.featureId = extra.id;
+        extra.continuityClose.closeEvidence = { path: "specs/closed/other-evidence.md", sha256: digest("stale other proof\n") };
+        state.closedFeatures.push(extra);
+      }
+    }
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(plan.status, "unsupported", variant);
+    assert.equal(plan.diagnosis.status, "refused", "claimant details must not overwrite refusal status");
+    assert.equal(plan.code, variant === "zero-matches" ? "CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS"
+      : variant === "multiple-groups" ? "CONTINUITY-REPAIR-SHARED-PATH-AMBIGUOUS"
+        : "CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID");
+    assert.deepEqual(readFileSync(damaged.statePath), before);
+  }
+});
+
+check("shared evidence repair refuses unsafe paths and malformed unrelated state without writing", () => {
+  for (const variant of ["traversal", "symlink", "directory", "discarded", "coordinator", "repair-record"]) {
+    const root = fixture(`repair-unsafe-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const state = JSON.parse(readFileSync(damaged.statePath));
+    if (variant === "traversal") {
+      for (const entry of state.closedFeatures) entry.continuityClose.closeEvidence.path = "../outside.md";
+    } else if (variant === "symlink" || variant === "directory") {
+      rmSync(join(root, damaged.evidencePath));
+      if (variant === "symlink") symlinkSync("newer-feature-result.md", join(root, damaged.evidencePath));
+      else mkdirSync(join(root, damaged.evidencePath));
+    } else if (variant === "discarded") state.discardedFeatures = [{}];
+    else if (variant === "coordinator") state.closedFeatures[0].coordinatorClose = {};
+    else state.stateRepairs = [{}];
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(plan.status, "unsupported", variant);
+    assert.equal(plan.code, ["traversal", "symlink", "directory"].includes(variant)
+      ? "CONTINUITY-REPAIR-EVIDENCE-PATH-UNSAFE" : "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID", variant);
+    assert.deepEqual(readFileSync(damaged.statePath), before);
+  }
+});
+
+check("shared evidence repair rejects forged audit relationships after a successful repair", () => {
+  const root = fixture("repair-audit-tampering");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const valid = JSON.parse(readFileSync(damaged.statePath));
+  for (const tamper of [
+    (record) => { record.quarantinedAssertions[0].formerAssertion.closeEvidence.sha256 = record.evidence.observedSha256; },
+    (record) => { record.quarantinedAssertions[0].jsonPointer = record.preservedClaimant.jsonPointer; },
+    (record) => { record.quarantinedAssertions[0].formerAssertion.featureId = "wrong-feature"; },
+    (record) => { record.preservedClaimant.expectedSha256 = digest("wrong proof"); },
+  ]) {
+    const state = structuredClone(valid);
+    tamper(state.stateRepairs[0]);
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+    assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+  }
+});
+
+check("repair records must bind existing feature IDs and exact live closed-feature assertions", () => {
+  const root = fixture("repair-live-audit-bindings");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const valid = JSON.parse(readFileSync(damaged.statePath));
+  const variants = {
+    "nonexistent preserved ID": (state, record) => {
+      record.preservedClaimant.featureId = "nonexistent-feature";
+      record.affectedFeatureIds[0] = "nonexistent-feature";
+    },
+    "nonexistent quarantined ID": (state, record) => {
+      record.quarantinedAssertions[0].featureId = "nonexistent-feature";
+      record.quarantinedAssertions[0].formerAssertion.featureId = "nonexistent-feature";
+      record.affectedFeatureIds[1] = "nonexistent-feature";
+    },
+    "nonexistent preserved pointer": (state, record) => {
+      record.preservedClaimant.jsonPointer = "/closedFeatures/9/continuityClose/closeEvidence";
+    },
+    "unsafe integer quarantine pointer": (state, record) => {
+      record.quarantinedAssertions[0].jsonPointer = "/closedFeatures/9007199254740993/continuityClose/closeEvidence";
+    },
+    "pointers select the wrong live entries": (state, record) => {
+      [record.preservedClaimant.jsonPointer, record.quarantinedAssertions[0].jsonPointer]
+        = [record.quarantinedAssertions[0].jsonPointer, record.preservedClaimant.jsonPointer];
+    },
+    "preserved evidence path mismatch": (state, record) => {
+      record.evidence.path = "specs/closed/unrelated-evidence.md";
+      record.quarantinedAssertions[0].formerAssertion.closeEvidence.path = record.evidence.path;
+    },
+    "preserved evidence digest mismatch": (state, record) => {
+      record.evidence.observedSha256 = digest("unrelated proof\n");
+      record.preservedClaimant.expectedSha256 = record.evidence.observedSha256;
+    },
+    "preserved assertion missing": (state) => { delete state.closedFeatures[1].continuityClose; },
+    "quarantined assertion still present": (state, record) => {
+      const restored = structuredClone(record.quarantinedAssertions[0].formerAssertion);
+      restored.closeEvidence.sha256 = digest(damaged.currentEvidence);
+      state.closedFeatures[0].continuityClose = restored;
+    },
+    "duplicate live feature identity": (state) => {
+      state.closedFeatures.push(structuredClone(state.closedFeatures[1]));
+    },
+  };
+  for (const [label, tamper] of Object.entries(variants)) {
+    const state = structuredClone(valid);
+    tamper(state, state.stateRepairs[0]);
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const stateBefore = readFileSync(damaged.statePath);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged", label);
+    const refused = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(refused.status, "unsupported", label);
+    assert.equal(refused.code, "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID", label);
+    assert.deepEqual(readFileSync(damaged.statePath), stateBefore, label);
+    assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence, label);
+  }
+});
+
+check("repair records cannot reuse a claimant across records even with different plan and preimage digests", () => {
+  const root = fixture("repair-cross-record-claimant-reuse");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const valid = JSON.parse(readFileSync(damaged.statePath));
+  for (const variant of ["identical record", "reused preserved claimant", "reused quarantined claimant"]) {
+    const state = structuredClone(valid);
+    const extra = structuredClone(state.stateRepairs[0]);
+    if (variant !== "identical record") {
+      extra.planSha256 = digest("different repair plan");
+      extra.stateBeforeSha256 = digest("different state preimage");
+      const preserved = variant === "reused quarantined claimant";
+      const unrelated = structuredClone(state.closedFeatures[preserved ? 1 : 0]);
+      unrelated.id = "third-feature";
+      unrelated.closedAt = state.updatedAt;
+      if (preserved) unrelated.continuityClose.featureId = unrelated.id;
+      state.closedFeatures.push(unrelated);
+      const claimant = preserved ? extra.preservedClaimant : extra.quarantinedAssertions[0];
+      claimant.featureId = unrelated.id;
+      claimant.jsonPointer = "/closedFeatures/2/continuityClose/closeEvidence";
+      extra.affectedFeatureIds[preserved ? 0 : 1] = unrelated.id;
+      if (!preserved) claimant.formerAssertion.featureId = unrelated.id;
+    }
+    state.stateRepairs.push(extra);
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(damaged.statePath);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged", variant);
+    assert.equal(planOnboardingContinuityRepair({ rootDir: root }).code,
+      "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID", variant);
+    assert.deepEqual(readFileSync(damaged.statePath), before, variant);
+  }
+});
+
+check("a new collision overlapping an earlier repair is refused before changing State", () => {
+  const root = fixture("repair-prevent-overlapping-audit");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const firstPlan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: firstPlan.planSha256, activate: true });
+  const state = JSON.parse(readFileSync(damaged.statePath));
+  const newClaimant = structuredClone(state.closedFeatures[1]);
+  newClaimant.id = "third-feature";
+  newClaimant.continuityClose.featureId = newClaimant.id;
+  newClaimant.continuityClose.closeEvidence.sha256 = digest("new stale claim\n");
+  state.closedFeatures.push(newClaimant);
+  writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const before = readFileSync(damaged.statePath);
+  const refused = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(refused.status, "unsupported");
+  assert.equal(refused.code, "CONTINUITY-REPAIR-AUDIT-CONFLICT");
+  expectKickoffError("CONTINUITY-REPAIR-PLAN-DIGEST", () => applyOnboardingContinuityRepair({
+    rootDir: root, expectedPlanSha256: firstPlan.planSha256, activate: true,
+  }));
+  assert.deepEqual(readFileSync(damaged.statePath), before);
+  assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence);
+});
+
+check("shared evidence repair preserves earlier repair records byte-for-byte on another independent repair", () => {
+  const root = fixture("repair-append-only-audit");
+  const damaged = sharedCloseEvidenceDamage(root);
+  let plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const state = JSON.parse(readFileSync(damaged.statePath));
+  const firstRecord = JSON.stringify(state.stateRepairs[0]);
+  writeFileSync(join(root, "specs/closed/next-evidence.md"), "next proof\n");
+  for (const [index, id] of ["third-feature", "fourth-feature"].entries()) {
+    const entry = structuredClone(state.closedFeatures[1]);
+    entry.id = id;
+    entry.continuityClose.featureId = id;
+    entry.continuityClose.closeEvidence = { path: "specs/closed/next-evidence.md", sha256: digest(index === 0 ? "old next proof\n" : "next proof\n") };
+    state.closedFeatures.push(entry);
+  }
+  writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const repaired = JSON.parse(readFileSync(damaged.statePath));
+  assert.equal(repaired.stateRepairs.length, 2);
+  assert.equal(JSON.stringify(repaired.stateRepairs[0]), firstRecord);
+  assert.deepEqual(repaired.closedFeatures.slice(0, 2), state.closedFeatures.slice(0, 2));
+});
+
+check("shared close-evidence repair reports typed lock and CAS drift refusals without touching evidence", () => {
+  const driftRoot = fixture("repair-shared-close-cas-drift");
+  const drifted = sharedCloseEvidenceDamage(driftRoot);
+  const driftPlan = planOnboardingContinuityRepair({ rootDir: driftRoot });
+  const evidenceBefore = readFileSync(join(driftRoot, drifted.evidencePath));
+  expectKickoffError("CONTINUITY-REPAIR-CAS-DRIFT", () => applyOnboardingContinuityRepair({
+    rootDir: driftRoot,
+    expectedPlanSha256: driftPlan.planSha256,
+    activate: true,
+    deps: {
+      beforeCasRecheck() {
+        const state = JSON.parse(readFileSync(drifted.statePath, "utf8"));
+        state.closedFeatures[0].closedBy = "changed-after-plan";
+        writeFileSync(drifted.statePath, `${JSON.stringify(state, null, 2)}\n`);
+      },
+    },
+  }));
+  assert.deepEqual(readFileSync(join(driftRoot, drifted.evidencePath)), evidenceBefore);
+
+  const lockedRoot = fixture("repair-shared-close-locked");
+  const locked = sharedCloseEvidenceDamage(lockedRoot);
+  const lockedPlan = planOnboardingContinuityRepair({ rootDir: lockedRoot });
+  writeFileSync(`${locked.statePath}.lock`, `${JSON.stringify({
+    schema: "pipeline.continuity-lock.v0",
+    token: "foreign-writer",
+    ownerNonce: "foreign-owner",
+    acquiredAtMs: Date.now(),
+  })}\n`);
+  expectKickoffError("KICKOFF-LOCKED", () => applyOnboardingContinuityRepair({
+    rootDir: lockedRoot,
+    expectedPlanSha256: lockedPlan.planSha256,
+    activate: true,
+  }));
+  assert.deepEqual(readFileSync(join(lockedRoot, locked.evidencePath)), locked.currentEvidence);
+});
+
+check("shared evidence drift before replacement refuses without changing State and cleans the owned temporary", () => {
+  for (const stage of ["beforeCasRecheck", "beforeStateReplace"]) {
+    const root = fixture(`repair-evidence-drift-${stage}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const stateBefore = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    expectKickoffError("CONTINUITY-REPAIR-CAS-DRIFT", () => applyOnboardingContinuityRepair({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { [stage]() { writeFileSync(join(root, damaged.evidencePath), "concurrent writer evidence\n"); } },
+    }));
+    assert.deepEqual(readFileSync(damaged.statePath), stateBefore);
+    assert.equal(readFileSync(join(root, damaged.evidencePath), "utf8"), "concurrent writer evidence\n");
+    assert.ok(!existsSync(`${damaged.statePath}.lock`));
+    assert.equal(readdirSync(dirname(damaged.statePath)).some((name) => name.endsWith(".tmp")), false);
+  }
+});
+
+check("shared evidence repair failed readback is typed and committed, even if continuity remains valid", () => {
+  for (const variant of ["state", "evidence"]) {
+    const root = fixture(`repair-readback-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.throws(() => applyOnboardingContinuityRepair({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        beforeReadback() {
+          if (variant === "evidence") writeFileSync(join(root, damaged.evidencePath), "concurrent proof\n");
+          else {
+            const state = JSON.parse(readFileSync(damaged.statePath));
+            state.closedFeatures[0].closedBy = "concurrent owner";
+            writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+            assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+          }
+        },
+      },
+    }), (error) => error.code === "CONTINUITY-REPAIR-READBACK-INVALID" && error.committed === true);
+    assert.equal(JSON.parse(readFileSync(damaged.statePath)).stateRepairs.length, 1,
+      "never roll back a committed repair over a later writer");
+    if (variant === "state") assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence);
+    assert.ok(!existsSync(`${damaged.statePath}.lock`));
+  }
+});
+
+check("legacy adoption is explicit, PO-bound, and does not invent kickoff history", () => {
+  const root = fixture("repair-legacy-state");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "legacy"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "legacy", "prd_legacy.md"), "# Existing PRD\n");
+  writeFileSync(join(root, "specs", "legacy", "spec.md"), "# Existing specification\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: {
+      id: "legacy-feature",
+      planPath: "specs/legacy/prd_legacy.md",
+      phase: "implementation",
+    },
+    planApproved: true,
+    updatedAt: "2026-07-26T00:00:00.000Z",
+    planApproval: {
+      approvedBy: "PO",
+      approvedAt: "2026-07-26T00:00:00.000Z",
+      poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2",
+        humanFacing: "en",
+        planPath: "specs/legacy/prd_legacy.md",
+        specPath: "specs/legacy/spec.md",
+      },
+    },
+  }, null, 2)}\n`);
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "adopt-established-state");
+  assert.equal(plan.history.sha256, null);
+  assert.equal(plan.target.value.continuity.queueHead.nextAction, "review");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.continuity.status, "valid");
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json")), false);
+});
+
+check("continuity repair rejects authority drift and arbitrary invalid state", () => {
+  const root = fixture("repair-rejects-drift");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Reject repair drift" });
+  applyOnboardingKickoff({
+    plan: kickoff,
+    expectedPlanSha256: kickoff.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.continuity.resume = {
+    mode: "resume-on-next-turn",
+    sourceRevision: 0,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(join(root, state.continuity.authority.prd.path), "# drifted authority\n");
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+
+  state.continuity.resume = {
+    mode: "immediate",
+    sourceRevision: state.continuity.revision + 1,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+});
+
+check("operator-authority-required repair goes red then green once operator authority is supplied", () => {
+  const root = fixture("repair-operator-authority");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const red = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(red.status, "operator-authority-required");
+
+  const operatorAuthority = {
+    featureId: "mature-feature",
+    planPath: "specs/mature/prd_mature.md",
+    prdPath: "specs/mature/prd_mature.md",
+    specPath: "specs/mature/spec.md",
+    language: "en",
+  };
+  const green = planOnboardingContinuityRepair({ rootDir: root, operatorAuthority });
+  assert.equal(green.status, "ready");
+  assert.equal(green.reason, "adopt-operator-confirmed-authority");
+  assert.equal(green.target.beforeSha256, null);
+  assert.equal(green.target.value.activeFeature.id, "mature-feature");
+  assert.equal(green.target.value.activeFeature.phase, "design");
+  assert.equal(green.target.value.planApproved, false);
+});
+
+check("operator-confirmed repair applies end-to-end to a valid classification", () => {
+  const root = fixture("repair-operator-authority-apply");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const operatorAuthority = {
+    featureId: "mature-feature",
+    planPath: "specs/mature/prd_mature.md",
+    prdPath: "specs/mature/prd_mature.md",
+    specPath: "specs/mature/spec.md",
+    language: "en",
+  };
+  const plan = planOnboardingContinuityRepair({ rootDir: root, operatorAuthority });
+  assert.equal(plan.status, "ready");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    operatorAuthority,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.reason, "adopt-operator-confirmed-authority");
+  assert.equal(applied.continuity.status, "valid");
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  const stateOnDisk = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
+  assert.equal(stateOnDisk.activeFeature.id, "mature-feature");
+  assert.equal(stateOnDisk.continuity.authority.prd.path, "specs/mature/prd_mature.md");
+  assert.equal(stateOnDisk.continuity.authority.spec.path, "specs/mature/spec.md");
+});
+
+check("operator-confirmed repair refuses a bad or missing operator-supplied PRD or Spec path", () => {
+  const root = fixture("repair-operator-authority-fail-closed");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const missingSpec = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "specs/mature/prd_mature.md",
+      prdPath: "specs/mature/prd_mature.md",
+      specPath: "specs/mature/missing-spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(missingSpec.status, "unsupported");
+  assert.equal(missingSpec.code, "CONTINUITY-REPAIR-UNSUPPORTED");
+
+  const mismatchedPlan = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "specs/mature/prd_mature.md",
+      prdPath: "specs/mature/spec.md",
+      specPath: "specs/mature/spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(mismatchedPlan.status, "unsupported");
+  assert.equal(mismatchedPlan.code, "CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID");
+
+  const unsafePath = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "../outside.md",
+      prdPath: "../outside.md",
+      specPath: "specs/mature/spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(unsafePath.status, "unsupported");
+  assert.equal(unsafePath.code, "KICKOFF-PATH-UNSAFE");
+
+  assert.equal(existsSync(join(root, ".claude", "pipeline-state.json")), false);
+});
+
+check("completed apply replay is byte-null and returns the identical continuity hashes", () => {
+  const root = fixture("replay");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  const applied = applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const before = targetBytes(root, plan);
+  const replay = applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const after = targetBytes(root, plan);
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+  assert.deepEqual(replay.continuity, applied.continuity);
+  assert.deepEqual(after.bytes, before.bytes);
+});
+
+check("a competing state appearance fails closed", () => {
+  const root = fixture("state-conflict");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), '{"schema":"pipeline.state.v0"}\n');
+  expectKickoffError("KICKOFF-CAS-DRIFT", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"),
+    '{"schema":"pipeline.state.v0"}\n');
+});
+
+check("lock rejection creates neither private nor project target parents", () => {
+  const root = fixture("lock-before-parents", { handover: "notes/project state.md" });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  writeFileSync(join(root, ".claude", "pipeline-state.json.lock"), "foreign lock\n", { mode: 0o600 });
+  expectKickoffError("KICKOFF-LOCKED", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }));
+  assert.equal(existsSync(join(root, "notes")), false);
+  assert.equal(existsSync(join(root, "specs")), false);
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false);
+});
+
+check("kickoff never unlinks a predictable foreign temporary artifact", () => {
+  const root = fixture("foreign-temp");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  const suffix = "a".repeat(32);
+  const targetPath = join(root, plan.targets.prd.path);
+  const directory = dirname(targetPath);
+  const foreignPath = join(directory, `.${basename(targetPath)}.kickoff-${suffix}.tmp`);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(foreignPath, "foreign temporary artifact\n", { mode: 0o600 });
+  expectKickoffError("KICKOFF-WRITE-FAILED", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { randomUUID: () => suffix },
+  }));
+  assert.equal(readFileSync(foreignPath, "utf8"), "foreign temporary artifact\n");
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+});
+
+check("failed kickoff removes only its newly created empty target parents", () => {
+  const root = fixture("parent-rollback", { handover: "notes/project state.md" });
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
+  expectKickoffError("KICKOFF-FAULT", () => applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { fault: () => { const error = new Error("forced"); error.code = "KICKOFF-FAULT"; throw error; } },
+  }));
+  assert.equal(existsSync(join(root, "notes")), false);
+  assert.equal(existsSync(join(root, "specs")), false);
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false);
+});
+
+for (const stage of KICKOFF_FAULT_STAGES) {
+  check(`fault at ${stage} rolls back every proposed byte and permits a clean retry`, () => {
+    const root = fixture(`fault-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    const plan = planOnboardingKickoff({ rootDir: root, goal: `Recover from ${stage}` });
+    expectKickoffError("KICKOFF-FAULT", () => applyOnboardingKickoff({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        fault(point) {
+          if (point === stage) {
+            const error = new Error(stage);
+            error.code = "KICKOFF-FAULT";
+            throw error;
+          }
+        },
+      },
+    }));
+    const failed = targetBytes(root, plan);
+    assert.deepEqual(failed.bytes, {
+      state: null,
+      handover: null,
+      prd: null,
+      spec: null,
+      history: null,
+    });
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "absent-pristine");
+    assert.equal(applyOnboardingKickoff({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+    }).status, "applied");
+  });
+}
+
+for (const stage of KICKOFF_FAULT_STAGES) {
+  check(`crash at ${stage} is recovered only by the same digest-bound plan`, () => {
+    const root = fixture(`crash-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    const plan = planOnboardingKickoff({ rootDir: root, goal: `Recover crash at ${stage}` });
+    expectKickoffError("KICKOFF-SIMULATED-CRASH", () => applyOnboardingKickoff({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { crashAt: stage },
+    }));
+    const recovered = applyOnboardingKickoff({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+    });
+    assert.ok(["applied", "replayed"].includes(recovered.status));
+    assert.equal(recovered.readback.code, "CS-STATUS-ACTIVE");
+    assert.equal(recovered.continuity.status, "valid");
+    assert.equal(existsSync(join(root, ".claude", "pipeline-state.json.lock")), false);
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", ".kickoff-writer.lock")), false);
+  });
+}
+
+function promotionSeed(name, { privatized = false, bumpRevision = privatized, poLanguage = "en" } = {}) {
+  const root = fixture(`promotion-${name}`, { neutral: privatized });
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: `Promote ${name}` });
+  const statePath = join(root, kickoff.targets.state.path);
+  applyOnboardingKickoff({
+    plan: kickoff,
+    expectedPlanSha256: kickoff.planSha256,
+    activate: true,
+  });
+  if (privatized) {
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    bindOnboardingSessionCleanup({
+      rootDir: root,
+      expectedStateSha256: binding.stateSha256,
+      expectedRevision: 0,
+      sessionCleanup: {
+        sessionId: `session-${name}`,
+        descriptorSha256: "a".repeat(64),
+      },
+    });
+    // `bumpRevision` (default: mirrors `privatized`, so every existing caller
+    // keeps promoting a revision-1 re-kickoff exactly as before) is set false
+    // by the revision-0->1 recovery test below: it needs a private
+    // session-cleanup binding to exist at kickoff time -- exactly like a
+    // revision-1 re-kickoff -- while the kickoff itself stays at revision 0,
+    // the ordinary first-ever kickoff a project runs.
+    if (bumpRevision) {
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      state.continuity.revision = 1;
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    }
+  }
+  const directory = join(root, "specs", "promoted");
+  mkdirSync(directory, { recursive: true });
+  const specBytes = `# ${name} specification\n`;
+  writeFileSync(join(directory, "spec.md"), specBytes);
+  // The promoted PRD is the approval subject, so it carries the PO-gate
+  // markers: the human-facing language, the digest of the Spec beside it, and
+  // the PO's own plan acknowledgement (this fixture represents an already
+  // human-reviewed PRD, the state every promotion test in this file assumes).
+  writeFileSync(join(directory, "prd_promoted.md"), [
+    `<!-- po-language: ${poLanguage} -->`,
+    `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
+    PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+    `# ${name} PRD`,
+    "",
+  ].join("\n"));
+  writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
+  return {
+    root,
+    kickoff,
+    statePath,
+    request: {
+      rootDir: root,
+      profile: "feature",
+      featureId: `feature-${name}`,
+      planPath: "specs/promoted/prd_promoted.md",
+      prdPath: "specs/promoted/prd_promoted.md",
+      specPath: "specs/promoted/spec.md",
+      designInputPath: "specs/promoted/design-input.md",
+    },
+  };
+}
+
+function mutatePromotionState(seed, mutate) {
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  mutate(state);
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+check("revision-0 kickoff seed promotion remains monotonic and replayable", () => {
+  const seed = promotionSeed("revision-zero");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.kickoff.revision, 0);
+  assert.equal(plan.targets.state.value.continuity.revision, 1);
+  assert.equal(plan.targets.state.value.continuity.resume.sourceRevision, 1);
+  assert.deepEqual(plan.authority.designInput, {
+    path: "specs/promoted/design-input.md",
+    sha256: plan.targets.history.value.transactions[1].designInputSha256,
+  });
+  assert.equal(plan.targets.history.value.transactions[1].designInputPath, "specs/promoted/design-input.md");
+  assert.ok(plan.applyAction.argv.includes("--design-input-path"));
+  const applied = applyOnboardingKickoffPromotion({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  const replay = applyOnboardingKickoffPromotion({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+});
+
+check("promotion requires bound design evidence and rejects post-promotion evidence drift without repair", () => {
+  const seed = promotionSeed("design-evidence");
+  const designInput = join(seed.root, "specs", "promoted", "design-input.md");
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, designInputPath: undefined }),
+    /design input path is unsafe/u);
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, designInputPath: "specs/other/design-input.md" }),
+    /promotion plan and authority paths are inconsistent/u);
+  const kickoffDirectory = join(seed.root, dirname(seed.kickoff.targets.prd.path));
+  const kickoffDesignInput = join(kickoffDirectory, "design-input.md");
+  writeFileSync(kickoffDesignInput, "# provisional evidence\n");
+  assert.throws(() => planOnboardingKickoffPromotion({
+    ...seed.request,
+    planPath: seed.kickoff.targets.prd.path,
+    prdPath: seed.kickoff.targets.prd.path,
+    specPath: seed.kickoff.targets.spec.path,
+    designInputPath: `${dirname(seed.kickoff.targets.spec.path)}/design-input.md`,
+  }), /promotion authority must not reuse kickoff artifacts/u);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  writeFileSync(designInput, "# changed evidence\n");
+  assert.throws(() => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }), /promotion authority bytes drifted/u);
+  writeFileSync(designInput, "# design-evidence design input\n");
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  writeFileSync(designInput, "# altered after promotion\n");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+check("authentic post-privatization kickoff seed promotes revision 1 to revision 2", () => {
+  const seed = promotionSeed("post-private", { privatized: true });
+  const before = classifyOnboardingContinuity({ rootDir: seed.root });
+  const beforeBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.kickoff.revision, 1);
+  assert.equal(plan.targets.state.beforeSha256, before.stateSha256);
+  assert.equal(plan.targets.state.value.continuity.revision, 2);
+  assert.equal(plan.targets.state.value.continuity.resume.sourceRevision, 2);
+  assert.equal(plan.targets.history.value.transactions[1].previousTransactionSha256,
+    seed.kickoff.transactionSha256);
+  assert.equal(plan.targets.history.value.transactions[1].beforeStateSha256,
+    before.stateSha256);
+  const applied = applyOnboardingKickoffPromotion({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  const afterBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(afterBinding.status, "bound");
+  assert.equal(afterBinding.root, beforeBinding.root);
+  assert.deepEqual(afterBinding.sessionCleanup, beforeBinding.sessionCleanup);
+  assert.equal(afterBinding.stateSha256, plan.targets.state.afterSha256);
+  assert.equal(plan.targets.cleanupBinding.beforeSha256.length, 64);
+  assert.equal(plan.targets.cleanupBinding.afterSha256.length, 64);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  }).status, "replayed");
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+});
+
+// SSc.4: the two earlier per-target boundaries (temp-fsync, rename), additive
+// to the four pre-existing "-published" (directory-fsync) commit-boundary
+// hooks -- matching KICKOFF_FAULT_STAGES' finer per-target-per-boundary
+// granularity for the three targets applyOnboardingKickoffPromotion writes
+// with an inline temp/rename/fsync sequence (history, handover, state).
+// cleanupBinding is deliberately excluded: its write goes through
+// replacePromotedPrivateCleanupBinding()'s own try/catch, which remaps any
+// non-KickoffError exception (SimulatedKickoffCrash extends Error, not
+// KickoffError) into KICKOFF-PROMOTION-PRIVATE-WRITE -- finer-grained
+// injection there would require restructuring that shared helper (also used
+// by the unrelated cleanup-recovery apply path), out of this dispatch's scope.
+for (const stage of [
+  "promotion-history-temp-fsync",
+  "promotion-history-rename",
+  "promotion-history-published",
+  "promotion-handover-temp-fsync",
+  "promotion-handover-rename",
+  "promotion-handover-published",
+  "promotion-cleanup-binding-published",
+  "promotion-state-temp-fsync",
+  "promotion-state-rename",
+  "promotion-state-published",
+]) {
+  check(`post-privatization promotion ${stage} crash recovers with the same bound plan`, () => {
+    const seed = promotionSeed(`crash-${stage}`, { privatized: true });
+    const plan = planOnboardingKickoffPromotion(seed.request);
+    assert.throws(() => applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { crashAt: stage },
+    }), (error) => error?.message === stage);
+    const recovered = applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+    });
+    assert.ok(["applied", "replayed"].includes(recovered.status));
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: seed.root }).status, "bound");
+  });
+}
+
+// The provisional `specs/kickoff-*` PRD and Spec survive promotion as stale
+// copies of the two documents the whole gate chain is digest-bound to.  The
+// promotion transaction is the only place that knows both locations, so it is
+// where the provisional one is retired: by a marker naming the successor
+// package, published after the commit point, never by a removal this
+// transaction has no rollback to undo.  These checks pin both halves of that
+// decision -- the marker exists after a success, and no failure point can
+// leave a byte of it behind.
+const SUPERSEDED_BASENAME = "SUPERSEDED.md";
+
+function provisionalDirectory(seed) {
+  return join(seed.root, dirname(seed.kickoff.targets.prd.path));
+}
+
+function directoryBytes(directory) {
+  if (!existsSync(directory)) return null;
+  return Object.fromEntries(readdirSync(directory).sort().map((name) => [
+    name,
+    readFileSync(join(directory, name)).toString("base64"),
+  ]));
+}
+
+// Content *and* mtime of everything a promotion may write, so "zero-write" is
+// a claim about the filesystem rather than about identical bytes.
+function promotionWriteSurface(seed) {
+  const surface = {};
+  const visit = (directory, prefix) => {
+    if (!existsSync(directory)) return;
+    for (const name of readdirSync(directory).sort()) {
+      const child = join(directory, name);
+      const rel = `${prefix}/${name}`;
+      if (lstatSync(child).isDirectory()) {
+        visit(child, rel);
+        continue;
+      }
+      surface[rel] = `${readFileSync(child).toString("base64")}@${lstatSync(child).mtimeMs}`;
+    }
+  };
+  visit(join(seed.root, "specs"), "specs");
+  visit(join(seed.root, ".git", "agent-pipeline"), "private");
+  visit(dirname(seed.statePath), "state");
+  return surface;
+}
+
+check("promotion retires the provisional kickoff anchors with a marker naming its successor", () => {
+  const seed = promotionSeed("supersession");
+  const provisional = provisionalDirectory(seed);
+  const marker = join(provisional, SUPERSEDED_BASENAME);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(existsSync(marker), false);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "applied");
+  assert.equal(existsSync(marker), true);
+  const text = readFileSync(marker, "utf8");
+  for (const named of [
+    plan.kickoff.featureId, seed.request.featureId, seed.request.profile,
+    seed.request.prdPath, seed.request.specPath, seed.request.designInputPath,
+    plan.transactionSha256,
+  ]) {
+    assert.ok(text.includes(named), `supersession marker must name ${named}`);
+  }
+  assert.deepEqual(readdirSync(provisional).sort(), [
+    SUPERSEDED_BASENAME, basename(seed.kickoff.targets.prd.path), "spec.md",
+  ].sort());
+  // The marker is an annotation, never an authority record: the promotion
+  // history entry still records exactly what it recorded before, `specPath`
+  // included, and gains nothing.
+  const entry = JSON.parse(readFileSync(join(seed.root, ".git", "agent-pipeline",
+    "onboarding", "continuity-history.json"), "utf8")).transactions[1];
+  assert.deepEqual(entry, plan.targets.history.value.transactions[1]);
+  assert.deepEqual(Object.keys(entry).sort(), [
+    "afterStateSha256", "beforeStateSha256", "designInputPath", "designInputSha256",
+    // `handover` joined the record on 2026-08-09 when the promotion gained its
+    // fourth target. It is a target binding like `cleanupBinding`, not an
+    // authority record: the marker below still gains nothing from it.
+    "featureId", "handover", "kickoffFeatureId", "kind", "planPath", "prdSha256",
+    "previousTransactionSha256", "profile", "specPath", "specSha256", "transactionSha256",
+  ]);
+  assert.equal(entry.specPath, seed.request.specPath);
+  assert.equal(entry.planPath, seed.request.planPath);
+});
+
+// HANDOVER-1. The defect this target closes, stated as the test: after a
+// promotion, the canonical handover must not still describe the provisional
+// kickoff feature whose directory the same transaction just marked SUPERSEDED.md.
+// Both of the PO's 2026-08-09 greenfield repositories ended in exactly that state,
+// and the bootstrap reads this file first and treats it as canonical for "where am
+// I" -- so a resuming session was pointed at a superseded anchor by the artifact
+// that exists to prevent it.
+check("the promotion replaces the handover the kickoff wrote", () => {
+  const seed = promotionSeed("handover");
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const kickoffFeatureId = basename(dirname(seed.kickoff.targets.prd.path));
+  const before = readFileSync(handoverPath, "utf8");
+  assert.ok(before.includes(kickoffFeatureId), "the kickoff handover names the provisional feature");
+
+  const plan = promote(seed);
+  const after = readFileSync(handoverPath, "utf8");
+
+  // What must no longer be there, and what must be.
+  assert.ok(!after.includes(kickoffFeatureId),
+    "no artifact this transaction wrote may still name the superseded kickoff feature");
+  for (const named of [seed.request.featureId, seed.request.prdPath, seed.request.specPath,
+    seed.request.designInputPath, seed.request.profile]) {
+    assert.ok(after.includes(named), `the promoted handover must name ${named}`);
+  }
+  // The design input is the line that matters across a session boundary: the PO's
+  // report of the Codex run was that the runner "forgets the input", and the brief
+  // was never lost from disk -- nothing that survived the session pointed at it.
+  assert.ok(after.includes(seed.request.designInputPath), "the handover names the durable brief");
+
+  // Bound like the other three targets, not written and forgotten.
+  assert.equal(plan.targets.handover.path, "docs/state.md");
+  assert.equal(plan.targets.handover.beforeSha256, digest(before));
+  assert.equal(plan.targets.handover.afterSha256, digest(after));
+  const entry = JSON.parse(readFileSync(promotionHistoryPath(seed.root), "utf8")).transactions[1];
+  assert.deepEqual(entry.handover, {
+    path: "docs/state.md", beforeSha256: digest(before), afterSha256: digest(after),
+  });
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // Replay is zero-write and returns the identical plan digest.
+  const replayed = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(replayed.status, "replayed");
+  assert.equal(replayed.mutated, false);
+  assert.equal(readFileSync(handoverPath, "utf8"), after);
+});
+
+// HANDOVER-2. The handover is published BEFORE the State, which is this
+// transaction's commit point. A crash between them must therefore leave a
+// handover that is ahead of a State that is behind -- recoverable, roll-forward,
+// and never the reverse (a promoted State beside a handover still naming the
+// kickoff is the exact state the target exists to prevent).
+check("a crash after the handover publication rolls forward, never backward", () => {
+  const seed = promotionSeed("handover-crash", { privatized: true });
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.throws(() => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: { crashAt: "promotion-handover-published" },
+  }));
+
+  const crashed = readFileSync(handoverPath, "utf8");
+  assert.equal(crashed.includes("SUPERSEDED.md"), false,
+    "handover publication precedes optional marker publication");
+  assert.equal(digest(crashed), plan.targets.handover.afterSha256, "the handover reached its postimage");
+  assert.ok(!crashed.includes(basename(dirname(seed.kickoff.targets.prd.path))));
+  assert.notEqual(JSON.parse(readFileSync(seed.statePath, "utf8")).continuity.featureId, seed.request.featureId,
+    "the State has NOT been published -- the commit point was never reached");
+
+  // The same digest-bound plan completes it. The simulated crash holds the locks,
+  // exactly as a real one would, so recovery goes through the stale-lock path.
+  const resumed = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+  });
+  assert.equal(resumed.status, "applied");
+  assert.equal(readFileSync(handoverPath, "utf8"), crashed, "the recovered run rewrites no handover byte");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+// HANDOVER-3. A third party writing the handover between plan and apply is drift,
+// not a recoverable prefix: rolling forward over it would destroy bytes this
+// transaction never saw.
+check("a foreign handover write is drift, not a prefix to roll forward over", () => {
+  const seed = promotionSeed("handover-foreign");
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  writeFileSync(handoverPath, "# Someone else was here\n");
+  expectKickoffError("KICKOFF-PROMOTION-CAS-DRIFT", () => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }));
+  assert.equal(readFileSync(handoverPath, "utf8"), "# Someone else was here\n",
+    "the foreign bytes are preserved exactly");
+});
+
+for (const stage of [
+  "promotion-history-temp-fsync",
+  "promotion-history-rename",
+  "promotion-history-published",
+  "promotion-handover-temp-fsync",
+  "promotion-handover-rename",
+  "promotion-handover-published",
+  "promotion-cleanup-binding-published",
+  "promotion-state-temp-fsync",
+  "promotion-state-rename",
+  "promotion-state-published",
+]) {
+  check(`promotion crash at ${stage} leaves the provisional kickoff anchors byte for byte`, () => {
+    const seed = promotionSeed(`supersession-crash-${stage}`, { privatized: true });
+    const provisional = provisionalDirectory(seed);
+    const before = directoryBytes(provisional);
+    const plan = planOnboardingKickoffPromotion(seed.request);
+    assert.throws(() => applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { crashAt: stage },
+    }), (error) => error?.message === stage);
+    assert.deepEqual(directoryBytes(provisional), before);
+    assert.equal(existsSync(join(provisional, SUPERSEDED_BASENAME)), false);
+  });
+}
+
+check("promotion replay after supersession stays zero-write and canonically identical", () => {
+  const seed = promotionSeed("supersession-replay");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const applied = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  const surface = promotionWriteSurface(seed);
+  const replay = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+  assert.deepEqual(promotionWriteSurface(seed), surface);
+  assert.deepEqual({ ...replay, status: applied.status, mutated: applied.mutated }, applied);
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+});
+
+check("an already-cleaned provisional location survives inspection and replay", () => {
+  const seed = promotionSeed("supersession-cleaned");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  rmSync(provisionalDirectory(seed), { recursive: true, force: true });
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "replayed");
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+  assert.equal(existsSync(provisionalDirectory(seed)), false);
+  assert.equal(readFileSync(join(seed.root, "docs", "state.md"), "utf8").includes("SUPERSEDED.md"), false,
+    "an absent provisional directory cannot support a physical marker assertion");
+});
+
+check("an already-marked provisional location is never overwritten by the promotion", () => {
+  const seed = promotionSeed("supersession-marked");
+  const provisional = provisionalDirectory(seed);
+  const marker = join(provisional, SUPERSEDED_BASENAME);
+  const original = "# retired by hand, before the promotion ran\n";
+  writeFileSync(marker, original);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "applied");
+  assert.equal(readFileSync(marker, "utf8"), original);
+  assert.equal(readFileSync(join(seed.root, "docs", "state.md"), "utf8").includes("SUPERSEDED.md"), false,
+    "an existing unrelated annotation does not establish this successor");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "replayed");
+  assert.deepEqual(readdirSync(provisional).filter((name) => name.startsWith(".")), []);
+});
+
+function legacyPromotionCleanupMismatch(name) {
+  const seed = promotionSeed(`legacy-${name}`, { privatized: true });
+  const bindingPath = join(seed.root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+  const originalBinding = readFileSync(bindingPath);
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
+  const historyPath = join(seed.root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  delete history.transactions[1].cleanupBinding;
+  writeFileSync(historyPath, `${JSON.stringify(history)}\n`, { mode: 0o600 });
+  writeFileSync(bindingPath, originalBinding, { mode: 0o600 });
+  return { ...seed, bindingPath, historyPath };
+}
+
+check("legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay", () => {
+  const seed = legacyPromotionCleanupMismatch("repair");
+  const before = {
+    state: readFileSync(seed.statePath),
+    history: readFileSync(seed.historyPath),
+    binding: readFileSync(seed.bindingPath),
+  };
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.feature.from.startsWith("kickoff-"), true);
+  assert.equal(plan.feature.to, seed.request.featureId);
+  assert.deepEqual(readFileSync(seed.statePath), before.state);
+  assert.deepEqual(readFileSync(seed.historyPath), before.history);
+  assert.deepEqual(readFileSync(seed.bindingPath), before.binding);
+  const applied = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: seed.root }).status, "bound");
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+check("legacy promotion cleanup recovery is crash-replay safe after private binding publication", () => {
+  const seed = legacyPromotionCleanupMismatch("recovery-crash");
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.throws(() => applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { crashAt: "kickoff-promotion-cleanup-recovery-binding-published" },
+  }), (error) => error?.message === "kickoff-promotion-cleanup-recovery-binding-published");
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+check("ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay", () => {
+  // Unlike `legacyPromotionCleanupMismatch` (which seeds `privatized: true`, a
+  // revision-1 re-kickoff), this is the single most common path: the very
+  // first kickoff a project ever runs. A private session-cleanup binding can
+  // still exist at kickoff time (bound to the kickoff-XXXX pseudo feature id)
+  // -- `recognisedKickoff` simply never reads it for a revision-0 kickoff, so
+  // `buildKickoffPromotionPlan` structurally never carries a `cleanupBinding`
+  // promotion target for it. Recovering that binding afterward is exactly
+  // `kickoffPromotionCleanupRecoveryPlanCore`'s job, and it used to hardcode
+  // `state.continuity.revision !== 2`, excluding this revision-0->1 case.
+  const seed = promotionSeed("legacy-revision-zero", { privatized: true, bumpRevision: false });
+  const kickoffBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(kickoffBinding.revision, 0);
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(promotion.kickoff.revision, 0);
+  assert.equal(promotion.targets.cleanupBinding, undefined);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true,
+  }).status, "applied");
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.revision, 1);
+  assert.equal(plan.feature.from.startsWith("kickoff-"), true);
+  assert.equal(plan.feature.to, seed.request.featureId);
+  const applied = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.revision, 1);
+  const boundBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(boundBinding.status, "bound");
+  assert.equal(boundBinding.revision, 1);
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+for (const [name, mutate] of [
+  ["history-binding", (seed) => {
+    const history = JSON.parse(readFileSync(seed.historyPath, "utf8"));
+    history.transactions[1].featureId = "wrong-feature";
+    writeFileSync(seed.historyPath, `${JSON.stringify(history)}\n`, { mode: 0o600 });
+  }],
+  ["state-feature", (seed) => mutatePromotionState(seed, (state) => { state.activeFeature.id = "wrong-feature"; })],
+]) {
+  check(`legacy promotion cleanup mismatch ${name} fails closed`, () => {
+    const seed = legacyPromotionCleanupMismatch(name);
+    mutate(seed);
+    const result = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+    assert.equal(result.status, "recovery-unavailable");
+    // NVA-H-LASTBUILDERS: the non-ready branches return before nextAction is
+    // attached and must stay exactly as they were -- only the "ready" return
+    // gains applyAction/nextAction/planSha256.
+    assert.equal("applyAction" in result, false);
+    assert.equal("nextAction" in result, false);
+    assert.equal("planSha256" in result, false);
+  });
+}
+
+check("revision-1 kickoff lookalike without authenticated private binding is rejected", () => {
+  const seed = promotionSeed("missing-private-binding");
+  mutatePromotionState(seed, (state) => { state.continuity.revision = 1; });
+  expectKickoffError("KICKOFF-PROMOTION-NOT-SEED", () => {
+    planOnboardingKickoffPromotion(seed.request);
+  });
+});
+
+for (const [name, mutate] of [
+  ["revision-two", (seed) => mutatePromotionState(seed, (state) => { state.continuity.revision = 2; })],
+  ["authority-drift", (seed) => {
+    writeFileSync(join(seed.root, seed.kickoff.targets.prd.path), "# drifted initial authority\n");
+  }],
+  ["dispatch", (seed) => mutatePromotionState(seed, (state) => {
+    state.continuity.queueHead.dispatch = {
+      featureId: state.activeFeature.id,
+      queueRevision: state.continuity.revision,
+      packageId: state.continuity.queueHead.packageId,
+      actionId: state.continuity.queueHead.actionId,
+      dispatchId: "dispatch-1",
+      attemptId: "attempt-1",
+      authorityDigests: {
+        prdSha256: state.continuity.authority.prd.sha256,
+        specSha256: state.continuity.authority.spec.sha256,
+        resultSha256: null,
+      },
+      routeRequestSha256: "b".repeat(64),
+      mayDelegate: false,
+    };
+  })],
+  ["blocker", (seed) => mutatePromotionState(seed, (state) => {
+    state.continuity.queueHead = null;
+    state.continuity.blocker = {
+      type: "authority",
+      signature: "authority-blocked",
+      resumeCondition: { kind: "manual", evidenceSha256: null },
+      decisionBrief: null,
+    };
+  })],
+  ["queue-mutation", (seed) => mutatePromotionState(seed, (state) => {
+    state.continuity.queueHead.actionId = "mutated-action";
+  })],
+  ["result", (seed) => mutatePromotionState(seed, (state) => {
+    state.continuity.authority.result = {
+      path: "evidence/result.json",
+      sha256: "c".repeat(64),
+    };
+  })],
+  ["decision", (seed) => mutatePromotionState(seed, (state) => {
+    state.continuity.decisionTxn = {
+      idempotencyKey: "decision-1",
+      briefSha256: "d".repeat(64),
+      intentSha256: "e".repeat(64),
+      selectedOptionId: "option-1",
+      preSelectionRevision: 0,
+      selectedRevision: 1,
+      dispatchableRevision: 2,
+      phase: "state-applied",
+    };
+  })],
+  ["false-history", (seed) => {
+    const path = join(seed.root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+    const history = JSON.parse(readFileSync(path, "utf8"));
+    history.transactions[0].transactionSha256 = "f".repeat(64);
+    writeFileSync(path, JSON.stringify(history), { mode: 0o600 });
+  }],
+]) {
+  check(`post-privatization kickoff rejects ${name}`, () => {
+    const seed = promotionSeed(`reject-${name}`, { privatized: true });
+    mutate(seed);
+    expectKickoffError("KICKOFF-PROMOTION-NOT-SEED", () => {
+      planOnboardingKickoffPromotion(seed.request);
+    });
+  });
+}
+
+function promotionHistoryPath(root) {
+  return join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+}
+
+function promote(seed) {
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  return plan;
+}
+
+function promotedArtifact(seed, name) {
+  return join(seed.root, "specs", "promoted", name);
+}
+
+check("promotion binds the PRD as the approval subject and presents the Spec beside it", () => {
+  const seed = promotionSeed("prd-is-the-plan");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.feature.planPath, "specs/promoted/prd_promoted.md");
+  assert.equal(plan.authority.prd.path, plan.feature.planPath);
+  assert.equal(plan.authority.spec.path, "specs/promoted/spec.md");
+  assert.notEqual(plan.authority.prd.path, plan.authority.spec.path);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(state.activeFeature.planPath, "specs/promoted/prd_promoted.md");
+  assert.deepEqual(state.continuity.authority.prd, plan.authority.prd);
+  assert.deepEqual(state.continuity.authority.spec, plan.authority.spec);
+  assert.equal(state.planApproved, false);
+});
+
+check("the recorded promotion transaction names the PRD and the Spec with both digests", () => {
+  const seed = promotionSeed("both-digests");
+  const plan = promote(seed);
+  const entry = JSON.parse(readFileSync(promotionHistoryPath(seed.root), "utf8")).transactions[1];
+  assert.equal(entry.planPath, "specs/promoted/prd_promoted.md");
+  assert.equal(entry.specPath, "specs/promoted/spec.md");
+  assert.equal(entry.prdSha256, digest(readFileSync(promotedArtifact(seed, "prd_promoted.md"))));
+  assert.equal(entry.specSha256, digest(readFileSync(promotedArtifact(seed, "spec.md"))));
+  assert.equal(entry.prdSha256, plan.authority.prd.sha256);
+  assert.equal(entry.specSha256, plan.authority.spec.sha256);
+  assert.notEqual(entry.prdSha256, entry.specSha256);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+check("editing the promoted PRD invalidates the mutual digest binding", () => {
+  const seed = promotionSeed("prd-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+check("editing the promoted Spec invalidates the mutual digest binding", () => {
+  const seed = promotionSeed("spec-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const path = promotedArtifact(seed, "spec.md");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+// PROMOLANG-1. Both artifacts checked against EACH OTHER, which is what every
+// existing test omitted: each was checked against its own expectations, so a
+// transaction that emitted a PRD saying `de` and a state saying `en` passed all of
+// them. The kickoff freezes the historical English seed by design -- at that point
+// no portable source exists -- so a PO who answers German after the kickoff has
+// their answer arrive only in the promoted PRD's marker. The promotion is the
+// transaction that binds that PRD, so it is the transaction that must learn from
+// it. Observed in the PO's 2026-08-09 Claude greenfield run.
+check("the promoted state's language is the promoted PRD's marker, not the kickoff default", () => {
+  const seed = promotionSeed("language", { poLanguage: "de" });
+  const kickoffState = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(kickoffState.continuity.runtime.humanFacingLanguage, "en",
+    "the kickoff seed still freezes the historical English default -- that is the state this fixes, not a bug in itself");
+
+  promote(seed);
+  const promoted = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  const prdText = readFileSync(promotedArtifact(seed, "prd_promoted.md"), "utf8");
+  // A literal-string check, not a regex literal: semgrep's parser has a known
+  // PartialParsing false positive on regex literals containing `<!--`/`-->`
+  // (2026-08-19, found by a Verify run, unrelated to any product defect).
+  assert.ok(prdText.includes("<!-- po-language: de -->"));
+  assert.equal(promoted.continuity.runtime.humanFacingLanguage, "de",
+    "one transaction must not emit a PRD saying de and a state saying en");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // A PRD that answers English leaves the value where it already was, so the
+  // ordinary consistent case is untouched rather than rewritten.
+  const english = promotionSeed("language-en");
+  promote(english);
+  assert.equal(JSON.parse(readFileSync(english.statePath, "utf8")).continuity.runtime.humanFacingLanguage, "en");
+});
+
+// REOPEN-1. The two checks above are the assurance; this one is its boundary. The
+// PO's 2026-08-09 greenfield run reported it as "claude hat sich wieder selber
+// deadlocked": `reopen-design` sets the phase back to design so a submitted plan
+// can be worked on again, the agent edits `spec.md` -- the one action reopening the
+// design exists to enable -- and the mutual promotion binding above turned that
+// sanctioned edit into `continuity: unavailable` with `nextAction: null`. The only
+// escape observed was putting the old bytes back, which a greenfield repository
+// with no commits cannot do. The promotion record is history once the lifecycle has
+// released the documents; `continuity.authority` and the PO gate are the live
+// binding, and both are re-established by submit-plan/approve-plan.
+check("a reopened design may edit its promoted documents without ending the session", () => {
+  const seed = promotionSeed("reopen-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // Exactly what `reopenPlanDesign` records: phase back to design, approval
+  // cleared, and a durable `planInvalidation` naming the submission it invalidated.
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  state.activeFeature = { ...state.activeFeature, phase: "design" };
+  state.planApproved = false;
+  state.planInvalidation = { invalidatedSubmissionSha256: digest(Buffer.from("submission")), invalidatedAt: "2026-08-09T07:48:00.000Z" };
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+  for (const name of ["spec.md", "prd_promoted.md"]) {
+    const path = promotedArtifact(seed, name);
+    writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited while the design is reopened.\n`);
+    assert.notEqual(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable",
+      `editing ${name} while the design is reopened must not make the session unobservable`);
+  }
+
+  // And the assurance is not gone, only scoped: a state that never reopened its
+  // design still loses the binding on the same edit. Both checks above pin that
+  // directly; this asserts the marker is what separates them, not the edit.
+  delete state.planInvalidation;
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable",
+    "without the recorded reopening, the same edited bytes must still invalidate the binding");
+});
+
+check("promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec", () => {
+  const seed = promotionSeed("plan-subject");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: seed.request.specPath,
+  }));
+  writeFileSync(promotedArtifact(seed, "plan.md"), "# not the PRD\n");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-NOT-PRD", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: "specs/promoted/plan.md",
+  }));
+  writeFileSync(promotedArtifact(seed, "prd.md"), "# misnamed PRD\n");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-NOT-PRD", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: "specs/promoted/prd.md", prdPath: "specs/promoted/prd.md",
+  }));
+  writeFileSync(promotedArtifact(seed, "technical.md"), "# misnamed Spec\n");
+  expectKickoffError("KICKOFF-PROMOTION-SPEC-NOT-CANONICAL", () => planOnboardingKickoffPromotion({
+    ...seed.request, specPath: "specs/promoted/technical.md",
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+// A feature id that passes the permissive SAFE_FEATURE_ID check used broadly
+// across this file can still be rejected much later, at push/signing time, by
+// po-human-approval.mjs's stricter `^[a-z][a-z0-9-]{0,63}$` (and the same
+// shape re-applied by every approval/proof intent builder that takes a
+// featureId). Confirmed live 2026-08-10: a session's promoted feature id was
+// only discovered invalid at the push ceremony, hours after promotion fixed
+// it. Promotion must refuse it at the one point the id is still choosable.
+check("promotion refuses a feature id that would later fail push-approval's stricter shape", () => {
+  const seed = promotionSeed("feature-id-shape");
+  for (const featureId of [
+    "Feature-Upper",           // uppercase, permitted by SAFE_FEATURE_ID, not by push-approval
+    "feature_underscore",      // underscore
+    "feature.dotted",          // period
+    "feature:colon",           // colon
+    `feature-${"x".repeat(60)}`, // 65+ chars, over push-approval's 64-char cap
+  ]) {
+    assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, featureId }),
+      (error) => error?.code === "KICKOFF-PROMOTION-INPUT"
+        && error.message.includes("must be lowercase alphanumeric with hyphens")
+        && error.message.includes("push-approval"),
+      `expected featureId ${JSON.stringify(featureId)} to be refused with the stricter downstream message`);
+  }
+  // The kickoff- prefix is a distinct, actionable reason: that prefix names
+  // provisional onboarding anchors, not promotable feature identities.
+  expectKickoffError("KICKOFF-PROMOTION-INPUT", () => planOnboardingKickoffPromotion({
+    ...seed.request, featureId: "kickoff-still-rejected",
+  }));
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, featureId: "kickoff-still-rejected" }),
+    (error) => error?.code === "KICKOFF-PROMOTION-INPUT"
+      && error.message.includes('must not start with reserved prefix "kickoff-"')
+      && error.message.includes("lowercase feature slug"),
+    "the reserved kickoff- prefix must explain why a new feature slug is required");
+  // An ordinary lowercase-hyphenated feature id under 64 chars is unaffected --
+  // no regression for the common case (this is exactly what promotionSeed's
+  // own `feature-${name}` ids already are, exercised by every other check
+  // in this file, but assert it once here directly against the new code path).
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.feature.id, seed.request.featureId);
+});
+
+// A1-PROMOGATE: `kickoff promote plan` must refuse a PRD the PO plan gate
+// (po-gate-authority.mjs) will reject anyway, before anything is frozen --
+// naming the exact line and digest to add, not just a generic authority
+// refusal. The marker grammars come from po-gate-authority.mjs itself, so
+// these fixtures use the identical `<!-- ... -->` shapes the gate parses.
+
+check("promotion refuses a PRD without the technical Spec marker, naming the exact digest to add", () => {
+  const seed = promotionSeed("spec-marker-missing");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const specSha256 = digest(readFileSync(promotedArtifact(seed, "spec.md")));
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING" && error.message.includes(specSha256));
+});
+
+check("promotion refuses a PRD carrying more than one technical Spec marker, with the same missing-marker code", () => {
+  const seed = promotionSeed("spec-marker-duplicate");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const original = readFileSync(path, "utf8");
+  const markerLine = original.split("\n").find((line) => line.startsWith("<!-- technical-spec-sha256:"));
+  writeFileSync(path, `${markerLine}\n${original}`);
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING");
+});
+
+check("promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code", () => {
+  const seed = promotionSeed("spec-marker-mismatch");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  // A RegExp() string constructor, not a regex literal: semgrep's parser has a
+  // known PartialParsing false positive on regex literals containing
+  // `<!--`/`-->` (2026-08-19, found by a Verify run, unrelated to any product
+  // defect).
+  writeFileSync(path, readFileSync(path, "utf8").replace(
+    new RegExp("<!-- technical-spec-sha256: [0-9a-f]{64} -->", "u"),
+    `<!-- technical-spec-sha256: ${"a".repeat(64)} -->`,
+  ));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH");
+});
+
+check("promotion refuses a PRD without the PO plan acknowledgement marker (NVA-W4-2B)", () => {
+  const seed = promotionSeed("acknowledgement-marker-missing");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-plan-acknowledged:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+});
+
+check("promotion refuses a PRD carrying more than one PO plan acknowledgement marker, with the same missing-marker code (NVA-W4-2B)", () => {
+  const seed = promotionSeed("acknowledgement-marker-duplicate");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const original = readFileSync(path, "utf8");
+  const markerLine = original.split("\n").find((line) => line.startsWith("<!-- po-plan-acknowledged:"));
+  writeFileSync(path, `${markerLine}\n${original}`);
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+});
+
+check("a generated coordinator checkpoint cannot be re-routed through a new legacy kickoff promotion", () => {
+  const coordinatorRoot = readyToGenerateRoot("legacy-promotion-bypass-source");
+  const generated = planOnboardingIntakeGenerate({ rootDir: coordinatorRoot });
+  applyOnboardingIntakeGenerate({ rootDir: coordinatorRoot, expectedPlanSha256: generated.planSha256, activate: true });
+  const coordinatorCheckpoint = JSON.parse(readFileSync(resolveIntakeCheckpointPaths({ rootDir: coordinatorRoot }).checkpoint, "utf8"));
+
+  const seed = promotionSeed("legacy-promotion-bypass-target");
+  const targetPaths = resolveIntakeCheckpointPaths({ rootDir: seed.root, create: true });
+  const { contentSha256: ignoredSourceDigest, ...unsignedCheckpoint } = coordinatorCheckpoint;
+  void ignoredSourceDigest;
+  const forgedOnlyForRouteFixture = { ...unsignedCheckpoint, root: targetPaths.root };
+  forgedOnlyForRouteFixture.contentSha256 = sha256CanonicalJson(forgedOnlyForRouteFixture);
+  writeFileSync(targetPaths.checkpoint, `${JSON.stringify(forgedOnlyForRouteFixture, null, 2)}\n`);
+
+  expectKickoffError("KICKOFF-PROMOTION-COORDINATOR-REQUIRED", () => planOnboardingKickoffPromotion(seed.request));
+});
+
+check("promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set", () => {
+  const missing = promotionSeed("language-marker-missing");
+  const missingPath = promotedArtifact(missing, "prd_promoted.md");
+  writeFileSync(missingPath, readFileSync(missingPath, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-language:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(missing.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID");
+
+  const unsupported = promotionSeed("language-marker-unsupported");
+  const unsupportedPath = promotedArtifact(unsupported, "prd_promoted.md");
+  writeFileSync(unsupportedPath, readFileSync(unsupportedPath, "utf8")
+    .replace("<!-- po-language: en -->", "<!-- po-language: eng -->"));
+  assert.throws(() => planOnboardingKickoffPromotion(unsupported.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID");
+});
+
+check("promote apply independently refuses a PRD that lost its technical Spec marker after plan", () => {
+  const seed = promotionSeed("apply-marker-missing");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+  assert.throws(() => applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }),
+    (error) => error?.code === "KICKOFF-PROMOTION-CAS-DRIFT");
+});
+
+check("promotion admits a PRD carrying both correct po-gate markers exactly as before", () => {
+  const seed = promotionSeed("markers-valid");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.authority.prd.sha256, digest(readFileSync(promotedArtifact(seed, "prd_promoted.md"))));
+  const applied = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+});
+
+check("promotion admits a PRD carrying a document-language marker outside {de, en} and records it separately from the operator-facing language", () => {
+  const seed = promotionSeed("language-document-fr", { poLanguage: "fr" });
+  const before = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  const beforeHumanFacing = before.continuity.runtime.humanFacingLanguage;
+  promote(seed);
+  const promoted = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(promoted.continuity.runtime.documentLanguage, "fr");
+  assert.equal(promoted.continuity.runtime.humanFacingLanguage, beforeHumanFacing,
+    "a non-de/en document-language marker must not touch the operator-facing language");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+function publishPoGateProfile(root) {
+  const gitCommonDir = join(root, ".git");
+  writeFileSync(join(root, "pipeline.user.yaml"),
+    "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
+  // Layout-aware: `resolveProjectAuthorityPaths` (via poGateProfileProjectionPaths)
+  // resolves the runtime manifest to `.claude/pipeline.yaml` for a legacy fixture
+  // and `project/pipeline.yaml` for a neutral one -- writing unconditionally to
+  // `.claude/pipeline.yaml` left a neutral-layout caller's receipt bound to bytes
+  // `validatePoGateAuthority`'s own readProjection() never reads back, which
+  // resolves as PO-PROFILE-RECEIPT-STALE rather than a real profile mismatch.
+  const { manifest } = poGateProfileProjectionPaths(root);
+  const manifestAbsolute = join(root, manifest);
+  mkdirSync(dirname(manifestAbsolute), { recursive: true });
+  writeFileSync(manifestAbsolute, "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+  const receipt = createPoGateProfileReceipt({
+    repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot: root }),
+    primaryRoot: root,
+    sourceBytes: readFileSync(join(root, "pipeline.user.yaml")),
+    runtimeBytes: readFileSync(manifestAbsolute),
+    updatedAt: "2026-08-08T00:00:00.000Z",
+  });
+  const path = poGateProfileReceiptPath(gitCommonDir);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, serializePoGateProfileReceipt(receipt));
+  chmodSync(path, 0o600);
+  return {
+    repoRoot: root,
+    gitCommonDir,
+    primaryRoot: root,
+    registeredWorktreeRoots: [root],
+  };
+}
+
+// Seeds only the two source files `ensureLocalPromotionPoProfileReceipt`
+// reads (pipeline.user.yaml and the runtime manifest) -- deliberately NOT the
+// receipt itself, unlike `publishPoGateProfile` above. These two files are
+// what the real onboarding flow seeds early (apply-portable-seed), well
+// before any promotion runs; the receipt is what promotion apply is supposed
+// to publish on its own once they are present.
+function seedPoGateProfileFiles(root) {
+  writeFileSync(join(root, "pipeline.user.yaml"),
+    "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
+  const { manifest } = poGateProfileProjectionPaths(root);
+  const manifestAbsolute = join(root, manifest);
+  mkdirSync(dirname(manifestAbsolute), { recursive: true });
+  writeFileSync(manifestAbsolute, "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+}
+
+check("a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike", () => {
+  const seed = promotionSeed("po-gate");
+  const plan = promote(seed);
+  const topology = publishPoGateProfile(seed.root);
+  const authority = validatePoGateAuthority({
+    ...topology,
+    expectedPlanSha256: plan.authority.prd.sha256,
+    expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-GATE-AUTHORITY-VALID");
+  assert.equal(authority.value.planPath, plan.authority.prd.path);
+  assert.equal(authority.value.planSha256, plan.authority.prd.sha256);
+  assert.equal(authority.value.specPath, plan.authority.spec.path);
+  assert.equal(authority.value.specSha256, plan.authority.spec.sha256);
+});
+
+check("a legacy promotion whose planPath is the Spec stays readable and is refused a new promotion", () => {
+  const seed = promotionSeed("legacy-plan-is-spec");
+  promote(seed);
+  const historyPath = promotionHistoryPath(seed.root);
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  state.activeFeature.planPath = seed.request.specPath;
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  history.transactions[1].planPath = seed.request.specPath;
+  delete history.transactions[1].specPath;
+  history.transactions[1].afterStateSha256 = digest(readFileSync(seed.statePath));
+  writeFileSync(historyPath, `${JSON.stringify(history, null, 2)}\n`, { mode: 0o600 });
+  // Tolerated read-only: an honest older record stays readable, and no reader
+  // crashes on it.  It simply cannot pass the PO plan gate, which is the state
+  // it was already in, and a rebind is the way out.
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const topology = publishPoGateProfile(seed.root);
+  const authority = validatePoGateAuthority(topology);
+  assert.equal(authority.ok, false);
+  assert.equal(authority.code, "PO-GATE-ACTIVE-FEATURE-INVALID");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: seed.request.specPath,
+  }));
+});
+
+// RUNNERNEUT-1 direction 2: the shared construction site for a plan-bound
+// apply action (`planBoundApplyAction`) requires the runner as a formal
+// argument, not a default, so a caller that forgets to thread it through
+// fails at plan-construction time. Exercised through the public plan
+// builders -- with an explicit empty runner, bypassing the "codex" default
+// the way a caller that genuinely lost the identity would -- rather than by
+// reaching into the private helper directly.
+check("a plan-bound apply action cannot be constructed without the runner its plan was made under", () => {
+  const root = fixture("runner-required-kickoff");
+  expectKickoffError("APPLY-ACTION-RUNNER-REQUIRED", () => planOnboardingKickoff({
+    rootDir: root, goal: "Runner is required at construction", runner: "",
+  }));
+  const seed = promotionSeed("runner-required-promotion");
+  expectKickoffError("APPLY-ACTION-RUNNER-REQUIRED", () => planOnboardingKickoffPromotion({
+    ...seed.request, runner: "",
+  }));
+});
+
+// RUNNERNEUT-1 direction 3: an enumerating check over every plan-producing
+// entry point in this module, discovered from the module's own exports
+// rather than named twice. A name matched by the naming pattern below that
+// has neither a fixture in the table nor a documented exemption fails this
+// check by construction -- so a new kickoff/promotion plan builder that
+// forgets to carry the runner into its resolved apply action goes red here,
+// not in someone's fresh project.
+const KICKOFF_PLAN_BUILDER_PATTERN = /^export function ((?:plan|reconstruct)OnboardingKickoff\w*)\(/gmu;
+const KICKOFF_PLAN_BUILDER_EXEMPT = new Set([
+  // Recovers a private session-cleanup binding after a kickoff promotion by
+  // re-invoking the session-cleanup script, not the onboarding-script CLI;
+  // that script has no runner concept at all (RUNNERNEUT-1 direction 4 sweep,
+  // 2026-08-08). Matched by the naming pattern above, so it is exempted here
+  // by name with its reason on record, rather than silently excluded.
+  "planOnboardingKickoffPromotionCleanupRecovery",
+]);
+
+function assertActionCarriesRunner(action, runner) {
+  assert.equal(action.kind, "command");
+  const index = action.argv.indexOf("--runner");
+  assert.notEqual(index, -1, "resolved action argv is missing --runner");
+  assert.equal(action.argv[index + 1], runner);
+}
+
+check("every kickoff/promotion plan builder carries its runner into the resolved apply action (enumerating)", () => {
+  const modulePath = fileURLToPath(new URL("./onboarding-continuity.mjs", import.meta.url));
+  const source = readFileSync(modulePath, "utf8");
+  const discovered = [...source.matchAll(KICKOFF_PLAN_BUILDER_PATTERN)]
+    .map((match) => match[1])
+    .filter((name) => !KICKOFF_PLAN_BUILDER_EXEMPT.has(name));
+
+  const runner = "claude";
+  const fixtures = {
+    planOnboardingKickoff: () => {
+      const root = fixture("enumerate-kickoff-plan");
+      return planOnboardingKickoff({ rootDir: root, goal: "Enumerate the kickoff plan", runner });
+    },
+    reconstructOnboardingKickoffPlan: () => {
+      const root = fixture("enumerate-kickoff-reconstruct");
+      const goal = "Enumerate the kickoff reconstruction";
+      const plan = planOnboardingKickoff({ rootDir: root, goal, runner });
+      applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+      return reconstructOnboardingKickoffPlan({ rootDir: root, goal, runner });
+    },
+    planOnboardingKickoffPromotion: () => {
+      const seed = promotionSeed("enumerate-promotion-plan");
+      return planOnboardingKickoffPromotion({ ...seed.request, runner });
+    },
+    reconstructOnboardingKickoffPromotionPlan: () => {
+      const seed = promotionSeed("enumerate-promotion-reconstruct");
+      const request = { ...seed.request, runner };
+      const plan = planOnboardingKickoffPromotion(request);
+      applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+      return reconstructOnboardingKickoffPromotionPlan(request);
+    },
+  };
+
+  assert.deepEqual(
+    [...discovered].sort(),
+    Object.keys(fixtures).sort(),
+    "a plan-producing entry point was added, removed, or renamed without updating this enumerating check",
+  );
+
+  for (const name of discovered) {
+    const plan = fixtures[name]();
+    assertActionCarriesRunner(plan.applyAction, runner);
+  }
+});
+
+// ---- GF-090: nextActionSection / replaceNextActionSection / syncStateMdNextAction ------
+
+const NEXT_ACTION_AUTHORITY = {
+  schema: "pipeline.po-gate-authority.v2",
+  humanFacing: "en",
+  sourceSha256: "a".repeat(64),
+  runtimeSha256: "b".repeat(64),
+  receiptSha256: "c".repeat(64),
+  repositoryFingerprint: "d".repeat(64),
+  planPath: "specs/demo/prd.md",
+  planSha256: "e".repeat(64),
+  specPath: "specs/demo/spec.md",
+  specSha256: "f".repeat(64),
+};
+
+function nextActionSubmissionFixture(overrides = {}) {
+  return {
+    schema: "pipeline.plan-submission.v1",
+    featureId: "demo-feature",
+    planPath: NEXT_ACTION_AUTHORITY.planPath,
+    planSha256: NEXT_ACTION_AUTHORITY.planSha256,
+    specPath: NEXT_ACTION_AUTHORITY.specPath,
+    specSha256: NEXT_ACTION_AUTHORITY.specSha256,
+    profile: "feature",
+    profileSha256: "1".repeat(64),
+    submittedBy: "coordinator",
+    submittedAt: "2026-08-10T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function nextActionApprovalFixture(submission, overrides = {}) {
+  return {
+    schema: "pipeline.plan-approval.v4",
+    approvedBy: "po-test",
+    approvedAt: "2026-08-10T01:00:00.000Z",
+    submissionSha256: sha256CanonicalJson(submission),
+    profileSha256: submission.profileSha256,
+    poGateAuthority: NEXT_ACTION_AUTHORITY,
+    priorInvalidationSha256: null,
+    ...overrides,
+  };
+}
+
+function nextActionStateFixture(overrides = {}) {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "demo-feature", planPath: NEXT_ACTION_AUTHORITY.planPath, phase: "design" },
+    planApproved: false,
+    ...overrides,
+  };
+}
+
+check("nextActionSection: no active feature renders the set-feature action", () => {
+  const text = nextActionSection({ schema: "pipeline.state.v0" });
+  assert.match(text, /^## Next action\n\n/);
+  assert.match(text, /pipeline-state set-feature --id/);
+});
+
+check("nextActionSection: a closed feature (activeFeature removed) renders the same set-feature action", () => {
+  const text = nextActionSection({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    closedFeatures: [{
+      id: "demo", planPath: "specs/demo/prd.md", phaseAtClose: "implementation",
+      closedAt: "2026-08-10T00:00:00.000Z", closedBy: "po", forCommit: null,
+    }],
+  });
+  assert.match(text, /pipeline-state set-feature --id/);
+});
+
+check("nextActionSection: draft (no submission yet) renders submit-plan", () => {
+  const text = nextActionSection(nextActionStateFixture());
+  assert.match(text, /pipeline-state submit-plan --by/);
+  assert.doesNotMatch(text, /approve-plan/);
+});
+
+check("nextActionSection: awaiting-approval points at the canonical typed inspection action", () => {
+  const submission = nextActionSubmissionFixture();
+  const text = nextActionSection(nextActionStateFixture({ planSubmission: submission }));
+  assert.match(text, /pipeline-state inspect/);
+  assert.doesNotMatch(text, /approve-plan --by/);
+  assert.match(text, /Advisor and readiness/);
+  assert.doesNotMatch(text, /submit-plan/);
+});
+
+check("nextActionSection: approved but still in design phase renders set-phase implementation", () => {
+  const submission = nextActionSubmissionFixture();
+  const approval = nextActionApprovalFixture(submission);
+  const text = nextActionSection(nextActionStateFixture({
+    planSubmission: submission, planApproval: approval, planApproved: true,
+  }));
+  assert.match(text, /pipeline-state set-phase --phase implementation/);
+});
+
+check("nextActionSection: implementing (phase switched) renders the proceed-with-implementation text", () => {
+  const submission = nextActionSubmissionFixture();
+  const approval = nextActionApprovalFixture(submission);
+  const text = nextActionSection(nextActionStateFixture({
+    activeFeature: { id: "demo-feature", planPath: NEXT_ACTION_AUTHORITY.planPath, phase: "implementation" },
+    planSubmission: submission, planApproval: approval, planApproved: true,
+  }));
+  assert.match(text, /in implementation/);
+  assert.match(text, /pipeline-state reopen-design --by/);
+});
+
+check("nextActionSection: a contradictory state (planApproved true, no approval on record) fails closed to the live-source fallback", () => {
+  const text = nextActionSection(nextActionStateFixture({ planApproved: true }));
+  assert.match(text, /could not be classified/);
+  assert.match(text, /project\/pipeline-state\.json/);
+  // The exact defect this fix closes: never claim the plan still needs
+  // submitting while the recorded state says it is already approved.
+  assert.doesNotMatch(text, /submit-plan/);
+});
+
+check("nextActionSection: a malformed state (unrecognized schema) never throws and falls back to the live-source text", () => {
+  const text = nextActionSection({ schema: "not-a-real-schema" });
+  assert.match(text, /could not be classified/);
+});
+
+check("nextActionSection does not mutate its input state object", () => {
+  const submission = nextActionSubmissionFixture();
+  const state = nextActionStateFixture({ planSubmission: submission });
+  const before = JSON.stringify(state);
+  nextActionSection(state);
+  assert.equal(JSON.stringify(state), before);
+});
+
+check("replaceNextActionSection: replaces only the Next-action span; another heading follows", () => {
+  const original = [
+    "# Project state", "", "## Goal", "", "Ship the thing.", "",
+    "## Current state", "", "Feature `x` is active.", "",
+    "## Next action", "", "OLD TEXT.", "",
+    "## Trailer", "", "Untouched.", "",
+  ].join("\n");
+  const replacement = "## Next action\n\nNEW TEXT.\n";
+  const updated = replaceNextActionSection(original, replacement);
+  assert.ok(updated.includes("## Goal\n\nShip the thing.\n\n## Current state"));
+  assert.ok(updated.includes("NEW TEXT."));
+  assert.ok(!updated.includes("OLD TEXT"));
+  assert.ok(updated.includes("## Trailer\n\nUntouched.\n"));
+});
+
+check("replaceNextActionSection: Next action is the last section (EOF); trailing newline preserved", () => {
+  const original = "# Project state\n\n## Next action\n\nOLD.\n";
+  const replacement = "## Next action\n\nNEW.\n";
+  const updated = replaceNextActionSection(original, replacement);
+  assert.equal(updated, "# Project state\n\n## Next action\n\nNEW.\n");
+});
+
+check("replaceNextActionSection: returns null (fail closed) when no '## Next action' heading exists", () => {
+  const original = "# Project state\n\n## Something else\n\nbody\n";
+  assert.equal(replaceNextActionSection(original, "## Next action\n\nNEW.\n"), null);
+});
+
+check("replaceNextActionSection: returns null on non-string input rather than throwing", () => {
+  assert.equal(replaceNextActionSection(null, "## Next action\n\nNEW.\n"), null);
+  assert.equal(replaceNextActionSection("markdown", null), null);
+});
+
+check("syncStateMdNextAction: rewrites docs/state.md's Next action section in place", () => {
+  const root = mkdtempTestScratch("gf090-sync-");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), [
+    "# Project state", "", "## Goal", "", "Ship it.", "",
+    "## Current state", "", "Feature `demo` is active.", "",
+    "## Next action", "", "Review the goal and establish the initial PRD and technical specification.", "",
+  ].join("\n"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  const rewritten = readFileSync(join(root, "docs", "state.md"), "utf8");
+  assert.match(rewritten, /## Goal\n\nShip it\./);
+  assert.match(rewritten, /pipeline-state submit-plan --by/);
+});
+
+check("syncStateMdNextAction: fails closed (no write) when docs/state.md is absent", () => {
+  const root = mkdtempTestScratch("gf090-sync-absent-");
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, false);
+  assert.ok(!existsSync(join(root, "docs", "state.md")));
+});
+
+check("syncStateMdNextAction: fails closed (no corruption) when no '## Next action' heading exists", () => {
+  const root = mkdtempTestScratch("gf090-sync-noheading-");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  const original = "# Project state\n\n## Hand-edited section\n\nsomething else\n";
+  writeFileSync(join(root, "docs", "state.md"), original);
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, false);
+  assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8"), original);
+});
+
+check("syncStateMdNextAction: resyncs a calibration-configured handover path, not docs/state.md", () => {
+  const root = fixture("sync-custom-handover", { handover: "notes/project state.md" });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "notes", "project state.md"), [
+    "# Project state", "", "## Goal", "", "Ship it.", "",
+    "## Next action", "", "Review the goal and establish the initial PRD and technical specification.", "",
+  ].join("\n"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  const rewritten = readFileSync(join(root, "notes", "project state.md"), "utf8");
+  assert.match(rewritten, /pipeline-state submit-plan --by/);
+  assert.ok(!existsSync(join(root, "docs", "state.md")),
+    "the sync must not fall back to writing docs/state.md when a custom handover is configured");
+});
+
+check("syncStateMdNextAction: resyncs an object-shaped ({ path, maxBytes }) calibration-configured handover", () => {
+  const root = fixture("sync-object-handover", { handover: { path: "notes/project state.md", maxBytes: 30000 } });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "notes", "project state.md"), [
+    "# Project state", "", "## Goal", "", "Ship it.", "",
+    "## Next action", "", "Review the goal and establish the initial PRD and technical specification.", "",
+  ].join("\n"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  const rewritten = readFileSync(join(root, "notes", "project state.md"), "utf8");
+  assert.match(rewritten, /pipeline-state submit-plan --by/);
+  assert.ok(!existsSync(join(root, "docs", "state.md")),
+    "the sync must not fall back to writing docs/state.md when an object-shaped handover is configured");
+});
+
+check("syncStateMdNextAction: is a no-op write when the rendered text already matches", () => {
+  const state = nextActionStateFixture();
+  const section = nextActionSection(state);
+  const root = mkdtempTestScratch("gf090-sync-noop-");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), `# Project state\n\n${section}`);
+  const result = syncStateMdNextAction(root, state);
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, false);
+});
+
+// ---------------------------------------------------------------------------
+// Intake checkpoint (Wave 4 onboarding coordinator, steps 1-3 -- NVA-W4-COORD-1
+// Batch A: happy-path / precondition-and-error-path / idempotency coverage
+// for the three step-1/2/3 apply functions, plus one validateIntakeCheckpoint
+// round-trip test (validateIntakeCheckpoint itself is not exported; exercised
+// indirectly through readOnboardingIntakeCheckpoint, which calls it on every
+// read). Batch B (crash-injection at each fault point + the CAS-drift test)
+// is a separate follow-up dispatch, deliberately not attempted here.
+
+function expectIntakeError(code, fn) {
+  assert.throws(fn, (error) => error?.code === code);
+}
+
+function grantIntakeConsent(root) {
+  return applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+}
+
+function captureIntakeMaterial(root) {
+  grantIntakeConsent(root);
+  return applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material", activate: true });
+}
+
+check("intake checkpoint: validateIntakeCheckpoint round-trips through readOnboardingIntakeCheckpoint", () => {
+  const root = fixture("intake-validate-roundtrip");
+  const applied = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+    language: "en",
+    profile: "feature",
+    activate: true,
+  });
+  assert.equal(applied.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(observed.status, "present");
+  assert.equal(observed.value.schema, INTAKE_CHECKPOINT_SCHEMA);
+  assert.equal(observed.value.revision, 0);
+  assert.equal(observed.value.transactionState, "collecting");
+  assert.deepEqual(observed.value.consent, { granted: true, at: observed.value.createdAt });
+  assert.deepEqual(observed.value.values, {
+    gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+    language: "en",
+    profile: "feature",
+  });
+
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const tampered = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  tampered.revision = 7; // contentSha256 now stale -- self-digest must catch this
+  writeFileSync(paths.checkpoint, `${JSON.stringify(tampered, null, 2)}\n`);
+  expectIntakeError("INTAKE-CHECKPOINT-MALFORMED", () => readOnboardingIntakeCheckpoint({ rootDir: root }));
+});
+
+check("applyOnboardingIntakeConsent: happy path grants consent and fills all three values in one bundled ask", () => {
+  const root = fixture("intake-consent-happy");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "A B", email: "a@b.example" },
+    language: "de",
+    profile: "mini",
+    activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.status, "applied");
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.consent.granted, true);
+  assert.deepEqual(result.checkpoint.values, {
+    gitAuthor: { name: "A B", email: "a@b.example" },
+    language: "de",
+    profile: "mini",
+  });
+});
+
+check("applyOnboardingIntakeConsent: activation is required", () => {
+  const root = fixture("intake-consent-activation");
+  expectIntakeError("INTAKE-CONSENT-ACTIVATION-REQUIRED", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: requires explicit affirmative consent", () => {
+  const root = fixture("intake-consent-required");
+  expectIntakeError("INTAKE-CONSENT-REQUIRED", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: false, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate git author", () => {
+  const root = fixture("intake-consent-bad-author");
+  expectIntakeError("INTAKE-CONSENT-INVALID-GIT-AUTHOR", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, gitAuthor: { name: "", email: "a@b.example" }, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate language", () => {
+  const root = fixture("intake-consent-bad-language");
+  expectIntakeError("INTAKE-CONSENT-INVALID-LANGUAGE", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "fr", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate profile", () => {
+  const root = fixture("intake-consent-bad-profile");
+  expectIntakeError("INTAKE-CONSENT-INVALID-PROFILE", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, profile: "huge", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: idempotent re-run only fills fields still null, never overwrites an answered one", () => {
+  const root = fixture("intake-consent-idempotent");
+  const first = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, gitAuthor: { name: "First", email: "first@example.com" }, activate: true,
+  });
+  assert.equal(first.mutated, true);
+  assert.equal(first.checkpoint.values.language, null);
+  assert.equal(first.checkpoint.values.profile, null);
+
+  const second = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Second", email: "second@example.com" }, // already answered -- must be ignored
+    language: "en",
+    profile: "epic",
+    activate: true,
+  });
+  assert.equal(second.mutated, true);
+  assert.deepEqual(second.checkpoint.values, {
+    gitAuthor: { name: "First", email: "first@example.com" },
+    language: "en",
+    profile: "epic",
+  });
+  assert.equal(second.checkpoint.consent.at, first.checkpoint.consent.at);
+  assert.equal(second.checkpoint.revision, first.checkpoint.revision + 1);
+
+  const third = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Third", email: "third@example.com" },
+    language: "de",
+    profile: "mini",
+    activate: true,
+  });
+  assert.equal(third.mutated, false, "every field is already answered -- a third call is a true no-op");
+  assert.deepEqual(third.checkpoint.values, second.checkpoint.values);
+  assert.equal(third.checkpoint.revision, second.checkpoint.revision);
+});
+
+// NVA-V10B-INTAKEONEROUND: a PO who answers the onboarding questions AND supplies their first
+// chunk of project material in the same message can have both recorded by ONE call. `text` is
+// an additional optional parameter on applyOnboardingIntakeConsent, reusing
+// applyOnboardingIntakeCapture rather than reimplementing its body.
+
+check("applyOnboardingIntakeConsent: without text, consent applies without creating a material capture", () => {
+  const root = fixture("intake-consent-notext-shape");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+  });
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema", "status"],
+    "the current consent result includes its status and has no `capture` field when text is omitted");
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.status, "applied");
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.materialInput.length, 0);
+  assert.equal(result.checkpoint.transactionState, "collecting");
+  assert.deepEqual(result.checkpoint.values, { gitAuthor: null, language: "en", profile: "feature" });
+  const material = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(material.status, "present", "consent still records its checkpoint");
+  assert.deepEqual(material.chunks, [], "omitting text must not create a material-input entry");
+  assert.equal(existsSync(resolveIntakeCheckpointPaths({ rootDir: root }).evidenceDirectory), false,
+    "omitting text must not create content evidence");
+  assert.equal(result.capture, undefined);
+});
+
+check("applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined", () => {
+  const root = fixture("intake-consent-undefined-text-shape");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, activate: true, text: undefined,
+  });
+  assert.deepEqual(Object.keys(result).sort(), ["checkpoint", "mutated", "root", "schema", "status"]);
+  assert.equal(result.status, "applied");
+  assert.equal(result.checkpoint.materialInput.length, 0);
+  assert.deepEqual(result.checkpoint.values, { gitAuthor: null, language: null, profile: null });
+  const material = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(material.status, "present");
+  assert.deepEqual(material.chunks, []);
+  assert.equal(existsSync(resolveIntakeCheckpointPaths({ rootDir: root }).evidenceDirectory), false);
+  assert.equal(result.capture, undefined);
+});
+
+check("applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs", () => {
+  const root = fixture("intake-consent-merged-fresh");
+  assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).status, "absent",
+    "the entire point of this case: capture must see consent that this SAME call just recorded");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", profile: "feature",
+    text: "The PO's first description of the project.", activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.consent.granted, true);
+  assert.equal(result.checkpoint.materialInput.length, 1);
+  // Same transactionState advance a separate intake-capture-apply call would have produced
+  // (applyOnboardingIntakeCapture: advances collecting -> design-questions-pending on the
+  // first accepted capture).
+  assert.equal(result.checkpoint.transactionState, "design-questions-pending");
+  assert.equal(result.capture.mutated, true);
+  assert.ok(result.capture.evidence.sha256);
+  // Reused, not reimplemented: the same content-addressed evidence file
+  // applyOnboardingIntakeCapture itself writes.
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const evidenceBytes = readFileSync(join(paths.evidenceDirectory, `${result.capture.evidence.sha256}.txt`));
+  assert.equal(evidenceBytes.toString("utf8"), "The PO's first description of the project.");
+});
+
+check("applyOnboardingIntakeConsent: a merged call produces the identical checkpoint (minus timestamps) as two separate consent-apply then capture-apply calls", () => {
+  const merged = fixture("intake-consent-merged-compare-merged");
+  const mergedResult = applyOnboardingIntakeConsent({
+    rootDir: merged, granted: true, language: "en", profile: "feature",
+    text: "Identical material.", activate: true,
+  });
+
+  const separate = fixture("intake-consent-merged-compare-separate");
+  applyOnboardingIntakeConsent({ rootDir: separate, granted: true, language: "en", profile: "feature", activate: true });
+  const separateCapture = applyOnboardingIntakeCapture({ rootDir: separate, text: "Identical material.", activate: true });
+
+  assert.equal(mergedResult.checkpoint.materialInput.length, separateCapture.checkpoint.materialInput.length);
+  assert.equal(mergedResult.checkpoint.materialInput[0].sha256, separateCapture.checkpoint.materialInput[0].sha256);
+  assert.equal(mergedResult.checkpoint.materialInput[0].evidencePath, separateCapture.checkpoint.materialInput[0].evidencePath);
+  assert.equal(mergedResult.checkpoint.transactionState, separateCapture.checkpoint.transactionState);
+  assert.deepEqual(mergedResult.checkpoint.values, separateCapture.checkpoint.values);
+});
+
+check("applyOnboardingIntakeConsent: a merged call that fails at the capture step leaves consent durably recorded, and a retry converges", () => {
+  const root = fixture("intake-consent-merged-capture-fails");
+  expectIntakeError("INTAKE-CAPTURE-EMPTY", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", text: "", activate: true,
+  }));
+  // Consent survived the thrown capture failure: durably recorded, no materialInput yet.
+  const afterFailure = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(afterFailure.status, "present");
+  assert.equal(afterFailure.value.consent.granted, true);
+  assert.equal(afterFailure.value.materialInput.length, 0);
+  assert.equal(afterFailure.value.transactionState, "collecting");
+
+  // Retry with corrected text: consent-apply is idempotent (a true no-op re-run, since every
+  // field is already answered) and the capture step now succeeds -- exactly the state two
+  // separate calls would have converged to.
+  const retried = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "en", text: "corrected material", activate: true,
+  });
+  assert.equal(retried.checkpoint.materialInput.length, 1);
+  assert.equal(retried.checkpoint.transactionState, "design-questions-pending");
+});
+
+check("applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry", () => {
+  const root = fixture("intake-capture-happy");
+  grantIntakeConsent(root);
+  const result = applyOnboardingIntakeCapture({
+    rootDir: root, text: "The PO's real requirement text.", activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CAPTURE_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.materialInput.length, 1);
+  const entry = result.checkpoint.materialInput[0];
+  assert.equal(entry.evidencePath, `intake-checkpoint-evidence/${entry.sha256}.txt`);
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const evidenceBytes = readFileSync(join(paths.evidenceDirectory, `${entry.sha256}.txt`));
+  assert.equal(evidenceBytes.toString("utf8"), "The PO's real requirement text.");
+  assert.equal(result.checkpoint.transactionState, "design-questions-pending");
+});
+
+check("applyOnboardingIntakeCapture: activation is required", () => {
+  const root = fixture("intake-capture-activation");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-ACTIVATION-REQUIRED", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "text", activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: rejects empty text", () => {
+  const root = fixture("intake-capture-empty");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-EMPTY", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: rejects a chunk over the per-chunk byte limit", () => {
+  const root = fixture("intake-capture-too-large");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-TOO-LARGE", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "a".repeat(1_000_001), activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: requires consent to already be recorded", () => {
+  const root = fixture("intake-capture-consent-required");
+  expectIntakeError("INTAKE-CAPTURE-CONSENT-REQUIRED", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "text before consent", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: advances transactionState from collecting to design-questions-pending only on the first capture", () => {
+  const root = fixture("intake-capture-transition");
+  grantIntakeConsent(root);
+  const first = applyOnboardingIntakeCapture({ rootDir: root, text: "chunk one", activate: true });
+  assert.equal(first.checkpoint.transactionState, "design-questions-pending");
+  const second = applyOnboardingIntakeCapture({ rootDir: root, text: "chunk two", activate: true });
+  assert.equal(second.checkpoint.transactionState, "design-questions-pending");
+  assert.equal(second.checkpoint.materialInput.length, 2);
+});
+
+check("applyOnboardingIntakeCapture: an idempotent duplicate-content capture converges without a second entry", () => {
+  const root = fixture("intake-capture-duplicate");
+  grantIntakeConsent(root);
+  const first = applyOnboardingIntakeCapture({ rootDir: root, text: "same content", activate: true });
+  assert.equal(first.mutated, true);
+  const second = applyOnboardingIntakeCapture({ rootDir: root, text: "same content", activate: true });
+  assert.equal(second.mutated, false);
+  assert.equal(second.checkpoint.materialInput.length, 1);
+});
+
+// NVA-RESUMEVERBATIM-1: readOnboardingIntakeMaterialInput() is the read-side companion
+// scripts/resume-hint.mjs's `inspect` uses to surface the verbatim material input a
+// prior `capture` routed into this SAME checkpoint -- resolving each entry's evidence
+// blob back to its actual bytes and re-verifying the sha256 that references it.
+
+check("readOnboardingIntakeMaterialInput: absent checkpoint returns status absent and an empty chunk list", () => {
+  const root = fixture("intake-material-input-absent");
+  const result = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(result.status, "absent");
+  assert.deepEqual(result.chunks, []);
+});
+
+check("readOnboardingIntakeMaterialInput: resolves every captured chunk back to its byte-identical text, in capture order", () => {
+  const root = fixture("intake-material-input-present");
+  grantIntakeConsent(root);
+  const first = "Line one of a design brief.\nLine two, multi-line, unbounded by the short-string caps.";
+  const second = "A second, later chunk of user input -- unicode: café, 日本語, emoji 🚀.";
+  applyOnboardingIntakeCapture({ rootDir: root, text: first, activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: second, activate: true });
+  const result = readOnboardingIntakeMaterialInput({ rootDir: root });
+  assert.equal(result.status, "present");
+  assert.equal(result.chunks.length, 2);
+  assert.deepEqual(result.chunks.map((chunk) => chunk.text), [first, second]);
+  for (const chunk of result.chunks) {
+    assert.equal(chunk.sha256, createHash("sha256").update(chunk.text, "utf8").digest("hex"));
+    assert.equal(chunk.byteLength, Buffer.byteLength(chunk.text, "utf8"));
+    assert.ok(chunk.receivedAt);
+  }
+});
+
+check("applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate", () => {
+  const root = fixture("intake-design-questions-happy");
+  captureIntakeMaterial(root);
+  const result = applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the primary user?", answer: "Internal operators." }],
+    activate: true,
+  });
+  assert.equal(result.schema, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(result.checkpoint.designQuestions.length, 1);
+  assert.equal(result.checkpoint.designQuestions[0].question, "What is the primary user?");
+});
+
+check("applyOnboardingIntakeDesignQuestions: activation is required", () => {
+  const root = fixture("intake-design-questions-activation");
+  captureIntakeMaterial(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ACTIVATION-REQUIRED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: rejects an empty answer set", () => {
+  const root = fixture("intake-design-questions-empty");
+  captureIntakeMaterial(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-EMPTY", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: affirmative zero-open disposition is distinct from missing input and replays exactly", () => {
+  const root = fixture("intake-design-questions-none-open");
+  captureIntakeMaterial(root);
+  const disposition = { disposition: "no-open-questions" };
+  const first = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: disposition, activate: true });
+  assert.equal(first.mutated, true);
+  assert.deepEqual(first.checkpoint.designQuestions, []);
+  assert.equal(first.checkpoint.transactionState, "ready-to-generate");
+  const replay = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: disposition, activate: true });
+  assert.equal(replay.mutated, false);
+  assert.equal(replay.checkpoint.revision, first.checkpoint.revision);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-EMPTY", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [], activate: true,
+  }));
+});
+check("applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first", () => {
+  const root = fixture("intake-design-questions-precondition");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-PRECONDITION", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at all", () => {
+  const root = fixture("intake-design-questions-no-checkpoint");
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-PRECONDITION", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: normal apply refuses a different answer set once the round is already answered", () => {
+  const root = fixture("intake-design-questions-already-answered");
+  captureIntakeMaterial(root);
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "A1" }], activate: true,
+  });
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q2", answer: "A2" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: explicit replacement corrects answers before generation", () => {
+  const root = fixture("intake-design-questions-replace");
+  captureIntakeMaterial(root);
+  const first = applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "wrong test value" }], activate: true,
+  });
+  const corrected = applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "real answer" }], replace: true, activate: true,
+  });
+  assert.equal(corrected.mutated, true);
+  assert.equal(corrected.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(corrected.checkpoint.revision, first.checkpoint.revision + 1);
+  assert.equal(corrected.checkpoint.designQuestions[0].answer, "real answer");
+});
+
+check("applyOnboardingIntakeDesignQuestions: explicit replacement is refused after staging generation", () => {
+  const root = fixture("intake-design-questions-replace-after-generation");
+  captureIntakeMaterial(root);
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "A1" }], activate: true,
+  });
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "late replacement" }], replace: true, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: an exact replay of the same already-answered round is a no-op", () => {
+  const root = fixture("intake-design-questions-replay");
+  captureIntakeMaterial(root);
+  const answers = [{ question: "Q1", answer: "A1" }];
+  const first = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers, activate: true });
+  assert.equal(first.mutated, true);
+  const replay = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers, activate: true });
+  assert.equal(replay.mutated, false);
+  assert.equal(replay.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(replay.checkpoint.revision, first.checkpoint.revision);
+});
+
+// ---------------------------------------------------------------------------
+// Intake checkpoint Batch B (NVA-W4-COORD-1 follow-up): crash-injection at
+// every fault point stubbed via deps.crashAt in applyIntakeCheckpointMutation
+// (the shared single-target CAS writer every step-1/2/3 function goes
+// through) and writeIntakeCheckpointEvidence (capture's evidence blob write),
+// plus the CAS-drift test. Mirrors the file's own pre-existing
+// KICKOFF_FAULT_STAGES "crash at X" pattern above.
+
+// applyIntakeCheckpointMutation's own fault points -- exercised once through
+// applyOnboardingIntakeConsent (the simplest single-call vehicle) since the
+// fault-injected code is the SHARED writer every step-1/2/3 function calls
+// into; the shared logic only needs covering once, not per caller.
+const INTAKE_CHECKPOINT_WRITE_FAULT_STAGES = ["cas-recheck", "temp-fsync", "rename", "directory-fsync"];
+
+for (const stage of INTAKE_CHECKPOINT_WRITE_FAULT_STAGES) {
+  check(`intake checkpoint write: crash at ${stage} leaves either absent or fully committed content, never torn, and a retry converges`, () => {
+    const root = fixture(`intake-checkpoint-crash-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    expectIntakeError("INTAKE-CHECKPOINT-SIMULATED-CRASH", () => applyOnboardingIntakeConsent({
+      rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+      deps: { crashAt: stage },
+    }));
+    const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+    if (stage === "rename" || stage === "directory-fsync") {
+      // renameSync() is atomic: by the time these two fault points fire, the
+      // real target already carries the fully valid new content.
+      assert.equal(afterCrash.status, "present");
+      assert.equal(afterCrash.value.values.language, "en");
+      assert.equal(afterCrash.value.values.profile, "feature");
+    } else {
+      // cas-recheck/temp-fsync fire strictly before the rename -- this is
+      // the first-ever write for this root, so the real target must be
+      // untouched (absent), never a torn partial file.
+      assert.equal(afterCrash.status, "absent");
+    }
+    // A real crash never releases its writer lock -- prove the retry
+    // recovers it through the same stale-lock path the kickoff crash tests
+    // use (lockStaleMs: 0, nowMs pushed forward), converging either way.
+    const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+    assert.equal(existsSync(paths.lock), true);
+    const recovered = applyOnboardingIntakeConsent({
+      rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+      deps: { lockStaleMs: 0, nowMs: Date.now() + 60_000 },
+    });
+    assert.equal(recovered.checkpoint.values.language, "en");
+    assert.equal(recovered.checkpoint.values.profile, "feature");
+    if (stage === "rename" || stage === "directory-fsync") {
+      // The crash already published a complete checkpoint.  Its identical
+      // retry remains checkpoint-byte-null, but now exercises the existing
+      // schema/token/age-gated stale-lock recovery so it does not strand the
+      // next real intake mutation behind KICKOFF-LOCKED.
+      assert.equal(existsSync(paths.lock), false, "the identical retry reclaims its own stale writer lock");
+    } else {
+      assert.equal(existsSync(paths.lock), false);
+    }
+  });
+}
+
+// writeIntakeCheckpointEvidence's own fault points -- only reachable through
+// applyOnboardingIntakeCapture, and unlocked (content-addressed, no writer
+// lock), so recovery here is a plain retry, not a stale-lock recovery.
+const INTAKE_EVIDENCE_WRITE_FAULT_STAGES = ["evidence-temp-fsync", "evidence-rename", "evidence-directory-fsync"];
+
+for (const stage of INTAKE_EVIDENCE_WRITE_FAULT_STAGES) {
+  check(`intake checkpoint evidence: crash at ${stage} leaves either absent or fully committed evidence bytes, never torn, and a retry converges`, () => {
+    const root = fixture(`intake-evidence-crash-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    grantIntakeConsent(root);
+    const text = "material to capture";
+    expectIntakeError("INTAKE-CHECKPOINT-SIMULATED-CRASH", () => applyOnboardingIntakeCapture({
+      rootDir: root, text, activate: true,
+      deps: { crashAt: stage },
+    }));
+    const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+    const evidencePath = join(paths.evidenceDirectory, `${digest(text)}.txt`);
+    if (stage === "evidence-rename" || stage === "evidence-directory-fsync") {
+      assert.equal(existsSync(evidencePath), true);
+      assert.equal(readFileSync(evidencePath, "utf8"), text);
+    } else {
+      assert.equal(existsSync(evidencePath), false);
+    }
+    // The checkpoint entry is written only AFTER writeIntakeCheckpointEvidence
+    // returns -- a crash inside it never reaches applyIntakeCheckpointMutation
+    // at all, so the checkpoint's materialInput must be exactly as before.
+    const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+    assert.equal(afterCrash.value.materialInput.length, 0);
+    const recovered = applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
+    assert.equal(recovered.mutated, true);
+    assert.equal(recovered.checkpoint.materialInput.length, 1);
+  });
+}
+
+check("intake checkpoint: a preimage that changes between the two observations is refused as CAS drift, not silently overwritten", () => {
+  const root = fixture("intake-cas-drift");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", activate: true });
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  expectIntakeError("INTAKE-CHECKPOINT-CAS-DRIFT", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, profile: "feature", activate: true,
+    deps: {
+      fault(point) {
+        if (point !== "cas-recheck") return;
+        // Simulate a concurrent writer changing the checkpoint's raw bytes
+        // between this call's own unlocked pre-check and its locked
+        // re-observation -- the exact window applyIntakeCheckpointMutation's
+        // two-observation CAS discipline exists to close.
+        const concurrent = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+        concurrent.values.language = "de";
+        writeFileSync(paths.checkpoint, `${JSON.stringify(concurrent, null, 2)}\n`);
+      },
+    },
+  }));
+  // Refused, so nothing from the refused call's own attempted write landed --
+  // the file must still carry exactly the concurrent writer's content.
+  const after = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  assert.equal(after.values.language, "de");
+  assert.equal(after.values.profile, null, "the refused call's own profile candidate must never have been written");
+});
+
+// ---------------------------------------------------------------------------
+// Intake staging generation (Wave 4 onboarding coordinator, step 4 --
+// NVA-W4-COORD-2, design.md SSa.5 point 4 / SSc.2). Happy path, precondition/
+// error paths, and idempotent no-op/regeneration coverage for the
+// plan/apply pair, plus the SSc.2-mandated crash-injection matrix.
+
+function readyToGenerateRoot(name, text = "requirement material one", profile = "feature") {
+  const root = fixture(name, { neutral: true });
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile, activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  return root;
+}
+
+check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path derives and writes all three staging targets", () => {
+  const root = readyToGenerateRoot("intake-generate-happy");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.schema, INTAKE_GENERATE_PLAN_SCHEMA);
+  assert.match(plan.featureId, /^onboarding-[a-f0-9]{12}$/);
+  // NVA-INTAKESPECS-1: the design package is generated straight into specs/<featureId>/, the
+  // location ADR-0045 already names, rather than a separate pre-authority holding area.
+  assert.equal(intakeDesignDirname(plan.featureId), `specs/${plan.featureId}`);
+  assert.equal(plan.targets.designInput.path, `specs/${plan.featureId}/design-input.md`);
+  assert.equal(plan.targets.prd.path, `specs/${plan.featureId}/prd_${plan.featureId}.md`);
+  assert.equal(plan.targets.spec.path, `specs/${plan.featureId}/spec.md`);
+
+  const configuredCrlf = spawnSync("git", ["config", "--local", "core.autocrlf", "true"], {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(configuredCrlf.status, 0, configuredCrlf.stderr);
+
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.featureId, plan.featureId);
+  assert.equal(applied.checkpoint.transactionState, "generated");
+  assert.equal(applied.checkpoint.generated.designInputSha256, plan.targets.designInput.afterSha256);
+  const localAutocrlf = spawnSync("git", ["config", "--local", "--get", "core.autocrlf"], {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(localAutocrlf.status, 0, localAutocrlf.stderr);
+  assert.equal(localAutocrlf.stdout.trim(), "false",
+    "generation prepares only the disposable repository's effective autocrlf value before publishing bound bytes");
+
+  for (const key of ["designInput", "prd", "spec"]) {
+    const absolute = join(root, plan.targets[key].path);
+    assert.equal(existsSync(absolute), true);
+    assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
+    assert.equal(readFileSync(absolute, "utf8").includes("\r"), false,
+      `${key}: generated design bytes remain LF after repository-local preparation`);
+    assert.equal(applied.targets[key].wrote, true);
+    assert.equal(readFileSync(absolute, "utf8").includes("this staging file is NOT yet bound as project authority"), false,
+      `${key}: canonical generated artifacts must not claim they are pre-authority staging files`);
+  }
+});
+
+// NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
+// intake-generate-apply publishes one deterministic tracked projection. A
+// local operator path must not strand the greenfield flow or ride unchanged
+// into design-input.md, the PRD, and the spec.
+check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
+  const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
+  const macOsPrivateVarPath = "/private/var/folders/example-operator/T/nova-signing-key.pem";
+  const posixVarPath = "/var/lib/nova/operator-state.json";
+  const posixTmpPath = "/tmp/nova/operator-input.txt";
+  const windowsDriveKeyPath = String.raw`C:\Users\example-operator\.ssh\nova-signing-key.pem`;
+  const wslUncKeyPath = String.raw`\\wsl.localhost\Ubuntu\home\example-operator\.ssh\nova-signing-key.pem`;
+  const privatePaths = [
+    posixHomeKeyPath,
+    macOsPrivateVarPath,
+    posixVarPath,
+    posixTmpPath,
+    windowsDriveKeyPath,
+    wslUncKeyPath,
+  ];
+  const material = [
+    "The service must capture meaningful product requirements and continue greenfield generation automatically.",
+    `A local POSIX operator may load a signing key from ${posixHomeKeyPath}.`,
+    `A local macOS operator may stage it at ${macOsPrivateVarPath}, or under ${posixVarPath}.`,
+    `A local temporary file may be ${posixTmpPath}.`,
+    `A Windows operator may use ${windowsDriveKeyPath}.`,
+    `A WSL operator may use ${wslUncKeyPath}.`,
+    "The documented HTTP route /v1/onboarding/intake is not a local host path and must remain visible.",
+    "The tracked design package must retain this surrounding requirement prose without requiring another human round.",
+  ].join("\n");
+  const marker = "[REDACTED LOCAL PATH]";
+  const projectedMaterial = privatePaths.reduce((text, value) => text.replaceAll(value, marker), material);
+  const root = readyToGenerateRoot("intake-generate-private-path-projection", material);
+  const beforeCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const beforeMaterialEntries = Buffer.from(JSON.stringify(beforeCheckpoint.value.materialInput), "utf8");
+  const privateEvidencePath = join(beforeCheckpoint.paths.directory, beforeCheckpoint.value.materialInput[0].evidencePath);
+  const beforeEvidence = readFileSync(privateEvidencePath);
+  assert.equal(beforeEvidence.toString("utf8"), material);
+
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const applied = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(applied.checkpoint.transactionState, "generated");
+
+  for (const key of ["designInput", "prd", "spec"]) {
+    const tracked = readFileSync(join(root, plan.targets[key].path), "utf8");
+    for (const privatePath of privatePaths) {
+      assert.equal(tracked.includes(privatePath), false, `${key} must not contain a captured private host path`);
+    }
+    assert.equal(tracked.includes(projectedMaterial), true,
+      `${key} must use the same projection while retaining surrounding requirement prose`);
+    assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
+    assert.equal(tracked.includes("/v1/onboarding/intake"), true,
+      `${key} must preserve ordinary route prose that is not a host path`);
+  }
+
+  const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.deepEqual(Buffer.from(JSON.stringify(afterCheckpoint.value.materialInput), "utf8"), beforeMaterialEntries,
+    "generation metadata may advance, but the checkpoint's captured material references must stay byte-identical");
+  assert.deepEqual(readFileSync(privateEvidencePath), beforeEvidence,
+    "the private content-addressed evidence bytes must never be rewritten by projection");
+  assert.deepEqual(readOnboardingIntakeMaterialInput({ rootDir: root }).chunks.map((chunk) => chunk.text), [material],
+    "restart consumption must still recover the PO's exact original input");
+
+  const replayPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked projection must reconstruct deterministically");
+  const replay = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true,
+  });
+  assert.equal(replay.mutated, false);
+  for (const key of ["designInput", "prd", "spec"]) assert.equal(replay.targets[key].wrote, false);
+});
+
+check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts", () => {
+  const material = "The coordinator must preserve ordinary requirement prose byte for byte, including café and punctuation: yes.";
+  const root = readyToGenerateRoot("intake-generate-path-free-byte-identity", material);
+  const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root }).value;
+  const entry = checkpoint.materialInput[0];
+  const expectedMaterialBlock = [
+    "### Chunk 1 -- sha256:" + entry.sha256 + ", " + entry.byteLength + " bytes, received " + entry.receivedAt,
+    "",
+    material + "\n",
+  ].join("\n");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), true,
+      key + " must retain the exact legacy material-input rendering for clean text");
+    assert.equal(plan.targets[key].content.includes("[REDACTED LOCAL PATH]"), false);
+    assert.equal(plan.targets[key].content.includes("Tracked projection:"), false);
+  }
+});
+
+// NVA-GF-GREENFIELD-INTAKEPROJ-1: capture remains lossless and private, while
+// intake-generate-apply publishes one deterministic tracked projection. A
+// local operator path must not strand the greenfield flow or ride unchanged
+// into design-input.md, the PRD, and the spec.
+check("applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence", () => {
+  const posixHomeKeyPath = "/home/example-operator/.ssh/nova-signing-key.pem";
+  const macOsPrivateVarPath = "/private/var/folders/example-operator/T/nova-signing-key.pem";
+  const posixVarPath = "/var/lib/nova/operator-state.json";
+  const posixTmpPath = "/tmp/nova/operator-input.txt";
+  const windowsDriveKeyPath = String.raw`C:\Users\example-operator\.ssh\nova-signing-key.pem`;
+  const wslUncKeyPath = String.raw`\\wsl.localhost\Ubuntu\home\example-operator\.ssh\nova-signing-key.pem`;
+  const privatePaths = [
+    posixHomeKeyPath,
+    macOsPrivateVarPath,
+    posixVarPath,
+    posixTmpPath,
+    windowsDriveKeyPath,
+    wslUncKeyPath,
+  ];
+  const material = [
+    "The service must capture meaningful product requirements and continue greenfield generation automatically.",
+    `A local POSIX operator may load a signing key from ${posixHomeKeyPath}.`,
+    `A local macOS operator may stage it at ${macOsPrivateVarPath}, or under ${posixVarPath}.`,
+    `A local temporary file may be ${posixTmpPath}.`,
+    `A Windows operator may use ${windowsDriveKeyPath}.`,
+    `A WSL operator may use ${wslUncKeyPath}.`,
+    "The documented HTTP route /v1/onboarding/intake is not a local host path and must remain visible.",
+    "The tracked design package must retain this surrounding requirement prose without requiring another human round.",
+  ].join("\n");
+  const marker = "[REDACTED LOCAL PATH]";
+  const projectedMaterial = privatePaths.reduce((text, value) => text.replaceAll(value, marker), material);
+  const root = readyToGenerateRoot("intake-generate-private-path-projection", material);
+  const beforeCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  const beforeMaterialEntries = Buffer.from(JSON.stringify(beforeCheckpoint.value.materialInput), "utf8");
+  const privateEvidencePath = join(beforeCheckpoint.paths.directory, beforeCheckpoint.value.materialInput[0].evidencePath);
+  const beforeEvidence = readFileSync(privateEvidencePath);
+  assert.equal(beforeEvidence.toString("utf8"), material);
+
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const applied = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(applied.checkpoint.transactionState, "generated");
+
+  for (const key of ["designInput", "prd", "spec"]) {
+    const tracked = readFileSync(join(root, plan.targets[key].path), "utf8");
+    for (const privatePath of privatePaths) {
+      assert.equal(tracked.includes(privatePath), false, `${key} must not contain a captured private host path`);
+    }
+    assert.equal(tracked.includes(projectedMaterial), true,
+      `${key} must use the same projection while retaining surrounding requirement prose`);
+    assert.equal(tracked.includes(marker), true, `${key} must carry an explicit deterministic redaction marker`);
+    assert.equal(tracked.includes("/v1/onboarding/intake"), true,
+      `${key} must preserve ordinary route prose that is not a host path`);
+  }
+
+  const afterCheckpoint = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.deepEqual(Buffer.from(JSON.stringify(afterCheckpoint.value.materialInput), "utf8"), beforeMaterialEntries,
+    "generation metadata may advance, but the checkpoint's captured material references must stay byte-identical");
+  assert.deepEqual(readFileSync(privateEvidencePath), beforeEvidence,
+    "the private content-addressed evidence bytes must never be rewritten by projection");
+  assert.deepEqual(readOnboardingIntakeMaterialInput({ rootDir: root }).chunks.map((chunk) => chunk.text), [material],
+    "restart consumption must still recover the PO's exact original input");
+
+  const replayPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(replayPlan.planSha256, plan.planSha256, "the tracked projection must reconstruct deterministically");
+  const replay = applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: replayPlan.planSha256, activate: true,
+  });
+  assert.equal(replay.mutated, false);
+  for (const key of ["designInput", "prd", "spec"]) assert.equal(replay.targets[key].wrote, false);
+});
+
+check("planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts", () => {
+  const material = "The coordinator must preserve ordinary requirement prose byte for byte, including café and punctuation: yes.";
+  const root = readyToGenerateRoot("intake-generate-path-free-byte-identity", material);
+  const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root }).value;
+  const entry = checkpoint.materialInput[0];
+  const expectedMaterialBlock = [
+    "### Chunk 1 -- sha256:" + entry.sha256 + ", " + entry.byteLength + " bytes, received " + entry.receivedAt,
+    "",
+    material + "\n",
+  ].join("\n");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(plan.targets[key].content.includes(expectedMaterialBlock), true,
+      key + " must retain the exact legacy material-input rendering for clean text");
+    assert.equal(plan.targets[key].content.includes("[REDACTED LOCAL PATH]"), false);
+    assert.equal(plan.targets[key].content.includes("Tracked projection:"), false);
+  }
+});
+
+check("planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here", () => {
+  const root = readyToGenerateRoot("intake-generate-next-action");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  assert.ok(Array.isArray(plan.nextAction.argv));
+  assert.ok(plan.nextAction.argv.every((part) => typeof part === "string"));
+  assert.equal(plan.nextAction.argv.includes("intake-generate-apply"), true);
+  assert.equal(plan.nextAction.argv.includes("--activate"), true);
+  // No digest binding is weakened: the published nextAction carries the SAME
+  // planSha256 the caller would otherwise have copied by hand -- assert the
+  // two actually agree, not merely that a --plan-sha256 flag is present.
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+
+  // The published command actually works when run for real, with no field on
+  // it invented beyond what applyOnboardingIntakeGenerate itself requires.
+  const applied = applyOnboardingIntakeGenerate({
+    rootDir: root,
+    expectedPlanSha256: plan.nextAction.argv[flagIndex + 1],
+    activate: true,
+  });
+  assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
+  assert.equal(applied.mutated, true);
+});
+
+check("applyOnboardingIntakeGenerate: activation is required", () => {
+  const root = readyToGenerateRoot("intake-generate-activation");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  expectIntakeError("INTAKE-GENERATE-ACTIVATION-REQUIRED", () => applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256,
+  }));
+});
+
+check("planOnboardingIntakeGenerate: requires an existing checkpoint", () => {
+  const root = fixture("intake-generate-no-checkpoint", { neutral: true });
+  expectIntakeError("INTAKE-GENERATE-PRECONDITION", () => planOnboardingIntakeGenerate({ rootDir: root }));
+});
+
+check("planOnboardingIntakeGenerate: refuses a checkpoint still short of ready-to-generate", () => {
+  const root = fixture("intake-generate-not-ready", { neutral: true });
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+  expectIntakeError("INTAKE-GENERATE-PRECONDITION", () => planOnboardingIntakeGenerate({ rootDir: root }));
+});
+
+check("applyOnboardingIntakeGenerate: refuses a plan digest mismatch", () => {
+  const root = readyToGenerateRoot("intake-generate-digest-mismatch");
+  expectIntakeError("INTAKE-GENERATE-PLAN-DIGEST", () => applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: "0".repeat(64), activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeGenerate: creates specs/ itself instead of demanding it, on a root that has neither specs/ nor project/", () => {
+  // NVA-INTAKESPECS-1 replaces the former INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING
+  // precondition. A greenfield repository legitimately has no specs/ yet, and the very first
+  // onboarding is exactly when it must appear -- refusing there would be a dead end on the
+  // one path this step exists to serve. The fixture deliberately has no project/ either, so
+  // this also pins that the old precondition is genuinely gone rather than merely relocated.
+  const root = fixture("intake-generate-no-specs-dir");
+  assert.equal(existsSync(join(root, "specs")), false, "fixture must start without specs/");
+  assert.equal(existsSync(join(root, "project")), false, "fixture must start without project/");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "material", activate: true });
+  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question: "Q?", answer: "A." }], activate: true });
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.mutated, true);
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(existsSync(join(root, plan.targets[key].path)), true, plan.targets[key].path);
+  }
+  assert.equal(existsSync(join(root, "project")), false, "generation must not create project/ any more");
+});
+
+check("applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op", () => {
+  const root = readyToGenerateRoot("intake-generate-noop-replay");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const first = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(first.mutated, true);
+  const replanned = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(replanned.planSha256, plan.planSha256, "an unchanged checkpoint must reconstruct the identical plan digest");
+  const second = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: replanned.planSha256, activate: true });
+  assert.equal(second.mutated, false);
+  assert.equal(second.checkpoint.revision, first.checkpoint.revision);
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(second.targets[key].wrote, false, `${key} must not be rewritten on an unchanged replay`);
+  }
+});
+
+check("applyOnboardingIntakeGenerate: a changed checkpoint safely regenerates with a STABLE featureId", () => {
+  const root = readyToGenerateRoot("intake-generate-regenerate");
+  const firstPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  const first = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: firstPlan.planSha256, activate: true });
+  // Capturing more material after "generated" is structurally permitted
+  // (applyOnboardingIntakeCapture does not gate on transactionState beyond
+  // the very first capture) -- exactly the case SSc.2 describes as safely
+  // regenerable.
+  applyOnboardingIntakeCapture({ rootDir: root, text: "a second, later requirement", activate: true });
+  const secondPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.notEqual(secondPlan.planSha256, firstPlan.planSha256);
+  assert.equal(secondPlan.featureId, firstPlan.featureId,
+    "featureId must stay stable across regeneration -- otherwise the prior prd_<id>.md is orphaned");
+  const second = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: secondPlan.planSha256, activate: true });
+  assert.equal(second.mutated, true);
+  assert.notEqual(second.checkpoint.generated.designInputSha256, first.checkpoint.generated.designInputSha256);
+  assert.equal(existsSync(join(root, secondPlan.targets.prd.path)), true);
+});
+
+// ---------------------------------------------------------------------------
+// Intake staging generation crash-injection (NVA-W4-COORD-2, design SSc.2):
+// per-target write-if-different is a pure function of the already-durable
+// checkpoint, so a crash at any fault point must leave the crashed target
+// either absent or fully committed (never torn), and a plain retry (against
+// the same still-unmutated checkpoint -- the crashed call never reached the
+// checkpoint commit, since staging is written entirely before it) must
+// converge to the correct fully-generated state.
+
+const INTAKE_GENERATE_STAGING_KEYS = ["designInput", "prd", "spec"];
+const INTAKE_GENERATE_WRITE_FAULT_STAGES = ["temp-fsync", "rename", "directory-fsync"];
+
+for (const key of INTAKE_GENERATE_STAGING_KEYS) {
+  for (const stage of INTAKE_GENERATE_WRITE_FAULT_STAGES) {
+    check(`intake staging generation: crash at ${key}-${stage} leaves that target either absent or fully committed, never torn, and a retry converges`, () => {
+      const root = readyToGenerateRoot(`intake-generate-crash-${key}-${stage}`);
+      const plan = planOnboardingIntakeGenerate({ rootDir: root });
+      expectIntakeError("INTAKE-GENERATE-SIMULATED-CRASH", () => applyOnboardingIntakeGenerate({
+        rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+        deps: { crashAt: `${key}-${stage}` },
+      }));
+      const absolute = join(root, plan.targets[key].path);
+      if (stage === "rename" || stage === "directory-fsync") {
+        // renameSync() is atomic: by the time these two fault points fire,
+        // the real target already carries the fully valid new content.
+        assert.equal(existsSync(absolute), true);
+        assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
+      } else {
+        // temp-fsync fires strictly before the rename -- this is the
+        // first-ever write for this target, so it must be untouched
+        // (absent), never a torn partial file.
+        assert.equal(existsSync(absolute), false);
+      }
+      const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+      assert.equal(afterCrash.value.transactionState, "ready-to-generate",
+        "the checkpoint commit is the LAST step -- a crash during staging writes must never reach it");
+      const recovered = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+      assert.equal(recovered.mutated, true);
+      assert.equal(recovered.checkpoint.transactionState, "generated");
+      for (const eachKey of INTAKE_GENERATE_STAGING_KEYS) {
+        const eachAbsolute = join(root, plan.targets[eachKey].path);
+        assert.equal(digest(readFileSync(eachAbsolute, "utf8")), plan.targets[eachKey].afterSha256,
+          `${eachKey} must converge to the correct fully-written content`);
+      }
+    });
+  }
+}
+
+// Wave 4 onboarding coordinator, step 5 (design SSa.5 point 5, SSc.3,
+// NVA-W5-COORD-STEP5-1). bootstrap-bind-plan/bootstrap-bind-apply: the thin
+// adapter over planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion
+// via the new coordinator-sourced ("no kickoff predecessor") branch.
+// NVA-BL-INTAKEBIND-1 (AC-4): the freshly generated staging PRD already
+// carries valid po-language/technical-spec-sha256 markers (AC-1).  The
+// remaining acknowledgement marker is an authority record, never prose an
+// agent may hand-edit.  Build this fixture through the same dedicated writer
+// that production uses after a configured human ceremony.  This continuity
+// unit suite deliberately uses its chat-mode test receipt; the signature
+// proof selection and verification live in the dedicated onboarding and
+// pipeline-state suites.
+// Complete only explicitly positive acknowledgement setups; draft refusal fixtures stay generated.
+function finishPositiveAcknowledgementFixture(root, generatePlan) {
+  const prdPath = join(root, generatePlan.targets.prd.path);
+  const language = readFileSync(prdPath, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+  const spec = "# Completed acknowledgement specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed intake package is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n- AC-03: WHEN the promotion is replayed, the system SHALL preserve its published action and receipt.\n- AC-04: WHEN document language differs from operator language, the system SHALL preserve the configured language contract.\n- AC-05: WHEN an acknowledged package requests mechanical marker repair, the system SHALL refuse that repair.\n\n## Architecture\nThe intake checkpoint owns package paths. The existing mechanical marker writer binds the final specification digest before the existing acknowledgement writer records consent. Promotion owns continuity, language propagation and profile authority.\n";
+  const prd = "<!-- po-language: " + language + " -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed acknowledgement design\n\n## Goal\nBind the final intake design package through the configured human acknowledgement and preserve its exact authority.\n\n## Scope\nExercise digest refusal, consent persistence, promotion action reconstruction, language propagation and acknowledged-marker protection through the existing public writers.\n\n## Acceptance\nThe completed specification defines each observable authority and language outcome. The intake checkpoint owns the paths; acknowledgement and promotion retain their existing responsibilities.\n";
+  writeFileSync(join(root, generatePlan.targets.spec.path), spec);
+  writeFileSync(prdPath, prd);
+  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+}
+
+function bootstrapBindReadyRoot(name) {
+  const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  // These five positive binding fixtures require completed design content.
+  // Other helper callers retain their original generated-draft setup.
+  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name)) {
+    const spec = "# Bootstrap binding specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed package is acknowledged, the system SHALL bind its exact PRD and Spec digests to the active feature.\n- AC-02: WHEN the same binding is applied twice, the system SHALL preserve all stored bytes on replay.\n- AC-03: WHEN activation is absent, the system SHALL refuse binding without publishing authority.\n- AC-04: WHEN binding succeeds, the system SHALL publish authority accepted by the PO gate.\n\n## Architecture\nThe intake checkpoint owns the design paths. The existing acknowledgement writer binds the final documents; the existing promotion writer publishes continuity and profile authority. No new decision is introduced.\n";
+    const prd = "<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed bootstrap binding design\n\n## Goal\nBind the reviewed intake design package to a local active feature so implementation can use its exact authority.\n\n## Scope\nPreserve digest checks, explicit activation, byte-null replay and PO profile validation. Refuse re-planning once continuity is bound.\n\n## Acceptance\nThe specification defines observable binding, replay, activation and authority outcomes. The existing writers own these transitions.\n";
+    writeFileSync(join(root, generatePlan.targets.spec.path), spec);
+    writeFileSync(join(root, generatePlan.targets.prd.path), prd);
+    const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+    applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+  }
+  if (["promotionaction-coordinator-fresh", "promotionaction-coordinator-replay", "spec-marker-ack", "spec-marker-bound"].includes(name)) {
+    finishPositiveAcknowledgementFixture(root, generatePlan);
+  }
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  const applied = applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  return { root, featureId: generatePlan.featureId };
+}
+
+// NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before that fix, a genuinely
+// fresh, unmodified intake-generated staging PRD (no hand-injected markers)
+// failed planOnboardingBootstrapBind() with KICKOFF-PROMOTION-PRD-LANGUAGE-
+// MARKER-INVALID -- a dead end for the entire material-intake happy path
+// (confirmed live via scratch/repro-nva-bl-intakebind-1.mjs before any fix
+// landed). Proves the fix: the freshly generated PRD now already carries
+// BOTH mechanical markers with the correct values.
+//
+check("planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement", () => {
+  for (const profile of ["mini", "feature", "epic"]) {
+    const root = readyToGenerateRoot("bootstrap-bind-ac1-markers-" + profile, "requirement material one", profile);
+    const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+    applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+    const prdPath = join(root, generatePlan.targets.prd.path);
+    const prdText = readFileSync(prdPath, "utf8");
+    assert.equal(prdText.startsWith("<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n"), true);
+    if (profile === "mini") {
+      expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+    } else {
+      const plan = planOnboardingBootstrapBind({ rootDir: root });
+      assert.equal(plan.targets.state.value.planApproved, false);
+      assert.equal(plan.targets.state.value.bootstrapAcknowledgementRequired, undefined);
+      writeFileSync(prdPath, prdText.split("\n").filter(line => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+      expectKickoffError("KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+    }
+  }
+});
+check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
+  const { root, featureId } = bootstrapBindReadyRoot("happy");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  assert.equal(plan.kickoff, null);
+  assert.equal(plan.feature.id, featureId);
+  assert.equal(plan.targets.state.beforeSha256, null);
+  assert.equal(plan.targets.history.beforeSha256, null);
+  assert.equal(plan.targets.handover.beforeSha256, null);
+  assert.equal(plan.targets.cleanupBinding, undefined);
+  assert.equal(plan.targets.state.value.continuity.revision, 0);
+
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.schema, KICKOFF_PROMOTION_APPLY_SCHEMA);
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.continuity.status, "valid");
+
+  const state = JSON.parse(readFileSync(join(root, plan.targets.state.path), "utf8"));
+  assert.equal(state.activeFeature.id, featureId);
+  assert.equal(state.activeFeature.planPath, plan.feature.planPath);
+  assert.equal(state.continuity.revision, 0);
+  // NVA-INTAKESPECS-1: the design package is generated in place, so binding leaves it exactly
+  // where it already was -- there is no promotion move and nothing to clean up afterwards.
+  assert.equal(existsSync(join(root, intakeDesignDirname(featureId))), true,
+    "the design package still exists post-bind (bind never moves or removes it)");
+  const history = JSON.parse(readFileSync(promotionHistoryPath(root), "utf8"));
+  assert.equal(history.transactions.length, 1);
+  assert.equal(history.transactions[0].kind, "bootstrap-binding");
+  assert.equal(history.transactions[0].featureId, featureId);
+  assert.equal(readFileSync(join(root, plan.targets.handover.path), "utf8"), plan.targets.handover.content);
+  assert.equal(plan.targets.handover.content.includes("SUPERSEDED.md"), false,
+    "direct intake has no provisional kickoff package to supersede");
+});
+
+check("applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay", () => {
+  const { root } = bootstrapBindReadyRoot("replay");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  // applyOnboardingBootstrapBind always reconstructs its own comparison plan
+  // via allowAppliedReplay: true (mirroring applyProjectOnboardingKickoffPromotionV4's
+  // convention), so a caller re-running apply with the ORIGINAL plan's digest --
+  // exactly what the CLI's own --plan-sha256 contract requires -- hits the
+  // internal exact-postimage fast path and returns a byte-null replay.
+  const replayed = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(replayed.status, "replayed");
+  assert.equal(replayed.mutated, false);
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan({
+    rootDir: root, profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+    prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path, designInputPath: plan.authority.designInput.path,
+    coordinatorSourced: true,
+  }), plan);
+});
+
+check("planOnboardingBootstrapBind: requires an existing intake checkpoint", () => {
+  const root = fixture("bootstrap-bind-no-checkpoint", { neutral: true });
+  expectIntakeError("BOOTSTRAP-BIND-PRECONDITION", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated", () => {
+  const root = readyToGenerateRoot("bootstrap-bind-not-generated");
+  expectIntakeError("BOOTSTRAP-BIND-PRECONDITION", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)", () => {
+  const { root } = bootstrapBindReadyRoot("already-bound");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  expectKickoffError("KICKOFF-PROMOTION-NOT-PRISTINE", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("applyOnboardingBootstrapBind: activation is required", () => {
+  const { root } = bootstrapBindReadyRoot("activation");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  expectKickoffError("BOOTSTRAP-BIND-ACTIVATION-REQUIRED", () => applyOnboardingBootstrapBind({
+    rootDir: root, expectedPlanSha256: plan.planSha256,
+  }));
+});
+
+// SSd point 1: the coordinator's generated planPath must satisfy the PO plan
+// gate's CURRENT contract -- the regression this design names explicitly
+// (backlog/items/2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md),
+// prevented structurally by reusing applyOnboardingKickoffPromotion verbatim
+// rather than reimplementing a second binder that could re-diverge from it.
+check("a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)", () => {
+  const { root } = bootstrapBindReadyRoot("po-gate");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const topology = publishPoGateProfile(root);
+  const authority = validatePoGateAuthority({
+    ...topology,
+    expectedPlanSha256: plan.authority.prd.sha256,
+    expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-GATE-AUTHORITY-VALID");
+  assert.equal(authority.value.planPath, plan.authority.prd.path);
+  assert.equal(authority.value.specPath, plan.authority.spec.path);
+});
+
+// ---------------------------------------------------------------------------
+// A generated coordinator draft is never exempt from the configured human
+// acknowledgement.  This helper makes both states explicit: markerless stays
+// bind-blocked; acknowledged goes through the dedicated receipt writer.
+function bootstrapBindPureGeneratorRoot(name, { acknowledged = false, profile = "feature" } = {}) {
+  const root = readyToGenerateRoot(`bootstrap-bind-pure-${name}`, "requirement material one", profile);
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  if (acknowledged) {
+    if (["acknowledged", "edit-after-plan", "consent-withdrawn-after-plan"].includes(name)) {
+      finishPositiveAcknowledgementFixture(root, generatePlan);
+    }
+    const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+    applyOnboardingBootstrapAcknowledgement({
+      rootDir: root,
+      expectedPlanSha256: acknowledgement.intentSha256,
+      attendedChat: true,
+      activate: true,
+    });
+  }
+  return { root, featureId: generatePlan.featureId, generatePlan };
+}
+
+check("planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("one-byte-edit", { profile: "mini" });
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const original = readFileSync(prdAbsolute, "utf8");
+  assert.equal(original.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: an acknowledged intake-generated staging PRD binds end to end through the coordinator-sourced path", () => {
+  const { root, featureId, generatePlan } = bootstrapBindPureGeneratorRoot("acknowledged", { acknowledged: true });
+  const prdText = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  assert.equal(prdText.includes("po-plan-acknowledged"), true, "fixture must carry its acknowledgement marker");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  assert.equal(plan.kickoff, null);
+  assert.equal(plan.feature.id, featureId);
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.schema, KICKOFF_PROMOTION_APPLY_SCHEMA);
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+});
+
+// NVA-R3-STAGINGACKAPPLY: a PRD edit slipped in AFTER a valid plan is taken never
+// reaches the exemption at all -- the plan digest is re-derived from the current
+// bytes first, so it is refused as KICKOFF-PROMOTION-PLAN-DIGEST one layer earlier.
+// Recorded as the code the implementation actually produces, measured: an earlier
+// draft of this check asserted CAS-DRIFT and was corrected to what ran, rather than
+// the implementation being bent toward the guess.
+check("applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("edit-after-plan", { acknowledged: true });
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  writeFileSync(prdAbsolute, `${readFileSync(prdAbsolute, "utf8")}\nSlipped in after the plan was taken.\n`);
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-DIGEST",
+    () => applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true }));
+});
+
+check("applyOnboardingBootstrapBind: consent withdrawal after an acknowledged plan does not erase its bound acknowledgement", () => {
+  const { root } = bootstrapBindPureGeneratorRoot("consent-withdrawn-after-plan", { acknowledged: true });
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const checkpoint = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  checkpoint.consent = null;
+  const { contentSha256: _stale, ...unsigned } = checkpoint;
+  checkpoint.contentSha256 = sha256CanonicalJson(unsigned);
+  writeFileSync(paths.checkpoint, `${JSON.stringify(checkpoint, null, 2)}\n`);
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+});
+
+check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)", () => {
+  const { root } = bootstrapBindPureGeneratorRoot("no-consent", { profile: "mini" });
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const checkpoint = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  checkpoint.consent = null;
+  const { contentSha256: _stale, ...unsigned } = checkpoint;
+  checkpoint.contentSha256 = sha256CanonicalJson(unsigned);
+  writeFileSync(paths.checkpoint, `${JSON.stringify(checkpoint, null, 2)}\n`);
+  const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(observed.status, "present", "the hand-edited checkpoint must still be well-formed -- only consent is absent");
+  assert.equal(observed.value.consent, null);
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+// The legacy kickoff route also remains marker-strict. A generated checkpoint
+// is additionally refused earlier as coordinator-only; this fixture covers a
+// genuine legacy promotion without such a checkpoint.
+check("planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS)", () => {
+  const seed = promotionSeed("r2-stagingack-other-route-untouched");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-plan-acknowledged:")).join("\n"));
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingKickoffPromotion(seed.request));
+});
+
+// ---- NVA-F-PROMOTIONACTION: promotion plans publish nextAction -----------
+// Same sibling-field convention as NVA-D-PLANACTION (intake-generate, above):
+// the generic guided driver (onboarding-init.mjs) reads ONLY `nextAction`,
+// never `applyAction`. Without a `nextAction` on the promotion plan, a fresh
+// repository's guided chain named `bootstrap-bind-plan` every round, forever
+// -- the plan already carried the apply command as `applyAction`, just not
+// under the name the driver reads.
+
+function assertPromotionPlanPublishesNextAction(plan) {
+  assert.deepEqual(plan.nextAction, plan.applyAction);
+  assert.equal(plan.nextAction.kind, "command");
+  assert.equal(plan.nextAction.executable, "node");
+  assert.ok(Array.isArray(plan.nextAction.argv));
+  const flagIndex = plan.nextAction.argv.indexOf("--plan-sha256");
+  assert.ok(flagIndex >= 0, "nextAction argv must carry --plan-sha256");
+  assert.equal(plan.nextAction.argv[flagIndex + 1], plan.planSha256);
+}
+
+check("planOnboardingKickoffPromotion (kickoff-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest", () => {
+  const seed = promotionSeed("promotionaction-kickoff-fresh");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assertPromotionPlanPublishesNextAction(plan);
+});
+
+check("reconstructOnboardingKickoffPromotionPlan (kickoff-sourced, replay): the reconstructed plan also publishes nextAction identical to applyAction", () => {
+  const seed = promotionSeed("promotionaction-kickoff-replay");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPromotionPlan(seed.request);
+  assertPromotionPlanPublishesNextAction(replayed);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingBootstrapBind (coordinator-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest", () => {
+  const { root } = bootstrapBindReadyRoot("promotionaction-coordinator-fresh");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assertPromotionPlanPublishesNextAction(plan);
+});
+
+check("reconstructOnboardingKickoffPromotionPlan (coordinator-sourced, replay): the reconstructed binding also publishes nextAction identical to applyAction", () => {
+  const { root } = bootstrapBindReadyRoot("promotionaction-coordinator-replay");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const replayed = reconstructOnboardingKickoffPromotionPlan({
+    rootDir: root, profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+    prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path, designInputPath: plan.authority.designInput.path,
+    coordinatorSourced: true,
+  });
+  assertPromotionPlanPublishesNextAction(replayed);
+  assert.deepEqual(replayed, plan);
+});
+
+check("planOnboardingKickoffPromotion: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-F-PROMOTIONACTION)", () => {
+  const seed = promotionSeed("promotionaction-digest-stability");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  // Same key set `promotionBinding()` (onboarding-continuity.mjs, private)
+  // projects out of the plan -- deliberately neither `planSha256` nor
+  // `applyAction`/`nextAction`. Recomputing the digest from exactly this
+  // projection, using the plugin's own canonical-JSON sha256 helper, proves
+  // planSha256 does not depend on nextAction's presence or value.
+  const binding = {
+    schema: plan.schema, root: plan.root, repositoryCapability: plan.repositoryCapability,
+    profile: plan.profile, feature: plan.feature, authority: plan.authority, kickoff: plan.kickoff,
+    targets: plan.targets, transactionSha256: plan.transactionSha256, onboardingScript: plan.onboardingScript,
+    runner: plan.runner,
+  };
+  assert.equal(sha256CanonicalJson(binding), plan.planSha256,
+    "planSha256 must be derivable from the transaction-bound fields alone -- applyAction and nextAction are excluded from the digest");
+});
+
+check("applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-F-PROMOTIONACTION)", () => {
+  const seed = promotionSeed("promotionaction-nextaction-mismatch");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const tampered = { ...plan, nextAction: { ...plan.nextAction, argv: [...plan.nextAction.argv, "--bogus"] } };
+  expectKickoffError("KICKOFF-PROMOTION-PLAN", () => applyOnboardingKickoffPromotion({
+    plan: tampered, expectedPlanSha256: tampered.planSha256, activate: true,
+  }));
+});
+
+// NVA-P-RECEIPTPIN: `ensureLocalPromotionPoProfileReceipt()` (called from both
+// the applied and replayed exit paths of `applyOnboardingKickoffPromotion`)
+// is the only site that publishes a PO-gate profile receipt for a
+// coordinator-sourced ("bootstrap-bind") local project's promotion, and
+// previously there was none -- `submit-plan` refused PO-PROFILE-RECEIPT-INVALID
+// forever. Real enough fixture, deliberately: `fixture()` runs a genuine
+// `git init`, so `validatePoGateProfileForRepository()` below resolves real
+// Git topology and exercises the concrete `po-gate-profile-publisher.mjs`
+// writer end to end -- nothing about Git topology or the publisher itself is
+// stubbed. Only the two upstream profile *inputs* (pipeline.user.yaml, the
+// runtime manifest) are seeded fixture data, exactly as real onboarding seeds
+// them ahead of any promotion.
+check("promotion apply for a local repository publishes a PO-gate profile receipt that po-gate-authority.mjs's own validator accepts (NVA-P-RECEIPTPIN)", () => {
+  const seed = promotionSeed("receipt-pin-invariant");
+  seedPoGateProfileFiles(seed.root);
+  promote(seed);
+  // Assert acceptance through the authority's own validator -- never by
+  // checking the receipt file merely exists, and never by re-deriving what a
+  // valid receipt should contain. A file-existence check is precisely the gap
+  // that let the defect ship: a receipt could exist and still fail the
+  // authority's own fingerprint/projection binding.
+  const authority = validatePoGateProfileForRepository({ repoRoot: seed.root });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-PROFILE-AUTHORITY-VALID");
+});
+
+check("promotion apply replay leaves exactly one valid PO-gate profile receipt, untouched byte for byte (NVA-P-RECEIPTPIN)", () => {
+  const seed = promotionSeed("receipt-pin-idempotent");
+  seedPoGateProfileFiles(seed.root);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const applied = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  const receiptPath = poGateProfileReceiptPath(join(seed.root, ".git"));
+  assert.equal(existsSync(receiptPath), true);
+  assert.deepEqual(readdirSync(dirname(receiptPath)), ["profile-receipt.json"],
+    "exactly one receipt, no leftover temporary publish artifact");
+  const beforeReplay = readFileSync(receiptPath);
+  // The replay path (`applyOnboardingKickoffPromotion`'s exact-postimage
+  // branch) is what a second, idempotent apply of the same already-committed
+  // promotion takes -- this is the call this test targets.
+  const replayed = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(replayed.status, "replayed");
+  assert.deepEqual(readdirSync(dirname(receiptPath)), ["profile-receipt.json"],
+    "still exactly one receipt after replay, not a second or renamed one");
+  const afterReplay = readFileSync(receiptPath);
+  // `initializePoGateProfileReceipt` is documented as leaving a currently-valid
+  // receipt completely untouched -- no write, no timestamp bump -- so the
+  // natural assertion is that the bytes on disk are unchanged by the replay,
+  // not merely that they still happen to validate.
+  assert.deepEqual(afterReplay, beforeReplay,
+    "a currently-valid receipt must not be rewritten by a promotion replay");
+  const authority = validatePoGateProfileForRepository({ repoRoot: seed.root });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+});
+
+// ---------------------------------------------------------------------------
+// NVA-R5-LANGWIRE: applyOnboardingBootstrapBind() previously called
+// applyOnboardingKickoffPromotion() directly and never propagated the PO's
+// answered language into the language.human_facing pair configuredLanguage()
+// (po-gate-authority.mjs) reads -- the legacy kickoff-promotion wrapper
+// already did this via correctPromotedLanguage(); these two checks target
+// bootstrap-bind-apply SPECIFICALLY (the coordinator-sourced flow), never the
+// legacy kickoff path project-onboarding-v3.test.mjs already covers, since
+// that coverage is exactly why this gap went uncaught. Both were run against
+// the pre-fix onboarding-continuity.mjs first (see the dispatch record's
+// `log` for the RED observation) before the wiring above was added.
+function renderLangYaml(value, indent = "") {
+  if (Array.isArray(value)) return value.map((item) => (item && typeof item === "object")
+    ? `${indent}-\n${renderLangYaml(item, `${indent}  `)}` : `${indent}- ${renderLangScalar(item)}\n`).join("");
+  return Object.keys(value).sort().map((key) => {
+    const child = value[key];
+    return child && typeof child === "object" ? `${indent}${key}:\n${renderLangYaml(child, `${indent}  `)}` : `${indent}${key}: ${renderLangScalar(child)}\n`;
+  }).join("");
+}
+function renderLangScalar(value) {
+  if (typeof value === "string") return JSON.stringify(value).replace(/</gu, "\\u003c").replace(/>/gu, "\\u003e");
+  if (typeof value === "boolean" || Number.isInteger(value)) return String(value);
+  throw new Error("unsupported V3 YAML scalar");
+}
+function validV3Source(language) {
+  return {
+    schema: "pipeline.user.v3",
+    language: { human_facing: language, agent_facing: language },
+    agent_runtime: "other",
+    runners: { enabled: ["codex"], default: "codex" },
+    routing: registeredRouting(),
+    usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 200 },
+    critic_export: registeredCriticExportPolicy(),
+  };
+}
+// Seeds a "fresh-seed shape" pipeline.user.yaml (source) plus BOTH
+// runtime-manifest tiers (.claude/pipeline.yaml, project/pipeline.yaml) --
+// correctSeededKickoffLanguage() corrects both unconditionally, mirroring
+// what a real fresh v3-onboarded project's apply-portable-seed leaves behind
+// (project-onboarding-v3.mjs), which this narrower test file's own fixture()
+// does not otherwise replicate.
+function seedFreshBootstrapBindLanguageRoot(root, language = "en") {
+  writeFileSync(join(root, "pipeline.user.yaml"), renderLangYaml(validV3Source(language)), { encoding: "utf8", mode: 0o600 });
+  const manifestBlock = `language:\n  human_facing: ${language}\n`;
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), `schema: pipeline.manifest.v0\n${manifestBlock}`, { encoding: "utf8", mode: 0o600 });
+  writeFileSync(join(root, "project", "pipeline.yaml"), `schema: pipeline.manifest.v0\n${manifestBlock}`, { encoding: "utf8", mode: 0o600 });
+}
+
+check("applyOnboardingBootstrapBind: a PO answer of de propagates into the configured language pair, and the PO gate does not raise PO-GATE-PRD-LANGUAGE-MISMATCH (NVA-R5-LANGWIRE)", () => {
+  const root = fixture("bootstrap-bind-lang-de", { neutral: true });
+  seedFreshBootstrapBindLanguageRoot(root, "en");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "de", profile: "feature", activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material one", activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const prdText = readFileSync(prdAbsolute, "utf8");
+  assert.equal(prdText.startsWith("<!-- po-language: de -->"), true, prdText);
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
+  });
+
+  const seededSource = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(seededSource.language.human_facing, "en", "fixture must start on the seeded English default before propagation");
+
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+
+  const correctedSource = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(correctedSource.language.human_facing, "de",
+    "pipeline.po-language-propagated-to-configured-pair: the PO's de answer must reach the configured pair");
+  assert.match(readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+  assert.match(readFileSync(join(root, "project", "pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+
+  const topology = { repoRoot: root, gitCommonDir: join(root, ".git"), primaryRoot: root, registeredWorktreeRoots: [root] };
+  const authority = validatePoGateAuthority({
+    ...topology, expectedPlanSha256: plan.authority.prd.sha256, expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
+});
+
+check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) still binds end to end and passes the PO gate without forcing the operator-facing axis (NVA-R5-LANGWIRE)", () => {
+  const root = fixture("bootstrap-bind-lang-fr", { neutral: true });
+  seedFreshBootstrapBindLanguageRoot(root, "en");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material one", activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const original = readFileSync(prdAbsolute, "utf8");
+  assert.equal(original.startsWith("<!-- po-language: en -->"), true, original);
+  // The document content may be revised during design, but the acknowledgement
+  // must bind those final revised bytes through its dedicated writer.
+  const rewritten = original.replace("<!-- po-language: en -->", "<!-- po-language: fr -->");
+  writeFileSync(prdAbsolute, rewritten);
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
+  });
+
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+
+  const source = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+  assert.equal(source.language.human_facing, "en",
+    "a content language outside {de, en} must never be forced into the operator-facing axis");
+
+  const state = JSON.parse(readFileSync(join(root, plan.targets.state.path), "utf8"));
+  assert.equal(state.continuity.runtime.documentLanguage, "fr");
+
+  // Direct boundary assertion (not by inspection): humanFacingLanguage stays
+  // closed to {de, en}, documentLanguage stays open to any two-letter code --
+  // both checked against the ACTUAL persisted continuity object via the real
+  // validator, not merely observed to happen to be a two-letter code above.
+  const closedRejected = validateContinuityState(
+    { ...state.continuity, runtime: { ...state.continuity.runtime, humanFacingLanguage: "fr" } },
+    state.activeFeature.id,
+  );
+  assert.equal(closedRejected.ok, false, "humanFacingLanguage must reject a non-{de,en} value");
+  const openAccepted = validateContinuityState(
+    { ...state.continuity, runtime: { ...state.continuity.runtime, documentLanguage: "it" } },
+    state.activeFeature.id,
+  );
+  assert.equal(openAccepted.ok, true, JSON.stringify(openAccepted));
+
+  const topology = { repoRoot: root, gitCommonDir: join(root, ".git"), primaryRoot: root, registeredWorktreeRoots: [root] };
+  const authority = validatePoGateAuthority({
+    ...topology, expectedPlanSha256: plan.authority.prd.sha256, expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
+});
+
+function specMarkerSeed(name) {
+  const root = readyToGenerateRoot("spec-marker-" + name);
+  const generation = planOnboardingIntakeGenerate({rootDir: root});
+  applyOnboardingIntakeGenerate({rootDir: root, expectedPlanSha256: generation.planSha256, activate: true});
+  const prdPath = join(root, generation.targets.prd.path), specPath = join(root, generation.targets.spec.path);
+  writeFileSync(specPath, readFileSync(specPath, "utf8") + "\nDesign elaboration — 日本語.\n");
+  return {root, prdPath, specPath};
+}
+
+check("mechanical Spec marker repair preserves all other document and checkpoint bytes", () => {
+  const seed = specMarkerSeed("exact");
+  const beforePrd = readFileSync(seed.prdPath, "utf8"), beforeSpec = readFileSync(seed.specPath);
+  const checkpoint = readOnboardingIntakeCheckpoint({rootDir: seed.root});
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(plan.status, "repair-required");
+  const result = applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true});
+  assert.equal(result.status, "applied");
+  assert.equal(readFileSync(seed.prdPath, "utf8"), beforePrd.replace(/(?<=<!-- technical-spec-sha256: )[a-f0-9]{64}(?= -->)/u, digest(beforeSpec)));
+  assert.deepEqual(readFileSync(seed.specPath), beforeSpec);
+  assert.equal(readOnboardingIntakeCheckpoint({rootDir: seed.root}).sha256, checkpoint.sha256);
+  assert.equal(classifyOnboardingContinuity({rootDir: seed.root}).status, "absent-pristine");
+  const current = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(current.status, "already-current");
+  assert.equal(applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: current.planSha256, activate: true}).mutated, false);
+});
+
+check("mechanical Spec marker repair rejects stale PRD and Spec before any replacement", () => {
+  for (const name of ["prdPath", "specPath"]) {
+    const seed = specMarkerSeed("stale-" + name), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+    writeFileSync(seed[name], readFileSync(seed[name], "utf8") + "Foreign design edit.\n");
+    const prd = readFileSync(seed.prdPath);
+    expectKickoffError("INTAKE-SPEC-MARKER-PLAN-DRIFT", () => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true}));
+    assert.deepEqual(readFileSync(seed.prdPath), prd);
+  }
+});
+
+check("mechanical Spec marker repair refuses acknowledged or bound authority", () => {
+  // This fixture invokes the existing sanctioned acknowledgement writer.
+  const acknowledged = bootstrapBindReadyRoot("spec-marker-ack");
+  expectKickoffError("INTAKE-SPEC-MARKER-ACKNOWLEDGED", () => planOnboardingIntakeSpecMarker({rootDir: acknowledged.root}));
+  const bound = bootstrapBindReadyRoot("spec-marker-bound");
+  const bind = planOnboardingBootstrapBind({rootDir: bound.root});
+  applyOnboardingBootstrapBind({rootDir: bound.root, expectedPlanSha256: bind.planSha256, activate: true});
+  expectKickoffError("INTAKE-SPEC-MARKER-AUTHORITY", () => planOnboardingIntakeSpecMarker({rootDir: bound.root}));
+});
+
+check("mechanical Spec marker repair refuses malformed duplicate and invalid UTF8 input", () => {
+  for (const kind of ["missing", "duplicate", "encoding"]) {
+    const seed = specMarkerSeed(kind), text = readFileSync(seed.prdPath, "utf8");
+    if (kind === "missing") writeFileSync(seed.prdPath, text.replace(/^<!-- technical-spec-sha256: [a-f0-9]{64} -->\n/mu, ""));
+    if (kind === "duplicate") writeFileSync(seed.prdPath, text + "\n<!-- technical-spec-sha256: " + "a".repeat(64) + " -->\n");
+    if (kind === "encoding") writeFileSync(seed.specPath, Buffer.from([0xff, 0xfe]));
+    expectKickoffError(kind === "encoding" ? "INTAKE-SPEC-MARKER-ENCODING" : "INTAKE-SPEC-MARKER-GRAMMAR",
+      () => planOnboardingIntakeSpecMarker({rootDir: seed.root}));
+  }
+});
+
+check("mechanical Spec marker repair rejects an edit between temporary fsync and publication", () => {
+  const seed = specMarkerSeed("publication"), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  const before = readFileSync(seed.prdPath);
+  expectKickoffError("INTAKE-SPEC-MARKER-PLAN-DRIFT", () => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: {fault(point) {if (point === "before-publish") writeFileSync(seed.specPath, "A concurrently rewritten Spec.\n");}}}));
+  assert.deepEqual(readFileSync(seed.prdPath), before);
+  assert.equal(readdirSync(dirname(seed.prdPath)).some(name => name.includes(".spec-marker-")), false);
+});
+
+check("mechanical Spec marker repair reports committed readback drift without a success receipt", () => {
+  const seed = specMarkerSeed("readback"), plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.throws(() => applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: {fault(point) {if (point === "before-readback") writeFileSync(seed.specPath, "Changed after publication.\n");}}}),
+    error => error.code === "INTAKE-SPEC-MARKER-READBACK" && error.committed === true);
+});
+
+check("mechanical Spec marker repair rejects symlink and hardlink staging aliases", () => {
+  for (const kind of ["symlink", "hardlink"]) {
+    const seed = specMarkerSeed("alias-" + kind), alias = join(seed.root, "spec-alias.md");
+    if (kind === "symlink") {
+      writeFileSync(alias, readFileSync(seed.specPath));
+      rmSync(seed.specPath); symlinkSync(alias, seed.specPath);
+    } else linkSync(seed.specPath, alias);
+    expectKickoffError(kind === "symlink" ? "KICKOFF-PATH-UNSAFE" : "INTAKE-SPEC-MARKER-FILE",
+      () => planOnboardingIntakeSpecMarker({rootDir: seed.root}));
+  }
+});
+
+check("mechanical Spec marker repair preserves BOM CRLF Unicode and final blank lines", () => {
+  const seed = specMarkerSeed("encoding-preservation");
+  const before = "\ufeff" + readFileSync(seed.prdPath, "utf8").replaceAll("\n", "\r\n") + "\r\n日本語 — Ergänzung\r\n\r\n";
+  writeFileSync(seed.prdPath, before);
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  applyOnboardingIntakeSpecMarker({rootDir: seed.root, expectedPlanSha256: plan.planSha256, activate: true});
+  const expected = before.replace(/(?<=<!-- technical-spec-sha256: )[a-f0-9]{64}(?= -->)/u, digest(readFileSync(seed.specPath)));
+  assert.deepEqual(readFileSync(seed.prdPath), Buffer.from(expected, "utf8"));
+});
+
+check("mechanical Spec marker route publishes CLI argv admitted in bootstrap-binding phase", () => {
+  const seed = specMarkerSeed("cli-route");
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root, runner: "codex", intent: "session"});
+  assert.equal(plan.nextAction.requiresConfirmation, false);
+  assert.equal(plan.nextAction.mutation, true);
+  const command = [plan.nextAction.executable, ...plan.nextAction.argv].map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+  assert.equal(isSanctionedLifecycleCommand(command, seed.root), true, command);
+  const denial = () => {throw new ProjectOnboardingReadyError("PORG-NOT-READY", "fixture", {intent: "session", lifecycleStatus: "bootstrap-binding-required"});};
+  const verdict = evaluateLifecycleReadyGuard({tool_name: "Bash", tool_input: {command}}, {
+    projectDir: seed.root, requireProjectOnboardingReadyFn: denial,
+  });
+  assert.equal(verdict.exitCode, 0, verdict.stderr);
+  let plannedOutput = "";
+  assert.equal(markerOnboardingCliMain(["intake-spec-marker-plan", "--root", seed.root, "--runner", "codex", "--intent", "session"], {
+    write: value => {plannedOutput += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  }), 0, plannedOutput);
+  assert.equal(JSON.parse(plannedOutput).planSha256, plan.planSha256);
+  let stdout = "", stderr = "";
+  const result = markerOnboardingCliMain(plan.nextAction.argv.slice(1), {
+    write: value => {stdout += value;}, writeError: value => {stderr += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  });
+  assert.equal(result, 0, stdout + stderr);
+  const receipt = JSON.parse(stdout);
+  assert.equal(receipt.status, "applied");
+  assert.equal(receipt.spec.sha256, digest(readFileSync(seed.specPath)));
+  const current = planOnboardingIntakeSpecMarker({rootDir: seed.root});
+  assert.equal(current.status, "already-current");
+  assert.equal(current.nextAction, null);
+  let currentOutput = "";
+  assert.equal(markerOnboardingCliMain(["intake-spec-marker-apply", "--root", seed.root,
+    "--plan-sha256", current.planSha256, "--activate", "--runner", "codex"], {
+    write: value => {currentOutput += value;},
+    deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})},
+  }), 0, currentOutput);
+  assert.equal(JSON.parse(currentOutput).status, "already-current");
+});
+
+check("mechanical Spec marker route parser and guard refuse incomplete or expanded argv", () => {
+  const seed = specMarkerSeed("cli-invalid");
+  const plan = planOnboardingIntakeSpecMarker({rootDir: seed.root, runner: "codex"});
+  const before = readFileSync(seed.prdPath);
+  for (const tail of [
+    ["intake-spec-marker-apply", "--root", seed.root, "--activate", "--runner", "codex"],
+    ["intake-spec-marker-apply", "--root", seed.root, "--plan-sha256", plan.planSha256, "--runner", "codex"],
+  ]) {
+    let error = "";
+    assert.notEqual(markerOnboardingCliMain(tail, {write: value => {error += value;}, writeError: value => {error += value;},
+      deps: {observeCodexOnboardingCapabilities: () => ({mode: "local"})}}), 0);
+    assert.ok(error.length > 0);
+    assert.deepEqual(readFileSync(seed.prdPath), before);
+  }
+  const expanded = [...plan.nextAction.argv, "--text", "unrequested-content"];
+  const command = [plan.nextAction.executable, ...expanded].map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+  assert.equal(isSanctionedLifecycleCommand(command, seed.root), false);
+  for (const extra of [["--intent", "invalid"], ["--intent", "session", "--intent", "session"]]) {
+    const invalid = [plan.nextAction.executable, ...plan.nextAction.argv, ...extra]
+      .map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(" ");
+    assert.equal(isSanctionedLifecycleCommand(invalid, seed.root), false, invalid);
+  }
+});
+
+export function runFreshEnrollmentHistoryRegression() {
+  const root=mkdtempTestScratch("fresh-enrollment-history-");
+  const git=(args,cwd=root)=>{const run=spawnSync("git",args,{cwd,encoding:"utf8"});assert.equal(run.status,0,run.stderr);};
+  try {
+    assert.deepEqual(observeOnboardingEnrollmentHistory({rootDir:root}).paths,[]);
+    git(["init","--initial-branch=main"]);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:root}).retained,false);
+    applyOnboardingIntakeConsent({rootDir:root,granted:true,language:"en",profile:"feature",activate:true});
+    const prior=readOnboardingIntakeCheckpoint({rootDir:root}),priorBytes=readFileSync(prior.paths.checkpoint);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:root}).retained,true);
+    git(["-c","user.name=Disposable Fixture","-c","user.email=fixture@example.invalid","commit","--allow-empty","-m","fixture"]);
+    const selected=join(root,"selected-worktree");git(["worktree","add","-b","selected-fixture",selected]);
+    assert.equal(observeOnboardingEnrollmentHistory({rootDir:selected}).retained,false,"foreign shared intake cannot make a new physical worktree a re-enrollment");
+    assert.deepEqual(readFileSync(prior.paths.checkpoint),priorBytes);
+    assert.equal(readOnboardingIntakeCheckpoint({rootDir:root}).sha256,prior.sha256);
+  } finally {rmSync(root,{recursive:true,force:true});}
+}
+check("first enrollment history reads stay empty and ignore foreign shared worktree intake",runFreshEnrollmentHistoryRegression);
+
+// Greenfield-walk RED pins F7 and F9 (E2E-ONB-B, 24a27a1c9; ONB-T3-20261009, Ruling 163). Intended reds until the F slices land.
+// F7. Owner: the buildKickoffPromotionPlan throw site in lib/onboarding-continuity.mjs
+// (`fail("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", ...)`). The seam is a proposal: the F slice may move it,
+// but it must keep a typed next step (the same kind `inspect` returns while architecture authoring is incomplete).
+check("planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f7-next-step", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture must hold the unfinished architecture draft");
+  let refusal = null;
+  try { planOnboardingBootstrapBind({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.equal(refusal?.code, "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+  assert.equal(refusal?.nextAction?.kind, "architecture-design-required",
+    "the refusal must name the next step inspect would return, not leave the walker with a code and no action");
+});
+
+// F9. Owner: bootstrapAcknowledgementPlan in lib/onboarding-continuity.mjs (the shared first step of the Chat route and of
+// the signature route, before writeBootstrapAcknowledgementRequest). Pinned on the Chat route: the signature route needs a
+// configured PO key directory and trust policy (BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE in a bare fixture), which would make
+// that route red for the wrong reason. The exact code is the contract the F slice implements (Elephant ruling, ONB-T3).
+check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f9-draft-markers", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  const spec = readFileSync(join(root, generatePlan.targets.spec.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture PRD must hold the DRAFT TEMPLATE comment");
+  assert.match(prd, /REPLACE/u, "fixture PRD must hold a REPLACE value");
+  assert.match(spec, /AC-01: WHEN <trigger>, the system SHALL <observable result>\./u, "fixture spec must hold the AC-01 template line");
+  let refusal = null;
+  try { planOnboardingBootstrapAcknowledgementChat({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.equal(refusal?.code, "BOOTSTRAP-ACK-PLACEHOLDER-CONTENT",
+    "a generated draft must be refused with the typed BOOTSTRAP-ACK-PLACEHOLDER-CONTENT code before any acknowledgement request is offered");
+  const scratch = join(root, "scratch");
+  const requests = existsSync(scratch)
+    ? readdirSync(scratch).filter((name) => name.startsWith("bootstrap-plan-acknowledgement-request-"))
+    : [];
+  assert.deepEqual(requests, [], "no signature request file may be written over an unfinished package");
+});
+
+assert.equal(cases.length, 300, "the complete onboarding continuity corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(devNull, "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

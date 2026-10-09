@@ -1,0 +1,3276 @@
+command: node scratch/report-mechanic-preserve-F2.mjs
+label: ALFRED-MECH-PRESERVE-F2-20261009-scope-block
+exitCode: 0
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+command: node scratch/diagnostic-ALFRED-MECH-PRESERVE-F2-20261009.mjs
+label: ALFRED-MECH-PRESERVE-F2-20261009
+exitCode: 0
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+{
+  "inventory": [
+    {
+      "source": "plugins/pipeline-core/config/routing-authority.json",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/config/routing-authority.json",
+      "sourceSha256": "87d360fbaa2c16a9dc88b0056eab78073dafd46e98d02b7be5f859091708b3f3",
+      "proposalSha256": "4db7f19aed7fcd3b2289a7f2db2bf030794f247cc40281e088546fee92f50585"
+    },
+    {
+      "source": "plugins/pipeline-core/config/runner-mappings.json",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/config/runner-mappings.json",
+      "sourceSha256": "5b9bbd7f8c41cdecb43be89089ababfe899d77dac1a090dfb218b8dbefd99377",
+      "proposalSha256": "cbc1315e7f410f6ba6a13ac97f3c6407f5de431ce8784765efd764186f5a7963"
+    },
+    {
+      "source": "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/agents/goldfish-mechanic.md",
+      "sourceSha256": "886e229e57da04f9eb317f7e7a1be65088b71958cf3a3069b9c69b68509adbcc",
+      "proposalSha256": "162d4261abb87d7c45039b34ce4a1be82a5f1d58b22e7f84ba899d7bf472f79b"
+    },
+    {
+      "source": "policies/model-policy.md",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/policies/model-policy.md",
+      "sourceSha256": "82d0b43b5303666c34260a1cb97c2eac4adf0986424d409cf671898236ffdbb9",
+      "proposalSha256": "7b5f84273a14e190b0c3f26878a3dcc831dab65d2066ef050b98bc4eb4d4fe6d"
+    }
+  ],
+  "graphModules": [
+    "plugins/pipeline-core/config/control-execution-extension-namespaces.json",
+    "plugins/pipeline-core/config/lifecycle-extension-namespaces.json",
+    "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+    "plugins/pipeline-core/hooks/staleness-check.mjs",
+    "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+    "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+    "plugins/pipeline-core/lib/advisory-receipt.mjs",
+    "plugins/pipeline-core/lib/advisory-route-selection.mjs",
+    "plugins/pipeline-core/lib/agent-decision-journal.mjs",
+    "plugins/pipeline-core/lib/agent-model-registry.mjs",
+    "plugins/pipeline-core/lib/agy-central-refresh.mjs",
+    "plugins/pipeline-core/lib/agy-central-snapshot.mjs",
+    "plugins/pipeline-core/lib/agy-final-return.mjs",
+    "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-receipt.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+    "plugins/pipeline-core/lib/agy-session-authority.mjs",
+    "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+    "plugins/pipeline-core/lib/agy-start-hint.mjs",
+    "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+    "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+    "plugins/pipeline-core/lib/antigravity-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+    "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",
+    "plugins/pipeline-core/lib/architecture-adoption-orientation.mjs",
+    "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+    "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+    "plugins/pipeline-core/lib/architecture-design.mjs",
+    "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+    "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+    "plugins/pipeline-core/lib/audit-bundle.mjs",
+    "plugins/pipeline-core/lib/authority-revision-proof.mjs",
+    "plugins/pipeline-core/lib/bootstrap-payload-budget.mjs",
+    "plugins/pipeline-core/lib/bound-design-line-endings.mjs",
+    "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+    "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
+    "plugins/pipeline-core/lib/claude-initial-prompt-pointer.mjs",
+    "plugins/pipeline-core/lib/claude-intake-prompt-capture.mjs",
+    "plugins/pipeline-core/lib/claude-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-admission.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-execution.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-request.mjs",
+    "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-host-layout.mjs",
+    "plugins/pipeline-core/lib/codex-host-output-custody.mjs",
+    "plugins/pipeline-core/lib/codex-host-plugin-list.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-launcher.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+    "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+    "plugins/pipeline-core/lib/codex-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-app-server.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+    "plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs",
+    "plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs",
+    "plugins/pipeline-core/lib/commit-message-policy.mjs",
+    "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
+    "plugins/pipeline-core/lib/consumer-verify.mjs",
+    "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+    "plugins/pipeline-core/lib/continuity-state.mjs",
+    "plugins/pipeline-core/lib/continuity-status.mjs",
+    "plugins/pipeline-core/lib/control-execution-exchange.mjs",
+    "plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs",
+    "plugins/pipeline-core/lib/copy-safe-command.mjs",
+    "plugins/pipeline-core/lib/critic-course-admission.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-packet.mjs",
+    "plugins/pipeline-core/lib/critic-disposition-addendum.mjs",
+    "plugins/pipeline-core/lib/critic-export-policy.mjs",
+    "plugins/pipeline-core/lib/critic-packet-governance.mjs",
+    "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+    "plugins/pipeline-core/lib/critic-route-v3.mjs",
+    "plugins/pipeline-core/lib/critic-session-model-route.mjs",
+    "plugins/pipeline-core/lib/critic-skip-decision.mjs",
+    "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+    "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+    "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+    "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
+    "plugins/pipeline-core/lib/design-advisor-course-store.mjs",
+    "plugins/pipeline-core/lib/design-advisor-course.mjs",
+    "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+    "plugins/pipeline-core/lib/design-authoring.mjs",
+    "plugins/pipeline-core/lib/design-readiness-hashes.mjs",
+    "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+    "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+    "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-builder.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package.mjs",
+    "plugins/pipeline-core/lib/dispatch-budget-binding.mjs",
+    "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
+    "plugins/pipeline-core/lib/dispatch-policy.mjs",
+    "plugins/pipeline-core/lib/dispatch-record.mjs",
+    "plugins/pipeline-core/lib/document-hooks.mjs",
+    "plugins/pipeline-core/lib/enrollment-retirement-coordinator.mjs",
+    "plugins/pipeline-core/lib/entrypoint.mjs",
+    "plugins/pipeline-core/lib/external-push-ledger.mjs",
+    "plugins/pipeline-core/lib/feature-close-audit-receipt.mjs",
+    "plugins/pipeline-core/lib/feature-package-topology.mjs",
+    "plugins/pipeline-core/lib/fs-durability.mjs",
+    "plugins/pipeline-core/lib/gate-estimate.mjs",
+    "plugins/pipeline-core/lib/git-cmd.mjs",
+    "plugins/pipeline-core/lib/git-hook-footprint.mjs",
+    "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+    "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+    "plugins/pipeline-core/lib/git-null-device.mjs",
+    "plugins/pipeline-core/lib/governance-action-artifact.mjs",
+    "plugins/pipeline-core/lib/governance-action-events.mjs",
+    "plugins/pipeline-core/lib/governance-event-store.mjs",
+    "plugins/pipeline-core/lib/governance-event.mjs",
+    "plugins/pipeline-core/lib/governance-gate-action.mjs",
+    "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
+    "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
+    "plugins/pipeline-core/lib/governance-review-action.mjs",
+    "plugins/pipeline-core/lib/governance-scope.mjs",
+    "plugins/pipeline-core/lib/governance-verification-action.mjs",
+    "plugins/pipeline-core/lib/guard-handoff-offer.mjs",
+    "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+    "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+    "plugins/pipeline-core/lib/hook-currentness.mjs",
+    "plugins/pipeline-core/lib/human-governance-decision.mjs",
+    "plugins/pipeline-core/lib/human-guard-override.mjs",
+    "plugins/pipeline-core/lib/human-role-exception-decision.mjs",
+    "plugins/pipeline-core/lib/human-role-labels.mjs",
+    "plugins/pipeline-core/lib/installed-plugin-attestation.mjs",
+    "plugins/pipeline-core/lib/intake-material-reference.mjs",
+    "plugins/pipeline-core/lib/lifecycle-governance-events.mjs",
+    "plugins/pipeline-core/lib/machine-plane.mjs",
+    "plugins/pipeline-core/lib/manifest.mjs",
+    "plugins/pipeline-core/lib/model-family-authority.mjs",
+    "plugins/pipeline-core/lib/model-family-discovery.mjs",
+    "plugins/pipeline-core/lib/model-family-execution.mjs",
+    "plugins/pipeline-core/lib/model-family-host-store.mjs",
+    "plugins/pipeline-core/lib/model-family-invocation.mjs",
+    "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+    "plugins/pipeline-core/lib/model-family-route-source.mjs",
+    "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+    "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+    "plugins/pipeline-core/lib/model-role-dispatch.mjs",
+    "plugins/pipeline-core/lib/model-role-host-identity.mjs",
+    "plugins/pipeline-core/lib/model-role-host-observations.mjs",
+    "plugins/pipeline-core/lib/model-role-host-session.mjs",
+    "plugins/pipeline-core/lib/model-role-host-store.mjs",
+    "plugins/pipeline-core/lib/model-role-route-source.mjs",
+    "plugins/pipeline-core/lib/model-role-session.mjs",
+    "plugins/pipeline-core/lib/model-role-v3-baseline.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+    "plugins/pipeline-core/lib/native-initial-advisor-execution.mjs",
+    "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+    "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "plugins/pipeline-core/lib/onboarding-initial-answers-state.mjs",
+    "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
+    "plugins/pipeline-core/lib/onboarding-language-correction.mjs",
+    "plugins/pipeline-core/lib/onboarding-later-language.mjs",
+    "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+    "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+    "plugins/pipeline-core/lib/organization-policy.mjs",
+    "plugins/pipeline-core/lib/passive-read-policy.mjs",
+    "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
+    "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+    "plugins/pipeline-core/lib/po-approval-proof.mjs",
+    "plugins/pipeline-core/lib/po-gate-authority.mjs",
+    "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
+    "plugins/pipeline-core/lib/po-key-directory.mjs",
+    "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs",
+    "plugins/pipeline-core/lib/portable-critic-export.mjs",
+    "plugins/pipeline-core/lib/private-boundary.mjs",
+    "plugins/pipeline-core/lib/project-authority.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+    "plugins/pipeline-core/lib/provenance-attestation.mjs",
+    "plugins/pipeline-core/lib/provenance-envelope.mjs",
+    "plugins/pipeline-core/lib/public-core-observation.mjs",
+    "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
+    "plugins/pipeline-core/lib/publication-authority.mjs",
+    "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
+    "plugins/pipeline-core/lib/publication-bundle.mjs",
+    "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
+    "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+    "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+    "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
+    "plugins/pipeline-core/lib/repository-path-identity.mjs",
+    "plugins/pipeline-core/lib/requirement-traceability.mjs",
+    "plugins/pipeline-core/lib/review-economy.mjs",
+    "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+    "plugins/pipeline-core/lib/routing-projection.mjs",
+    "plugins/pipeline-core/lib/ruleset-source.mjs",
+    "plugins/pipeline-core/lib/runner-native-continuation.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+    "plugins/pipeline-core/lib/runner-profiles-v2.mjs",
+    "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+    "plugins/pipeline-core/lib/runner-readiness-request.mjs",
+    "plugins/pipeline-core/lib/runtime-handover-projection.mjs",
+    "plugins/pipeline-core/lib/runtime-projection-v2.mjs",
+    "plugins/pipeline-core/lib/runtime-projection-v3.mjs",
+    "plugins/pipeline-core/lib/sandbox-failure.mjs",
+    "plugins/pipeline-core/lib/sandboxed-readonly-duty.mjs",
+    "plugins/pipeline-core/lib/schema-lite.mjs",
+    "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
+    "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+    "plugins/pipeline-core/lib/signed-quality-package.mjs",
+    "plugins/pipeline-core/lib/source-observation.mjs",
+    "plugins/pipeline-core/lib/successful-spawn.mjs",
+    "plugins/pipeline-core/lib/test-case-completion.mjs",
+    "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
+    "plugins/pipeline-core/lib/threat-model.mjs",
+    "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+    "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+    "plugins/pipeline-core/lib/verify-evidence-path.mjs",
+    "plugins/pipeline-core/lib/verify-resume.mjs",
+    "plugins/pipeline-core/lib/verify-run-record.mjs",
+    "plugins/pipeline-core/lib/verify-selection.mjs",
+    "plugins/pipeline-core/lib/windows-hide-preload.mjs",
+    "plugins/pipeline-core/lib/windows-private-state.mjs",
+    "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+    "plugins/pipeline-core/lib/yaml-lite.mjs",
+    "plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.adoption-state.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.design-readiness-receipt.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json",
+    "plugins/pipeline-core/schemas/pipeline.module-inventory.v1.json",
+    "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+    "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+    "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+    "plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+    "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
+    "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+    "plugins/pipeline-core/scripts/check-routing-projections.mjs",
+    "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+    "plugins/pipeline-core/scripts/check-runner-manifest-parity.mjs",
+    "plugins/pipeline-core/scripts/codex-app-server-health.mjs",
+    "plugins/pipeline-core/scripts/codex-app-server-model-probe.mjs",
+    "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+    "plugins/pipeline-core/scripts/codex-host-repository-init.mjs",
+    "plugins/pipeline-core/scripts/codex-onboarding-launch.mjs",
+    "plugins/pipeline-core/scripts/codex-project-runtime-readback-host.mjs",
+    "plugins/pipeline-core/scripts/codex-sandbox-compatibility-receipt.schema.json",
+    "plugins/pipeline-core/scripts/codex-sandbox-select.mjs",
+    "plugins/pipeline-core/scripts/codex-sandbox-selection.schema.json",
+    "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
+    "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+    "plugins/pipeline-core/scripts/continuity-status.mjs",
+    "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+    "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+    "plugins/pipeline-core/scripts/design-course-session.mjs",
+    "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+    "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+    "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+    "plugins/pipeline-core/scripts/model-family-approval-request.mjs",
+    "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+    "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs",
+    "plugins/pipeline-core/scripts/module-inventory.mjs",
+    "plugins/pipeline-core/scripts/onboarding-init.mjs",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+    "plugins/pipeline-core/scripts/po-approval-request.mjs",
+    "plugins/pipeline-core/scripts/po-gate-profile-repair.mjs",
+    "plugins/pipeline-core/scripts/po-human-approval.mjs",
+    "plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs",
+    "plugins/pipeline-core/scripts/portable-critic-export.mjs",
+    "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+    "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+    "plugins/pipeline-core/scripts/project-authority-migration.mjs",
+    "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+    "plugins/pipeline-core/scripts/publication-close-journal.mjs",
+    "plugins/pipeline-core/scripts/push-gate-satisfiability.mjs",
+    "plugins/pipeline-core/scripts/push-prepare.mjs",
+    "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
+    "plugins/pipeline-core/scripts/ruleset-update-policy.mjs",
+    "plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
+    "plugins/pipeline-core/scripts/session-capability-diagnose.mjs",
+    "plugins/pipeline-core/scripts/session-cleanup.mjs",
+    "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+    "plugins/pipeline-core/scripts/settings-allowlist-merge.mjs",
+    "plugins/pipeline-core/scripts/tool-identity.mjs",
+    "plugins/pipeline-core/scripts/toolchain-preflight.mjs",
+    "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
+    "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+    "plugins/pipeline-core/scripts/verify-journal.mjs",
+    "setup.mjs"
+  ],
+  "substitutions": [
+    "plugins/pipeline-core/config/routing-authority.json",
+    "plugins/pipeline-core/config/runner-mappings.json",
+    "plugins/pipeline-core/agents/goldfish-mechanic.md",
+    "policies/model-policy.md"
+  ]
+}
+
+GRAPH baseline ENTRY plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs EXIT 1 SETUP_ERROR false
+TAP version 13
+# Subtest: RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+not ok 1 - RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+  ---
+  duration_ms: 8.227516
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    v0 must plan with  absent
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:157:16)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner
+not ok 2 - RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner
+  ---
+  duration_ms: 4.755223
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    v0 must plan with .claude/pipeline.yaml absent
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:194:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty
+ok 3 - RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty
+  ---
+  duration_ms: 66.537588
+  type: 'test'
+  ...
+# Subtest: RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature
+ok 4 - RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature
+  ---
+  duration_ms: 94.494829
+  type: 'test'
+  ...
+# Subtest: RPM05 apply requires explicit activation and an unchanged in-process digest-only plan
+ok 5 - RPM05 apply requires explicit activation and an unchanged in-process digest-only plan
+  ---
+  duration_ms: 7.29063
+  type: 'test'
+  ...
+# Subtest: RPM06 a V3 authority update refreshes every frozen routing mapping as one registry
+ok 6 - RPM06 a V3 authority update refreshes every frozen routing mapping as one registry
+  ---
+  duration_ms: 50.968403
+  type: 'test'
+  ...
+# Subtest: RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection
+ok 7 - RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection
+  ---
+  duration_ms: 52.420553
+  type: 'test'
+  ...
+# Subtest: RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction
+ok 8 - RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction
+  ---
+  duration_ms: 58.363061
+  type: 'test'
+  ...
+# Subtest: RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it
+ok 9 - RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it
+  ---
+  duration_ms: 51.599965
+  type: 'test'
+  ...
+# Subtest: RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed
+ok 10 - RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed
+  ---
+  duration_ms: 145.329795
+  type: 'test'
+  ...
+# Subtest: RPM11 a cached preview acknowledgement cannot authorize a second recovery
+ok 11 - RPM11 a cached preview acknowledgement cannot authorize a second recovery
+  ---
+  duration_ms: 35.840813
+  type: 'test'
+  ...
+# Subtest: RPM12 stale source invalidates a reviewed plan before staging
+ok 12 - RPM12 stale source invalidates a reviewed plan before staging
+  ---
+  duration_ms: 7.359417
+  type: 'test'
+  ...
+# Subtest: RPM13 a handled durable exclusive-commit error rolls every target back
+ok 13 - RPM13 a handled durable exclusive-commit error rolls every target back
+  ---
+  duration_ms: 37.4853
+  type: 'test'
+  ...
+# Subtest: RPM14 already-current v3 inspects ready and plans noop
+ok 14 - RPM14 already-current v3 inspects ready and plans noop
+  ---
+  duration_ms: 43.357609
+  type: 'test'
+  ...
+# Subtest: RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh
+ok 15 - RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh
+  ---
+  duration_ms: 3.380823
+  type: 'test'
+  ...
+# Subtest: RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial
+ok 16 - RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial
+  ---
+  duration_ms: 50.819245
+  type: 'test'
+  ...
+# Subtest: RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+not ok 17 - RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+  ---
+  duration_ms: 3.226895
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:676:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM18 Issue \#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs
+not ok 18 - RPM18 Issue \#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs
+  ---
+  duration_ms: 4.857283
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:763:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+ok 19 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+  ---
+  duration_ms: 146.760685
+  type: 'test'
+  ...
+# Subtest: RPM20 legacy additions roll back files and created directories after interruption
+not ok 20 - RPM20 legacy additions roll back files and created directories after interruption
+  ---
+  duration_ms: 3.50323
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'interrupted'
+         ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'interrupted'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:833:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target
+not ok 21 - RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target
+  ---
+  duration_ms: 4.223662
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'apply-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'apply-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:851:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup
+not ok 22 - RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup
+  ---
+  duration_ms: 3.491532
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:885:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes
+ok 23 - RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes
+  ---
+  duration_ms: 3.427002
+  type: 'test'
+  ...
+# Subtest: RPM24 exclusive absent-target commit closes the race after its final preimage check
+not ok 24 - RPM24 exclusive absent-target commit closes the race after its final preimage check
+  ---
+  duration_ms: 2.993909
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:949:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary
+ok 25 - RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary
+  ---
+  duration_ms: 39.398643
+  type: 'test'
+  ...
+# Subtest: RPM26 current V3 with any missing runtime target remains fail-closed
+ok 26 - RPM26 current V3 with any missing runtime target remains fail-closed
+  ---
+  duration_ms: 2.324488
+  type: 'test'
+  ...
+# Subtest: RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable
+ok 27 - RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable
+  ---
+  duration_ms: 44.945547
+  type: 'test'
+  ...
+# Subtest: RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant
+ok 28 - RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant
+  ---
+  duration_ms: 28.630543
+  type: 'test'
+  ...
+# Subtest: RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent
+ok 29 - RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent
+  ---
+  duration_ms: 56.508266
+  type: 'test'
+  ...
+# Subtest: RPM30 slim V3 initialization never replaces a present malformed runtime baseline
+ok 30 - RPM30 slim V3 initialization never replaces a present malformed runtime baseline
+  ---
+  duration_ms: 4.850163
+  type: 'test'
+  ...
+# Subtest: RPM31 legacy compatibility remains closed to malformed and unknown aliases
+ok 31 - RPM31 legacy compatibility remains closed to malformed and unknown aliases
+  ---
+  duration_ms: 4.797284
+  type: 'test'
+  ...
+# Subtest: RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert
+ok 32 - RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert
+  ---
+  duration_ms: 38.318748
+  type: 'test'
+  ...
+# Subtest: RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets
+ok 33 - RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets
+  ---
+  duration_ms: 54.448285
+  type: 'test'
+  ...
+# Subtest: RPM34 authenticated noop apply remains bound to source, runtime digests, and root
+ok 34 - RPM34 authenticated noop apply remains bound to source, runtime digests, and root
+  ---
+  duration_ms: 57.646341
+  type: 'test'
+  ...
+# Subtest: RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors
+ok 35 - RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors
+  ---
+  duration_ms: 136.989101
+  type: 'test'
+  ...
+# Subtest: RPM36 an unsafe existing neutral authority mirror fails planning without a transaction
+ok 36 - RPM36 an unsafe existing neutral authority mirror fails planning without a transaction
+  ---
+  duration_ms: 3.886007
+  type: 'test'
+  ...
+# Subtest: RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply
+ok 37 - RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply
+  ---
+  duration_ms: 47.659829
+  type: 'test'
+  ...
+# Subtest: RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically
+ok 38 - RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically
+  ---
+  duration_ms: 48.25303
+  type: 'test'
+  ...
+# Subtest: RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded
+ok 39 - RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded
+  ---
+  duration_ms: 48.688615
+  type: 'test'
+  ...
+# Subtest: RPM40 a source stale only in critic_export classifies as v3-refresh
+ok 40 - RPM40 a source stale only in critic_export classifies as v3-refresh
+  ---
+  duration_ms: 47.991146
+  type: 'test'
+  ...
+# Subtest: RPM41 a source with critic_export entirely absent still fills it in unchanged
+ok 41 - RPM41 a source with critic_export entirely absent still fills it in unchanged
+  ---
+  duration_ms: 48.459778
+  type: 'test'
+  ...
+# Subtest: RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid
+ok 42 - RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid
+  ---
+  duration_ms: 3.275605
+  type: 'test'
+  ...
+# Subtest: RPM43 CLI enforces inspect/plan/apply and explicit activation
+ok 43 - RPM43 CLI enforces inspect/plan/apply and explicit activation
+  ---
+  duration_ms: 55.068226
+  type: 'test'
+  ...
+# Subtest: RPM44 CLI activated apply emits the complete classified preview before any target mutation
+not ok 44 - RPM44 CLI activated apply emits the complete classified preview before any target mutation
+  ---
+  duration_ms: 5.522173
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1504:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM45 CLI production preview contract completes bounded short writes before activation
+not ok 45 - RPM45 CLI production preview contract completes bounded short writes before activation
+  ---
+  duration_ms: 3.053438
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1559:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM46 CLI production preview zero-progress and failure seams stop before apply
+not ok 46 - RPM46 CLI production preview zero-progress and failure seams stop before apply
+  ---
+  duration_ms: 3.123347
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    zero-progress
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'preview-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'preview-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1585:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM47 CLI preview-channel failure returns one sanitized result and cannot activate
+not ok 47 - RPM47 CLI preview-channel failure returns one sanitized result and cannot activate
+  ---
+  duration_ms: 3.144557
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'preview-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'preview-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1604:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM48 CLI previews a classified pending recovery before recovery and activation
+ok 48 - RPM48 CLI previews a classified pending recovery before recovery and activation
+  ---
+  duration_ms: 89.293411
+  type: 'test'
+  ...
+# Subtest: RPM49 CLI completes bounded short writes for pending recovery before touching its journal
+ok 49 - RPM49 CLI completes bounded short writes for pending recovery before touching its journal
+  ---
+  duration_ms: 88.338415
+  type: 'test'
+  ...
+# Subtest: RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes
+ok 50 - RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes
+  ---
+  duration_ms: 61.252672
+  type: 'test'
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+ok 51 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 78.478132
+  type: 'test'
+  ...
+# Subtest: RPM52 a freshly onboarded project seeds both manifest tiers byte-identically
+ok 52 - RPM52 a freshly onboarded project seeds both manifest tiers byte-identically
+  ---
+  duration_ms: 356.009384
+  type: 'test'
+  ...
+# Subtest: RPM53 both freshly seeded manifest tiers resolve the same gate chapter
+ok 53 - RPM53 both freshly seeded manifest tiers resolve the same gate chapter
+  ---
+  duration_ms: 340.058594
+  type: 'test'
+  ...
+# Subtest: RPM54 a customised existing manifest is never replaced by the fresh seed
+ok 54 - RPM54 a customised existing manifest is never replaced by the fresh seed
+  ---
+  duration_ms: 40.178823
+  type: 'test'
+  ...
+# Subtest: RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply
+ok 55 - RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply
+  ---
+  duration_ms: 912.396498
+  type: 'test'
+  ...
+# Subtest: RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed
+ok 56 - RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed
+  ---
+  duration_ms: 344.038029
+  type: 'test'
+  ...
+# Subtest: RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed
+ok 57 - RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed
+  ---
+  duration_ms: 298.62244
+  type: 'test'
+  ...
+# Subtest: RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier
+ok 58 - RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier
+  ---
+  duration_ms: 261.04093
+  type: 'test'
+  ...
+# Subtest: RPM59 an Antigravity enrolment publishes its own tier and no Codex target
+ok 59 - RPM59 an Antigravity enrolment publishes its own tier and no Codex target
+  ---
+  duration_ms: 500.538699
+  type: 'test'
+  ...
+# Subtest: RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines
+ok 60 - RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines
+  ---
+  duration_ms: 386.089876
+  type: 'test'
+  ...
+1..60
+# tests 60
+# suites 0
+# pass 48
+# fail 12
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5453.632106
+
+
+GRAPH baseline ENTRY plugins/pipeline-core/scripts/check-routing-projections.test.mjs EXIT 1 SETUP_ERROR false
+PASS RP01 authority is provider-neutral
+PASS RP02 Claude design mapping unchanged
+PASS RP03 Claude implement mapping unchanged
+PASS RP05 implementor effort is medium
+PASS RP06 deep effort is xhigh
+PASS RP07 critic effort is max
+PASS RP08 manifest projection is byte-deterministic
+PASS RP09 all profile phase routes are projected
+PASS RP09a all configured advisor routes are projected without invented effort
+PASS RP09b Claude manifest alias remains sonnet-5
+PASS RP10 all fixed agent routes are projected
+PASS RP11 Codex Fable keeps low
+PASS RP11 Codex Fable keeps medium
+PASS RP11 Codex Fable keeps high
+PASS RP11 Codex Fable keeps xhigh
+PASS RP11 Codex Fable keeps max
+PASS RP12 unsupported Codex identity fails closed
+PASS RP12b unsupported effort fails closed
+PASS RP13 partial Codex alias mapping remains narrow
+PASS RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch
+PASS RP13b Codex normal Critic duty contract passes
+PASS RP13c unknown host duty fails closed
+PASS RP14 committed projections match authority
+PASS RP15 light is ceremony-only
+PASS RP16 light routes exclude deep
+PASS RP17 missing manifest route is detected
+PASS RP18 extra manifest route is detected
+PASS RP19 stale provenance is detected
+PASS RP20 custom models pass through without invented aliases
+PASS RP21 pro preset remains projectable
+PASS RP22 valid custom design advisor is projected
+PASS RP23 direct v1 defaults validate as the sole source
+PASS RP24 direct Claude projection preserves the legacy modelRouting shape
+PASS RP25 all direct routes project deterministically
+PASS RP26 Codex design and Critic preserve the validator-approved canonical requests
+PASS RP27 Codex implementation preserves the validator-approved canonical request
+PASS RP28 unobserved concrete Codex IDs fail closed
+PASS RP29 any advisory route may be deliberately disabled
+PASS RP30 cross-runner worktype substitution fails closed before P5
+PASS RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf
+PASS RP32 P1 Codex implementation retains its validated direct request
+PASS RP33 P1 runner providers stay explicitly mapped
+PASS RP34 P1 Fable resolves to Sol at identity low effort
+PASS RP34 P1 Fable resolves to Sol at identity medium effort
+PASS RP34 P1 Fable resolves to Sol at identity high effort
+PASS RP34 P1 Fable resolves to Sol at identity xhigh effort
+PASS RP34 P1 Fable resolves to Sol at identity max effort
+PASS RP35 V3 checker accepts the configured advisory selector and effort projection
+PASS RP35a V3 checker rejects advisory selector and effort corruption before projection
+PASS RP35b V3 checker detects advisory bytes tampered on disk
+PASS RP36 V3 checker detects advisory runtime drift
+PASS RP37 Antigravity runner provider is google
+PASS RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes
+PASS RP39 Antigravity aliases resolve accurately
+PASS RP40 Antigravity direct routes validate against observed model-ids
+
+55/56 checks passed.
+FAIL RP04 mechanic route is Haiku at effort medium
+
+
+GRAPH proposal ENTRY plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs EXIT 1 SETUP_ERROR false
+TAP version 13
+# Subtest: RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+not ok 1 - RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+  ---
+  duration_ms: 7.743513
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    v0 must plan with  absent
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:157:16)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner
+not ok 2 - RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner
+  ---
+  duration_ms: 4.381009
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    v0 must plan with .claude/pipeline.yaml absent
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:194:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty
+ok 3 - RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty
+  ---
+  duration_ms: 68.635447
+  type: 'test'
+  ...
+# Subtest: RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature
+ok 4 - RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature
+  ---
+  duration_ms: 96.719448
+  type: 'test'
+  ...
+# Subtest: RPM05 apply requires explicit activation and an unchanged in-process digest-only plan
+ok 5 - RPM05 apply requires explicit activation and an unchanged in-process digest-only plan
+  ---
+  duration_ms: 7.113721
+  type: 'test'
+  ...
+# Subtest: RPM06 a V3 authority update refreshes every frozen routing mapping as one registry
+ok 6 - RPM06 a V3 authority update refreshes every frozen routing mapping as one registry
+  ---
+  duration_ms: 52.677989
+  type: 'test'
+  ...
+# Subtest: RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection
+ok 7 - RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection
+  ---
+  duration_ms: 54.016261
+  type: 'test'
+  ...
+# Subtest: RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction
+ok 8 - RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction
+  ---
+  duration_ms: 63.773856
+  type: 'test'
+  ...
+# Subtest: RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it
+ok 9 - RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it
+  ---
+  duration_ms: 52.67723
+  type: 'test'
+  ...
+# Subtest: RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed
+ok 10 - RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed
+  ---
+  duration_ms: 149.936021
+  type: 'test'
+  ...
+# Subtest: RPM11 a cached preview acknowledgement cannot authorize a second recovery
+ok 11 - RPM11 a cached preview acknowledgement cannot authorize a second recovery
+  ---
+  duration_ms: 36.798079
+  type: 'test'
+  ...
+# Subtest: RPM12 stale source invalidates a reviewed plan before staging
+ok 12 - RPM12 stale source invalidates a reviewed plan before staging
+  ---
+  duration_ms: 9.928742
+  type: 'test'
+  ...
+# Subtest: RPM13 a handled durable exclusive-commit error rolls every target back
+ok 13 - RPM13 a handled durable exclusive-commit error rolls every target back
+  ---
+  duration_ms: 38.788402
+  type: 'test'
+  ...
+# Subtest: RPM14 already-current v3 inspects ready and plans noop
+ok 14 - RPM14 already-current v3 inspects ready and plans noop
+  ---
+  duration_ms: 45.289991
+  type: 'test'
+  ...
+# Subtest: RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh
+ok 15 - RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh
+  ---
+  duration_ms: 3.543081
+  type: 'test'
+  ...
+# Subtest: RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial
+ok 16 - RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial
+  ---
+  duration_ms: 53.459949
+  type: 'test'
+  ...
+# Subtest: RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+not ok 17 - RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+  ---
+  duration_ms: 3.175976
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:676:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM18 Issue \#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs
+not ok 18 - RPM18 Issue \#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs
+  ---
+  duration_ms: 4.867522
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:763:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+not ok 19 - RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract
+  ---
+  duration_ms: 3.921576
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:813:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM20 legacy additions roll back files and created directories after interruption
+not ok 20 - RPM20 legacy additions roll back files and created directories after interruption
+  ---
+  duration_ms: 2.89478
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'interrupted'
+         ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'interrupted'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:833:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target
+not ok 21 - RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target
+  ---
+  duration_ms: 3.140087
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'apply-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'apply-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:851:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup
+not ok 22 - RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup
+  ---
+  duration_ms: 2.89275
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:885:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes
+ok 23 - RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes
+  ---
+  duration_ms: 2.720293
+  type: 'test'
+  ...
+# Subtest: RPM24 exclusive absent-target commit closes the race after its final preimage check
+not ok 24 - RPM24 exclusive absent-target commit closes the race after its final preimage check
+  ---
+  duration_ms: 2.934909
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:949:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary
+ok 25 - RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary
+  ---
+  duration_ms: 40.626137
+  type: 'test'
+  ...
+# Subtest: RPM26 current V3 with any missing runtime target remains fail-closed
+ok 26 - RPM26 current V3 with any missing runtime target remains fail-closed
+  ---
+  duration_ms: 2.396136
+  type: 'test'
+  ...
+# Subtest: RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable
+ok 27 - RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable
+  ---
+  duration_ms: 49.176518
+  type: 'test'
+  ...
+# Subtest: RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant
+ok 28 - RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant
+  ---
+  duration_ms: 30.432258
+  type: 'test'
+  ...
+# Subtest: RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent
+ok 29 - RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent
+  ---
+  duration_ms: 59.651773
+  type: 'test'
+  ...
+# Subtest: RPM30 slim V3 initialization never replaces a present malformed runtime baseline
+ok 30 - RPM30 slim V3 initialization never replaces a present malformed runtime baseline
+  ---
+  duration_ms: 4.549997
+  type: 'test'
+  ...
+# Subtest: RPM31 legacy compatibility remains closed to malformed and unknown aliases
+ok 31 - RPM31 legacy compatibility remains closed to malformed and unknown aliases
+  ---
+  duration_ms: 5.109509
+  type: 'test'
+  ...
+# Subtest: RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert
+ok 32 - RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert
+  ---
+  duration_ms: 40.923733
+  type: 'test'
+  ...
+# Subtest: RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets
+ok 33 - RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets
+  ---
+  duration_ms: 58.034206
+  type: 'test'
+  ...
+# Subtest: RPM34 authenticated noop apply remains bound to source, runtime digests, and root
+ok 34 - RPM34 authenticated noop apply remains bound to source, runtime digests, and root
+  ---
+  duration_ms: 60.649958
+  type: 'test'
+  ...
+# Subtest: RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors
+ok 35 - RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors
+  ---
+  duration_ms: 142.80818
+  type: 'test'
+  ...
+# Subtest: RPM36 an unsafe existing neutral authority mirror fails planning without a transaction
+ok 36 - RPM36 an unsafe existing neutral authority mirror fails planning without a transaction
+  ---
+  duration_ms: 3.890596
+  type: 'test'
+  ...
+# Subtest: RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply
+ok 37 - RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply
+  ---
+  duration_ms: 47.926056
+  type: 'test'
+  ...
+# Subtest: RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically
+ok 38 - RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically
+  ---
+  duration_ms: 51.751863
+  type: 'test'
+  ...
+# Subtest: RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded
+ok 39 - RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded
+  ---
+  duration_ms: 51.997099
+  type: 'test'
+  ...
+# Subtest: RPM40 a source stale only in critic_export classifies as v3-refresh
+ok 40 - RPM40 a source stale only in critic_export classifies as v3-refresh
+  ---
+  duration_ms: 53.37444
+  type: 'test'
+  ...
+# Subtest: RPM41 a source with critic_export entirely absent still fills it in unchanged
+ok 41 - RPM41 a source with critic_export entirely absent still fills it in unchanged
+  ---
+  duration_ms: 52.536971
+  type: 'test'
+  ...
+# Subtest: RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid
+ok 42 - RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid
+  ---
+  duration_ms: 3.347554
+  type: 'test'
+  ...
+# Subtest: RPM43 CLI enforces inspect/plan/apply and explicit activation
+ok 43 - RPM43 CLI enforces inspect/plan/apply and explicit activation
+  ---
+  duration_ms: 64.224079
+  type: 'test'
+  ...
+# Subtest: RPM44 CLI activated apply emits the complete classified preview before any target mutation
+not ok 44 - RPM44 CLI activated apply emits the complete classified preview before any target mutation
+  ---
+  duration_ms: 5.690412
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1504:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM45 CLI production preview contract completes bounded short writes before activation
+not ok 45 - RPM45 CLI production preview contract completes bounded short writes before activation
+  ---
+  duration_ms: 3.366444
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1559:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM46 CLI production preview zero-progress and failure seams stop before apply
+not ok 46 - RPM46 CLI production preview zero-progress and failure seams stop before apply
+  ---
+  duration_ms: 3.459193
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    zero-progress
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'preview-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'preview-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1585:14)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM47 CLI preview-channel failure returns one sanitized result and cannot activate
+not ok 47 - RPM47 CLI preview-channel failure returns one sanitized result and cannot activate
+  ---
+  duration_ms: 3.474632
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-plan'
+    - 'preview-failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'preview-failed'
+  actual: 'invalid-plan'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1604:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM48 CLI previews a classified pending recovery before recovery and activation
+ok 48 - RPM48 CLI previews a classified pending recovery before recovery and activation
+  ---
+  duration_ms: 101.076088
+  type: 'test'
+  ...
+# Subtest: RPM49 CLI completes bounded short writes for pending recovery before touching its journal
+ok 49 - RPM49 CLI completes bounded short writes for pending recovery before touching its journal
+  ---
+  duration_ms: 98.920038
+  type: 'test'
+  ...
+# Subtest: RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes
+ok 50 - RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes
+  ---
+  duration_ms: 67.033832
+  type: 'test'
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+not ok 51 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 4.234961
+  type: 'test'
+  location: '<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    undefined !== 'v1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'v1'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1722:12)
+    TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-PRESERVE-F2-20261009/proposal/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RPM52 a freshly onboarded project seeds both manifest tiers byte-identically
+ok 52 - RPM52 a freshly onboarded project seeds both manifest tiers byte-identically
+  ---
+  duration_ms: 381.083306
+  type: 'test'
+  ...
+# Subtest: RPM53 both freshly seeded manifest tiers resolve the same gate chapter
+ok 53 - RPM53 both freshly seeded manifest tiers resolve the same gate chapter
+  ---
+  duration_ms: 363.20632
+  type: 'test'
+  ...
+# Subtest: RPM54 a customised existing manifest is never replaced by the fresh seed
+ok 54 - RPM54 a customised existing manifest is never replaced by the fresh seed
+  ---
+  duration_ms: 46.678792
+  type: 'test'
+  ...
+# Subtest: RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply
+ok 55 - RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply
+  ---
+  duration_ms: 939.515937
+  type: 'test'
+  ...
+# Subtest: RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed
+ok 56 - RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed
+  ---
+  duration_ms: 361.02582
+  type: 'test'
+  ...
+# Subtest: RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed
+ok 57 - RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed
+  ---
+  duration_ms: 323.70249
+  type: 'test'
+  ...
+# Subtest: RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier
+ok 58 - RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier
+  ---
+  duration_ms: 269.005695
+  type: 'test'
+  ...
+# Subtest: RPM59 an Antigravity enrolment publishes its own tier and no Codex target
+ok 59 - RPM59 an Antigravity enrolment publishes its own tier and no Codex target
+  ---
+  duration_ms: 516.245045
+  type: 'test'
+  ...
+# Subtest: RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines
+ok 60 - RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines
+  ---
+  duration_ms: 379.687849
+  type: 'test'
+  ...
+1..60
+# tests 60
+# suites 0
+# pass 46
+# fail 14
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5482.443185
+
+
+GRAPH proposal ENTRY plugins/pipeline-core/scripts/check-routing-projections.test.mjs EXIT 1 SETUP_ERROR false
+PASS RP01 authority is provider-neutral
+PASS RP02 Claude design mapping unchanged
+PASS RP03 Claude implement mapping unchanged
+PASS RP04 mechanic route is Haiku at effort medium
+PASS RP05 implementor effort is medium
+PASS RP06 deep effort is xhigh
+PASS RP07 critic effort is max
+PASS RP08 manifest projection is byte-deterministic
+PASS RP09 all profile phase routes are projected
+PASS RP09a all configured advisor routes are projected without invented effort
+PASS RP09b Claude manifest alias remains sonnet-5
+PASS RP10 all fixed agent routes are projected
+PASS RP11 Codex Fable keeps low
+PASS RP11 Codex Fable keeps medium
+PASS RP11 Codex Fable keeps high
+PASS RP11 Codex Fable keeps xhigh
+PASS RP11 Codex Fable keeps max
+PASS RP12 unsupported Codex identity fails closed
+PASS RP12b unsupported effort fails closed
+PASS RP13 partial Codex alias mapping remains narrow
+PASS RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch
+PASS RP13b Codex normal Critic duty contract passes
+PASS RP13c unknown host duty fails closed
+PASS RP14 committed projections match authority
+PASS RP15 light is ceremony-only
+PASS RP16 light routes exclude deep
+PASS RP17 missing manifest route is detected
+PASS RP18 extra manifest route is detected
+PASS RP19 stale provenance is detected
+PASS RP20 custom models pass through without invented aliases
+PASS RP21 pro preset remains projectable
+PASS RP22 valid custom design advisor is projected
+PASS RP23 direct v1 defaults validate as the sole source
+PASS RP24 direct Claude projection preserves the legacy modelRouting shape
+PASS RP25 all direct routes project deterministically
+PASS RP26 Codex design and Critic preserve the validator-approved canonical requests
+PASS RP27 Codex implementation preserves the validator-approved canonical request
+PASS RP28 unobserved concrete Codex IDs fail closed
+PASS RP29 any advisory route may be deliberately disabled
+PASS RP30 cross-runner worktype substitution fails closed before P5
+PASS RP32 P1 Codex implementation retains its validated direct request
+PASS RP33 P1 runner providers stay explicitly mapped
+PASS RP34 P1 Fable resolves to Sol at identity low effort
+PASS RP34 P1 Fable resolves to Sol at identity medium effort
+PASS RP34 P1 Fable resolves to Sol at identity high effort
+PASS RP34 P1 Fable resolves to Sol at identity xhigh effort
+PASS RP34 P1 Fable resolves to Sol at identity max effort
+PASS RP35 V3 checker accepts the configured advisory selector and effort projection
+PASS RP35a V3 checker rejects advisory selector and effort corruption before projection
+PASS RP35b V3 checker detects advisory bytes tampered on disk
+PASS RP36 V3 checker detects advisory runtime drift
+PASS RP37 Antigravity runner provider is google
+PASS RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes
+PASS RP39 Antigravity aliases resolve accurately
+PASS RP40 Antigravity direct routes validate against observed model-ids
+
+55/56 checks passed.
+FAIL RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf
+
+{
+  "results": [
+    {
+      "graph": "baseline",
+      "entry": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "exitCode": 1,
+      "reached": [
+        {
+          "status": "FAIL",
+          "name": "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM05 apply requires explicit activation and an unchanged in-process digest-only plan"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM06 a V3 authority update refreshes every frozen routing mapping as one registry"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM11 a cached preview acknowledgement cannot authorize a second recovery"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM12 stale source invalidates a reviewed plan before staging"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM13 a handled durable exclusive-commit error rolls every target back"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM14 already-current v3 inspects ready and plans noop"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM20 legacy additions roll back files and created directories after interruption"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM24 exclusive absent-target commit closes the race after its final preimage check"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM26 current V3 with any missing runtime target remains fail-closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM30 slim V3 initialization never replaces a present malformed runtime baseline"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM31 legacy compatibility remains closed to malformed and unknown aliases"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM34 authenticated noop apply remains bound to source, runtime digests, and root"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM36 an unsafe existing neutral authority mirror fails planning without a transaction"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM40 a source stale only in critic_export classifies as v3-refresh"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM41 a source with critic_export entirely absent still fills it in unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM43 CLI enforces inspect/plan/apply and explicit activation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM44 CLI activated apply emits the complete classified preview before any target mutation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM45 CLI production preview contract completes bounded short writes before activation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM46 CLI production preview zero-progress and failure seams stop before apply"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM48 CLI previews a classified pending recovery before recovery and activation"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM49 CLI completes bounded short writes for pending recovery before touching its journal"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM52 a freshly onboarded project seeds both manifest tiers byte-identically"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM53 both freshly seeded manifest tiers resolve the same gate chapter"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM54 a customised existing manifest is never replaced by the fresh seed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM59 an Antigravity enrolment publishes its own tier and no Codex target"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines"
+        }
+      ],
+      "setupError": false
+    },
+    {
+      "graph": "baseline",
+      "entry": "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+      "exitCode": 1,
+      "reached": [
+        {
+          "status": "PASS",
+          "name": "RP01 authority is provider-neutral"
+        },
+        {
+          "status": "PASS",
+          "name": "RP02 Claude design mapping unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RP03 Claude implement mapping unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RP05 implementor effort is medium"
+        },
+        {
+          "status": "PASS",
+          "name": "RP06 deep effort is xhigh"
+        },
+        {
+          "status": "PASS",
+          "name": "RP07 critic effort is max"
+        },
+        {
+          "status": "PASS",
+          "name": "RP08 manifest projection is byte-deterministic"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09 all profile phase routes are projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09a all configured advisor routes are projected without invented effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09b Claude manifest alias remains sonnet-5"
+        },
+        {
+          "status": "PASS",
+          "name": "RP10 all fixed agent routes are projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps low"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps medium"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps high"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps xhigh"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps max"
+        },
+        {
+          "status": "PASS",
+          "name": "RP12 unsupported Codex identity fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP12b unsupported effort fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13 partial Codex alias mapping remains narrow"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13b Codex normal Critic duty contract passes"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13c unknown host duty fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP14 committed projections match authority"
+        },
+        {
+          "status": "PASS",
+          "name": "RP15 light is ceremony-only"
+        },
+        {
+          "status": "PASS",
+          "name": "RP16 light routes exclude deep"
+        },
+        {
+          "status": "PASS",
+          "name": "RP17 missing manifest route is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP18 extra manifest route is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP19 stale provenance is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP20 custom models pass through without invented aliases"
+        },
+        {
+          "status": "PASS",
+          "name": "RP21 pro preset remains projectable"
+        },
+        {
+          "status": "PASS",
+          "name": "RP22 valid custom design advisor is projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP23 direct v1 defaults validate as the sole source"
+        },
+        {
+          "status": "PASS",
+          "name": "RP24 direct Claude projection preserves the legacy modelRouting shape"
+        },
+        {
+          "status": "PASS",
+          "name": "RP25 all direct routes project deterministically"
+        },
+        {
+          "status": "PASS",
+          "name": "RP26 Codex design and Critic preserve the validator-approved canonical requests"
+        },
+        {
+          "status": "PASS",
+          "name": "RP27 Codex implementation preserves the validator-approved canonical request"
+        },
+        {
+          "status": "PASS",
+          "name": "RP28 unobserved concrete Codex IDs fail closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP29 any advisory route may be deliberately disabled"
+        },
+        {
+          "status": "PASS",
+          "name": "RP30 cross-runner worktype substitution fails closed before P5"
+        },
+        {
+          "status": "PASS",
+          "name": "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf"
+        },
+        {
+          "status": "PASS",
+          "name": "RP32 P1 Codex implementation retains its validated direct request"
+        },
+        {
+          "status": "PASS",
+          "name": "RP33 P1 runner providers stay explicitly mapped"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity low effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity medium effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity high effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity xhigh effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity max effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35 V3 checker accepts the configured advisory selector and effort projection"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35a V3 checker rejects advisory selector and effort corruption before projection"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35b V3 checker detects advisory bytes tampered on disk"
+        },
+        {
+          "status": "PASS",
+          "name": "RP36 V3 checker detects advisory runtime drift"
+        },
+        {
+          "status": "PASS",
+          "name": "RP37 Antigravity runner provider is google"
+        },
+        {
+          "status": "PASS",
+          "name": "RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes"
+        },
+        {
+          "status": "PASS",
+          "name": "RP39 Antigravity aliases resolve accurately"
+        },
+        {
+          "status": "PASS",
+          "name": "RP40 Antigravity direct routes validate against observed model-ids"
+        },
+        {
+          "status": "FAIL",
+          "name": "RP04 mechanic route is Haiku at effort medium"
+        }
+      ],
+      "setupError": false
+    },
+    {
+      "graph": "proposal",
+      "entry": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "exitCode": 1,
+      "reached": [
+        {
+          "status": "FAIL",
+          "name": "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM05 apply requires explicit activation and an unchanged in-process digest-only plan"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM06 a V3 authority update refreshes every frozen routing mapping as one registry"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM11 a cached preview acknowledgement cannot authorize a second recovery"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM12 stale source invalidates a reviewed plan before staging"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM13 a handled durable exclusive-commit error rolls every target back"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM14 already-current v3 inspects ready and plans noop"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM20 legacy additions roll back files and created directories after interruption"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM24 exclusive absent-target commit closes the race after its final preimage check"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM26 current V3 with any missing runtime target remains fail-closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM30 slim V3 initialization never replaces a present malformed runtime baseline"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM31 legacy compatibility remains closed to malformed and unknown aliases"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM34 authenticated noop apply remains bound to source, runtime digests, and root"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM36 an unsafe existing neutral authority mirror fails planning without a transaction"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM40 a source stale only in critic_export classifies as v3-refresh"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM41 a source with critic_export entirely absent still fills it in unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM43 CLI enforces inspect/plan/apply and explicit activation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM44 CLI activated apply emits the complete classified preview before any target mutation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM45 CLI production preview contract completes bounded short writes before activation"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM46 CLI production preview zero-progress and failure seams stop before apply"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM48 CLI previews a classified pending recovery before recovery and activation"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM49 CLI completes bounded short writes for pending recovery before touching its journal"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes"
+        },
+        {
+          "status": "FAIL",
+          "name": "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM52 a freshly onboarded project seeds both manifest tiers byte-identically"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM53 both freshly seeded manifest tiers resolve the same gate chapter"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM54 a customised existing manifest is never replaced by the fresh seed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM59 an Antigravity enrolment publishes its own tier and no Codex target"
+        },
+        {
+          "status": "PASS",
+          "name": "RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines"
+        }
+      ],
+      "setupError": false
+    },
+    {
+      "graph": "proposal",
+      "entry": "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+      "exitCode": 1,
+      "reached": [
+        {
+          "status": "PASS",
+          "name": "RP01 authority is provider-neutral"
+        },
+        {
+          "status": "PASS",
+          "name": "RP02 Claude design mapping unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RP03 Claude implement mapping unchanged"
+        },
+        {
+          "status": "PASS",
+          "name": "RP04 mechanic route is Haiku at effort medium"
+        },
+        {
+          "status": "PASS",
+          "name": "RP05 implementor effort is medium"
+        },
+        {
+          "status": "PASS",
+          "name": "RP06 deep effort is xhigh"
+        },
+        {
+          "status": "PASS",
+          "name": "RP07 critic effort is max"
+        },
+        {
+          "status": "PASS",
+          "name": "RP08 manifest projection is byte-deterministic"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09 all profile phase routes are projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09a all configured advisor routes are projected without invented effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP09b Claude manifest alias remains sonnet-5"
+        },
+        {
+          "status": "PASS",
+          "name": "RP10 all fixed agent routes are projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps low"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps medium"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps high"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps xhigh"
+        },
+        {
+          "status": "PASS",
+          "name": "RP11 Codex Fable keeps max"
+        },
+        {
+          "status": "PASS",
+          "name": "RP12 unsupported Codex identity fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP12b unsupported effort fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13 partial Codex alias mapping remains narrow"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13b Codex normal Critic duty contract passes"
+        },
+        {
+          "status": "PASS",
+          "name": "RP13c unknown host duty fails closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP14 committed projections match authority"
+        },
+        {
+          "status": "PASS",
+          "name": "RP15 light is ceremony-only"
+        },
+        {
+          "status": "PASS",
+          "name": "RP16 light routes exclude deep"
+        },
+        {
+          "status": "PASS",
+          "name": "RP17 missing manifest route is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP18 extra manifest route is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP19 stale provenance is detected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP20 custom models pass through without invented aliases"
+        },
+        {
+          "status": "PASS",
+          "name": "RP21 pro preset remains projectable"
+        },
+        {
+          "status": "PASS",
+          "name": "RP22 valid custom design advisor is projected"
+        },
+        {
+          "status": "PASS",
+          "name": "RP23 direct v1 defaults validate as the sole source"
+        },
+        {
+          "status": "PASS",
+          "name": "RP24 direct Claude projection preserves the legacy modelRouting shape"
+        },
+        {
+          "status": "PASS",
+          "name": "RP25 all direct routes project deterministically"
+        },
+        {
+          "status": "PASS",
+          "name": "RP26 Codex design and Critic preserve the validator-approved canonical requests"
+        },
+        {
+          "status": "PASS",
+          "name": "RP27 Codex implementation preserves the validator-approved canonical request"
+        },
+        {
+          "status": "PASS",
+          "name": "RP28 unobserved concrete Codex IDs fail closed"
+        },
+        {
+          "status": "PASS",
+          "name": "RP29 any advisory route may be deliberately disabled"
+        },
+        {
+          "status": "PASS",
+          "name": "RP30 cross-runner worktype substitution fails closed before P5"
+        },
+        {
+          "status": "PASS",
+          "name": "RP32 P1 Codex implementation retains its validated direct request"
+        },
+        {
+          "status": "PASS",
+          "name": "RP33 P1 runner providers stay explicitly mapped"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity low effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity medium effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity high effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity xhigh effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP34 P1 Fable resolves to Sol at identity max effort"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35 V3 checker accepts the configured advisory selector and effort projection"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35a V3 checker rejects advisory selector and effort corruption before projection"
+        },
+        {
+          "status": "PASS",
+          "name": "RP35b V3 checker detects advisory bytes tampered on disk"
+        },
+        {
+          "status": "PASS",
+          "name": "RP36 V3 checker detects advisory runtime drift"
+        },
+        {
+          "status": "PASS",
+          "name": "RP37 Antigravity runner provider is google"
+        },
+        {
+          "status": "PASS",
+          "name": "RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes"
+        },
+        {
+          "status": "PASS",
+          "name": "RP39 Antigravity aliases resolve accurately"
+        },
+        {
+          "status": "PASS",
+          "name": "RP40 Antigravity direct routes validate against observed model-ids"
+        },
+        {
+          "status": "FAIL",
+          "name": "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf"
+        }
+      ],
+      "setupError": false
+    }
+  ],
+  "comparisons": [
+    {
+      "entry": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "baselineCases": [
+        "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization",
+        "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner",
+        "RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty",
+        "RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature",
+        "RPM05 apply requires explicit activation and an unchanged in-process digest-only plan",
+        "RPM06 a V3 authority update refreshes every frozen routing mapping as one registry",
+        "RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection",
+        "RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction",
+        "RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it",
+        "RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed",
+        "RPM11 a cached preview acknowledgement cannot authorize a second recovery",
+        "RPM12 stale source invalidates a reviewed plan before staging",
+        "RPM13 a handled durable exclusive-commit error rolls every target back",
+        "RPM14 already-current v3 inspects ready and plans noop",
+        "RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh",
+        "RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial",
+        "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy",
+        "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs",
+        "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract",
+        "RPM20 legacy additions roll back files and created directories after interruption",
+        "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target",
+        "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup",
+        "RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes",
+        "RPM24 exclusive absent-target commit closes the race after its final preimage check",
+        "RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary",
+        "RPM26 current V3 with any missing runtime target remains fail-closed",
+        "RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable",
+        "RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant",
+        "RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent",
+        "RPM30 slim V3 initialization never replaces a present malformed runtime baseline",
+        "RPM31 legacy compatibility remains closed to malformed and unknown aliases",
+        "RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert",
+        "RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets",
+        "RPM34 authenticated noop apply remains bound to source, runtime digests, and root",
+        "RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors",
+        "RPM36 an unsafe existing neutral authority mirror fails planning without a transaction",
+        "RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply",
+        "RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically",
+        "RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded",
+        "RPM40 a source stale only in critic_export classifies as v3-refresh",
+        "RPM41 a source with critic_export entirely absent still fills it in unchanged",
+        "RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid",
+        "RPM43 CLI enforces inspect/plan/apply and explicit activation",
+        "RPM44 CLI activated apply emits the complete classified preview before any target mutation",
+        "RPM45 CLI production preview contract completes bounded short writes before activation",
+        "RPM46 CLI production preview zero-progress and failure seams stop before apply",
+        "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate",
+        "RPM48 CLI previews a classified pending recovery before recovery and activation",
+        "RPM49 CLI completes bounded short writes for pending recovery before touching its journal",
+        "RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes",
+        "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate",
+        "RPM52 a freshly onboarded project seeds both manifest tiers byte-identically",
+        "RPM53 both freshly seeded manifest tiers resolve the same gate chapter",
+        "RPM54 a customised existing manifest is never replaced by the fresh seed",
+        "RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply",
+        "RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed",
+        "RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed",
+        "RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier",
+        "RPM59 an Antigravity enrolment publishes its own tier and no Codex target",
+        "RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines"
+      ],
+      "proposalCases": [
+        "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization",
+        "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner",
+        "RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty",
+        "RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature",
+        "RPM05 apply requires explicit activation and an unchanged in-process digest-only plan",
+        "RPM06 a V3 authority update refreshes every frozen routing mapping as one registry",
+        "RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection",
+        "RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction",
+        "RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it",
+        "RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed",
+        "RPM11 a cached preview acknowledgement cannot authorize a second recovery",
+        "RPM12 stale source invalidates a reviewed plan before staging",
+        "RPM13 a handled durable exclusive-commit error rolls every target back",
+        "RPM14 already-current v3 inspects ready and plans noop",
+        "RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh",
+        "RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial",
+        "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy",
+        "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs",
+        "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract",
+        "RPM20 legacy additions roll back files and created directories after interruption",
+        "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target",
+        "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup",
+        "RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes",
+        "RPM24 exclusive absent-target commit closes the race after its final preimage check",
+        "RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary",
+        "RPM26 current V3 with any missing runtime target remains fail-closed",
+        "RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable",
+        "RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant",
+        "RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent",
+        "RPM30 slim V3 initialization never replaces a present malformed runtime baseline",
+        "RPM31 legacy compatibility remains closed to malformed and unknown aliases",
+        "RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert",
+        "RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets",
+        "RPM34 authenticated noop apply remains bound to source, runtime digests, and root",
+        "RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors",
+        "RPM36 an unsafe existing neutral authority mirror fails planning without a transaction",
+        "RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply",
+        "RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically",
+        "RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded",
+        "RPM40 a source stale only in critic_export classifies as v3-refresh",
+        "RPM41 a source with critic_export entirely absent still fills it in unchanged",
+        "RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid",
+        "RPM43 CLI enforces inspect/plan/apply and explicit activation",
+        "RPM44 CLI activated apply emits the complete classified preview before any target mutation",
+        "RPM45 CLI production preview contract completes bounded short writes before activation",
+        "RPM46 CLI production preview zero-progress and failure seams stop before apply",
+        "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate",
+        "RPM48 CLI previews a classified pending recovery before recovery and activation",
+        "RPM49 CLI completes bounded short writes for pending recovery before touching its journal",
+        "RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes",
+        "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate",
+        "RPM52 a freshly onboarded project seeds both manifest tiers byte-identically",
+        "RPM53 both freshly seeded manifest tiers resolve the same gate chapter",
+        "RPM54 a customised existing manifest is never replaced by the fresh seed",
+        "RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply",
+        "RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed",
+        "RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed",
+        "RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier",
+        "RPM59 an Antigravity enrolment publishes its own tier and no Codex target",
+        "RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines"
+      ],
+      "baselineFailures": [
+        "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization",
+        "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner",
+        "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy",
+        "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs",
+        "RPM20 legacy additions roll back files and created directories after interruption",
+        "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target",
+        "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup",
+        "RPM24 exclusive absent-target commit closes the race after its final preimage check",
+        "RPM44 CLI activated apply emits the complete classified preview before any target mutation",
+        "RPM45 CLI production preview contract completes bounded short writes before activation",
+        "RPM46 CLI production preview zero-progress and failure seams stop before apply",
+        "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate"
+      ],
+      "proposalFailures": [
+        "RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization",
+        "RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner",
+        "RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy",
+        "RPM18 Issue \\#58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs",
+        "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract",
+        "RPM20 legacy additions roll back files and created directories after interruption",
+        "RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target",
+        "RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup",
+        "RPM24 exclusive absent-target commit closes the race after its final preimage check",
+        "RPM44 CLI activated apply emits the complete classified preview before any target mutation",
+        "RPM45 CLI production preview contract completes bounded short writes before activation",
+        "RPM46 CLI production preview zero-progress and failure seams stop before apply",
+        "RPM47 CLI preview-channel failure returns one sanitized result and cannot activate",
+        "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"
+      ],
+      "reachedCaseSetsEqual": true,
+      "failureSetsEqual": false,
+      "baselineAssertionRed": true,
+      "proposalAssertionRed": true,
+      "addedFailures": [
+        "RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract",
+        "RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate"
+      ],
+      "removedFailures": []
+    },
+    {
+      "entry": "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+      "baselineCases": [
+        "RP01 authority is provider-neutral",
+        "RP02 Claude design mapping unchanged",
+        "RP03 Claude implement mapping unchanged",
+        "RP04 mechanic route is Haiku at effort medium",
+        "RP05 implementor effort is medium",
+        "RP06 deep effort is xhigh",
+        "RP07 critic effort is max",
+        "RP08 manifest projection is byte-deterministic",
+        "RP09 all profile phase routes are projected",
+        "RP09a all configured advisor routes are projected without invented effort",
+        "RP09b Claude manifest alias remains sonnet-5",
+        "RP10 all fixed agent routes are projected",
+        "RP11 Codex Fable keeps high",
+        "RP11 Codex Fable keeps low",
+        "RP11 Codex Fable keeps max",
+        "RP11 Codex Fable keeps medium",
+        "RP11 Codex Fable keeps xhigh",
+        "RP12 unsupported Codex identity fails closed",
+        "RP12b unsupported effort fails closed",
+        "RP13 partial Codex alias mapping remains narrow",
+        "RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch",
+        "RP13b Codex normal Critic duty contract passes",
+        "RP13c unknown host duty fails closed",
+        "RP14 committed projections match authority",
+        "RP15 light is ceremony-only",
+        "RP16 light routes exclude deep",
+        "RP17 missing manifest route is detected",
+        "RP18 extra manifest route is detected",
+        "RP19 stale provenance is detected",
+        "RP20 custom models pass through without invented aliases",
+        "RP21 pro preset remains projectable",
+        "RP22 valid custom design advisor is projected",
+        "RP23 direct v1 defaults validate as the sole source",
+        "RP24 direct Claude projection preserves the legacy modelRouting shape",
+        "RP25 all direct routes project deterministically",
+        "RP26 Codex design and Critic preserve the validator-approved canonical requests",
+        "RP27 Codex implementation preserves the validator-approved canonical request",
+        "RP28 unobserved concrete Codex IDs fail closed",
+        "RP29 any advisory route may be deliberately disabled",
+        "RP30 cross-runner worktype substitution fails closed before P5",
+        "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf",
+        "RP32 P1 Codex implementation retains its validated direct request",
+        "RP33 P1 runner providers stay explicitly mapped",
+        "RP34 P1 Fable resolves to Sol at identity high effort",
+        "RP34 P1 Fable resolves to Sol at identity low effort",
+        "RP34 P1 Fable resolves to Sol at identity max effort",
+        "RP34 P1 Fable resolves to Sol at identity medium effort",
+        "RP34 P1 Fable resolves to Sol at identity xhigh effort",
+        "RP35 V3 checker accepts the configured advisory selector and effort projection",
+        "RP35a V3 checker rejects advisory selector and effort corruption before projection",
+        "RP35b V3 checker detects advisory bytes tampered on disk",
+        "RP36 V3 checker detects advisory runtime drift",
+        "RP37 Antigravity runner provider is google",
+        "RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes",
+        "RP39 Antigravity aliases resolve accurately",
+        "RP40 Antigravity direct routes validate against observed model-ids"
+      ],
+      "proposalCases": [
+        "RP01 authority is provider-neutral",
+        "RP02 Claude design mapping unchanged",
+        "RP03 Claude implement mapping unchanged",
+        "RP04 mechanic route is Haiku at effort medium",
+        "RP05 implementor effort is medium",
+        "RP06 deep effort is xhigh",
+        "RP07 critic effort is max",
+        "RP08 manifest projection is byte-deterministic",
+        "RP09 all profile phase routes are projected",
+        "RP09a all configured advisor routes are projected without invented effort",
+        "RP09b Claude manifest alias remains sonnet-5",
+        "RP10 all fixed agent routes are projected",
+        "RP11 Codex Fable keeps high",
+        "RP11 Codex Fable keeps low",
+        "RP11 Codex Fable keeps max",
+        "RP11 Codex Fable keeps medium",
+        "RP11 Codex Fable keeps xhigh",
+        "RP12 unsupported Codex identity fails closed",
+        "RP12b unsupported effort fails closed",
+        "RP13 partial Codex alias mapping remains narrow",
+        "RP13a Codex normal Critic duty preserves the canonical requested route and host-native dispatch",
+        "RP13b Codex normal Critic duty contract passes",
+        "RP13c unknown host duty fails closed",
+        "RP14 committed projections match authority",
+        "RP15 light is ceremony-only",
+        "RP16 light routes exclude deep",
+        "RP17 missing manifest route is detected",
+        "RP18 extra manifest route is detected",
+        "RP19 stale provenance is detected",
+        "RP20 custom models pass through without invented aliases",
+        "RP21 pro preset remains projectable",
+        "RP22 valid custom design advisor is projected",
+        "RP23 direct v1 defaults validate as the sole source",
+        "RP24 direct Claude projection preserves the legacy modelRouting shape",
+        "RP25 all direct routes project deterministically",
+        "RP26 Codex design and Critic preserve the validator-approved canonical requests",
+        "RP27 Codex implementation preserves the validator-approved canonical request",
+        "RP28 unobserved concrete Codex IDs fail closed",
+        "RP29 any advisory route may be deliberately disabled",
+        "RP30 cross-runner worktype substitution fails closed before P5",
+        "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf",
+        "RP32 P1 Codex implementation retains its validated direct request",
+        "RP33 P1 runner providers stay explicitly mapped",
+        "RP34 P1 Fable resolves to Sol at identity high effort",
+        "RP34 P1 Fable resolves to Sol at identity low effort",
+        "RP34 P1 Fable resolves to Sol at identity max effort",
+        "RP34 P1 Fable resolves to Sol at identity medium effort",
+        "RP34 P1 Fable resolves to Sol at identity xhigh effort",
+        "RP35 V3 checker accepts the configured advisory selector and effort projection",
+        "RP35a V3 checker rejects advisory selector and effort corruption before projection",
+        "RP35b V3 checker detects advisory bytes tampered on disk",
+        "RP36 V3 checker detects advisory runtime drift",
+        "RP37 Antigravity runner provider is google",
+        "RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes",
+        "RP39 Antigravity aliases resolve accurately",
+        "RP40 Antigravity direct routes validate against observed model-ids"
+      ],
+      "baselineFailures": [
+        "RP04 mechanic route is Haiku at effort medium"
+      ],
+      "proposalFailures": [
+        "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf"
+      ],
+      "reachedCaseSetsEqual": true,
+      "failureSetsEqual": false,
+      "baselineAssertionRed": true,
+      "proposalAssertionRed": true,
+      "addedFailures": [
+        "RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf"
+      ],
+      "removedFailures": [
+        "RP04 mechanic route is Haiku at effort medium"
+      ]
+    }
+  ],
+  "assertionInputs": [
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "sha256": "85024ebe8caeb39fe033c3ed6d215cc69d109729f78072def25257132e430d55"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+      "sha256": "fdf604be26e4f7dfca4ac6bd2870f87e68c908efeb485faf759fbfd8d292499d"
+    }
+  ],
+  "diagnosticComplete": true,
+  "sourceAndProposalUnchanged": true,
+  "liveUserOverride": "not read or modified; no live runtime or user source writes",
+  "independentReview": "pending",
+  "poAcceptance": "pending",
+  "setupFailure": false
+}
+
+--- stderr ---
+
+ACTUAL_GENERATOR_READER_DIAGNOSIS
+{
+  "graph": "baseline",
+  "mechanic": {
+    "runner": "claude",
+    "selector": {
+      "kind": "alias",
+      "value": "sonnet"
+    },
+    "effort": "low",
+    "unavailability": "defer",
+    "evidenceRequirement": "dispatch-receipt"
+  },
+  "planStatus": "ready",
+  "sourceKind": "v1",
+  "diagnostics": []
+}
+{
+  "graph": "proposal",
+  "mechanic": {
+    "runner": "claude",
+    "selector": {
+      "kind": "alias",
+      "value": "haiku"
+    },
+    "effort": "medium",
+    "unavailability": "defer",
+    "evidenceRequirement": "dispatch-receipt"
+  },
+  "planStatus": "invalid-source",
+  "diagnostics": [
+    {
+      "path": "$.routing.duties.mechanic.selector",
+      "code": "unknown_selector",
+      "message": "direct route selector is not registered",
+      "repair": "use a supported requested selector"
+    }
+  ]
+}
+
+
+GENERATOR_READER_DIAGNOSIS_EXIT 0
+NARROW_SOURCE_POSTIMAGE_DIFF plugins/pipeline-core/config/routing-authority.json EXIT 1
+--- plugins/pipeline-core/config/routing-authority.json	2026-10-02 12:57:02.000000000 +0200
++++ specs/sprint-alfred-epic/signed-package/tranche-2/config/routing-authority.json	2026-10-09 13:41:51.437924948 +0200
+@@ -22,7 +22,7 @@
+       },
+       "duties": {
+         "implement": { "capability": "implement", "effort": "medium" },
+-        "mechanic": { "capability": "mechanic", "effort": "low" },
++        "mechanic": { "capability": "mechanic", "effort": "medium" },
+         "deep": { "capability": "deep", "effort": "xhigh" },
+         "review": { "capability": "review", "effort": "max" }
+       }
+@@ -59,7 +59,7 @@
+       },
+       "models": {
+         "implement": { "capability": "implement", "effort": "medium" },
+-        "mechanic": { "capability": "mechanic", "effort": "low" },
++        "mechanic": { "capability": "mechanic", "effort": "medium" },
+         "deep": { "capability": "deep", "effort": "xhigh" },
+         "review": { "capability": "review", "effort": "max" }
+       }
+@@ -84,14 +84,14 @@
+       },
+       "models": {
+         "implement": { "capability": "implement", "effort": "medium" },
+-        "mechanic": { "capability": "mechanic", "effort": "low" },
++        "mechanic": { "capability": "mechanic", "effort": "medium" },
+         "deep": { "capability": "deep", "effort": "xhigh" },
+         "review": { "capability": "review", "effort": "max" }
+       }
+     }
+   },
+   "agentAssignments": {
+-    "plugins/pipeline-core/agents/goldfish-mechanic.md": { "capability": "mechanic", "effort": "low" },
++    "plugins/pipeline-core/agents/goldfish-mechanic.md": { "capability": "mechanic", "effort": "medium" },
+     "plugins/pipeline-core/agents/goldfish-implementor.md": { "capability": "implement", "effort": "medium" },
+     "plugins/pipeline-core/agents/goldfish-deep.md": { "capability": "deep", "effort": "xhigh" },
+     "plugins/pipeline-core/agents/critic.md": { "capability": "review", "effort": "max" },
+
+NARROW_SOURCE_POSTIMAGE_DIFF plugins/pipeline-core/config/runner-mappings.json EXIT 1
+--- plugins/pipeline-core/config/runner-mappings.json	2026-10-02 12:57:02.000000000 +0200
++++ specs/sprint-alfred-epic/signed-package/tranche-2/config/runner-mappings.json	2026-10-09 13:41:51.442194969 +0200
+@@ -5,7 +5,7 @@
+       "capabilities": {
+         "design": "opus",
+         "implement": "sonnet",
+-        "mechanic": "sonnet",
++        "mechanic": "haiku",
+         "deep": "sonnet",
+         "review": "sonnet"
+       },
+@@ -15,7 +15,7 @@
+       "directSelectors": {
+         "design": { "kind": "alias", "value": "opus", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+         "implement": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+-        "mechanic": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
++        "mechanic": { "kind": "alias", "value": "haiku", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+         "deep": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+         "review": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null }
+       },
+
+NARROW_SOURCE_POSTIMAGE_DIFF plugins/pipeline-core/agents/goldfish-mechanic.md EXIT 1
+--- plugins/pipeline-core/agents/goldfish-mechanic.md	2026-10-02 12:57:02.000000000 +0200
++++ specs/sprint-alfred-epic/signed-package/tranche-2/agents/goldfish-mechanic.md	2026-10-09 13:41:51.442194969 +0200
+@@ -1,8 +1,8 @@
+ ---
+ name: goldfish-mechanic
+-description: "Agent-Pipeline Goldfish (mechanic tier, effort low) - fresh-context executor for PURELY mechanical, uniform, plan-execution tasks with a fully-specified briefing and NO in-task design decisions (e.g. bulk rename, whitespace/formatting sweeps, config-value bumps, uniform doc-sync edits following an exact pattern). Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for guardrail/class-high work or anything requiring a judgment call mid-task - use goldfish-implementor (clearly-briefed implementation, effort medium) or goldfish-deep (design-latitude/guardrail/test-authorship, effort xhigh) instead. Delivers diff + condensed evidence-backed report, or a clean stop."
+-model: sonnet
+-effort: low
++description: "Agent-Pipeline Goldfish (mechanic tier, effort medium) - fresh-context executor for PURELY mechanical, uniform, plan-execution tasks with a fully-specified briefing and NO in-task design decisions (e.g. bulk rename, whitespace/formatting sweeps, config-value bumps, uniform doc-sync edits following an exact pattern). Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for guardrail/class-high work or anything requiring a judgment call mid-task - use goldfish-implementor (clearly-briefed implementation, effort medium) or goldfish-deep (design-latitude/guardrail/test-authorship, effort xhigh) instead. Delivers diff + condensed evidence-backed report, or a clean stop."
++model: haiku
++effort: medium
+ maxTurns: 50
+ tools: Read, Edit, Write, Grep, Glob, Bash
+ # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
+@@ -12,17 +12,18 @@
+ #   else `.claude/pipeline.json`, field `worktree`). Caution: a
+ #   project's compile/type-check gate can be fail-open inside a worktree - verify this per project
+ #   when enabling worktree isolation.
+-# model: sonnet = mechanic-tier shipped default (MP-02; configured in pipeline.user.yaml ->
+-#   models.mechanic, overridable per project). The mechanic tier is the floor for a Goldfish dispatch
+-#   (MP-03/MP-25 rescope): no weaker model for THIS implementing role; a weakest-tier model is
+-#   permitted only for a separate, non-implementing read-only research-fetcher role. Escalation to a
++# model: haiku = mechanic-tier route (MP-02; Rulings 158/161; configured in pipeline.user.yaml ->
++#   models.mechanic, overridable per project). The mechanic tier is Haiku at effort medium and is the
++#   floor for a Goldfish dispatch (MP-03/MP-25 rescope): no weaker model for THIS implementing role; the
++#   weakest-tier exception for a separate, non-implementing read-only research-fetcher role is
++#   unchanged. Escalation to a
+ #   higher-capability (design-tier) model is an ELEPHANT dispatch decision, passed as invocation model
+ #   parameter WITH a model justification in briefing field 6 (MP-05) - never self-chosen. Every
+ #   dispatch names the model explicitly. CLAUDE_CODE_SUBAGENT_MODEL must stay unset (MP-04) or it
+ #   silently overrides this frontmatter.
+-# effort: low = the MECHANIC tier of the 3-tier goldfish effort matrix (MP-27): mechanical/uniform/
+-#   pure-plan-execution work with a fully-specified briefing and NO in-task design decisions. This is
+-#   the LOWEST of the three tiers - NOT a general-purpose default. The scope boundary below is a HARD
++# effort: medium = the MECHANIC tier of the 3-tier goldfish effort matrix (MP-27): mechanical/uniform/
++#   pure-plan-execution work with a fully-specified briefing and NO in-task design decisions. The
++#   mechanic tier runs Haiku at effort medium (Rulings 158/161) - NOT a general-purpose default. The scope boundary below is a HARD
+ #   FORBID, not just a preference: guardrail/hook/canon code, test-suite/verify authorship, class-high
+ #   work, and any task with genuine in-task design latitude belong to goldfish-deep (effort xhigh)
+ #   instead; ordinary clearly-briefed implementation belongs to goldfish-implementor (effort medium,
+
+NARROW_SOURCE_POSTIMAGE_DIFF policies/model-policy.md EXIT 1
+--- policies/model-policy.md	2026-10-09 10:32:27.324740821 +0200
++++ specs/sprint-alfred-epic/signed-package/tranche-2/policies/model-policy.md	2026-10-09 13:41:51.442194969 +0200
+@@ -36,7 +36,7 @@
+ |---------------------|-------------------------------------|------------------------------|-----------------|
+ | `worktypes.<profile>.{design_phase,execution_phase}` | Elephant (Orchestrator), routed per session profile & phase | opus (`design` profile, both phases) / opus→sonnet (`feature` profile: opus design phase, sonnet execution phase, revised 2026-07-10) / sonnet (`mini` profile, both phases) | high — see `pipeline.user.yaml` → `worktypes` for the full per-profile/phase matrix (revised 2026-07-10, was high–max) |
+ | `models.implement`  | Goldfish (Implementor)             | sonnet                       | medium          |
+-| `models.mechanic`   | Goldfish (Mechanic)                | sonnet                       | low             |
++| `models.mechanic`   | Goldfish (Mechanic)                | haiku                        | medium          |
+ | `models.deep`       | Goldfish (Deep, MP-27)             | sonnet                       | xhigh           |
+ | `models.review`     | Critic                             | sonnet                       | max             |
+ | `worktypes.<profile>.advisor` | optional second-opinion advisor, per session profile | `off` (`design` profile) / opus (`feature`/`mini` profiles, fixed pairing — `feature` advisor changed from `off` to `opus` 2026-07-10) | — |
+@@ -58,14 +58,14 @@
+ 
+ ### MP-02 — Goldfish: model floor = Mechanic-tier model, effort per MP-27
+ 
+-- **Must:** Goldfish never run below the configured Mechanic-tier model for repository writing (hard model floor — no downgrade to a smaller/cheaper model class, even for trivial edits). Pure read-only fetch/extraction is governed separately by MP-25. Effort allocation follows the 3-tier matrix in MP-27.
++- **Must:** Goldfish never run below the configured Mechanic-tier model for repository writing (hard model floor — the Mechanic tier is Haiku since the 2026-10-09 route change, Rulings 158/161; no downgrade below it, even for trivial edits). Pure read-only fetch/extraction is governed separately by MP-25. Effort allocation follows the 3-tier matrix in MP-27.
+ - **Implementation:** Subagent frontmatter sets model + effort explicitly per subagent (plugin level) — never implicit inheritance from the main model (related trap: MP-04, global model-override env var).
+ - **How to check:** Frontmatter of the versioned plugin agents shows the model floor; telemetry line per Goldfish block.
+ 
+ ### MP-27 — Goldfish 3-tier effort matrix
+ 
+ - **Must:** Goldfish dispatches run on one of three dedicated subagents, each with a fixed effort (frontmatter, not prose):
+-  - **`goldfish-mechanic`** — effort **`low`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Pending route change (PO decision 2026-10-09, Ruling 158):** this tier moves to Haiku at effort `medium`. NOT yet installed: the mechanic route is pinned in `plugins/pipeline-core/config/routing-authority.json` (checked against the agent frontmatter by `check-routing-projections.mjs`) and `runner-mappings.json` has no Haiku alias yet (follow-up slice MECH-HAIKU, tracked in `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`). Until then the agent stays on Sonnet at `low`, and a mechanic dispatch that wants Haiku passes it as the tool-layer `model` parameter.
++  - **`goldfish-mechanic`** — effort **`medium`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Installed route (PO decision 2026-10-09, Rulings 158/161):** this tier runs on Haiku at effort `medium`. The route is pinned in `plugins/pipeline-core/config/routing-authority.json` (checked against the agent frontmatter by `check-routing-projections.mjs`) and `runner-mappings.json` maps the Claude mechanic to Haiku (slice MECH-HAIKU, tracked in `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`).
+   - **`goldfish-implementor`** — effort **`medium`** — the default for clearly briefed implementation tasks.
+   - **`goldfish-deep`** — effort **`xhigh`**: test-suite/verify authorship, guardrail/hook/canon code, tasks with genuine in-task design latitude, senior-class work.
+   Planning/design and analysis synthesis stay unchanged on the Design tier at `xhigh`+ (MP-01/MP-22/MP-23 untouched).
+@@ -85,7 +85,7 @@
+ 
+ ### MP-03 — MUST NOT: models below the Mechanic tier for implementation/judgment/review
+ 
+-- **Must not (hard):** No model below the Mechanic-tier class for implementation, repository writing, judgment, or review work in the pipeline — not as Goldfish, not as Critic, not as a workflow stage that produces or evaluates artifacts. The three read-only/runtime exceptions below are exhaustive.
++- **Must not (hard):** No model below the Mechanic-tier class (Haiku at effort `medium`, MP-27) for implementation, repository writing, judgment, or review work in the pipeline — not as Goldfish, not as Critic, not as a workflow stage that produces or evaluates artifacts. The three read-only/runtime exceptions below are exhaustive.
+ - **Why:** Quality risk creates iteration loops that eat nominal savings. A smaller model does not gain writing authority merely because a diff is mechanical or narrowly briefed.
+ - **Exception (a) — built-in runtime mechanisms:** Excepted are built-in agent-runtime mechanisms that internally use a smaller model class (e.g. a `/goal` evaluator) — that isn't a role assignment.
+ - **Exception (b) — harness-internal read-only summarizer:** WebFetch/WebSearch summarization may run internally on the smallest model class — sanctioned-but-noted, as long as the output stays a pure fetch summary (no judgment, no artifact creation). Telemetry may report the model without that counting as a violation.
+@@ -117,7 +117,7 @@
+ 
+ ### MP-06 — De-escalation within the matrix
+ 
+-- **Must:** De-escalation means lower effort, never a lower writing tier/model. For mechanical/uniform Goldfish tasks, the `goldfish-mechanic` subagent (effort `low`, MP-27) remains the target. MP-25 permits a separate read-only fetch/extraction class; Critic and Design-tier floors are never undercut.
++- **Must:** De-escalation means lower effort, never a lower writing tier/model. For mechanical/uniform Goldfish tasks, the `goldfish-mechanic` subagent (Haiku at effort `medium`, MP-27) remains the target. MP-25 permits a separate read-only fetch/extraction class; Critic and Design-tier floors are never undercut.
+ - **Why:** Effort is the ordinary savings lever for writing. Caution: the effort scale is calibrated PER MODEL — "high" on a smaller model ≠ "high" on a larger one; don't compare effort levels across models.
+ - **How to check:** telemetry; frontmatter defaults in the plugin.
+ 
+
+{"path":"setup.mjs","sha256":"19c9ea659f59424026cad3d419134c81fdf75c7dcf37e4c178d8ef7776ad7096"}
+{"path":"plugins/pipeline-core/lib/runner-profile-migration-v3.mjs","sha256":"1b36005298a13b0eb78b5602572f26ffa09ddd67d6cb96a7648df579d6ba232f"}
+{"path":"plugins/pipeline-core/lib/runner-profile-migration-v2.mjs","sha256":"5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a"}
+{"path":"plugins/pipeline-core/lib/runner-profiles-v2.mjs","sha256":"3c041dab267d86e3548b2728f0a519b7b09ff8d14e7c95fc8ffaf7edb8598e47"}
+{"disposition":"blocked-scope-burst","assertions":{"RP31":"obsolete Shared 654ebaf Sonnet/low compatibility fixture; approved mechanic change intentionally requires Haiku/medium; candidate satisfies RP04","RPM19":"real generated-v1 migration regression: plan.status invalid-source instead of ready at line 812","RPM51":"real generated-v1 migration regression: plan.sourceKind undefined instead of v1 at line 1722"},"readerDiagnostic":{"path":"$.routing.duties.mechanic.selector","code":"unknown_selector","message":"direct route selector is not registered"},"requiredNextScope":"approved reader/registry selector compatibility change; do not revert approved parked mechanic route","authoredPostimageChanges":[],"liveSourceWrites":false,"liveUserOverride":"not read or modified","independentReview":"pending","poAcceptance":"pending"}
+
+--- stderr ---

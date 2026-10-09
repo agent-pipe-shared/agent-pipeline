@@ -1,0 +1,214 @@
+command: node scratch/design-compat-diag-run.mjs
+label: ALFRED-DESIGN-COMPAT-DIAG-20261009
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+IMMUTABLE_INPUTS [{"path":"plugins/pipeline-core/lib/schema-lite.mjs","sha256":"189b0ebe6c35859123fe999e25cba4a81d8205e4d0f99545245a729e5cbe96c4"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs","sha256":"6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2"},{"path":"plugins/pipeline-core/lib/design-workflow-package.mjs","sha256":"c05a085035e9117c272ced4c0d615dc30de99838ae09ad2d6a268500aae43550"},{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs","sha256":"7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs","sha256":"7f60305f726d7d8f155cd71bb49519bde2823b31224b57ee9a3f0e6abf041270"}]
+STAGE parked schema-lite / immutable boundary
+TAP version 13
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"5ffc0ae8d0aaaa4f548f1c4c5123156f9698b2d823899a5f97afd7dcc5cc090e"},"direct":{"ok":true,"id":"c857b627078d72bd3e854035be385010b41f10e0eeffd5629c67f2de71b648e5","mode":"approved-design-chat"}}
+# HOOK_DIAG {"status":0,"stderr":""}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"4f670e7c0518686f3ca84a6e1eb528b088cc971b8d5df87ce0bee83da3ab2c97"},"direct":{"ok":true,"id":"c857b627078d72bd3e854035be385010b41f10e0eeffd5629c67f2de71b648e5","mode":"approved-design-signature"}}
+# HOOK_DIAG {"status":0,"stderr":""}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"772de8384393a55f9d91d8daf66bf7eaf1eec2875cea72845c37e735a4eaf849"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-MODE-MISMATCH"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-MODE-MISMATCH).\\nRe-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.\\nUse one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution.\\n"}
+# DIRECT_API_DIAG {"approvalValid":false,"lifecycle":{"ok":false,"code":"PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED","status":"awaiting-approval","phase":"implementation","nextAction":"reopen-design","submissionCurrent":true,"approvalCurrent":false},"direct":{"ok":false,"code":"DAA-DESIGN-APPROVAL-BINDING-DRIFT"}}
+# HOOK_DIAG {"status":2,"stderr":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \\"authority-feature\\" lifecycle is \\"awaiting-approval\\".\\nPlan: specs/feature/prd.md\\nFile: src/foo.ts\\nWhy: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"0975e0707ed75e42b1de387d9d63db12581363b8b883c3325969a9f55a6d506f"},"direct":{"ok":false,"code":"DAA-DESIGN-SOURCE-DRIFT"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-DESIGN-SOURCE-DRIFT).\\nCurrent design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"29af0c31695fbc7fe2294ce041df469cc161323c3038d6e545759dbf7e278f3f","approvalSha256":"482846d484f824c40ef4262d819373fe4d94eadba46e1dc2263e63b3672dc368"},"direct":{"ok":true,"id":"mini-no-design-approval","mode":"not-required"}}
+# HOOK_DIAG {"status":0,"stderr":""}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"41e05fbf3341a528aa35d4a944fea43985e0bb40cbadf992d6058448a3b2395d"},"direct":{"ok":true,"id":"c857b627078d72bd3e854035be385010b41f10e0eeffd5629c67f2de71b648e5","mode":"approved-design-chat"}}
+# HOOK_DIAG {"status":0,"stderr":""}
+# DIRECT_API_DIAG {"approvalValid":false,"lifecycle":{"ok":false,"code":"PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED","status":"awaiting-approval","phase":"implementation","nextAction":"reopen-design","submissionCurrent":true,"approvalCurrent":false},"direct":{"ok":false,"code":"DAA-DESIGN-APPROVAL-BINDING-DRIFT"}}
+# HOOK_DIAG {"status":2,"stderr":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \\"authority-feature\\" lifecycle is \\"awaiting-approval\\".\\nPlan: specs/feature/prd.md\\nFile: src/foo.ts\\nWhy: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.\\n"}
+# DIRECT_API_DIAG {"approvalValid":false,"lifecycle":{"ok":false,"code":"PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED","status":"awaiting-approval","phase":"implementation","nextAction":"reopen-design","submissionCurrent":true,"approvalCurrent":false},"direct":{"ok":false,"code":"DAA-DESIGN-APPROVAL-BINDING-DRIFT"}}
+# HOOK_DIAG {"status":2,"stderr":"BLOCKED (guard-devplan, plugin pipeline-core): Feature \\"authority-feature\\" lifecycle is \\"awaiting-approval\\".\\nPlan: specs/feature/prd.md\\nFile: src/foo.ts\\nWhy: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"1aa4b90da1b58d3b903041fbaffad7275db960459beec7b6742819af101510ce"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP).\\nComplete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"1aa4b90da1b58d3b903041fbaffad7275db960459beec7b6742819af101510ce"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP).\\nComplete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"412be6de1c288e25cdb6463d35187700b753e620fd4f8ed1353de26e12d2eea1"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP).\\nComplete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"412be6de1c288e25cdb6463d35187700b753e620fd4f8ed1353de26e12d2eea1"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP).\\nComplete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"d0962b78f71e869145a03fd919319f8601e87fdcaa00abb5f28641d80599c56f"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-MISMATCH"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-MISMATCH).\\nRe-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.\\nUse one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution.\\n"}
+# DIRECT_API_DIAG {"approvalValid":true,"lifecycle":{"ok":true,"code":"PLAN-LIFECYCLE-CURRENT","status":"implementing","phase":"implementation","nextAction":null,"submissionCurrent":true,"approvalCurrent":true,"submissionSha256":"d59a57a3948c2c975cc33205cba6ad4ab2e788e12ceee646fee0b4fcfd97846b","approvalSha256":"d0962b78f71e869145a03fd919319f8601e87fdcaa00abb5f28641d80599c56f"},"direct":{"ok":false,"code":"DAA-PO-APPROVAL-TRUST-MISMATCH"}}
+# HOOK_DIAG {"status":2,"stderr":"[guard-devplan] implementation requires a valid design approval (DAA-PO-APPROVAL-TRUST-MISMATCH).\\nRe-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.\\nUse one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution.\\n"}
+# Subtest: C1 admit  v8 chat record under configured chat
+ok 1 - C1 admit  v8 chat record under configured chat
+  ---
+  duration_ms: 456.388176
+  type: 'test'
+  ...
+# Subtest: C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+ok 2 - C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+  ---
+  duration_ms: 369.828747
+  type: 'test'
+  ...
+# Subtest: C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+ok 3 - C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+  ---
+  duration_ms: 369.661838
+  type: 'test'
+  ...
+# Subtest: C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+not ok 4 - C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+  ---
+  duration_ms: 368.522773
+  type: 'test'
+  location: '<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:340:1'
+  failureType: 'testCodeFailure'
+  error: 'C4: the refusal must name DAA-DESIGN-APPROVAL-BINDING-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:315:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:354:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+ok 5 - C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+  ---
+  duration_ms: 373.301393
+  type: 'test'
+  ...
+# Subtest: C6 admit  mini profile with both design keys null and no design artifact
+ok 6 - C6 admit  mini profile with both design keys null and no design artifact
+  ---
+  duration_ms: 368.005115
+  type: 'test'
+  ...
+# Subtest: C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+ok 7 - C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+  ---
+  duration_ms: 1089.525139
+  type: 'test'
+  ...
+# Subtest: FX1 fixture: the signature proof verifies against the committed matching anchor
+ok 8 - FX1 fixture: the signature proof verifies against the committed matching anchor
+  ---
+  duration_ms: 213.40836
+  type: 'test'
+  ...
+# Subtest: TA1 refuse signature with missing policy anchors and name the setup remedy
+ok 9 - TA1 refuse signature with missing policy anchors and name the setup remedy
+  ---
+  duration_ms: 535.123716
+  type: 'test'
+  ...
+# Subtest: TA2 refuse signature with empty policy anchors and name the setup remedy
+ok 10 - TA2 refuse signature with empty policy anchors and name the setup remedy
+  ---
+  duration_ms: 531.46495
+  type: 'test'
+  ...
+# Subtest: TA3 refuse a self-generated signing key outside the committed anchor set
+ok 11 - TA3 refuse a self-generated signing key outside the committed anchor set
+  ---
+  duration_ms: 535.826863
+  type: 'test'
+  ...
+# Subtest: FX2 fixture: the configured mode resolves from the committed user config
+ok 12 - FX2 fixture: the configured mode resolves from the committed user config
+  ---
+  duration_ms: 626.013744
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 11
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5927.257295
+FD3 {"label":"parked schema-lite / immutable boundary","status":1,"signal":null,"fd3":"{\"status\":1,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","error":null}
+STAGE parked schema-lite / immutable v7
+TAP version 13
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"afe818fd41ed2a08d6918de7ebf86a13c93d6337","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+not ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 412.063444
+  type: 'test'
+  location: '<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"ok":false,"code":"DWP2-PACKAGE-SCHEMA"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    buildLiveShapedV7Fixture (file://<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:211:10)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/design-compat-diag-graph/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs:273:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 588.255875
+FD3 {"label":"parked schema-lite / immutable v7","status":1,"signal":null,"fd3":"{\"status\":1,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","error":null}
+STAGE same anchored v7 fixture / real live schema-lite / parked strong writer
+TAP version 13
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# SCHEMA_DIAG {"packageSchema":"pipeline.design-workflow-package.v2","advisor":{"status":"unavailable","runner":"claude","route":{"candidateCommit":"0b1566e27947077b37cbdf29ba131c82f816da3b","effort":null,"model":null,"sourceSha256":"f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3"},"hostReceipt":null,"receipt":null},"live":{"valid":true,"errors":[]},"parked":{"valid":false,"errors":["$.advisor: oneOf matched 2 branches; expected exactly one"]},"branches":[{"branch":{"$ref":"\#/$defs/answeredAdvisor"},"errors":[]},{"branch":{"$ref":"\#/$defs/unavailableAdvisor"},"errors":[]}],"localRefBranches":[{"ref":"\#/$defs/answeredAdvisor","result":{"valid":false,"errors":["$.route.model: expected type \\"string\\", got \\"null\\"","$.route.effort: value null is not one of [low, medium, high, xhigh, max]","$.hostReceipt: expected type \\"object\\", got \\"null\\"","$: unexpected additional property \\"failureEvidence\\"","$: unexpected additional property \\"proposedException\\""]}},{"ref":"\#/$defs/unavailableAdvisor","result":{"valid":false,"errors":["$.receipt: oneOf matched 2 branches; expected exactly one"]}}]}
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+    # Subtest: control: live-shaped v7 record, course store present -> both lanes admit (green today)
+    ok 1 - control: live-shaped v7 record, course store present -> both lanes admit (green today)
+      ---
+      duration_ms: 225.871567
+      type: 'test'
+      ...
+    # Subtest: target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+    ok 2 - target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+      ---
+      duration_ms: 186.300118
+      type: 'test'
+      ...
+    1..2
+ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 971.548461
+  type: 'test'
+  ...
+1..1
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1151.058338
+FD3 {"status":0,"signal":null,"fd3":"{\"status\":0,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","error":null}
+IMMUTABLE_INPUTS_UNCHANGED true; expected RED retained; diagnostic execution complete
+
+--- stderr ---

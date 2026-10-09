@@ -1,0 +1,1948 @@
+command: node scratch/onboarding-fixture-r2-20261009.mjs
+label: onboarding-finished-positive-fixture-r2
+exitCode: 0
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+INPUT_HASHES [{"path":"plugins/pipeline-core/scripts/project-onboarding-v3.mjs","sha256":"b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/project-onboarding-v3.mjs","sha256":"c6bed9395fb85f5e94f5bd26c5dc96090382fdf98f1aad65fecfb094b1ccb3dc"},{"path":"plugins/pipeline-core/lib/project-onboarding-v3.mjs","sha256":"d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/project-onboarding-v3.mjs","sha256":"e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51"},{"path":"plugins/pipeline-core/lib/onboarding-continuity.mjs","sha256":"a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.mjs","sha256":"512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"},{"path":"plugins/pipeline-core/lib/continuity-state.mjs","sha256":"4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/continuity-state.mjs","sha256":"43845ab88ba6c99fa2c075805e1e8dedd2a4169498e5ef2376d713d11275998a"},{"path":"plugins/pipeline-core/scripts/pipeline-state.mjs","sha256":"3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"},{"path":"plugins/pipeline-core/scripts/continuity-state.schema.json","sha256":"b3c51a274f3534bb935241924ff78215b555b6daee7341f66bac5ed2fa82f877"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/continuity-state.schema.json","sha256":"281217053aebf3272430fc927e04f79b96160d6b5346b4b26894d39a49405091"},{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"plugins/pipeline-core/lib/architecture-design.mjs","sha256":"2ca715d8789dcdcf2890e7ee5578c9b6ed413bcb7c985d271dcf45cff54061e6"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","sha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"},{"path":"plugins/pipeline-core/lib/onboarding-continuity.test.mjs","sha256":"76e7b84b05e468a80274b8af671289a19148ca14ac8bd85c17e3f80653804387"}]
+RUN {"stage":"r2-exact-eight-old-regressions","args":["--test","--test-isolation=none","--test-reporter=tap","--test-name-pattern","^OBC26[4-9] |^OBC27[01] ","<repo-root>/scratch/onboarding-fixture-r2-20261009-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs"]}
+TAP version 13
+# Subtest: OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+ok 1 - OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+  ---
+  duration_ms: 434.971128
+  type: 'test'
+  ...
+# Subtest: OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+ok 2 - OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+  ---
+  duration_ms: 249.86457
+  type: 'test'
+  ...
+# Subtest: OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+ok 3 - OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+  ---
+  duration_ms: 264.442216
+  type: 'test'
+  ...
+# Subtest: OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+ok 4 - OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+  ---
+  duration_ms: 11.340221
+  type: 'test'
+  ...
+# Subtest: OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+ok 5 - OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+  ---
+  duration_ms: 70.339175
+  type: 'test'
+  ...
+# Subtest: OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+ok 6 - OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+  ---
+  duration_ms: 247.945378
+  type: 'test'
+  ...
+# Subtest: OBC270 applyOnboardingBootstrapBind: activation is required
+ok 7 - OBC270 applyOnboardingBootstrapBind: activation is required
+  ---
+  duration_ms: 216.397114
+  type: 'test'
+  ...
+# Subtest: OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+ok 8 - OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+  ---
+  duration_ms: 250.633685
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1905.921715
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["OBC001","OBC002","OBC003","OBC004","OBC005","OBC006","OBC007","OBC008","OBC009","OBC010","OBC011","OBC012","OBC013","OBC014","OBC015","OBC016","OBC017","OBC018","OBC019","OBC020","OBC021","OBC022","OBC023","OBC024","OBC025","OBC026","OBC027","OBC028","OBC029","OBC030","OBC031","OBC032","OBC033","OBC034","OBC035","OBC036","OBC037","OBC038","OBC039","OBC040","OBC041","OBC042","OBC043","OBC044","OBC045","OBC046","OBC047","OBC048","OBC049","OBC050","OBC051","OBC052","OBC053","OBC054","OBC055","OBC056","OBC057","OBC058","OBC059","OBC060","OBC061","OBC062","OBC063","OBC064","OBC065","OBC066","OBC067","OBC068","OBC069","OBC070","OBC071","OBC072","OBC073","OBC074","OBC075","OBC076","OBC077","OBC078","OBC079","OBC080","OBC081","OBC082","OBC083","OBC084","OBC085","OBC086","OBC087","OBC088","OBC089","OBC090","OBC091","OBC092","OBC093","OBC094","OBC095","OBC096","OBC097","OBC098","OBC099","OBC100","OBC101","OBC102","OBC103","OBC104","OBC105","OBC106","OBC107","OBC108","OBC109","OBC110","OBC111","OBC112","OBC113","OBC114","OBC115","OBC116","OBC117","OBC118","OBC119","OBC120","OBC121","OBC122","OBC123","OBC124","OBC125","OBC126","OBC127","OBC128","OBC129","OBC130","OBC131","OBC132","OBC133","OBC134","OBC135","OBC136","OBC137","OBC138","OBC139","OBC140","OBC141","OBC142","OBC143","OBC144","OBC145","OBC146","OBC147","OBC148","OBC149","OBC150","OBC151","OBC152","OBC153","OBC154","OBC155","OBC156","OBC157","OBC158","OBC159","OBC160","OBC161","OBC162","OBC163","OBC164","OBC165","OBC166","OBC167","OBC168","OBC169","OBC170","OBC171","OBC172","OBC173","OBC174","OBC175","OBC176","OBC177","OBC178","OBC179","OBC180","OBC181","OBC182","OBC183","OBC184","OBC185","OBC186","OBC187","OBC188","OBC189","OBC190","OBC191","OBC192","OBC193","OBC194","OBC195","OBC196","OBC197","OBC198","OBC199","OBC200","OBC201","OBC202","OBC203","OBC204","OBC205","OBC206","OBC207","OBC208","OBC209","OBC210","OBC211","OBC212","OBC213","OBC214","OBC215","OBC216","OBC217","OBC218","OBC219","OBC220","OBC221","OBC222","OBC223","OBC224","OBC225","OBC226","OBC227","OBC228","OBC229","OBC230","OBC231","OBC232","OBC233","OBC234","OBC235","OBC236","OBC237","OBC238","OBC239","OBC240","OBC241","OBC242","OBC243","OBC244","OBC245","OBC246","OBC247","OBC248","OBC249","OBC250","OBC251","OBC252","OBC253","OBC254","OBC255","OBC256","OBC257","OBC258","OBC259","OBC260","OBC261","OBC262","OBC263","OBC264","OBC265","OBC266","OBC267","OBC268","OBC269","OBC270","OBC271","OBC272","OBC273","OBC274","OBC275","OBC276","OBC277","OBC278","OBC279","OBC280","OBC281","OBC282","OBC283","OBC284","OBC285","OBC286","OBC287","OBC288","OBC289","OBC290","OBC291","OBC292","OBC293","OBC294","OBC295","OBC296","OBC297","OBC298","OBC299","OBC300"],"caseCount":300,"caseSetSha256":"6a827a066a76be0d5ceab6a9325f2fcf5ed5291fe398ebfcd3c9ab6741ec591d"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC264","ordinal":263,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC265","ordinal":264,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC266","ordinal":265,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC267","ordinal":266,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC268","ordinal":267,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC269","ordinal":268,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC270","ordinal":269,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC271","ordinal":270,"disposition":"pass"}]
+RUN_RESULT {"stage":"r2-exact-eight-old-regressions","filtered":true,"exitCode":0,"signal":null,"declared":300,"disposed":8,"terminal":false,"counts":{"pass":8},"failures":[]}
+RUN {"stage":"r2-complete-300-corpus","args":["--test","--test-isolation=none","--test-reporter=tap","<repo-root>/scratch/onboarding-fixture-r2-20261009-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs"]}
+TAP version 13
+# Subtest: OBC001 pristine requires all three continuity sources to be absent
+ok 1 - OBC001 pristine requires all three continuity sources to be absent
+  ---
+  duration_ms: 13.530931
+  type: 'test'
+  ...
+# Subtest: OBC002 empty handover without machine state is damaged
+ok 2 - OBC002 empty handover without machine state is damaged
+  ---
+  duration_ms: 9.751847
+  type: 'test'
+  ...
+# Subtest: OBC003 manual handover without machine state is damaged
+ok 3 - OBC003 manual handover without machine state is damaged
+  ---
+  duration_ms: 9.707859
+  type: 'test'
+  ...
+# Subtest: OBC004 custom configured handover is observed instead of docs/state.md
+ok 4 - OBC004 custom configured handover is observed instead of docs/state.md
+  ---
+  duration_ms: 9.27909
+  type: 'test'
+  ...
+# Subtest: OBC005 object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable
+ok 5 - OBC005 object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable
+  ---
+  duration_ms: 9.21144
+  type: 'test'
+  ...
+# Subtest: OBC006 object-shaped configured handover without a usable .path still fails unavailable
+ok 6 - OBC006 object-shaped configured handover without a usable .path still fails unavailable
+  ---
+  duration_ms: 7.436177
+  type: 'test'
+  ...
+# Subtest: OBC007 present inactive state is damaged rather than pristine
+ok 7 - OBC007 present inactive state is damaged rather than pristine
+  ---
+  duration_ms: 9.601118
+  type: 'test'
+  ...
+# Subtest: OBC008 writer-shaped closed state is a valid feature re-entry boundary
+ok 8 - OBC008 writer-shaped closed state is a valid feature re-entry boundary
+  ---
+  duration_ms: 10.315845
+  type: 'test'
+  ...
+# Subtest: OBC009 a current closed entry keeps its compact audit reference observable without weakening historical entries
+ok 9 - OBC009 a current closed entry keeps its compact audit reference observable without weakening historical entries
+  ---
+  duration_ms: 9.35765
+  type: 'test'
+  ...
+# Subtest: OBC010 writer-shaped unapproved design state remains valid before continuity initialization
+ok 10 - OBC010 writer-shaped unapproved design state remains valid before continuity initialization
+  ---
+  duration_ms: 9.655608
+  type: 'test'
+  ...
+# Subtest: OBC011 inactive and design transition lookalikes remain damaged
+ok 11 - OBC011 inactive and design transition lookalikes remain damaged
+  ---
+  duration_ms: 17.382065
+  type: 'test'
+  ...
+# Subtest: OBC012 writer-shaped discard state is a valid feature re-entry boundary
+ok 12 - OBC012 writer-shaped discard state is a valid feature re-entry boundary
+  ---
+  duration_ms: 41.293031
+  type: 'test'
+  ...
+# Subtest: OBC013 writer-shaped discard state with a prior closed feature remains valid
+ok 13 - OBC013 writer-shaped discard state with a prior closed feature remains valid
+  ---
+  duration_ms: 39.659649
+  type: 'test'
+  ...
+# Subtest: OBC014 a discard as the latest transaction is observable by the cleanup reader, not only by the projection
+ok 14 - OBC014 a discard as the latest transaction is observable by the cleanup reader, not only by the projection
+  ---
+  duration_ms: 77.969792
+  type: 'test'
+  ...
+# Subtest: OBC015 discard transition accepts exact feature-bound archived plan receipts
+ok 15 - OBC015 discard transition accepts exact feature-bound archived plan receipts
+  ---
+  duration_ms: 9.4402
+  type: 'test'
+  ...
+# Subtest: OBC016 discard transition rejects malformed or foreign archived plan receipts
+ok 16 - OBC016 discard transition rejects malformed or foreign archived plan receipts
+  ---
+  duration_ms: 36.181323
+  type: 'test'
+  ...
+# Subtest: OBC017 discard transition with a stale updatedAt remains damaged
+ok 17 - OBC017 discard transition with a stale updatedAt remains damaged
+  ---
+  duration_ms: 9.682969
+  type: 'test'
+  ...
+# Subtest: OBC018 discard entry with an extra key remains damaged
+ok 18 - OBC018 discard entry with an extra key remains damaged
+  ---
+  duration_ms: 8.727872
+  type: 'test'
+  ...
+# Subtest: OBC019 discard entry missing a required key remains damaged
+ok 19 - OBC019 discard entry missing a required key remains damaged
+  ---
+  duration_ms: 8.892371
+  type: 'test'
+  ...
+# Subtest: OBC020 discard transition with planApproved true remains damaged
+ok 20 - OBC020 discard transition with planApproved true remains damaged
+  ---
+  duration_ms: 9.039281
+  type: 'test'
+  ...
+# Subtest: OBC021 discard transition with continuity still present remains damaged
+ok 21 - OBC021 discard transition with continuity still present remains damaged
+  ---
+  duration_ms: 9.288229
+  type: 'test'
+  ...
+# Subtest: OBC022 discard transition with an empty discardedFeatures array remains damaged
+ok 22 - OBC022 discard transition with an empty discardedFeatures array remains damaged
+  ---
+  duration_ms: 9.173691
+  type: 'test'
+  ...
+# Subtest: OBC023 discard entry whose planPath escapes the project root remains damaged
+ok 23 - OBC023 discard entry whose planPath escapes the project root remains damaged
+  ---
+  duration_ms: 9.375089
+  type: 'test'
+  ...
+# Subtest: OBC024 orphan continuity and invalid active feature are damaged
+ok 24 - OBC024 orphan continuity and invalid active feature are damaged
+  ---
+  duration_ms: 11.462881
+  type: 'test'
+  ...
+# Subtest: OBC025 malformed state is unavailable and retains no invented digest
+ok 25 - OBC025 malformed state is unavailable and retains no invented digest
+  ---
+  duration_ms: 9.553189
+  type: 'test'
+  ...
+# Subtest: OBC026 mode-unreadable state is unavailable
+ok 26 - OBC026 mode-unreadable state is unavailable
+  ---
+  duration_ms: 7.434298
+  type: 'test'
+  ...
+# Subtest: OBC027 machine-state symlink is unavailable
+ok 27 - OBC027 machine-state symlink is unavailable
+  ---
+  duration_ms: 7.750017
+  type: 'test'
+  ...
+# Subtest: OBC028 project-root symlink is unavailable
+ok 28 - OBC028 project-root symlink is unavailable
+  ---
+  duration_ms: 7.417658
+  type: 'test'
+  ...
+# Subtest: OBC029 private history without machine state is damaged
+ok 29 - OBC029 private history without machine state is damaged
+  ---
+  duration_ms: 13.75726
+  type: 'test'
+  ...
+# Subtest: OBC030 malformed private history is unavailable with its observed digest
+ok 30 - OBC030 malformed private history is unavailable with its observed digest
+  ---
+  duration_ms: 9.706597
+  type: 'test'
+  ...
+# Subtest: OBC031 non-private history mode is unavailable
+ok 31 - OBC031 non-private history mode is unavailable
+  ---
+  duration_ms: 13.459553
+  type: 'test'
+  ...
+# Subtest: OBC032 win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed
+ok 32 - OBC032 win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed
+  ---
+  duration_ms: 13.357112
+  type: 'test'
+  ...
+# Subtest: OBC033 win32: an insecure DACL assessment on the private directory still fails closed
+ok 33 - OBC033 win32: an insecure DACL assessment on the private directory still fails closed
+  ---
+  duration_ms: 9.517538
+  type: 'test'
+  ...
+# Subtest: OBC034 win32: a secure directory but an insecure history-file DACL assessment still fails closed
+ok 34 - OBC034 win32: a secure directory but an insecure history-file DACL assessment still fails closed
+  ---
+  duration_ms: 13.268023
+  type: 'test'
+  ...
+# Subtest: OBC035 unsafe escape handover path is unavailable
+ok 35 - OBC035 unsafe escape handover path is unavailable
+  ---
+  duration_ms: 7.341798
+  type: 'test'
+  ...
+# Subtest: OBC036 unsafe absolute handover path is unavailable
+ok 36 - OBC036 unsafe absolute handover path is unavailable
+  ---
+  duration_ms: 7.194089
+  type: 'test'
+  ...
+# Subtest: OBC037 unsafe backslash handover path is unavailable
+ok 37 - OBC037 unsafe backslash handover path is unavailable
+  ---
+  duration_ms: 8.461862
+  type: 'test'
+  ...
+# Subtest: OBC038 handover symlink is unavailable
+ok 38 - OBC038 handover symlink is unavailable
+  ---
+  duration_ms: 7.497988
+  type: 'test'
+  ...
+# Subtest: OBC039 mode-unreadable handover is unavailable even for privileged test runners
+ok 39 - OBC039 mode-unreadable handover is unavailable even for privileged test runners
+  ---
+  duration_ms: 7.288259
+  type: 'test'
+  ...
+# Subtest: OBC040 goal validation trims UTF-8 and preserves shell metacharacters as data
+ok 40 - OBC040 goal validation trims UTF-8 and preserves shell metacharacters as data
+  ---
+  duration_ms: 0.129679
+  type: 'test'
+  ...
+# Subtest: OBC041 goal rejects blank
+ok 41 - OBC041 goal rejects blank
+  ---
+  duration_ms: 0.303879
+  type: 'test'
+  ...
+# Subtest: OBC042 goal rejects NUL
+ok 42 - OBC042 goal rejects NUL
+  ---
+  duration_ms: 0.128449
+  type: 'test'
+  ...
+# Subtest: OBC043 goal rejects multiple lines
+ok 43 - OBC043 goal rejects multiple lines
+  ---
+  duration_ms: 0.09274
+  type: 'test'
+  ...
+# Subtest: OBC044 goal rejects over 160 bytes
+ok 44 - OBC044 goal rejects over 160 bytes
+  ---
+  duration_ms: 0.084139
+  type: 'test'
+  ...
+# Subtest: OBC045 goal rejects UTF-8 over 160 bytes
+ok 45 - OBC045 goal rejects UTF-8 over 160 bytes
+  ---
+  duration_ms: 0.0779
+  type: 'test'
+  ...
+# Subtest: OBC046 160-byte goal is accepted exactly
+ok 46 - OBC046 160-byte goal is accepted exactly
+  ---
+  duration_ms: 0.089929
+  type: 'test'
+  ...
+# Subtest: OBC047 kickoff plan is deterministic, closed, valid, and read-only
+ok 47 - OBC047 kickoff plan is deterministic, closed, valid, and read-only
+  ---
+  duration_ms: 13.620462
+  type: 'test'
+  ...
+# Subtest: OBC048 kickoff resolves the PO language from a neutral runtime manifest
+ok 48 - OBC048 kickoff resolves the PO language from a neutral runtime manifest
+  ---
+  duration_ms: 11.132582
+  type: 'test'
+  ...
+# Subtest: OBC049 apply requires activation and the exact plan digest
+ok 49 - OBC049 apply requires activation and the exact plan digest
+  ---
+  duration_ms: 12.144068
+  type: 'test'
+  ...
+# Subtest: OBC050 apply is calibration-CAS bound and writes nothing after drift
+ok 50 - OBC050 apply is calibration-CAS bound and writes nothing after drift
+  ---
+  duration_ms: 23.286859
+  type: 'test'
+  ...
+# Subtest: OBC051 apply rejects apply-metadata drift even when the top-level digest field is unchanged
+ok 51 - OBC051 apply rejects apply-metadata drift even when the top-level digest field is unchanged
+  ---
+  duration_ms: 12.269587
+  type: 'test'
+  ...
+# Subtest: OBC052 apply rejects a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-H-LASTBUILDERS)
+ok 52 - OBC052 apply rejects a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-H-LASTBUILDERS)
+  ---
+  duration_ms: 11.862739
+  type: 'test'
+  ...
+# Subtest: OBC053 reconstructOnboardingKickoffPlan (replay): the reconstructed goal-bound plan also publishes nextAction identical to applyAction (NVA-H-LASTBUILDERS)
+ok 53 - OBC053 reconstructOnboardingKickoffPlan (replay): the reconstructed goal-bound plan also publishes nextAction identical to applyAction (NVA-H-LASTBUILDERS)
+  ---
+  duration_ms: 38.475523
+  type: 'test'
+  ...
+# Subtest: OBC054 planOnboardingKickoff: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-H-LASTBUILDERS)
+ok 54 - OBC054 planOnboardingKickoff: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-H-LASTBUILDERS)
+  ---
+  duration_ms: 10.196266
+  type: 'test'
+  ...
+# Subtest: OBC055 planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS)
+ok 55 - OBC055 planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS)
+  ---
+  duration_ms: 93.935864
+  type: 'test'
+  ...
+# Subtest: OBC056 planOnboardingKickoffPromotionCleanupRecovery: a not-applicable result carries neither applyAction nor nextAction nor planSha256 (NVA-H-LASTBUILDERS)
+ok 56 - OBC056 planOnboardingKickoffPromotionCleanupRecovery: a not-applicable result carries neither applyAction nor nextAction nor planSha256 (NVA-H-LASTBUILDERS)
+  ---
+  duration_ms: 10.952972
+  type: 'test'
+  ...
+# Subtest: OBC057 pre-existing initial authority artifact blocks plan without overwriting it
+ok 57 - OBC057 pre-existing initial authority artifact blocks plan without overwriting it
+  ---
+  duration_ms: 12.710485
+  type: 'test'
+  ...
+# Subtest: OBC058 apply creates exact state, configured handover, private history, and immediate valid readback
+ok 58 - OBC058 apply creates exact state, configured handover, private history, and immediate valid readback
+  ---
+  duration_ms: 34.770319
+  type: 'test'
+  ...
+# Subtest: OBC059 cleanup descriptor bind and release use exact state CAS without touching other fields
+ok 59 - OBC059 cleanup descriptor bind and release use exact state CAS without touching other fields
+  ---
+  duration_ms: 47.142947
+  type: 'test'
+  ...
+# Subtest: OBC060 bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state
+ok 60 - OBC060 bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state
+  ---
+  duration_ms: 72.103208
+  type: 'test'
+  ...
+# Subtest: OBC061 bindEphemeralPrivateCleanup refuses a non-neutral (legacy .claude/) state -- it never writes tracked authority state on a session-less caller's behalf
+ok 61 - OBC061 bindEphemeralPrivateCleanup refuses a non-neutral (legacy .claude/) state -- it never writes tracked authority state on a session-less caller's behalf
+  ---
+  duration_ms: 37.694478
+  type: 'test'
+  ...
+# Subtest: OBC062 bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound
+ok 62 - OBC062 bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound
+  ---
+  duration_ms: 58.191427
+  type: 'test'
+  ...
+# Subtest: OBC063 bounded repair normalizes only the invalid active-turn resume pair
+ok 63 - OBC063 bounded repair normalizes only the invalid active-turn resume pair
+  ---
+  duration_ms: 52.360793
+  type: 'test'
+  ...
+# Subtest: OBC064 shared close-evidence damage is diagnosed and repaired without changing evidence bytes
+ok 64 - OBC064 shared close-evidence damage is diagnosed and repaired without changing evidence bytes
+  ---
+  duration_ms: 35.372498
+  type: 'test'
+  ...
+# Subtest: OBC065 shared evidence repair keeps the sole matching claimant regardless of age and quarantines every mismatch
+ok 65 - OBC065 shared evidence repair keeps the sole matching claimant regardless of age and quarantines every mismatch
+  ---
+  duration_ms: 26.703534
+  type: 'test'
+  ...
+# Subtest: OBC066 shared close-evidence repair refuses missing, unrelated, and ambiguous evidence
+ok 66 - OBC066 shared close-evidence repair refuses missing, unrelated, and ambiguous evidence
+  ---
+  duration_ms: 30.938786
+  type: 'test'
+  ...
+# Subtest: OBC067 shared evidence diagnosis refuses zero matching claims, multiple groups, and independent stale claims
+ok 67 - OBC067 shared evidence diagnosis refuses zero matching claims, multiple groups, and independent stale claims
+  ---
+  duration_ms: 33.208056
+  type: 'test'
+  ...
+# Subtest: OBC068 shared evidence repair refuses unsafe paths and malformed unrelated state without writing
+ok 68 - OBC068 shared evidence repair refuses unsafe paths and malformed unrelated state without writing
+  ---
+  duration_ms: 61.670093
+  type: 'test'
+  ...
+# Subtest: OBC069 shared evidence repair rejects forged audit relationships after a successful repair
+ok 69 - OBC069 shared evidence repair rejects forged audit relationships after a successful repair
+  ---
+  duration_ms: 45.529483
+  type: 'test'
+  ...
+# Subtest: OBC070 repair records must bind existing feature IDs and exact live closed-feature assertions
+ok 70 - OBC070 repair records must bind existing feature IDs and exact live closed-feature assertions
+  ---
+  duration_ms: 73.431983
+  type: 'test'
+  ...
+# Subtest: OBC071 repair records cannot reuse a claimant across records even with different plan and preimage digests
+ok 71 - OBC071 repair records cannot reuse a claimant across records even with different plan and preimage digests
+  ---
+  duration_ms: 42.021208
+  type: 'test'
+  ...
+# Subtest: OBC072 a new collision overlapping an earlier repair is refused before changing State
+ok 72 - OBC072 a new collision overlapping an earlier repair is refused before changing State
+  ---
+  duration_ms: 31.684083
+  type: 'test'
+  ...
+# Subtest: OBC073 shared evidence repair preserves earlier repair records byte-for-byte on another independent repair
+ok 73 - OBC073 shared evidence repair preserves earlier repair records byte-for-byte on another independent repair
+  ---
+  duration_ms: 45.800981
+  type: 'test'
+  ...
+# Subtest: OBC074 shared close-evidence repair reports typed lock and CAS drift refusals without touching evidence
+ok 74 - OBC074 shared close-evidence repair reports typed lock and CAS drift refusals without touching evidence
+  ---
+  duration_ms: 30.863286
+  type: 'test'
+  ...
+# Subtest: OBC075 shared evidence drift before replacement refuses without changing State and cleans the owned temporary
+ok 75 - OBC075 shared evidence drift before replacement refuses without changing State and cleans the owned temporary
+  ---
+  duration_ms: 42.887755
+  type: 'test'
+  ...
+# Subtest: OBC076 shared evidence repair failed readback is typed and committed, even if continuity remains valid
+ok 76 - OBC076 shared evidence repair failed readback is typed and committed, even if continuity remains valid
+  ---
+  duration_ms: 53.532788
+  type: 'test'
+  ...
+# Subtest: OBC077 legacy adoption is explicit, PO-bound, and does not invent kickoff history
+ok 77 - OBC077 legacy adoption is explicit, PO-bound, and does not invent kickoff history
+  ---
+  duration_ms: 23.37896
+  type: 'test'
+  ...
+# Subtest: OBC078 continuity repair rejects authority drift and arbitrary invalid state
+ok 78 - OBC078 continuity repair rejects authority drift and arbitrary invalid state
+  ---
+  duration_ms: 38.267204
+  type: 'test'
+  ...
+# Subtest: OBC079 operator-authority-required repair goes red then green once operator authority is supplied
+ok 79 - OBC079 operator-authority-required repair goes red then green once operator authority is supplied
+  ---
+  duration_ms: 12.519616
+  type: 'test'
+  ...
+# Subtest: OBC080 operator-confirmed repair applies end-to-end to a valid classification
+ok 80 - OBC080 operator-confirmed repair applies end-to-end to a valid classification
+  ---
+  duration_ms: 25.33222
+  type: 'test'
+  ...
+# Subtest: OBC081 operator-confirmed repair refuses a bad or missing operator-supplied PRD or Spec path
+ok 81 - OBC081 operator-confirmed repair refuses a bad or missing operator-supplied PRD or Spec path
+  ---
+  duration_ms: 14.033819
+  type: 'test'
+  ...
+# Subtest: OBC082 completed apply replay is byte-null and returns the identical continuity hashes
+ok 82 - OBC082 completed apply replay is byte-null and returns the identical continuity hashes
+  ---
+  duration_ms: 44.635908
+  type: 'test'
+  ...
+# Subtest: OBC083 a competing state appearance fails closed
+ok 83 - OBC083 a competing state appearance fails closed
+  ---
+  duration_ms: 19.870363
+  type: 'test'
+  ...
+# Subtest: OBC084 lock rejection creates neither private nor project target parents
+ok 84 - OBC084 lock rejection creates neither private nor project target parents
+  ---
+  duration_ms: 12.113977
+  type: 'test'
+  ...
+# Subtest: OBC085 kickoff never unlinks a predictable foreign temporary artifact
+ok 85 - OBC085 kickoff never unlinks a predictable foreign temporary artifact
+  ---
+  duration_ms: 26.485876
+  type: 'test'
+  ...
+# Subtest: OBC086 failed kickoff removes only its newly created empty target parents
+ok 86 - OBC086 failed kickoff removes only its newly created empty target parents
+  ---
+  duration_ms: 27.69544
+  type: 'test'
+  ...
+# Subtest: OBC087 fault at prd-temp-fsync rolls back every proposed byte and permits a clean retry
+ok 87 - OBC087 fault at prd-temp-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 55.765169
+  type: 'test'
+  ...
+# Subtest: OBC088 fault at spec-temp-fsync rolls back every proposed byte and permits a clean retry
+ok 88 - OBC088 fault at spec-temp-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 56.556816
+  type: 'test'
+  ...
+# Subtest: OBC089 fault at state-temp-fsync rolls back every proposed byte and permits a clean retry
+ok 89 - OBC089 fault at state-temp-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 58.038409
+  type: 'test'
+  ...
+# Subtest: OBC090 fault at handover-temp-fsync rolls back every proposed byte and permits a clean retry
+ok 90 - OBC090 fault at handover-temp-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 62.553889
+  type: 'test'
+  ...
+# Subtest: OBC091 fault at history-temp-fsync rolls back every proposed byte and permits a clean retry
+ok 91 - OBC091 fault at history-temp-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 64.77142
+  type: 'test'
+  ...
+# Subtest: OBC092 fault at prd-rename rolls back every proposed byte and permits a clean retry
+ok 92 - OBC092 fault at prd-rename rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 64.93159
+  type: 'test'
+  ...
+# Subtest: OBC093 fault at prd-directory-fsync rolls back every proposed byte and permits a clean retry
+ok 93 - OBC093 fault at prd-directory-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 66.433142
+  type: 'test'
+  ...
+# Subtest: OBC094 fault at spec-rename rolls back every proposed byte and permits a clean retry
+ok 94 - OBC094 fault at spec-rename rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 69.341039
+  type: 'test'
+  ...
+# Subtest: OBC095 fault at spec-directory-fsync rolls back every proposed byte and permits a clean retry
+ok 95 - OBC095 fault at spec-directory-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 63.700926
+  type: 'test'
+  ...
+# Subtest: OBC096 fault at handover-rename rolls back every proposed byte and permits a clean retry
+ok 96 - OBC096 fault at handover-rename rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 61.300093
+  type: 'test'
+  ...
+# Subtest: OBC097 fault at handover-directory-fsync rolls back every proposed byte and permits a clean retry
+ok 97 - OBC097 fault at handover-directory-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 61.082195
+  type: 'test'
+  ...
+# Subtest: OBC098 fault at history-rename rolls back every proposed byte and permits a clean retry
+ok 98 - OBC098 fault at history-rename rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 60.39612
+  type: 'test'
+  ...
+# Subtest: OBC099 fault at history-directory-fsync rolls back every proposed byte and permits a clean retry
+ok 99 - OBC099 fault at history-directory-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 60.569548
+  type: 'test'
+  ...
+# Subtest: OBC100 fault at state-rename rolls back every proposed byte and permits a clean retry
+ok 100 - OBC100 fault at state-rename rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 62.19926
+  type: 'test'
+  ...
+# Subtest: OBC101 fault at state-directory-fsync rolls back every proposed byte and permits a clean retry
+ok 101 - OBC101 fault at state-directory-fsync rolls back every proposed byte and permits a clean retry
+  ---
+  duration_ms: 63.143487
+  type: 'test'
+  ...
+# Subtest: OBC102 crash at prd-temp-fsync is recovered only by the same digest-bound plan
+ok 102 - OBC102 crash at prd-temp-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 47.382585
+  type: 'test'
+  ...
+# Subtest: OBC103 crash at spec-temp-fsync is recovered only by the same digest-bound plan
+ok 103 - OBC103 crash at spec-temp-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 49.543646
+  type: 'test'
+  ...
+# Subtest: OBC104 crash at state-temp-fsync is recovered only by the same digest-bound plan
+ok 104 - OBC104 crash at state-temp-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 56.379056
+  type: 'test'
+  ...
+# Subtest: OBC105 crash at handover-temp-fsync is recovered only by the same digest-bound plan
+ok 105 - OBC105 crash at handover-temp-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 53.33927
+  type: 'test'
+  ...
+# Subtest: OBC106 crash at history-temp-fsync is recovered only by the same digest-bound plan
+ok 106 - OBC106 crash at history-temp-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 50.965699
+  type: 'test'
+  ...
+# Subtest: OBC107 crash at prd-rename is recovered only by the same digest-bound plan
+ok 107 - OBC107 crash at prd-rename is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 50.178042
+  type: 'test'
+  ...
+# Subtest: OBC108 crash at prd-directory-fsync is recovered only by the same digest-bound plan
+ok 108 - OBC108 crash at prd-directory-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 50.153554
+  type: 'test'
+  ...
+# Subtest: OBC109 crash at spec-rename is recovered only by the same digest-bound plan
+ok 109 - OBC109 crash at spec-rename is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 48.27128
+  type: 'test'
+  ...
+# Subtest: OBC110 crash at spec-directory-fsync is recovered only by the same digest-bound plan
+ok 110 - OBC110 crash at spec-directory-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 49.043039
+  type: 'test'
+  ...
+# Subtest: OBC111 crash at handover-rename is recovered only by the same digest-bound plan
+ok 111 - OBC111 crash at handover-rename is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 46.638317
+  type: 'test'
+  ...
+# Subtest: OBC112 crash at handover-directory-fsync is recovered only by the same digest-bound plan
+ok 112 - OBC112 crash at handover-directory-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 48.234482
+  type: 'test'
+  ...
+# Subtest: OBC113 crash at history-rename is recovered only by the same digest-bound plan
+ok 113 - OBC113 crash at history-rename is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 47.009476
+  type: 'test'
+  ...
+# Subtest: OBC114 crash at history-directory-fsync is recovered only by the same digest-bound plan
+ok 114 - OBC114 crash at history-directory-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 46.711698
+  type: 'test'
+  ...
+# Subtest: OBC115 crash at state-rename is recovered only by the same digest-bound plan
+ok 115 - OBC115 crash at state-rename is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 44.297148
+  type: 'test'
+  ...
+# Subtest: OBC116 crash at state-directory-fsync is recovered only by the same digest-bound plan
+ok 116 - OBC116 crash at state-directory-fsync is recovered only by the same digest-bound plan
+  ---
+  duration_ms: 43.824441
+  type: 'test'
+  ...
+# Subtest: OBC117 revision-0 kickoff seed promotion remains monotonic and replayable
+ok 117 - OBC117 revision-0 kickoff seed promotion remains monotonic and replayable
+  ---
+  duration_ms: 73.547332
+  type: 'test'
+  ...
+# Subtest: OBC118 promotion requires bound design evidence and rejects post-promotion evidence drift without repair
+ok 118 - OBC118 promotion requires bound design evidence and rejects post-promotion evidence drift without repair
+  ---
+  duration_ms: 78.458479
+  type: 'test'
+  ...
+# Subtest: OBC119 authentic post-privatization kickoff seed promotes revision 1 to revision 2
+ok 119 - OBC119 authentic post-privatization kickoff seed promotes revision 1 to revision 2
+  ---
+  duration_ms: 119.605163
+  type: 'test'
+  ...
+# Subtest: OBC120 post-privatization promotion promotion-history-temp-fsync crash recovers with the same bound plan
+ok 120 - OBC120 post-privatization promotion promotion-history-temp-fsync crash recovers with the same bound plan
+  ---
+  duration_ms: 113.993266
+  type: 'test'
+  ...
+# Subtest: OBC121 post-privatization promotion promotion-history-rename crash recovers with the same bound plan
+ok 121 - OBC121 post-privatization promotion promotion-history-rename crash recovers with the same bound plan
+  ---
+  duration_ms: 116.404217
+  type: 'test'
+  ...
+# Subtest: OBC122 post-privatization promotion promotion-history-published crash recovers with the same bound plan
+ok 122 - OBC122 post-privatization promotion promotion-history-published crash recovers with the same bound plan
+  ---
+  duration_ms: 122.176621
+  type: 'test'
+  ...
+# Subtest: OBC123 post-privatization promotion promotion-handover-temp-fsync crash recovers with the same bound plan
+ok 123 - OBC123 post-privatization promotion promotion-handover-temp-fsync crash recovers with the same bound plan
+  ---
+  duration_ms: 130.648935
+  type: 'test'
+  ...
+# Subtest: OBC124 post-privatization promotion promotion-handover-rename crash recovers with the same bound plan
+ok 124 - OBC124 post-privatization promotion promotion-handover-rename crash recovers with the same bound plan
+  ---
+  duration_ms: 122.35217
+  type: 'test'
+  ...
+# Subtest: OBC125 post-privatization promotion promotion-handover-published crash recovers with the same bound plan
+ok 125 - OBC125 post-privatization promotion promotion-handover-published crash recovers with the same bound plan
+  ---
+  duration_ms: 119.109145
+  type: 'test'
+  ...
+# Subtest: OBC126 post-privatization promotion promotion-cleanup-binding-published crash recovers with the same bound plan
+ok 126 - OBC126 post-privatization promotion promotion-cleanup-binding-published crash recovers with the same bound plan
+  ---
+  duration_ms: 113.449619
+  type: 'test'
+  ...
+# Subtest: OBC127 post-privatization promotion promotion-state-temp-fsync crash recovers with the same bound plan
+ok 127 - OBC127 post-privatization promotion promotion-state-temp-fsync crash recovers with the same bound plan
+  ---
+  duration_ms: 113.784573
+  type: 'test'
+  ...
+# Subtest: OBC128 post-privatization promotion promotion-state-rename crash recovers with the same bound plan
+ok 128 - OBC128 post-privatization promotion promotion-state-rename crash recovers with the same bound plan
+  ---
+  duration_ms: 109.080722
+  type: 'test'
+  ...
+# Subtest: OBC129 post-privatization promotion promotion-state-published crash recovers with the same bound plan
+ok 129 - OBC129 post-privatization promotion promotion-state-published crash recovers with the same bound plan
+  ---
+  duration_ms: 105.310152
+  type: 'test'
+  ...
+# Subtest: OBC130 promotion retires the provisional kickoff anchors with a marker naming its successor
+ok 130 - OBC130 promotion retires the provisional kickoff anchors with a marker naming its successor
+  ---
+  duration_ms: 60.901119
+  type: 'test'
+  ...
+# Subtest: OBC131 the promotion replaces the handover the kickoff wrote
+ok 131 - OBC131 the promotion replaces the handover the kickoff wrote
+  ---
+  duration_ms: 70.06729
+  type: 'test'
+  ...
+# Subtest: OBC132 a crash after the handover publication rolls forward, never backward
+ok 132 - OBC132 a crash after the handover publication rolls forward, never backward
+  ---
+  duration_ms: 105.497169
+  type: 'test'
+  ...
+# Subtest: OBC133 a foreign handover write is drift, not a prefix to roll forward over
+ok 133 - OBC133 a foreign handover write is drift, not a prefix to roll forward over
+  ---
+  duration_ms: 48.036455
+  type: 'test'
+  ...
+# Subtest: OBC134 promotion crash at promotion-history-temp-fsync leaves the provisional kickoff anchors byte for byte
+ok 134 - OBC134 promotion crash at promotion-history-temp-fsync leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 74.235422
+  type: 'test'
+  ...
+# Subtest: OBC135 promotion crash at promotion-history-rename leaves the provisional kickoff anchors byte for byte
+ok 135 - OBC135 promotion crash at promotion-history-rename leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 80.737495
+  type: 'test'
+  ...
+# Subtest: OBC136 promotion crash at promotion-history-published leaves the provisional kickoff anchors byte for byte
+ok 136 - OBC136 promotion crash at promotion-history-published leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 87.184957
+  type: 'test'
+  ...
+# Subtest: OBC137 promotion crash at promotion-handover-temp-fsync leaves the provisional kickoff anchors byte for byte
+ok 137 - OBC137 promotion crash at promotion-handover-temp-fsync leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 85.812664
+  type: 'test'
+  ...
+# Subtest: OBC138 promotion crash at promotion-handover-rename leaves the provisional kickoff anchors byte for byte
+ok 138 - OBC138 promotion crash at promotion-handover-rename leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 84.16314
+  type: 'test'
+  ...
+# Subtest: OBC139 promotion crash at promotion-handover-published leaves the provisional kickoff anchors byte for byte
+ok 139 - OBC139 promotion crash at promotion-handover-published leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 82.537667
+  type: 'test'
+  ...
+# Subtest: OBC140 promotion crash at promotion-cleanup-binding-published leaves the provisional kickoff anchors byte for byte
+ok 140 - OBC140 promotion crash at promotion-cleanup-binding-published leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 81.935579
+  type: 'test'
+  ...
+# Subtest: OBC141 promotion crash at promotion-state-temp-fsync leaves the provisional kickoff anchors byte for byte
+ok 141 - OBC141 promotion crash at promotion-state-temp-fsync leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 87.440806
+  type: 'test'
+  ...
+# Subtest: OBC142 promotion crash at promotion-state-rename leaves the provisional kickoff anchors byte for byte
+ok 142 - OBC142 promotion crash at promotion-state-rename leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 84.34358
+  type: 'test'
+  ...
+# Subtest: OBC143 promotion crash at promotion-state-published leaves the provisional kickoff anchors byte for byte
+ok 143 - OBC143 promotion crash at promotion-state-published leaves the provisional kickoff anchors byte for byte
+  ---
+  duration_ms: 87.596875
+  type: 'test'
+  ...
+# Subtest: OBC144 promotion replay after supersession stays zero-write and canonically identical
+ok 144 - OBC144 promotion replay after supersession stays zero-write and canonically identical
+  ---
+  duration_ms: 72.61716
+  type: 'test'
+  ...
+# Subtest: OBC145 an already-cleaned provisional location survives inspection and replay
+ok 145 - OBC145 an already-cleaned provisional location survives inspection and replay
+  ---
+  duration_ms: 77.382189
+  type: 'test'
+  ...
+# Subtest: OBC146 an already-marked provisional location is never overwritten by the promotion
+ok 146 - OBC146 an already-marked provisional location is never overwritten by the promotion
+  ---
+  duration_ms: 72.56264
+  type: 'test'
+  ...
+# Subtest: OBC147 legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay
+ok 147 - OBC147 legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay
+  ---
+  duration_ms: 152.00696
+  type: 'test'
+  ...
+# Subtest: OBC148 legacy promotion cleanup recovery is crash-replay safe after private binding publication
+ok 148 - OBC148 legacy promotion cleanup recovery is crash-replay safe after private binding publication
+  ---
+  duration_ms: 145.321209
+  type: 'test'
+  ...
+# Subtest: OBC149 ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay
+ok 149 - OBC149 ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay
+  ---
+  duration_ms: 144.271942
+  type: 'test'
+  ...
+# Subtest: OBC150 legacy promotion cleanup mismatch history-binding fails closed
+ok 150 - OBC150 legacy promotion cleanup mismatch history-binding fails closed
+  ---
+  duration_ms: 97.747883
+  type: 'test'
+  ...
+# Subtest: OBC151 legacy promotion cleanup mismatch state-feature fails closed
+ok 151 - OBC151 legacy promotion cleanup mismatch state-feature fails closed
+  ---
+  duration_ms: 98.170211
+  type: 'test'
+  ...
+# Subtest: OBC152 revision-1 kickoff lookalike without authenticated private binding is rejected
+ok 152 - OBC152 revision-1 kickoff lookalike without authenticated private binding is rejected
+  ---
+  duration_ms: 43.530384
+  type: 'test'
+  ...
+# Subtest: OBC153 post-privatization kickoff rejects revision-two
+ok 153 - OBC153 post-privatization kickoff rejects revision-two
+  ---
+  duration_ms: 61.297017
+  type: 'test'
+  ...
+# Subtest: OBC154 post-privatization kickoff rejects authority-drift
+ok 154 - OBC154 post-privatization kickoff rejects authority-drift
+  ---
+  duration_ms: 62.232814
+  type: 'test'
+  ...
+# Subtest: OBC155 post-privatization kickoff rejects dispatch
+ok 155 - OBC155 post-privatization kickoff rejects dispatch
+  ---
+  duration_ms: 62.086675
+  type: 'test'
+  ...
+# Subtest: OBC156 post-privatization kickoff rejects blocker
+ok 156 - OBC156 post-privatization kickoff rejects blocker
+  ---
+  duration_ms: 64.804983
+  type: 'test'
+  ...
+# Subtest: OBC157 post-privatization kickoff rejects queue-mutation
+ok 157 - OBC157 post-privatization kickoff rejects queue-mutation
+  ---
+  duration_ms: 67.253252
+  type: 'test'
+  ...
+# Subtest: OBC158 post-privatization kickoff rejects result
+ok 158 - OBC158 post-privatization kickoff rejects result
+  ---
+  duration_ms: 62.727592
+  type: 'test'
+  ...
+# Subtest: OBC159 post-privatization kickoff rejects decision
+ok 159 - OBC159 post-privatization kickoff rejects decision
+  ---
+  duration_ms: 76.480443
+  type: 'test'
+  ...
+# Subtest: OBC160 post-privatization kickoff rejects false-history
+ok 160 - OBC160 post-privatization kickoff rejects false-history
+  ---
+  duration_ms: 80.558706
+  type: 'test'
+  ...
+# Subtest: OBC161 promotion binds the PRD as the approval subject and presents the Spec beside it
+ok 161 - OBC161 promotion binds the PRD as the approval subject and presents the Spec beside it
+  ---
+  duration_ms: 67.786329
+  type: 'test'
+  ...
+# Subtest: OBC162 the recorded promotion transaction names the PRD and the Spec with both digests
+ok 162 - OBC162 the recorded promotion transaction names the PRD and the Spec with both digests
+  ---
+  duration_ms: 70.064171
+  type: 'test'
+  ...
+# Subtest: OBC163 editing the promoted PRD invalidates the mutual digest binding
+ok 163 - OBC163 editing the promoted PRD invalidates the mutual digest binding
+  ---
+  duration_ms: 67.490331
+  type: 'test'
+  ...
+# Subtest: OBC164 editing the promoted Spec invalidates the mutual digest binding
+ok 164 - OBC164 editing the promoted Spec invalidates the mutual digest binding
+  ---
+  duration_ms: 66.474925
+  type: 'test'
+  ...
+# Subtest: OBC165 the promoted state's language is the promoted PRD's marker, not the kickoff default
+ok 165 - OBC165 the promoted state's language is the promoted PRD's marker, not the kickoff default
+  ---
+  duration_ms: 129.022689
+  type: 'test'
+  ...
+# Subtest: OBC166 a reopened design may edit its promoted documents without ending the session
+ok 166 - OBC166 a reopened design may edit its promoted documents without ending the session
+  ---
+  duration_ms: 73.561436
+  type: 'test'
+  ...
+# Subtest: OBC167 promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec
+ok 167 - OBC167 promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec
+  ---
+  duration_ms: 38.239716
+  type: 'test'
+  ...
+# Subtest: OBC168 promotion refuses a feature id that would later fail push-approval's stricter shape
+ok 168 - OBC168 promotion refuses a feature id that would later fail push-approval's stricter shape
+  ---
+  duration_ms: 44.260241
+  type: 'test'
+  ...
+# Subtest: OBC169 promotion refuses a PRD without the technical Spec marker, naming the exact digest to add
+ok 169 - OBC169 promotion refuses a PRD without the technical Spec marker, naming the exact digest to add
+  ---
+  duration_ms: 42.17342
+  type: 'test'
+  ...
+# Subtest: OBC170 promotion refuses a PRD carrying more than one technical Spec marker, with the same missing-marker code
+ok 170 - OBC170 promotion refuses a PRD carrying more than one technical Spec marker, with the same missing-marker code
+  ---
+  duration_ms: 50.482424
+  type: 'test'
+  ...
+# Subtest: OBC171 promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code
+ok 171 - OBC171 promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code
+  ---
+  duration_ms: 43.261385
+  type: 'test'
+  ...
+# Subtest: OBC172 promotion refuses a PRD without the PO plan acknowledgement marker (NVA-W4-2B)
+ok 172 - OBC172 promotion refuses a PRD without the PO plan acknowledgement marker (NVA-W4-2B)
+  ---
+  duration_ms: 45.696483
+  type: 'test'
+  ...
+# Subtest: OBC173 promotion refuses a PRD carrying more than one PO plan acknowledgement marker, with the same missing-marker code (NVA-W4-2B)
+ok 173 - OBC173 promotion refuses a PRD carrying more than one PO plan acknowledgement marker, with the same missing-marker code (NVA-W4-2B)
+  ---
+  duration_ms: 42.764248
+  type: 'test'
+  ...
+# Subtest: OBC174 a generated coordinator checkpoint cannot be re-routed through a new legacy kickoff promotion
+ok 174 - OBC174 a generated coordinator checkpoint cannot be re-routed through a new legacy kickoff promotion
+  ---
+  duration_ms: 200.366334
+  type: 'test'
+  ...
+# Subtest: OBC175 promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set
+ok 175 - OBC175 promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set
+  ---
+  duration_ms: 87.860544
+  type: 'test'
+  ...
+# Subtest: OBC176 promote apply independently refuses a PRD that lost its technical Spec marker after plan
+ok 176 - OBC176 promote apply independently refuses a PRD that lost its technical Spec marker after plan
+  ---
+  duration_ms: 54.093198
+  type: 'test'
+  ...
+# Subtest: OBC177 promotion admits a PRD carrying both correct po-gate markers exactly as before
+ok 177 - OBC177 promotion admits a PRD carrying both correct po-gate markers exactly as before
+  ---
+  duration_ms: 66.799345
+  type: 'test'
+  ...
+# Subtest: OBC178 promotion admits a PRD carrying a document-language marker outside {de, en} and records it separately from the operator-facing language
+ok 178 - OBC178 promotion admits a PRD carrying a document-language marker outside {de, en} and records it separately from the operator-facing language
+  ---
+  duration_ms: 67.078704
+  type: 'test'
+  ...
+# Subtest: OBC179 a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike
+ok 179 - OBC179 a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike
+  ---
+  duration_ms: 67.628101
+  type: 'test'
+  ...
+# Subtest: OBC180 a legacy promotion whose planPath is the Spec stays readable and is refused a new promotion
+ok 180 - OBC180 a legacy promotion whose planPath is the Spec stays readable and is refused a new promotion
+  ---
+  duration_ms: 66.162098
+  type: 'test'
+  ...
+# Subtest: OBC181 a plan-bound apply action cannot be constructed without the runner its plan was made under
+ok 181 - OBC181 a plan-bound apply action cannot be constructed without the runner its plan was made under
+  ---
+  duration_ms: 51.278561
+  type: 'test'
+  ...
+# Subtest: OBC182 every kickoff/promotion plan builder carries its runner into the resolved apply action (enumerating)
+ok 182 - OBC182 every kickoff/promotion plan builder carries its runner into the resolved apply action (enumerating)
+  ---
+  duration_ms: 153.933241
+  type: 'test'
+  ...
+# Subtest: OBC183 nextActionSection: no active feature renders the set-feature action
+ok 183 - OBC183 nextActionSection: no active feature renders the set-feature action
+  ---
+  duration_ms: 0.418338
+  type: 'test'
+  ...
+# Subtest: OBC184 nextActionSection: a closed feature (activeFeature removed) renders the same set-feature action
+ok 184 - OBC184 nextActionSection: a closed feature (activeFeature removed) renders the same set-feature action
+  ---
+  duration_ms: 0.12078
+  type: 'test'
+  ...
+# Subtest: OBC185 nextActionSection: draft (no submission yet) renders submit-plan
+ok 185 - OBC185 nextActionSection: draft (no submission yet) renders submit-plan
+  ---
+  duration_ms: 0.296958
+  type: 'test'
+  ...
+# Subtest: OBC186 nextActionSection: awaiting-approval points at the canonical typed inspection action
+ok 186 - OBC186 nextActionSection: awaiting-approval points at the canonical typed inspection action
+  ---
+  duration_ms: 0.301129
+  type: 'test'
+  ...
+# Subtest: OBC187 nextActionSection: approved but still in design phase renders set-phase implementation
+ok 187 - OBC187 nextActionSection: approved but still in design phase renders set-phase implementation
+  ---
+  duration_ms: 0.289949
+  type: 'test'
+  ...
+# Subtest: OBC188 nextActionSection: implementing (phase switched) renders the proceed-with-implementation text
+ok 188 - OBC188 nextActionSection: implementing (phase switched) renders the proceed-with-implementation text
+  ---
+  duration_ms: 0.191849
+  type: 'test'
+  ...
+# Subtest: OBC189 nextActionSection: a contradictory state (planApproved true, no approval on record) fails closed to the live-source fallback
+ok 189 - OBC189 nextActionSection: a contradictory state (planApproved true, no approval on record) fails closed to the live-source fallback
+  ---
+  duration_ms: 0.140609
+  type: 'test'
+  ...
+# Subtest: OBC190 nextActionSection: a malformed state (unrecognized schema) never throws and falls back to the live-source text
+ok 190 - OBC190 nextActionSection: a malformed state (unrecognized schema) never throws and falls back to the live-source text
+  ---
+  duration_ms: 0.09613
+  type: 'test'
+  ...
+# Subtest: OBC191 nextActionSection does not mutate its input state object
+ok 191 - OBC191 nextActionSection does not mutate its input state object
+  ---
+  duration_ms: 0.17547
+  type: 'test'
+  ...
+# Subtest: OBC192 replaceNextActionSection: replaces only the Next-action span; another heading follows
+ok 192 - OBC192 replaceNextActionSection: replaces only the Next-action span; another heading follows
+  ---
+  duration_ms: 0.183029
+  type: 'test'
+  ...
+# Subtest: OBC193 replaceNextActionSection: Next action is the last section (EOF); trailing newline preserved
+ok 193 - OBC193 replaceNextActionSection: Next action is the last section (EOF); trailing newline preserved
+  ---
+  duration_ms: 0.106759
+  type: 'test'
+  ...
+# Subtest: OBC194 replaceNextActionSection: returns null (fail closed) when no '\#\# Next action' heading exists
+ok 194 - OBC194 replaceNextActionSection: returns null (fail closed) when no '\#\# Next action' heading exists
+  ---
+  duration_ms: 0.10682
+  type: 'test'
+  ...
+# Subtest: OBC195 replaceNextActionSection: returns null on non-string input rather than throwing
+ok 195 - OBC195 replaceNextActionSection: returns null on non-string input rather than throwing
+  ---
+  duration_ms: 0.132089
+  type: 'test'
+  ...
+# Subtest: OBC196 syncStateMdNextAction: rewrites docs/state.md's Next action section in place
+ok 196 - OBC196 syncStateMdNextAction: rewrites docs/state.md's Next action section in place
+  ---
+  duration_ms: 1.319684
+  type: 'test'
+  ...
+# Subtest: OBC197 syncStateMdNextAction: fails closed (no write) when docs/state.md is absent
+ok 197 - OBC197 syncStateMdNextAction: fails closed (no write) when docs/state.md is absent
+  ---
+  duration_ms: 0.623458
+  type: 'test'
+  ...
+# Subtest: OBC198 syncStateMdNextAction: fails closed (no corruption) when no '\#\# Next action' heading exists
+ok 198 - OBC198 syncStateMdNextAction: fails closed (no corruption) when no '\#\# Next action' heading exists
+  ---
+  duration_ms: 1.046705
+  type: 'test'
+  ...
+# Subtest: OBC199 syncStateMdNextAction: resyncs a calibration-configured handover path, not docs/state.md
+ok 199 - OBC199 syncStateMdNextAction: resyncs a calibration-configured handover path, not docs/state.md
+  ---
+  duration_ms: 7.487579
+  type: 'test'
+  ...
+# Subtest: OBC200 syncStateMdNextAction: resyncs an object-shaped ({ path, maxBytes }) calibration-configured handover
+ok 200 - OBC200 syncStateMdNextAction: resyncs an object-shaped ({ path, maxBytes }) calibration-configured handover
+  ---
+  duration_ms: 7.342258
+  type: 'test'
+  ...
+# Subtest: OBC201 syncStateMdNextAction: is a no-op write when the rendered text already matches
+ok 201 - OBC201 syncStateMdNextAction: is a no-op write when the rendered text already matches
+  ---
+  duration_ms: 0.982896
+  type: 'test'
+  ...
+# Subtest: OBC202 intake checkpoint: validateIntakeCheckpoint round-trips through readOnboardingIntakeCheckpoint
+ok 202 - OBC202 intake checkpoint: validateIntakeCheckpoint round-trips through readOnboardingIntakeCheckpoint
+  ---
+  duration_ms: 40.357577
+  type: 'test'
+  ...
+# Subtest: OBC203 applyOnboardingIntakeConsent: happy path grants consent and fills all three values in one bundled ask
+ok 203 - OBC203 applyOnboardingIntakeConsent: happy path grants consent and fills all three values in one bundled ask
+  ---
+  duration_ms: 27.651922
+  type: 'test'
+  ...
+# Subtest: OBC204 applyOnboardingIntakeConsent: activation is required
+ok 204 - OBC204 applyOnboardingIntakeConsent: activation is required
+  ---
+  duration_ms: 6.88523
+  type: 'test'
+  ...
+# Subtest: OBC205 applyOnboardingIntakeConsent: requires explicit affirmative consent
+ok 205 - OBC205 applyOnboardingIntakeConsent: requires explicit affirmative consent
+  ---
+  duration_ms: 6.954051
+  type: 'test'
+  ...
+# Subtest: OBC206 applyOnboardingIntakeConsent: rejects an invalid candidate git author
+ok 206 - OBC206 applyOnboardingIntakeConsent: rejects an invalid candidate git author
+  ---
+  duration_ms: 7.065159
+  type: 'test'
+  ...
+# Subtest: OBC207 applyOnboardingIntakeConsent: rejects an invalid candidate language
+ok 207 - OBC207 applyOnboardingIntakeConsent: rejects an invalid candidate language
+  ---
+  duration_ms: 6.512782
+  type: 'test'
+  ...
+# Subtest: OBC208 applyOnboardingIntakeConsent: rejects an invalid candidate profile
+ok 208 - OBC208 applyOnboardingIntakeConsent: rejects an invalid candidate profile
+  ---
+  duration_ms: 7.825217
+  type: 'test'
+  ...
+# Subtest: OBC209 applyOnboardingIntakeConsent: idempotent re-run only fills fields still null, never overwrites an answered one
+ok 209 - OBC209 applyOnboardingIntakeConsent: idempotent re-run only fills fields still null, never overwrites an answered one
+  ---
+  duration_ms: 52.320596
+  type: 'test'
+  ...
+# Subtest: OBC210 applyOnboardingIntakeConsent: without text, consent applies without creating a material capture
+ok 210 - OBC210 applyOnboardingIntakeConsent: without text, consent applies without creating a material capture
+  ---
+  duration_ms: 35.697958
+  type: 'test'
+  ...
+# Subtest: OBC211 applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined
+ok 211 - OBC211 applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined
+  ---
+  duration_ms: 35.676248
+  type: 'test'
+  ...
+# Subtest: OBC212 applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs
+ok 212 - OBC212 applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs
+  ---
+  duration_ms: 57.928842
+  type: 'test'
+  ...
+# Subtest: OBC213 applyOnboardingIntakeConsent: a merged call produces the identical checkpoint (minus timestamps) as two separate consent-apply then capture-apply calls
+ok 213 - OBC213 applyOnboardingIntakeConsent: a merged call produces the identical checkpoint (minus timestamps) as two separate consent-apply then capture-apply calls
+  ---
+  duration_ms: 101.128318
+  type: 'test'
+  ...
+# Subtest: OBC214 applyOnboardingIntakeConsent: a merged call that fails at the capture step leaves consent durably recorded, and a retry converges
+ok 214 - OBC214 applyOnboardingIntakeConsent: a merged call that fails at the capture step leaves consent durably recorded, and a retry converges
+  ---
+  duration_ms: 63.606139
+  type: 'test'
+  ...
+# Subtest: OBC215 applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry
+ok 215 - OBC215 applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry
+  ---
+  duration_ms: 54.377278
+  type: 'test'
+  ...
+# Subtest: OBC216 applyOnboardingIntakeCapture: activation is required
+ok 216 - OBC216 applyOnboardingIntakeCapture: activation is required
+  ---
+  duration_ms: 28.178049
+  type: 'test'
+  ...
+# Subtest: OBC217 applyOnboardingIntakeCapture: rejects empty text
+ok 217 - OBC217 applyOnboardingIntakeCapture: rejects empty text
+  ---
+  duration_ms: 27.585032
+  type: 'test'
+  ...
+# Subtest: OBC218 applyOnboardingIntakeCapture: rejects a chunk over the per-chunk byte limit
+ok 218 - OBC218 applyOnboardingIntakeCapture: rejects a chunk over the per-chunk byte limit
+  ---
+  duration_ms: 29.288435
+  type: 'test'
+  ...
+# Subtest: OBC219 applyOnboardingIntakeCapture: requires consent to already be recorded
+ok 219 - OBC219 applyOnboardingIntakeCapture: requires consent to already be recorded
+  ---
+  duration_ms: 27.841381
+  type: 'test'
+  ...
+# Subtest: OBC220 applyOnboardingIntakeCapture: advances transactionState from collecting to design-questions-pending only on the first capture
+ok 220 - OBC220 applyOnboardingIntakeCapture: advances transactionState from collecting to design-questions-pending only on the first capture
+  ---
+  duration_ms: 72.565969
+  type: 'test'
+  ...
+# Subtest: OBC221 applyOnboardingIntakeCapture: an idempotent duplicate-content capture converges without a second entry
+ok 221 - OBC221 applyOnboardingIntakeCapture: an idempotent duplicate-content capture converges without a second entry
+  ---
+  duration_ms: 61.922946
+  type: 'test'
+  ...
+# Subtest: OBC222 readOnboardingIntakeMaterialInput: absent checkpoint returns status absent and an empty chunk list
+ok 222 - OBC222 readOnboardingIntakeMaterialInput: absent checkpoint returns status absent and an empty chunk list
+  ---
+  duration_ms: 12.291557
+  type: 'test'
+  ...
+# Subtest: OBC223 readOnboardingIntakeMaterialInput: resolves every captured chunk back to its byte-identical text, in capture order
+ok 223 - OBC223 readOnboardingIntakeMaterialInput: resolves every captured chunk back to its byte-identical text, in capture order
+  ---
+  duration_ms: 87.137558
+  type: 'test'
+  ...
+# Subtest: OBC224 applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate
+ok 224 - OBC224 applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate
+  ---
+  duration_ms: 69.437633
+  type: 'test'
+  ...
+# Subtest: OBC225 applyOnboardingIntakeDesignQuestions: activation is required
+ok 225 - OBC225 applyOnboardingIntakeDesignQuestions: activation is required
+  ---
+  duration_ms: 51.57224
+  type: 'test'
+  ...
+# Subtest: OBC226 applyOnboardingIntakeDesignQuestions: rejects an empty answer set
+ok 226 - OBC226 applyOnboardingIntakeDesignQuestions: rejects an empty answer set
+  ---
+  duration_ms: 51.461109
+  type: 'test'
+  ...
+# Subtest: OBC227 applyOnboardingIntakeDesignQuestions: affirmative zero-open disposition is distinct from missing input and replays exactly
+ok 227 - OBC227 applyOnboardingIntakeDesignQuestions: affirmative zero-open disposition is distinct from missing input and replays exactly
+  ---
+  duration_ms: 74.148584
+  type: 'test'
+  ...
+# Subtest: OBC228 applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first
+ok 228 - OBC228 applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first
+  ---
+  duration_ms: 36.242195
+  type: 'test'
+  ...
+# Subtest: OBC229 applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at all
+ok 229 - OBC229 applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at all
+  ---
+  duration_ms: 14.353879
+  type: 'test'
+  ...
+# Subtest: OBC230 applyOnboardingIntakeDesignQuestions: normal apply refuses a different answer set once the round is already answered
+ok 230 - OBC230 applyOnboardingIntakeDesignQuestions: normal apply refuses a different answer set once the round is already answered
+  ---
+  duration_ms: 75.153839
+  type: 'test'
+  ...
+# Subtest: OBC231 applyOnboardingIntakeDesignQuestions: explicit replacement corrects answers before generation
+ok 231 - OBC231 applyOnboardingIntakeDesignQuestions: explicit replacement corrects answers before generation
+  ---
+  duration_ms: 85.223235
+  type: 'test'
+  ...
+# Subtest: OBC232 applyOnboardingIntakeDesignQuestions: explicit replacement is refused after staging generation
+ok 232 - OBC232 applyOnboardingIntakeDesignQuestions: explicit replacement is refused after staging generation
+  ---
+  duration_ms: 131.423299
+  type: 'test'
+  ...
+# Subtest: OBC233 applyOnboardingIntakeDesignQuestions: an exact replay of the same already-answered round is a no-op
+ok 233 - OBC233 applyOnboardingIntakeDesignQuestions: an exact replay of the same already-answered round is a no-op
+  ---
+  duration_ms: 77.018451
+  type: 'test'
+  ...
+# Subtest: OBC234 intake checkpoint write: crash at cas-recheck leaves either absent or fully committed content, never torn, and a retry converges
+ok 234 - OBC234 intake checkpoint write: crash at cas-recheck leaves either absent or fully committed content, never torn, and a retry converges
+  ---
+  duration_ms: 56.674078
+  type: 'test'
+  ...
+# Subtest: OBC235 intake checkpoint write: crash at temp-fsync leaves either absent or fully committed content, never torn, and a retry converges
+ok 235 - OBC235 intake checkpoint write: crash at temp-fsync leaves either absent or fully committed content, never torn, and a retry converges
+  ---
+  duration_ms: 56.675028
+  type: 'test'
+  ...
+# Subtest: OBC236 intake checkpoint write: crash at rename leaves either absent or fully committed content, never torn, and a retry converges
+ok 236 - OBC236 intake checkpoint write: crash at rename leaves either absent or fully committed content, never torn, and a retry converges
+  ---
+  duration_ms: 46.451602
+  type: 'test'
+  ...
+# Subtest: OBC237 intake checkpoint write: crash at directory-fsync leaves either absent or fully committed content, never torn, and a retry converges
+ok 237 - OBC237 intake checkpoint write: crash at directory-fsync leaves either absent or fully committed content, never torn, and a retry converges
+  ---
+  duration_ms: 47.473937
+  type: 'test'
+  ...
+# Subtest: OBC238 intake checkpoint evidence: crash at evidence-temp-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+ok 238 - OBC238 intake checkpoint evidence: crash at evidence-temp-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+  ---
+  duration_ms: 63.476498
+  type: 'test'
+  ...
+# Subtest: OBC239 intake checkpoint evidence: crash at evidence-rename leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+ok 239 - OBC239 intake checkpoint evidence: crash at evidence-rename leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+  ---
+  duration_ms: 63.442919
+  type: 'test'
+  ...
+# Subtest: OBC240 intake checkpoint evidence: crash at evidence-directory-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+ok 240 - OBC240 intake checkpoint evidence: crash at evidence-directory-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges
+  ---
+  duration_ms: 62.850801
+  type: 'test'
+  ...
+# Subtest: OBC241 intake checkpoint: a preimage that changes between the two observations is refused as CAS drift, not silently overwritten
+ok 241 - OBC241 intake checkpoint: a preimage that changes between the two observations is refused as CAS drift, not silently overwritten
+  ---
+  duration_ms: 45.605695
+  type: 'test'
+  ...
+# Subtest: OBC242 planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path derives and writes all three staging targets
+ok 242 - OBC242 planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path derives and writes all three staging targets
+  ---
+  duration_ms: 125.594593
+  type: 'test'
+  ...
+# Subtest: OBC243 applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence
+ok 243 - OBC243 applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence
+  ---
+  duration_ms: 181.250726
+  type: 'test'
+  ...
+# Subtest: OBC244 planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts
+ok 244 - OBC244 planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts
+  ---
+  duration_ms: 79.043712
+  type: 'test'
+  ...
+# Subtest: OBC245 applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence
+ok 245 - OBC245 applyOnboardingIntakeGenerate: private host paths are projected consistently without changing restart-readable intake evidence
+  ---
+  duration_ms: 180.12141
+  type: 'test'
+  ...
+# Subtest: OBC246 planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts
+ok 246 - OBC246 planOnboardingIntakeGenerate: path-free material keeps the pre-projection byte layout in all three artifacts
+  ---
+  duration_ms: 80.024518
+  type: 'test'
+  ...
+# Subtest: OBC247 planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here
+ok 247 - OBC247 planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here
+  ---
+  duration_ms: 129.831395
+  type: 'test'
+  ...
+# Subtest: OBC248 applyOnboardingIntakeGenerate: activation is required
+ok 248 - OBC248 applyOnboardingIntakeGenerate: activation is required
+  ---
+  duration_ms: 83.266914
+  type: 'test'
+  ...
+# Subtest: OBC249 planOnboardingIntakeGenerate: requires an existing checkpoint
+ok 249 - OBC249 planOnboardingIntakeGenerate: requires an existing checkpoint
+  ---
+  duration_ms: 15.169005
+  type: 'test'
+  ...
+# Subtest: OBC250 planOnboardingIntakeGenerate: refuses a checkpoint still short of ready-to-generate
+ok 250 - OBC250 planOnboardingIntakeGenerate: refuses a checkpoint still short of ready-to-generate
+  ---
+  duration_ms: 40.791416
+  type: 'test'
+  ...
+# Subtest: OBC251 applyOnboardingIntakeGenerate: refuses a plan digest mismatch
+ok 251 - OBC251 applyOnboardingIntakeGenerate: refuses a plan digest mismatch
+  ---
+  duration_ms: 80.135016
+  type: 'test'
+  ...
+# Subtest: OBC252 applyOnboardingIntakeGenerate: creates specs/ itself instead of demanding it, on a root that has neither specs/ nor project/
+ok 252 - OBC252 applyOnboardingIntakeGenerate: creates specs/ itself instead of demanding it, on a root that has neither specs/ nor project/
+  ---
+  duration_ms: 126.458609
+  type: 'test'
+  ...
+# Subtest: OBC253 applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op
+ok 253 - OBC253 applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op
+  ---
+  duration_ms: 168.352341
+  type: 'test'
+  ...
+# Subtest: OBC254 applyOnboardingIntakeGenerate: a changed checkpoint safely regenerates with a STABLE featureId
+ok 254 - OBC254 applyOnboardingIntakeGenerate: a changed checkpoint safely regenerates with a STABLE featureId
+  ---
+  duration_ms: 209.222135
+  type: 'test'
+  ...
+# Subtest: OBC255 intake staging generation: crash at designInput-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 255 - OBC255 intake staging generation: crash at designInput-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 161.947185
+  type: 'test'
+  ...
+# Subtest: OBC256 intake staging generation: crash at designInput-rename leaves that target either absent or fully committed, never torn, and a retry converges
+ok 256 - OBC256 intake staging generation: crash at designInput-rename leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 158.899075
+  type: 'test'
+  ...
+# Subtest: OBC257 intake staging generation: crash at designInput-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 257 - OBC257 intake staging generation: crash at designInput-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 164.29151
+  type: 'test'
+  ...
+# Subtest: OBC258 intake staging generation: crash at prd-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 258 - OBC258 intake staging generation: crash at prd-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 162.416208
+  type: 'test'
+  ...
+# Subtest: OBC259 intake staging generation: crash at prd-rename leaves that target either absent or fully committed, never torn, and a retry converges
+ok 259 - OBC259 intake staging generation: crash at prd-rename leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 152.503342
+  type: 'test'
+  ...
+# Subtest: OBC260 intake staging generation: crash at prd-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 260 - OBC260 intake staging generation: crash at prd-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 155.556618
+  type: 'test'
+  ...
+# Subtest: OBC261 intake staging generation: crash at spec-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 261 - OBC261 intake staging generation: crash at spec-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 155.299509
+  type: 'test'
+  ...
+# Subtest: OBC262 intake staging generation: crash at spec-rename leaves that target either absent or fully committed, never torn, and a retry converges
+ok 262 - OBC262 intake staging generation: crash at spec-rename leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 153.135349
+  type: 'test'
+  ...
+# Subtest: OBC263 intake staging generation: crash at spec-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+ok 263 - OBC263 intake staging generation: crash at spec-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges
+  ---
+  duration_ms: 155.638508
+  type: 'test'
+  ...
+# Subtest: OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+ok 264 - OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement
+  ---
+  duration_ms: 410.792115
+  type: 'test'
+  ...
+# Subtest: OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+ok 265 - OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor
+  ---
+  duration_ms: 276.280987
+  type: 'test'
+  ...
+# Subtest: OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+ok 266 - OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay
+  ---
+  duration_ms: 271.521799
+  type: 'test'
+  ...
+# Subtest: OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+ok 267 - OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint
+  ---
+  duration_ms: 11.603349
+  type: 'test'
+  ...
+# Subtest: OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+ok 268 - OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated
+  ---
+  duration_ms: 72.416107
+  type: 'test'
+  ...
+# Subtest: OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+ok 269 - OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)
+  ---
+  duration_ms: 257.0138
+  type: 'test'
+  ...
+# Subtest: OBC270 applyOnboardingBootstrapBind: activation is required
+ok 270 - OBC270 applyOnboardingBootstrapBind: activation is required
+  ---
+  duration_ms: 229.599559
+  type: 'test'
+  ...
+# Subtest: OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+ok 271 - OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)
+  ---
+  duration_ms: 286.790312
+  type: 'test'
+  ...
+# Subtest: OBC272 planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit
+ok 272 - OBC272 planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit
+  ---
+  duration_ms: 162.040979
+  type: 'test'
+  ...
+# Subtest: OBC273 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: an acknowledged intake-generated staging PRD binds end to end through the coordinator-sourced path
+ok 273 - OBC273 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: an acknowledged intake-generated staging PRD binds end to end through the coordinator-sourced path
+  ---
+  duration_ms: 301.679258
+  type: 'test'
+  ...
+# Subtest: OBC274 applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding
+ok 274 - OBC274 applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding
+  ---
+  duration_ms: 295.601152
+  type: 'test'
+  ...
+# Subtest: OBC275 applyOnboardingBootstrapBind: consent withdrawal after an acknowledged plan does not erase its bound acknowledgement
+ok 275 - OBC275 applyOnboardingBootstrapBind: consent withdrawal after an acknowledged plan does not erase its bound acknowledgement
+  ---
+  duration_ms: 313.769576
+  type: 'test'
+  ...
+# Subtest: OBC276 planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)
+ok 276 - OBC276 planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)
+  ---
+  duration_ms: 162.01128
+  type: 'test'
+  ...
+# Subtest: OBC277 planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS)
+ok 277 - OBC277 planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS)
+  ---
+  duration_ms: 48.370951
+  type: 'test'
+  ...
+# Subtest: OBC278 planOnboardingKickoffPromotion (kickoff-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest
+ok 278 - OBC278 planOnboardingKickoffPromotion (kickoff-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest
+  ---
+  duration_ms: 49.450597
+  type: 'test'
+  ...
+# Subtest: OBC279 reconstructOnboardingKickoffPromotionPlan (kickoff-sourced, replay): the reconstructed plan also publishes nextAction identical to applyAction
+ok 279 - OBC279 reconstructOnboardingKickoffPromotionPlan (kickoff-sourced, replay): the reconstructed plan also publishes nextAction identical to applyAction
+  ---
+  duration_ms: 76.043472
+  type: 'test'
+  ...
+# Subtest: OBC280 planOnboardingBootstrapBind (coordinator-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest
+ok 280 - OBC280 planOnboardingBootstrapBind (coordinator-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest
+  ---
+  duration_ms: 264.706747
+  type: 'test'
+  ...
+# Subtest: OBC281 reconstructOnboardingKickoffPromotionPlan (coordinator-sourced, replay): the reconstructed binding also publishes nextAction identical to applyAction
+ok 281 - OBC281 reconstructOnboardingKickoffPromotionPlan (coordinator-sourced, replay): the reconstructed binding also publishes nextAction identical to applyAction
+  ---
+  duration_ms: 293.89152
+  type: 'test'
+  ...
+# Subtest: OBC282 planOnboardingKickoffPromotion: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-F-PROMOTIONACTION)
+ok 282 - OBC282 planOnboardingKickoffPromotion: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-F-PROMOTIONACTION)
+  ---
+  duration_ms: 49.546937
+  type: 'test'
+  ...
+# Subtest: OBC283 applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-F-PROMOTIONACTION)
+ok 283 - OBC283 applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-F-PROMOTIONACTION)
+  ---
+  duration_ms: 46.059201
+  type: 'test'
+  ...
+# Subtest: OBC284 promotion apply for a local repository publishes a PO-gate profile receipt that po-gate-authority.mjs's own validator accepts (NVA-P-RECEIPTPIN)
+ok 284 - OBC284 promotion apply for a local repository publishes a PO-gate profile receipt that po-gate-authority.mjs's own validator accepts (NVA-P-RECEIPTPIN)
+  ---
+  duration_ms: 105.213445
+  type: 'test'
+  ...
+# Subtest: OBC285 promotion apply replay leaves exactly one valid PO-gate profile receipt, untouched byte for byte (NVA-P-RECEIPTPIN)
+ok 285 - OBC285 promotion apply replay leaves exactly one valid PO-gate profile receipt, untouched byte for byte (NVA-P-RECEIPTPIN)
+  ---
+  duration_ms: 124.067255
+  type: 'test'
+  ...
+# Subtest: OBC286 applyOnboardingBootstrapBind: a PO answer of de propagates into the configured language pair, and the PO gate does not raise PO-GATE-PRD-LANGUAGE-MISMATCH (NVA-R5-LANGWIRE)
+ok 286 - OBC286 applyOnboardingBootstrapBind: a PO answer of de propagates into the configured language pair, and the PO gate does not raise PO-GATE-PRD-LANGUAGE-MISMATCH (NVA-R5-LANGWIRE)
+  ---
+  duration_ms: 310.09809
+  type: 'test'
+  ...
+# Subtest: OBC287 applyOnboardingBootstrapBind: a content language outside {de, en} (fr) still binds end to end and passes the PO gate without forcing the operator-facing axis (NVA-R5-LANGWIRE)
+ok 287 - OBC287 applyOnboardingBootstrapBind: a content language outside {de, en} (fr) still binds end to end and passes the PO gate without forcing the operator-facing axis (NVA-R5-LANGWIRE)
+  ---
+  duration_ms: 263.619051
+  type: 'test'
+  ...
+# Subtest: OBC288 mechanical Spec marker repair preserves all other document and checkpoint bytes
+ok 288 - OBC288 mechanical Spec marker repair preserves all other document and checkpoint bytes
+  ---
+  duration_ms: 248.568787
+  type: 'test'
+  ...
+# Subtest: OBC289 mechanical Spec marker repair rejects stale PRD and Spec before any replacement
+ok 289 - OBC289 mechanical Spec marker repair rejects stale PRD and Spec before any replacement
+  ---
+  duration_ms: 305.408571
+  type: 'test'
+  ...
+# Subtest: OBC290 mechanical Spec marker repair refuses acknowledged or bound authority
+ok 290 - OBC290 mechanical Spec marker repair refuses acknowledged or bound authority
+  ---
+  duration_ms: 464.508323
+  type: 'test'
+  ...
+# Subtest: OBC291 mechanical Spec marker repair refuses malformed duplicate and invalid UTF8 input
+ok 291 - OBC291 mechanical Spec marker repair refuses malformed duplicate and invalid UTF8 input
+  ---
+  duration_ms: 408.797765
+  type: 'test'
+  ...
+# Subtest: OBC292 mechanical Spec marker repair rejects an edit between temporary fsync and publication
+ok 292 - OBC292 mechanical Spec marker repair rejects an edit between temporary fsync and publication
+  ---
+  duration_ms: 175.80686
+  type: 'test'
+  ...
+# Subtest: OBC293 mechanical Spec marker repair reports committed readback drift without a success receipt
+ok 293 - OBC293 mechanical Spec marker repair reports committed readback drift without a success receipt
+  ---
+  duration_ms: 191.459644
+  type: 'test'
+  ...
+# Subtest: OBC294 mechanical Spec marker repair rejects symlink and hardlink staging aliases
+ok 294 - OBC294 mechanical Spec marker repair rejects symlink and hardlink staging aliases
+  ---
+  duration_ms: 268.452271
+  type: 'test'
+  ...
+# Subtest: OBC295 mechanical Spec marker repair preserves BOM CRLF Unicode and final blank lines
+ok 295 - OBC295 mechanical Spec marker repair preserves BOM CRLF Unicode and final blank lines
+  ---
+  duration_ms: 193.471736
+  type: 'test'
+  ...
+# Subtest: OBC296 mechanical Spec marker route publishes CLI argv admitted in bootstrap-binding phase
+ok 296 - OBC296 mechanical Spec marker route publishes CLI argv admitted in bootstrap-binding phase
+  ---
+  duration_ms: 305.816414
+  type: 'test'
+  ...
+# Subtest: OBC297 mechanical Spec marker route parser and guard refuse incomplete or expanded argv
+ok 297 - OBC297 mechanical Spec marker route parser and guard refuse incomplete or expanded argv
+  ---
+  duration_ms: 142.030759
+  type: 'test'
+  ...
+# Subtest: OBC298 first enrollment history reads stay empty and ignore foreign shared worktree intake
+ok 298 - OBC298 first enrollment history reads stay empty and ignore foreign shared worktree intake
+  ---
+  duration_ms: 118.937208
+  type: 'test'
+  ...
+# Subtest: OBC299 planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7)
+ok 299 - OBC299 planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7)
+  ---
+  duration_ms: 137.549267
+  type: 'test'
+  ...
+# Subtest: OBC300 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9)
+ok 300 - OBC300 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9)
+  ---
+  duration_ms: 136.583202
+  type: 'test'
+  ...
+1..300
+# tests 300
+# suites 0
+# pass 300
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 22041.888767
+
+STDERR 
+FD3 [{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["OBC001","OBC002","OBC003","OBC004","OBC005","OBC006","OBC007","OBC008","OBC009","OBC010","OBC011","OBC012","OBC013","OBC014","OBC015","OBC016","OBC017","OBC018","OBC019","OBC020","OBC021","OBC022","OBC023","OBC024","OBC025","OBC026","OBC027","OBC028","OBC029","OBC030","OBC031","OBC032","OBC033","OBC034","OBC035","OBC036","OBC037","OBC038","OBC039","OBC040","OBC041","OBC042","OBC043","OBC044","OBC045","OBC046","OBC047","OBC048","OBC049","OBC050","OBC051","OBC052","OBC053","OBC054","OBC055","OBC056","OBC057","OBC058","OBC059","OBC060","OBC061","OBC062","OBC063","OBC064","OBC065","OBC066","OBC067","OBC068","OBC069","OBC070","OBC071","OBC072","OBC073","OBC074","OBC075","OBC076","OBC077","OBC078","OBC079","OBC080","OBC081","OBC082","OBC083","OBC084","OBC085","OBC086","OBC087","OBC088","OBC089","OBC090","OBC091","OBC092","OBC093","OBC094","OBC095","OBC096","OBC097","OBC098","OBC099","OBC100","OBC101","OBC102","OBC103","OBC104","OBC105","OBC106","OBC107","OBC108","OBC109","OBC110","OBC111","OBC112","OBC113","OBC114","OBC115","OBC116","OBC117","OBC118","OBC119","OBC120","OBC121","OBC122","OBC123","OBC124","OBC125","OBC126","OBC127","OBC128","OBC129","OBC130","OBC131","OBC132","OBC133","OBC134","OBC135","OBC136","OBC137","OBC138","OBC139","OBC140","OBC141","OBC142","OBC143","OBC144","OBC145","OBC146","OBC147","OBC148","OBC149","OBC150","OBC151","OBC152","OBC153","OBC154","OBC155","OBC156","OBC157","OBC158","OBC159","OBC160","OBC161","OBC162","OBC163","OBC164","OBC165","OBC166","OBC167","OBC168","OBC169","OBC170","OBC171","OBC172","OBC173","OBC174","OBC175","OBC176","OBC177","OBC178","OBC179","OBC180","OBC181","OBC182","OBC183","OBC184","OBC185","OBC186","OBC187","OBC188","OBC189","OBC190","OBC191","OBC192","OBC193","OBC194","OBC195","OBC196","OBC197","OBC198","OBC199","OBC200","OBC201","OBC202","OBC203","OBC204","OBC205","OBC206","OBC207","OBC208","OBC209","OBC210","OBC211","OBC212","OBC213","OBC214","OBC215","OBC216","OBC217","OBC218","OBC219","OBC220","OBC221","OBC222","OBC223","OBC224","OBC225","OBC226","OBC227","OBC228","OBC229","OBC230","OBC231","OBC232","OBC233","OBC234","OBC235","OBC236","OBC237","OBC238","OBC239","OBC240","OBC241","OBC242","OBC243","OBC244","OBC245","OBC246","OBC247","OBC248","OBC249","OBC250","OBC251","OBC252","OBC253","OBC254","OBC255","OBC256","OBC257","OBC258","OBC259","OBC260","OBC261","OBC262","OBC263","OBC264","OBC265","OBC266","OBC267","OBC268","OBC269","OBC270","OBC271","OBC272","OBC273","OBC274","OBC275","OBC276","OBC277","OBC278","OBC279","OBC280","OBC281","OBC282","OBC283","OBC284","OBC285","OBC286","OBC287","OBC288","OBC289","OBC290","OBC291","OBC292","OBC293","OBC294","OBC295","OBC296","OBC297","OBC298","OBC299","OBC300"],"caseCount":300,"caseSetSha256":"6a827a066a76be0d5ceab6a9325f2fcf5ed5291fe398ebfcd3c9ab6741ec591d"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC001","ordinal":0,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC002","ordinal":1,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC003","ordinal":2,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC004","ordinal":3,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC005","ordinal":4,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC006","ordinal":5,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC007","ordinal":6,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC008","ordinal":7,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC009","ordinal":8,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC010","ordinal":9,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC011","ordinal":10,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC012","ordinal":11,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC013","ordinal":12,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC014","ordinal":13,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC015","ordinal":14,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC016","ordinal":15,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC017","ordinal":16,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC018","ordinal":17,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC019","ordinal":18,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC020","ordinal":19,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC021","ordinal":20,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC022","ordinal":21,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC023","ordinal":22,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC024","ordinal":23,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC025","ordinal":24,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC026","ordinal":25,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC027","ordinal":26,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC028","ordinal":27,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC029","ordinal":28,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC030","ordinal":29,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC031","ordinal":30,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC032","ordinal":31,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC033","ordinal":32,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC034","ordinal":33,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC035","ordinal":34,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC036","ordinal":35,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC037","ordinal":36,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC038","ordinal":37,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC039","ordinal":38,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC040","ordinal":39,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC041","ordinal":40,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC042","ordinal":41,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC043","ordinal":42,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC044","ordinal":43,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC045","ordinal":44,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC046","ordinal":45,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC047","ordinal":46,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC048","ordinal":47,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC049","ordinal":48,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC050","ordinal":49,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC051","ordinal":50,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC052","ordinal":51,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC053","ordinal":52,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC054","ordinal":53,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC055","ordinal":54,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC056","ordinal":55,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC057","ordinal":56,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC058","ordinal":57,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC059","ordinal":58,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC060","ordinal":59,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC061","ordinal":60,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC062","ordinal":61,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC063","ordinal":62,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC064","ordinal":63,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC065","ordinal":64,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC066","ordinal":65,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC067","ordinal":66,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC068","ordinal":67,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC069","ordinal":68,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC070","ordinal":69,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC071","ordinal":70,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC072","ordinal":71,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC073","ordinal":72,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC074","ordinal":73,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC075","ordinal":74,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC076","ordinal":75,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC077","ordinal":76,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC078","ordinal":77,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC079","ordinal":78,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC080","ordinal":79,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC081","ordinal":80,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC082","ordinal":81,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC083","ordinal":82,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC084","ordinal":83,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC085","ordinal":84,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC086","ordinal":85,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC087","ordinal":86,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC088","ordinal":87,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC089","ordinal":88,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC090","ordinal":89,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC091","ordinal":90,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC092","ordinal":91,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC093","ordinal":92,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC094","ordinal":93,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC095","ordinal":94,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC096","ordinal":95,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC097","ordinal":96,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC098","ordinal":97,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC099","ordinal":98,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC100","ordinal":99,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC101","ordinal":100,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC102","ordinal":101,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC103","ordinal":102,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC104","ordinal":103,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC105","ordinal":104,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC106","ordinal":105,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC107","ordinal":106,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC108","ordinal":107,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC109","ordinal":108,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC110","ordinal":109,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC111","ordinal":110,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC112","ordinal":111,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC113","ordinal":112,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC114","ordinal":113,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC115","ordinal":114,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC116","ordinal":115,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC117","ordinal":116,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC118","ordinal":117,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC119","ordinal":118,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC120","ordinal":119,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC121","ordinal":120,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC122","ordinal":121,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC123","ordinal":122,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC124","ordinal":123,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC125","ordinal":124,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC126","ordinal":125,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC127","ordinal":126,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC128","ordinal":127,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC129","ordinal":128,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC130","ordinal":129,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC131","ordinal":130,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC132","ordinal":131,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC133","ordinal":132,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC134","ordinal":133,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC135","ordinal":134,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC136","ordinal":135,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC137","ordinal":136,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC138","ordinal":137,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC139","ordinal":138,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC140","ordinal":139,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC141","ordinal":140,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC142","ordinal":141,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC143","ordinal":142,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC144","ordinal":143,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC145","ordinal":144,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC146","ordinal":145,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC147","ordinal":146,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC148","ordinal":147,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC149","ordinal":148,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC150","ordinal":149,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC151","ordinal":150,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC152","ordinal":151,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC153","ordinal":152,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC154","ordinal":153,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC155","ordinal":154,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC156","ordinal":155,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC157","ordinal":156,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC158","ordinal":157,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC159","ordinal":158,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC160","ordinal":159,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC161","ordinal":160,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC162","ordinal":161,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC163","ordinal":162,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC164","ordinal":163,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC165","ordinal":164,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC166","ordinal":165,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC167","ordinal":166,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC168","ordinal":167,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC169","ordinal":168,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC170","ordinal":169,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC171","ordinal":170,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC172","ordinal":171,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC173","ordinal":172,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC174","ordinal":173,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC175","ordinal":174,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC176","ordinal":175,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC177","ordinal":176,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC178","ordinal":177,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC179","ordinal":178,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC180","ordinal":179,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC181","ordinal":180,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC182","ordinal":181,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC183","ordinal":182,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC184","ordinal":183,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC185","ordinal":184,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC186","ordinal":185,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC187","ordinal":186,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC188","ordinal":187,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC189","ordinal":188,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC190","ordinal":189,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC191","ordinal":190,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC192","ordinal":191,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC193","ordinal":192,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC194","ordinal":193,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC195","ordinal":194,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC196","ordinal":195,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC197","ordinal":196,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC198","ordinal":197,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC199","ordinal":198,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC200","ordinal":199,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC201","ordinal":200,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC202","ordinal":201,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC203","ordinal":202,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC204","ordinal":203,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC205","ordinal":204,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC206","ordinal":205,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC207","ordinal":206,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC208","ordinal":207,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC209","ordinal":208,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC210","ordinal":209,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC211","ordinal":210,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC212","ordinal":211,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC213","ordinal":212,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC214","ordinal":213,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC215","ordinal":214,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC216","ordinal":215,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC217","ordinal":216,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC218","ordinal":217,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC219","ordinal":218,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC220","ordinal":219,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC221","ordinal":220,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC222","ordinal":221,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC223","ordinal":222,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC224","ordinal":223,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC225","ordinal":224,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC226","ordinal":225,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC227","ordinal":226,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC228","ordinal":227,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC229","ordinal":228,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC230","ordinal":229,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC231","ordinal":230,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC232","ordinal":231,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC233","ordinal":232,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC234","ordinal":233,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC235","ordinal":234,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC236","ordinal":235,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC237","ordinal":236,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC238","ordinal":237,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC239","ordinal":238,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC240","ordinal":239,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC241","ordinal":240,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC242","ordinal":241,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC243","ordinal":242,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC244","ordinal":243,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC245","ordinal":244,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC246","ordinal":245,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC247","ordinal":246,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC248","ordinal":247,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC249","ordinal":248,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC250","ordinal":249,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC251","ordinal":250,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC252","ordinal":251,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC253","ordinal":252,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC254","ordinal":253,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC255","ordinal":254,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC256","ordinal":255,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC257","ordinal":256,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC258","ordinal":257,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC259","ordinal":258,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC260","ordinal":259,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC261","ordinal":260,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC262","ordinal":261,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC263","ordinal":262,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC264","ordinal":263,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC265","ordinal":264,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC266","ordinal":265,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC267","ordinal":266,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC268","ordinal":267,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC269","ordinal":268,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC270","ordinal":269,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC271","ordinal":270,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC272","ordinal":271,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC273","ordinal":272,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC274","ordinal":273,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC275","ordinal":274,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC276","ordinal":275,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC277","ordinal":276,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC278","ordinal":277,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC279","ordinal":278,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC280","ordinal":279,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC281","ordinal":280,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC282","ordinal":281,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC283","ordinal":282,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC284","ordinal":283,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC285","ordinal":284,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC286","ordinal":285,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC287","ordinal":286,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC288","ordinal":287,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC289","ordinal":288,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC290","ordinal":289,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC291","ordinal":290,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC292","ordinal":291,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC293","ordinal":292,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC294","ordinal":293,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC295","ordinal":294,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC296","ordinal":295,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC297","ordinal":296,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC298","ordinal":297,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC299","ordinal":298,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"OBC300","ordinal":299,"disposition":"pass"},{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":300,"disposedCount":300,"caseIds":["OBC001","OBC002","OBC003","OBC004","OBC005","OBC006","OBC007","OBC008","OBC009","OBC010","OBC011","OBC012","OBC013","OBC014","OBC015","OBC016","OBC017","OBC018","OBC019","OBC020","OBC021","OBC022","OBC023","OBC024","OBC025","OBC026","OBC027","OBC028","OBC029","OBC030","OBC031","OBC032","OBC033","OBC034","OBC035","OBC036","OBC037","OBC038","OBC039","OBC040","OBC041","OBC042","OBC043","OBC044","OBC045","OBC046","OBC047","OBC048","OBC049","OBC050","OBC051","OBC052","OBC053","OBC054","OBC055","OBC056","OBC057","OBC058","OBC059","OBC060","OBC061","OBC062","OBC063","OBC064","OBC065","OBC066","OBC067","OBC068","OBC069","OBC070","OBC071","OBC072","OBC073","OBC074","OBC075","OBC076","OBC077","OBC078","OBC079","OBC080","OBC081","OBC082","OBC083","OBC084","OBC085","OBC086","OBC087","OBC088","OBC089","OBC090","OBC091","OBC092","OBC093","OBC094","OBC095","OBC096","OBC097","OBC098","OBC099","OBC100","OBC101","OBC102","OBC103","OBC104","OBC105","OBC106","OBC107","OBC108","OBC109","OBC110","OBC111","OBC112","OBC113","OBC114","OBC115","OBC116","OBC117","OBC118","OBC119","OBC120","OBC121","OBC122","OBC123","OBC124","OBC125","OBC126","OBC127","OBC128","OBC129","OBC130","OBC131","OBC132","OBC133","OBC134","OBC135","OBC136","OBC137","OBC138","OBC139","OBC140","OBC141","OBC142","OBC143","OBC144","OBC145","OBC146","OBC147","OBC148","OBC149","OBC150","OBC151","OBC152","OBC153","OBC154","OBC155","OBC156","OBC157","OBC158","OBC159","OBC160","OBC161","OBC162","OBC163","OBC164","OBC165","OBC166","OBC167","OBC168","OBC169","OBC170","OBC171","OBC172","OBC173","OBC174","OBC175","OBC176","OBC177","OBC178","OBC179","OBC180","OBC181","OBC182","OBC183","OBC184","OBC185","OBC186","OBC187","OBC188","OBC189","OBC190","OBC191","OBC192","OBC193","OBC194","OBC195","OBC196","OBC197","OBC198","OBC199","OBC200","OBC201","OBC202","OBC203","OBC204","OBC205","OBC206","OBC207","OBC208","OBC209","OBC210","OBC211","OBC212","OBC213","OBC214","OBC215","OBC216","OBC217","OBC218","OBC219","OBC220","OBC221","OBC222","OBC223","OBC224","OBC225","OBC226","OBC227","OBC228","OBC229","OBC230","OBC231","OBC232","OBC233","OBC234","OBC235","OBC236","OBC237","OBC238","OBC239","OBC240","OBC241","OBC242","OBC243","OBC244","OBC245","OBC246","OBC247","OBC248","OBC249","OBC250","OBC251","OBC252","OBC253","OBC254","OBC255","OBC256","OBC257","OBC258","OBC259","OBC260","OBC261","OBC262","OBC263","OBC264","OBC265","OBC266","OBC267","OBC268","OBC269","OBC270","OBC271","OBC272","OBC273","OBC274","OBC275","OBC276","OBC277","OBC278","OBC279","OBC280","OBC281","OBC282","OBC283","OBC284","OBC285","OBC286","OBC287","OBC288","OBC289","OBC290","OBC291","OBC292","OBC293","OBC294","OBC295","OBC296","OBC297","OBC298","OBC299","OBC300"],"caseSetSha256":"6a827a066a76be0d5ceab6a9325f2fcf5ed5291fe398ebfcd3c9ab6741ec591d","dispositionsSha256":"ee93c24b570c0ee32288b28929a4ffc601826498fd6a34451361fc025f0fadfb","counts":{"pass":300,"fail":0,"skip":0,"todo":0}}]
+RUN_RESULT {"stage":"r2-complete-300-corpus","filtered":false,"exitCode":0,"signal":null,"declared":300,"disposed":300,"terminal":true,"counts":{"pass":300},"failures":[]}
+NARROW_FIXTURE_DIFF
+--- <repo-root>/specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.test.mjs	2026-10-09 15:32:25.916321404 +0200
++++ <repo-root>/scratch/onboarding-fixture-r2-20261009-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs	2026-10-09 16:00:53.262543254 +0200
+@@ -4300,6 +4300,18 @@
+ // unit suite deliberately uses its chat-mode test receipt; the signature
+ // proof selection and verification live in the dedicated onboarding and
+ // pipeline-state suites.
++// Complete only explicitly positive acknowledgement setups; draft refusal fixtures stay generated.
++function finishPositiveAcknowledgementFixture(root, generatePlan) {
++  const prdPath = join(root, generatePlan.targets.prd.path);
++  const language = readFileSync(prdPath, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
++  const spec = "# Completed acknowledgement specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed intake package is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n- AC-03: WHEN the promotion is replayed, the system SHALL preserve its published action and receipt.\n- AC-04: WHEN document language differs from operator language, the system SHALL preserve the configured language contract.\n- AC-05: WHEN an acknowledged package requests mechanical marker repair, the system SHALL refuse that repair.\n\n## Architecture\nThe intake checkpoint owns package paths. The existing mechanical marker writer binds the final specification digest before the existing acknowledgement writer records consent. Promotion owns continuity, language propagation and profile authority.\n";
++  const prd = "<!-- po-language: " + language + " -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed acknowledgement design\n\n## Goal\nBind the final intake design package through the configured human acknowledgement and preserve its exact authority.\n\n## Scope\nExercise digest refusal, consent persistence, promotion action reconstruction, language propagation and acknowledged-marker protection through the existing public writers.\n\n## Acceptance\nThe completed specification defines each observable authority and language outcome. The intake checkpoint owns the paths; acknowledgement and promotion retain their existing responsibilities.\n";
++  writeFileSync(join(root, generatePlan.targets.spec.path), spec);
++  writeFileSync(prdPath, prd);
++  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
++  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
++}
++
+ function bootstrapBindReadyRoot(name) {
+   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
+   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+@@ -4314,6 +4326,9 @@
+     const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+     applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+   }
++  if (["promotionaction-coordinator-fresh", "promotionaction-coordinator-replay", "spec-marker-ack", "spec-marker-bound"].includes(name)) {
++    finishPositiveAcknowledgementFixture(root, generatePlan);
++  }
+   const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+   const applied = applyOnboardingBootstrapAcknowledgement({
+     rootDir: root,
+@@ -4461,6 +4476,9 @@
+   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+   if (acknowledged) {
++    if (["acknowledged", "edit-after-plan", "consent-withdrawn-after-plan"].includes(name)) {
++      finishPositiveAcknowledgementFixture(root, generatePlan);
++    }
+     const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+     applyOnboardingBootstrapAcknowledgement({
+       rootDir: root,
+@@ -4748,6 +4766,7 @@
+   });
+   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
++  finishPositiveAcknowledgementFixture(root, generatePlan);
+   const prdAbsolute = join(root, generatePlan.targets.prd.path);
+   const prdText = readFileSync(prdAbsolute, "utf8");
+   assert.equal(prdText.startsWith("<!-- po-language: de -->"), true, prdText);
+@@ -4793,6 +4812,7 @@
+   });
+   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
++  finishPositiveAcknowledgementFixture(root, generatePlan);
+   const prdAbsolute = join(root, generatePlan.targets.prd.path);
+   const original = readFileSync(prdAbsolute, "utf8");
+   assert.equal(original.startsWith("<!-- po-language: en -->"), true, original);
+
+RESULT {"mirror":"scratch/onboarding-fixture-r2-20261009-graph","results":[{"stage":"r2-exact-eight-old-regressions","filtered":true,"exitCode":0,"signal":null,"declared":300,"disposed":8,"terminal":false,"counts":{"pass":8},"failures":[]},{"stage":"r2-complete-300-corpus","filtered":false,"exitCode":0,"signal":null,"declared":300,"disposed":300,"terminal":true,"counts":{"pass":300},"failures":[]}],"priorPostimageSha256":"59521384173d95fffa1a4aacdf020b3d31e7468b65636e12331082b0686209fa","postimageSha256":"6dee0a2682ae09ccf07a561cd0295336bd6ccc96ccdfb88621c55d112bf8d452","allOriginalBytesRecovered":true,"firstFiveFinishedFixturesByteExact":true,"caseIdsAndAssertionBodiesUnchanged":true,"draftNegativeFixturesUnchanged":true,"sourcePlaceholderGuardUnchanged":true,"productionInputHashesUnchanged":true,"review":"pending","poAcceptance":"open"}
+
+--- stderr ---

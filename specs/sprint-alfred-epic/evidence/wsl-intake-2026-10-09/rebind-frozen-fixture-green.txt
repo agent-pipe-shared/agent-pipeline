@@ -1,0 +1,131 @@
+command: node scratch/rebind-frozen-fixture-verify-20261009.mjs
+label: ALFRED-REBIND-FIXTURE-T-20261009-RED-source-schema-prerequisite
+exitCode: 1
+head: 38f2fc513767796d5ae254de1fdde20c953011c4
+tree: 40852a3c7a203008ff9aeabed39a68c9c5dae851
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.rebind-frozen-fixture-verification.v1",
+  "unchangedAssertions": true,
+  "sourceMutation": false,
+  "setupFailure": "DWP-PACKAGE-SCHEMA",
+  "assertionsReached": false,
+  "prerequisites": [
+    "Resolve local #/$defs references in schema-lite validation for the frozen v1 package before enforcing oneOf exclusivity; null advisor.attemptTrail currently matches both the null branch and the unresolved evidenceFile reference branch.",
+    "Rerun unchanged R7-5a, R7-5b and R7-5c against that separately reviewed source/schema correction. Existing inspect TODO still needs a fully onboarded clone."
+  ],
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}
+{
+  "schema": "alfred.rebind-frozen-schema-diagnosis.v1",
+  "packageValidation": {
+    "valid": false,
+    "errors": [
+      "$.advisor.attemptTrail: oneOf matched 2 branches; expected exactly one"
+    ]
+  }
+}
+✖ R7-5a: a clone of an approved, committed fixture reaches verified with zero signatures and no State change (261.441292ms)
+✖ R7-5b: a changed PRD or Spec byte yields digest-set-changed and no rebind (254.261872ms)
+✖ R7-5c: a bound artifact absent from the clone yields DWP-REBIND-ARTIFACT-LOST with the attended prerequisite and reuses nothing (248.211389ms)
+⚠ inspect of an approval that cannot be verified on this checkout lists rebind-approval alongside reopen-design (245.884812ms) # onboarding inspect on the throwaway clone returns status partial (partial_authority, nextAction null) because the clone is not an onboarded project; the ready branch that calls designToImplementationHandoverAction is never reached, so the reopen-design precondition cannot be established on this fixture
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 1170.604962
+
+✖ failing tests:
+
+test at scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:273:1
+✖ R7-5a: a clone of an approved, committed fixture reaches verified with zero signatures and no State change (261.441292ms)
+  AssertionError [ERR_ASSERTION]: fixture frozen legacy package: DWP-PACKAGE-SCHEMA
+  
+  false !== true
+  
+      at approvedOrigin (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:183:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:274:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:298:1
+✖ R7-5b: a changed PRD or Spec byte yields digest-set-changed and no rebind (254.261872ms)
+  AssertionError [ERR_ASSERTION]: fixture frozen legacy package: DWP-PACKAGE-SCHEMA
+  
+  false !== true
+  
+      at approvedOrigin (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:183:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:300:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:320:1
+✖ R7-5c: a bound artifact absent from the clone yields DWP-REBIND-ARTIFACT-LOST with the attended prerequisite and reuses nothing (248.211389ms)
+  AssertionError [ERR_ASSERTION]: fixture frozen legacy package: DWP-PACKAGE-SCHEMA
+  
+  false !== true
+  
+      at approvedOrigin (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:183:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:321:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:347:1
+⚠ inspect of an approval that cannot be verified on this checkout lists rebind-approval alongside reopen-design (245.884812ms) # onboarding inspect on the throwaway clone returns status partial (partial_authority, nextAction null) because the clone is not an onboarded project; the ready branch that calls designToImplementationHandoverAction is never reached, so the reopen-design precondition cannot be established on this fixture
+  AssertionError [ERR_ASSERTION]: fixture frozen legacy package: DWP-PACKAGE-SCHEMA
+  
+  false !== true
+  
+      at approvedOrigin (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:183:10)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/alfred-rebind-frozen-fixture-20261009/b/plugins/pipeline-core/scripts/rebind-approval.test.mjs:348:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
