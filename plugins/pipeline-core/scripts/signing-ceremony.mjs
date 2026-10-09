@@ -100,9 +100,11 @@ export function parseSigningCeremonyArgs(argv) {
  * without touching real git state twice; production callers never supply them.
  * `dependencies.signDependencies` is forwarded verbatim to the sign-intent call
  * (e.g. a test's `readConfirmation` override) -- this is the ONLY dependency seam
- * that can influence the ceremony's single decision point, and it can only ever
- * choose who answers the prompt, never remove it: `sign-intent`'s own
- * `requireExplicitConfirmation()` still runs unconditionally in every case.
+ * that can influence the ceremony's single decision point; it chooses who
+ * answers the prompt. The typed confirmation is not unconditional: for a
+ * passphrase-protected key, `sign-intent` shows the disclosure only
+ * (`printDisclosureOnly`) because entering the passphrase is the deliberate
+ * human act; otherwise `requireExplicitConfirmation()` runs.
  * `dependencies.write` overrides the narration sink (default: real stdout).
  *
  * Async because `guard-maintenance-window.mjs`'s own `run()` is async (its

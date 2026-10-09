@@ -1866,19 +1866,27 @@ function executeHumanApproval(args, dependencies = {}) {
       // authorize-critical, ...) reads the key from `paths.privateKey` unconditionally,
       // so a key that stayed only at its original path would silently stop working the
       // moment that path moved or was cleaned up.
-      write(paths.privateKey, importedKeyBytes, { mode: 0o600 });
-      // Derive (and thereby VALIDATE -- an unparsable or corrupt key fails this
-      // command() call, exactly like every other openssl step in this file) the public
-      // key from the copy just written, mirroring the fresh-generation branch's own
-      // genpkey+pkey pair below.
-      runOpenssl(["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
-      const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
-      write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
-      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
-      return {
-        ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, imported: true,
-        paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority },
-      };
+      //
+      // TR-S1-F4: the copy is made only AFTER the key has been derived and validated from the
+      // original path, so a refused setup never leaves a private-key copy behind; any later failure
+      // removes every file this branch wrote (the directory held none, checked above).
+      try {
+        // Derive (and thereby VALIDATE -- an unparsable or corrupt key fails this
+        // command() call, exactly like every other openssl step in this file) the public
+        // key, mirroring the fresh-generation branch's own genpkey+pkey pair below.
+        runOpenssl(["pkey", "-in", args.existingKey, "-pubout", "-out", paths.publicKey], directory, dependencies);
+        write(paths.privateKey, importedKeyBytes, { mode: 0o600 });
+        const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
+        write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+        persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
+        return {
+          ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, imported: true,
+          paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority },
+        };
+      } catch (error) {
+        for (const partial of [paths.privateKey, paths.publicKey, paths.authority]) rmSync(partial, { force: true });
+        throw error;
+      }
     }
     if (present.privateKey && present.publicKey && !present.authority) {
       // No authority record exists yet -- there is nothing to read a name from, so this
