@@ -65,9 +65,9 @@ higher-capability Critic rounds cost about 20 % of a weekly budget.
 
 The earlier canonical wording (escalation of every architecture, guardrail or security diff, and of
 every rigor-2 diff with a high risk class, to the higher-capability tier) is superseded; the
-canonical wording quoted above replaces it word-identically in `harness/review-protocol.md` §2.1,
+canonical wording quoted above replaces it word-identically in the review protocol (§2.1),
 `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and this ADR.
-Operative detail: `policies/model-policy.md` MP-07 and `harness/review-protocol.md` §2.1. Backlog
+Operative detail: `policies/model-policy.md` MP-07 and the review protocol (§2.1). Backlog
 item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
 of this amendment: the plugin Critic route and budget checks and their test pin, which that item
 tracks.
@@ -87,7 +87,7 @@ unchanged.
    does not depend on it.
 
 The canonical wording quoted above carries this extension word-identically in
-`harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`,
+the review protocol (§2.1), `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`,
 ADR-0003 and this ADR. Operative detail: `policies/model-policy.md` MP-07 and
 `templates/prompts/critic-review.md`. Backlog item:
 `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part of this
