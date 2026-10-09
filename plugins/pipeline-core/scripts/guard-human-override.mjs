@@ -11,6 +11,7 @@ import {
   buildHumanGuardOverrideSignatureIntent,
   concurrentWorktreeAdvisory,
   HGO_SIGNATURE_REASON,
+  humanGuardAuditLockRecoveryLine,
   HumanGuardOverrideError,
   observeHumanGuardOverrideGovernanceConsumption,
   planHumanGuardOverride,
@@ -575,7 +576,10 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
     throw new Error(usage());
   } catch (error) {
     const code = error instanceof HumanGuardOverrideError ? error.code : "HGO-USAGE";
-    writeError(`${code}: ${error.message}\n`);
+    // T90-F2 (Ruling 125): an ambiguous audit lock carries a typed recovery; print the same
+    // fixed line the shared route renderer prints, after the unchanged first line.
+    const recoveryLine = error instanceof HumanGuardOverrideError ? humanGuardAuditLockRecoveryLine(error) : null;
+    writeError(`${code}: ${error.message}\n${recoveryLine === null ? "" : `${recoveryLine}\n`}`);
     return 2;
   }
 }

@@ -3095,17 +3095,67 @@ function routeToken(value, pattern, fallback) {
     : fallback;
 }
 
+// T90-F2 (Ruling 125, Critic T90 F1/F2): the typed recovery of an ambiguous audit lock reaches a
+// human. The recovery is produced by ambiguousAuditLockRefusal, but its `command` is never read
+// here: every entry of `recovery.files` is re-validated against the closed shape below (one bad
+// entry rejects the whole recovery, which fails closed to the unchanged two-line text) and the
+// command is re-rendered from the validated files only.
+const AUDIT_LOCK_AMBIGUOUS_CODE = "HGO-AUDIT-LOCK-AMBIGUOUS";
+const AUDIT_LOCK_RECOVERY_FILE = /^\.git\/agent-pipeline\/human-guard-overrides\/(?!\.{1,2}$)[A-Za-z0-9._-]{1,64}$/u;
+const AUDIT_LOCK_RECOVERY_MAX_FILES = 8;
+const AUDIT_LOCK_RECOVERY_PRECONDITION = "only after confirming that no other Pipeline session is running an override ceremony";
+
+/**
+ * The ONE fixed attended-recovery line for an ambiguous audit lock, shared by the route renderer
+ * below and the guard-human-override CLI.
+ * @param {unknown} error a refusal carrying `code` and `recovery`.
+ * @param {{platform?: string}} [options] delete-verb selector; the host platform when absent.
+ * @returns {string|null} the line, or null when the code is not the ambiguous-lock code or the
+ *   recovery is not well-formed (callers then print exactly what they printed before).
+ */
+export function humanGuardAuditLockRecoveryLine(error, options = {}) {
+  try {
+    if (error === null || typeof error !== "object" || error.code !== AUDIT_LOCK_AMBIGUOUS_CODE) return null;
+    const recovery = error.recovery;
+    if (recovery === null || typeof recovery !== "object" || Array.isArray(recovery)) return null;
+    const files = recovery.files;
+    if (!Array.isArray(files) || files.length === 0 || files.length > AUDIT_LOCK_RECOVERY_MAX_FILES) return null;
+    for (const file of files) {
+      if (typeof file !== "string" || !AUDIT_LOCK_RECOVERY_FILE.test(file)) return null;
+    }
+    const quoted = [...new Set(files)].map((file) => `'${file}'`);
+    const requested = options !== null && typeof options === "object" ? options.platform : undefined;
+    const win32 = (typeof requested === "string" ? requested : process.platform) === "win32";
+    const caution = win32
+      ? "; on win32 the lock owner may still be live, because a busy owner is reported as ambiguous too"
+      : "";
+    const command = win32
+      ? `Remove-Item -LiteralPath ${quoted.join(", ")}`
+      : `rm -- ${quoted.join(" ")}`;
+    return `Recovery (attended, run from the repository root, ${AUDIT_LOCK_RECOVERY_PRECONDITION}${caution}): ${command}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * @param {string} subject short noun the denying guard uses for the refused thing ("command", "edit").
  * @param {{planned?: object}|{error?: unknown}} outcome exactly what route planning produced.
- * @returns {string} two lines: that no route is offered, and the typed reason why.
+ * @param {{platform?: string}} [options] selects the delete verb of the audit-lock recovery line; the host platform when absent.
+ * @returns {string} two lines: that no route is offered, and the typed reason why; for code
+ *   HGO-AUDIT-LOCK-AMBIGUOUS with a well-formed `error.recovery`, a third line carrying the
+ *   attended recovery (humanGuardAuditLockRecoveryLine).
  */
-export function humanGuardRouteUnavailableReason(subject, outcome = {}) {
+export function humanGuardRouteUnavailableReason(subject, outcome = {}, options = {}) {
   const noun = routeToken(subject, ROUTE_SUBJECT_TOKEN, "action");
   const headline = `No human override route is offered for this exact ${noun}; the guard attempted to plan one.`;
   if (object(outcome) && Object.hasOwn(outcome, "error")) {
     const code = routeToken(outcome.error?.code, ROUTE_CODE_TOKEN, ROUTE_UNTYPED_CODE);
-    return `${headline}\nReason: planning the route failed with code=${code}.`;
+    const reason = `${headline}\nReason: planning the route failed with code=${code}.`;
+    const recoveryLine = code === AUDIT_LOCK_AMBIGUOUS_CODE
+      ? humanGuardAuditLockRecoveryLine(outcome.error, options)
+      : null;
+    return recoveryLine === null ? reason : `${reason}\n${recoveryLine}`;
   }
   const planned = object(outcome) && object(outcome.planned) ? outcome.planned : {};
   const status = routeToken(planned.status, ROUTE_STATUS_TOKEN, ROUTE_UNTYPED_STATUS);
