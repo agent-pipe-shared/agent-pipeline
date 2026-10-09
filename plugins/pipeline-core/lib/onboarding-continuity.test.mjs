@@ -5010,7 +5010,44 @@ export function runFreshEnrollmentHistoryRegression() {
 }
 check("first enrollment history reads stay empty and ignore foreign shared worktree intake",runFreshEnrollmentHistoryRegression);
 
-assert.equal(cases.length, 298, "the complete onboarding continuity corpus must be registered before execution begins");
+// Greenfield-walk RED pins F7 and F9 (E2E-ONB-B, 24a27a1c9; ONB-T3-20261009, Ruling 163). Intended reds until the F slices land.
+// F7. Owner: the buildKickoffPromotionPlan throw site in lib/onboarding-continuity.mjs
+// (`fail("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", ...)`). The seam is a proposal: the F slice may move it,
+// but it must keep a typed next step (the same kind `inspect` returns while architecture authoring is incomplete).
+check("planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f7-next-step", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture must hold the unfinished architecture draft");
+  let refusal = null;
+  try { planOnboardingBootstrapBind({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.equal(refusal?.code, "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+  assert.equal(refusal?.nextAction?.kind, "architecture-design-required",
+    "the refusal must name the next step inspect would return, not leave the walker with a code and no action");
+});
+
+// F9. Owner: bootstrapAcknowledgementPlan in lib/onboarding-continuity.mjs (the shared first step of the Chat route and of
+// the signature route, before writeBootstrapAcknowledgementRequest). Pinned on the Chat route: the signature route needs a
+// configured PO key directory and trust policy (BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE in a bare fixture), which would make
+// that route red for the wrong reason. The exact code is the contract the F slice implements (Elephant ruling, ONB-T3).
+check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9)", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("f9-draft-markers", { profile: "mini" });
+  const prd = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  const spec = readFileSync(join(root, generatePlan.targets.spec.path), "utf8");
+  assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture PRD must hold the DRAFT TEMPLATE comment");
+  assert.match(prd, /REPLACE/u, "fixture PRD must hold a REPLACE value");
+  assert.match(spec, /AC-01: WHEN <trigger>, the system SHALL <observable result>\./u, "fixture spec must hold the AC-01 template line");
+  let refusal = null;
+  try { planOnboardingBootstrapAcknowledgementChat({ rootDir: root }); } catch (error) { refusal = error; }
+  assert.equal(refusal?.code, "BOOTSTRAP-ACK-PLACEHOLDER-CONTENT",
+    "a generated draft must be refused with the typed BOOTSTRAP-ACK-PLACEHOLDER-CONTENT code before any acknowledgement request is offered");
+  const scratch = join(root, "scratch");
+  const requests = existsSync(scratch)
+    ? readdirSync(scratch).filter((name) => name.startsWith("bootstrap-plan-acknowledgement-request-"))
+    : [];
+  assert.deepEqual(requests, [], "no signature request file may be written over an unfinished package");
+});
+
+assert.equal(cases.length, 300, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
