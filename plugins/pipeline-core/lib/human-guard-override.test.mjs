@@ -2265,7 +2265,44 @@ function writeAuthenticatedAuditHead(base, entries, bytes) {
   writeFileSync(join(base, "audit.head.json"), `${JSON.stringify({ ...core, mac })}\n`, { mode: 0o600 });
 }
 
+// WIN-HGO-S: the killed-writer children below are bare `node -e` processes, so on native
+// win32 they cannot be handed the injected private-state assurance the parent process uses
+// (publishAuditLock() calls safePrivateFile() with its defaults). What production does
+// instead is harden the store directory before any lock lives there; the files created
+// inside then inherit an owner-only DACL. Do the same for the directory the child writes
+// into -- and for the directories already laid out inside it, which the parent process
+// assesses afterwards. A harness precondition, asserted so it cannot pass for a result.
+function hardenKilledWriterStore(base) {
+  if (process.platform !== "win32") return;
+  const parent = dirname(base);
+  const targets = [
+    ...(parent.endsWith("agent-pipeline") ? [parent] : []),
+    base,
+    ...readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => join(base, entry.name)),
+  ];
+  for (const target of targets) {
+    const hardened = hardenWindowsPrivateDirectory(target);
+    assert.equal(hardened.status, "secure",
+      `precondition: the win32 killed-writer store must be owner-private (status ${hardened.status})`);
+  }
+}
+
+// SIGKILL is a POSIX signal: a self-kill on native win32 is TerminateProcess, which reports
+// no signal, only a nonzero exit status. An uncaught throw exits nonzero too but prints its
+// stack, so the win32 arm also requires an empty stderr -- the child was terminated on
+// purpose, not by an error before the kill point.
+function assertChildKilled(result) {
+  if (process.platform === "win32") {
+    assert.equal(result.signal, null, result.stderr);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.equal(result.stderr, "", "the child must have been terminated at the kill point, not thrown");
+    return;
+  }
+  assert.equal(result.signal, "SIGKILL", result.stderr);
+}
+
 function killedAuditWriter(base, purpose = "existing") {
+  hardenKilledWriterStore(base);
   const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
   const child = [
     'import { readFileSync } from "node:fs";',
@@ -2280,7 +2317,7 @@ function killedAuditWriter(base, purpose = "existing") {
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base, purpose], {
     encoding: "utf8", shell: false,
   });
-  assert.equal(result.signal, "SIGKILL", result.stderr);
+  assertChildKilled(result);
   assert.equal(existsSync(join(base, "audit.lock")), true);
 }
 
@@ -2306,6 +2343,7 @@ test("an authenticated killed genesis writer can finish the first audit entry", 
 });
 
 function killedAuditLockPublisher(base, targetPurpose, purpose = "existing", stage = "temporary") {
+  hardenKilledWriterStore(base);
   const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
   const child = [
     'import { readFileSync } from "node:fs";',
@@ -2327,7 +2365,7 @@ function killedAuditLockPublisher(base, targetPurpose, purpose = "existing", sta
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base, targetPurpose, purpose, stage], {
     encoding: "utf8", shell: false,
   });
-  assert.equal(result.signal, "SIGKILL", result.stderr);
+  assertChildKilled(result);
 }
 
 test("SIGKILL during ordinary lock publication never exposes an empty canonical lock and reacquisition succeeds", () => {
@@ -2407,6 +2445,7 @@ test("SIGKILL after recovery-guard publication finalizes its authenticated twin 
 });
 
 function killedAuditReclaimer(base) {
+  hardenKilledWriterStore(base);
   const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
   const child = [
     'import { readFileSync } from "node:fs";',
@@ -2422,7 +2461,7 @@ function killedAuditReclaimer(base) {
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base], {
     encoding: "utf8", shell: false,
   });
-  assert.equal(result.signal, "SIGKILL", result.stderr);
+  assertChildKilled(result);
   assert.equal(existsSync(join(base, "audit.lock.recover")), true);
 }
 
@@ -2826,13 +2865,20 @@ test("a failed repair or ordinary append never removes the active repair writer'
       dependencies: {
         ...repairOptions.dependencies,
         afterLedgerWriteFn: () => {
+          // WIN-HGO-S: native win32 keeps no per-process start identity, so a present pid
+          // is never proof of a live owner (win32AuditLockOwnerState() answers only "dead"
+          // or "ambiguous", by documented design) and a lock held by this very process is
+          // refused as HGO-AUDIT-LOCK-AMBIGUOUS rather than HGO-AUDIT-LOCKED. The property
+          // this case protects -- a competing writer never removes the active repair
+          // writer's lock -- is asserted unchanged on every platform below.
+          const heldLockCode = process.platform === "win32" ? "HGO-AUDIT-LOCK-AMBIGUOUS" : "HGO-AUDIT-LOCKED";
           assert.throws(() => repairHumanGuardOverrideAudit(repairOptions),
-            (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCKED");
+            (error) => error instanceof HumanGuardOverrideError && error.code === heldLockCode);
           assert.equal(existsSync(join(base, "audit.lock")), true);
           assert.throws(() => recordHumanGuardDenial({
             rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
             toolInput: { file_path: "notes.md", content: "competing append\n" }, denials: denial,
-          }), (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCKED");
+          }), (error) => error instanceof HumanGuardOverrideError && error.code === heldLockCode);
           assert.equal(existsSync(join(base, "audit.lock")), true);
         },
       },
