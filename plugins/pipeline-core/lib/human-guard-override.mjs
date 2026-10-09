@@ -2435,17 +2435,37 @@ function auditLockOwnerState(record, host = resolveAuditLockHost()) {
   return "ambiguous";
 }
 
+// T90-F3 (Ruling 136): the recovery names the lock file relative to the directory that holds the
+// store's `.git`, the main checkout root (also from a linked worktree, whose store is the main
+// checkout's). The form is derived from the lock path alone, <common>/agent-pipeline/
+// human-guard-overrides/<name>, never from the process cwd. When the common dir's basename is not
+// `.git` (a separate git dir, a bare or submodule git dir) there is nothing the path can be
+// relative to, so null. The result must also satisfy the renderer's closed file shape, so a
+// recovery this module emits is one humanGuardAuditLockRecoveryLine can render.
+function auditLockRecoveryFile(lockPath) {
+  if (typeof lockPath !== "string" || lockPath === "") return null;
+  const store = dirname(lockPath);
+  const agentPipeline = dirname(store);
+  if (basename(store) !== "human-guard-overrides" || basename(agentPipeline) !== "agent-pipeline") return null;
+  if (basename(dirname(agentPipeline)) !== ".git") return null;
+  const relativeFile = `.git/agent-pipeline/human-guard-overrides/${basename(lockPath)}`;
+  return AUDIT_LOCK_RECOVERY_FILE.test(relativeFile) ? relativeFile : null;
+}
+
 // An ambiguous owner is a refusal only an attended human can resolve, so the refusal types
-// the way out: the exact lock file and the command that removes it. The message is kept
-// as before; the recovery is a separate own property.
+// the way out: the lock file (main-checkout-relative, see auditLockRecoveryFile) and the command
+// that removes it. The message is kept as before; the recovery is a separate own property, and it
+// is absent (no property at all) when the store's common dir is not named `.git`.
 function ambiguousAuditLockRefusal(message, lockPath) {
+  const error = new HumanGuardOverrideError("HGO-AUDIT-LOCK-AMBIGUOUS", message);
+  const relativeFile = auditLockRecoveryFile(lockPath);
+  if (relativeFile === null) return error;
   const win32 = process.platform === "win32";
   const quoted = win32
-    ? `'${lockPath.replaceAll("'", "''")}'`
-    : `'${lockPath.replaceAll("'", "'\\''")}'`;
-  const error = new HumanGuardOverrideError("HGO-AUDIT-LOCK-AMBIGUOUS", message);
+    ? `'${relativeFile.replaceAll("'", "''")}'`
+    : `'${relativeFile.replaceAll("'", "'\\''")}'`;
   error.recovery = {
-    files: [lockPath],
+    files: [relativeFile],
     command: win32 ? `Remove-Item -LiteralPath ${quoted}` : `rm -- ${quoted}`,
   };
   return error;
@@ -3132,7 +3152,7 @@ export function humanGuardAuditLockRecoveryLine(error, options = {}) {
     const command = win32
       ? `Remove-Item -LiteralPath ${quoted.join(", ")}`
       : `rm -- ${quoted.join(" ")}`;
-    return `Recovery (attended, run from the repository root, ${AUDIT_LOCK_RECOVERY_PRECONDITION}${caution}): ${command}`;
+    return `Recovery (attended, run from the main checkout root (the directory that holds .git), ${AUDIT_LOCK_RECOVERY_PRECONDITION}${caution}): ${command}`;
   } catch {
     return null;
   }
