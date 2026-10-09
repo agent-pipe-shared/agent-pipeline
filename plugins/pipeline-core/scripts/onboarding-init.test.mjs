@@ -37,9 +37,49 @@ import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language
 import { readMachinePlane } from "../lib/machine-plane.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { applyProjectOnboardingLifecycleV4, planProjectOnboardingLifecycleV4 } from "../lib/project-onboarding-v3.mjs";
+import { runHumanApproval } from "./po-human-approval.mjs";
 import "./bootstrap-trust-recovery.test.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
+
+/**
+ * TR-S1-T3f (Ruling 132): the PO key fixtures are passphrase-protected PKCS#8 keys, because
+ * `po-human-approval.mjs setup --existing-key` refuses an unencrypted one (PO-KEY-UNENCRYPTED).
+ * A passphrase cannot cross the onboarding-init CLI -> po-human-approval CLI -> `openssl pkey
+ * -pubout` process chain without a production seam, and production has no `-passin`. So the two
+ * cells that import a key drive the setup step IN-PROCESS through `runHumanApproval`, whose
+ * `spawn` dependency is the existing test seam: `passinSpawn` appends `-passin pass:<fixture>` to
+ * every OpenSSL call that names a `po-private.pem`, and passes every other spawn through
+ * untouched. `homedirFn` keeps the machine plane inside the fixture home, which the spawned CLI
+ * reached through the HOME/USERPROFILE rewrite of `childEnvironment()`.
+ */
+const KEY_FIXTURE_PASSPHRASE = "onboarding-init-test-fixture-passphrase";
+
+function encryptedKeyPem() {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  return privateKey.export({ format: "pem", type: "pkcs8", cipher: "aes-256-cbc", passphrase: KEY_FIXTURE_PASSPHRASE });
+}
+
+function passinSpawn(base = spawnSync) {
+  return (executable, args, options) => {
+    const list = Array.isArray(args) ? args : [];
+    const namesKey = /(?:^|[\\/])openssl(?:\.exe)?$/iu.test(String(executable)) && !list.includes("-passin")
+      && list.some((entry) => /po-private\.pem$/u.test(String(entry)));
+    return base(executable, namesKey ? [...list, "-passin", `pass:${KEY_FIXTURE_PASSPHRASE}`] : args, options);
+  };
+}
+
+function inProcessSetup(home, failures) {
+  return (_executable, setupArgs) => {
+    try {
+      runHumanApproval(setupArgs.slice(1), { spawn: passinSpawn(), homedirFn: () => home, isTTY: true });
+      return { status: 0, signal: null };
+    } catch (error) {
+      failures.push(error);
+      return { status: 1, signal: null };
+    }
+  };
+}
 
 test("a failed first-anchor action returns an attended digest-bound recovery command", () => {
   let output = "";
@@ -745,8 +785,7 @@ function checkApprovalCell(selectedCell) {
       const destination = join(home, "po-authority");
       const existingKey = join(sourceDirectory, "existing-private.pem");
       fixtures.push(root, home, sourceDirectory);
-      const { privateKey } = generateKeyPairSync("ed25519");
-      writeFileSync(existingKey, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
+      writeFileSync(existingKey, encryptedKeyPem(), { mode: 0o600 });
       const env = withConflictingAmbientRunner({
         ...process.env,
         PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
@@ -894,11 +933,20 @@ function checkApprovalCell(selectedCell) {
         .map((value) => `'${value.replaceAll("'", "'\\''")}'`).join(" ");
       assert.equal(isSanctionedLifecycleCommand(invalidCommand, root), false,
         `${runner}: existing + none is a different, invalid action and must remain refused`);
-      const anchored = spawnSync(anchorAsk.applyAction.executable, attendedArgv, {
-        encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
+      // TR-S1-T3f (Ruling 132): in-process, so the passphrase-protected fixture key can be derived with
+      // `-passin` through the setup step's spawn seam; a spawned CLI chain has no way to carry it.
+      const setupFailures = [];
+      let anchoredStdout = "";
+      let anchoredStderr = "";
+      const anchoredCode = main(attendedArgv.slice(1), {
+        write: (value) => { anchoredStdout += value; },
+        writeError: (value) => { anchoredStderr += value; },
+        env,
+        applyTrustAnchor: (request) => applyTrustAnchorBootstrap({ ...request, runSetup: inProcessSetup(home, setupFailures) }),
       });
-      assert.equal(anchored.status, 0, `${runner}: ${anchored.stderr}\n${anchored.stdout}`);
-      const anchoredResult = JSON.parse(anchored.stdout);
+      assert.equal(anchoredCode, 0,
+        `${runner}: ${setupFailures.map((error) => error.message).join("; ")}\n${anchoredStderr}\n${anchoredStdout}`);
+      const anchoredResult = JSON.parse(anchoredStdout);
       assert.deepEqual(anchoredResult.bootstrap, {
         ok: true,
         code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE",
@@ -1063,6 +1111,116 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
   }
 });
 
+// TR-S1-T3f (Ruling 132), fail-closed pin for the SPAWNED path the two key cells above no longer
+// walk: a CLI `setup --existing-key` on a passphrase-protected key, with stdin closed and no
+// controlling terminal (`detached` makes the child a session leader, so OpenSSL cannot reach a
+// /dev/tty), must end non-zero inside the bound and must register no trust anchor. The private key
+// is copied before OpenSSL derives the public half, so the pin checks the authority record and the
+// public key, not an empty directory. POSIX only: native Windows has no equivalent that avoids
+// opening a console window per run.
+test("setup --existing-key on a passphrase-protected key with no terminal fails closed without a trust anchor", {
+  skip: process.platform === "win32" ? "detaching from the console needs a POSIX session" : false,
+}, () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const directory = join(home, "unattended-po-authority");
+  const source = join(home, "source-private.pem");
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", root], { encoding: "utf8", shell: false }).status, 0);
+    writeFileSync(source, encryptedKeyPem(), { mode: 0o600 });
+    const result = spawnSync(process.execPath, [
+      fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "setup",
+      "--repo-root", root, "--directory", directory, "--existing-key", source,
+      "--human-name", "Unattended PO",
+    ], {
+      encoding: "utf8", shell: false, stdio: ["ignore", "pipe", "pipe"], detached: true, windowsHide: true,
+      timeout: 30000, killSignal: "SIGKILL",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home, HOME: home, USERPROFILE: home },
+    });
+    assert.equal(result.error, undefined, `the setup child must not hang: ${result.error?.message}`);
+    assert.equal(result.signal, null);
+    assert.notEqual(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    assert.match(result.stderr, /openssl failed/u, "the refusal comes from the key derivation, not from an earlier unrelated gate");
+    assert.equal(existsSync(join(directory, "trust-policy.json")), false, "no authority record is written");
+    assert.equal(existsSync(join(directory, "po-public.pem")), false, "no public key is derived");
+    assert.equal(existsSync(join(home, ".agent-pipeline", "machine.json")), false, "no machine key pointer is written");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+// TR-S1-T3g (Ruling 137), RED pin: the same unattended `setup --existing-key` as the case above, now
+// on the other half of "registers no trust anchor". By code read, po-human-approval.mjs copies the
+// private key into the target directory (the `write(paths.privateKey, ...)` step) BEFORE the OpenSSL
+// derivation that validates it, so a failed derivation leaves a copy of the passphrase-protected
+// private key behind in a directory that was never registered. The preconditions are identical to the
+// case above, so a red here is attributable to the leftover copy and to nothing earlier. Expected to
+// stay RED until the copy is moved behind (or rolled back after) the derivation in po-human-approval.mjs.
+test("setup --existing-key on a passphrase-protected key with no terminal leaves no copy of the private key in the target directory", {
+  skip: process.platform === "win32" ? "detaching from the console needs a POSIX session" : false,
+}, () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const directory = join(home, "unattended-po-authority");
+  const source = join(home, "source-private.pem");
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", root], { encoding: "utf8", shell: false }).status, 0);
+    writeFileSync(source, encryptedKeyPem(), { mode: 0o600 });
+    const result = spawnSync(process.execPath, [
+      fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "setup",
+      "--repo-root", root, "--directory", directory, "--existing-key", source,
+      "--human-name", "Unattended PO",
+    ], {
+      encoding: "utf8", shell: false, stdio: ["ignore", "pipe", "pipe"], detached: true, windowsHide: true,
+      timeout: 30000, killSignal: "SIGKILL",
+      env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home, HOME: home, USERPROFILE: home },
+    });
+    assert.equal(result.error, undefined, `the setup child must not hang: ${result.error?.message}`);
+    assert.equal(result.signal, null);
+    assert.notEqual(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    assert.match(result.stderr, /openssl failed/u, "the refusal comes from the key derivation, not from an earlier unrelated gate");
+    const leftovers = existsSync(directory) ? readdirSync(directory) : [];
+    assert.deepEqual(leftovers.filter((name) => name.endsWith(".pem")), [],
+      "a failed key derivation must leave no copy of the private key in the target directory");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+// TR-S1-T3g (Ruling 137): machine-plane isolation of the in-process setup step the two key cells now use.
+// The ambient home (what `os.homedir()` would return: HOME on POSIX, USERPROFILE on win32) is pointed at
+// a decoy for the duration of the call, so any code path that reached the plane through `os.homedir()`
+// instead of the injected `homedirFn` would write the decoy and fail the last assertion. The real
+// operator's `~/.agent-pipeline/machine.json` is never read, written or compared.
+test("the in-process setup step writes the machine plane into the injected home and never into the ambient home", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  const ambient = freshHome();
+  const directory = join(home, "po-authority");
+  const source = join(home, "source-private.pem");
+  const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  try {
+    assert.equal(spawnSync("git", ["init", "-q", root], { encoding: "utf8", shell: false }).status, 0);
+    writeFileSync(source, encryptedKeyPem(), { mode: 0o600 });
+    process.env.HOME = ambient;
+    process.env.USERPROFILE = ambient;
+    runHumanApproval(["setup", "--repo-root", root, "--directory", directory, "--existing-key", source,
+      "--human-name", "Isolated PO"], { spawn: passinSpawn(), homedirFn: () => home, isTTY: true });
+    const plane = readMachinePlane({ homedirFn: () => home });
+    assert.equal(plane.status, "valid", "the injected home received the machine plane");
+    assert.equal(existsSync(join(ambient, ".agent-pipeline")), false, "the ambient home never received a machine plane");
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    dispose(root);
+    dispose(home);
+    dispose(ambient);
+  }
+});
+
 test("signature anchor reuses a key already at the canonical directory path without importing or replacing it", () => {
   const root = freshRoot();
   const home = freshHome();
@@ -1071,14 +1229,11 @@ test("signature anchor reuses a key already at the canonical directory path with
   const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
   try {
     assert.equal(driveOnboardingInit({ rootDir: root, runner: "claude", env }).outcome, "pending-asks");
-    const { privateKey } = generateKeyPairSync("ed25519");
-    writeFileSync(source, privateKey.export({ format: "pem", type: "pkcs8" }), { mode: 0o600 });
-    const setup = spawnSync(process.execPath, [
-      fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url)), "setup",
-      "--repo-root", root, "--directory", directory, "--existing-key", source,
-      "--human-name", "Existing PO",
-    ], { encoding: "utf8", shell: false, env });
-    assert.equal(setup.status, 0, `${setup.stderr}\n${setup.stdout}`);
+    // TR-S1-T3f (Ruling 132): the import step runs in-process so the passphrase-protected key can be
+    // derived with `-passin`; runHumanApproval throws on failure, which fails this case with the reason.
+    writeFileSync(source, encryptedKeyPem(), { mode: 0o600 });
+    runHumanApproval(["setup", "--repo-root", root, "--directory", directory, "--existing-key", source,
+      "--human-name", "Existing PO"], { spawn: passinSpawn(), homedirFn: () => home, isTTY: true });
     const canonicalKey = join(directory, "po-private.pem");
     const suppliedKey = process.platform === "win32"
       ? `${canonicalKey[0].toLowerCase()}${canonicalKey.slice(1)}`.replaceAll("\\", "/")
