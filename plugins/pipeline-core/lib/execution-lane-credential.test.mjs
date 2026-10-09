@@ -98,6 +98,10 @@
 //  13. (F1) "Token-wise" means every argv token of a PowerShell carrier, including tokens after -Command
 //      and -File and after any positional word. Only the `-`, `/` and `--` prefixes of the
 //      EncodedCommand family are pinned (-e, -ec, -enc, -EncodedC, the full name, any case).
+//  14. (Ruling 97, TR-S2-T3) secretPatterns applies only to tokens in a FILE-OPERAND position, never to a
+//      search tool's pattern argument; for rg and grep that is the first positional and the value of -e or
+//      --regexp. Pinned under the production pattern set. Not pinned: whether the first positional is a file
+//      operand once -e or --regexp supplies the pattern (rg -e foo <name>), which the ruling leaves open.
 
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
@@ -1494,6 +1498,142 @@ defineRows(
       command: `node --test ${EXEMPT_PATH}.bak`,
       targets: EXEMPT_TARGETS,
       readScript: exemptReader,
+      tools: BOTH,
+    },
+  ],
+  "refused",
+);
+
+// =====================================================================================================
+// TR-S2-T3-20261009 -- Ruling 97 pins: targets.secretPatterns applies only to FILE OPERANDS. Test-only
+// (QG-04): the module fix is the parallel slice TR-S2-F2. The fixture is the PRODUCTION pattern set
+// (SECRET_PATTERNS above: suffixes p12, pfx, key, pem; prefixes env-file and id_), which mirrors the
+// secret-name rule of the passive read policy (lib/passive-read-policy.mjs).
+//
+// Why a pattern argument must be excluded: under that set the bare name of the PO key file matches the
+// pem suffix, so a rule that applied the patterns to EVERY token would refuse the searches the exact-name
+// rule deliberately admits (N3-4: a bare basename in a search pattern is not a target). Searching for a
+// name is not reading a file of that name.
+// =====================================================================================================
+
+// A name that only the PATTERN rule knows: it is not in secretBasenames, so a directory-qualified use of
+// it is refused by secretPatterns alone. The policy key name below is also an exact name, and a
+// directory-qualified use of that one is refused today by the exact-name rule, whatever the patterns say.
+const POLICY_KEY_NAME = part("po-", "pri", "vate", EXT_PEM);
+const PATTERN_ONLY_NAME = part("fixture-", "sign", EXT_PEM);
+const ID_KEY_NAME = part(PREFIX_ID, "ed", "25519");
+
+describe("TR-S2-T3 F3 fixture sanity: the names under test are what the pins say they are", () => {
+  test("F3S-0 the policy key name is an exact secret basename, the pattern-only name is not", () => {
+    const secrets = makeTargets().secretBasenames;
+    assert.ok(secrets.includes(POLICY_KEY_NAME), "the policy key name must be one of the fixture secretBasenames");
+    assert.ok(secrets.includes(ID_KEY_NAME), "the id_ name must be one of the fixture secretBasenames");
+    assert.ok(!secrets.includes(PATTERN_ONLY_NAME), "the pattern-only name must not be an exact secret basename");
+    assert.ok(PATTERN_ONLY_NAME.endsWith(EXT_PEM), "the pattern-only name must match the pem suffix");
+  });
+
+  test("F3S-1 the fixture carries the production pattern set: four suffixes, two prefixes", () => {
+    assert.equal(SECRET_PATTERNS.suffixes.length, 4);
+    assert.equal(SECRET_PATTERNS.prefixes.length, 2);
+    assert.ok(POLICY_KEY_NAME.endsWith(EXT_PEM) && SECRET_PATTERNS.suffixes.includes(EXT_PEM));
+    assert.ok(ID_KEY_NAME.startsWith(PREFIX_ID) && SECRET_PATTERNS.prefixes.includes(PREFIX_ID));
+  });
+});
+
+// --- F3 pattern position: a search tool's pattern argument is not a file operand ---------------------
+// GREEN today (the module ignores secretPatterns) and must stay green after the F2 fix.
+
+defineRows(
+  "TR-S2-T3 F3 pattern position: a secret-looking name searched FOR is not a target",
+  [
+    {
+      id: "F3P-1",
+      title: "rg -n <key name> docs/ (the first positional is the pattern; N3-4 under the production patterns)",
+      command: `rg -n "${POLICY_KEY_NAME}" docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3P-2",
+      title: "grep -rn <key name> docs (the first positional is the pattern)",
+      command: `grep -rn "${POLICY_KEY_NAME}" docs`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3P-3",
+      title: "rg -e <key name> docs/ (the value of -e is the pattern)",
+      command: `rg -e "${POLICY_KEY_NAME}" docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3P-4",
+      title: "rg --regexp=<key name> docs/ (the attached value of --regexp is the pattern)",
+      command: `rg --regexp=${POLICY_KEY_NAME} docs/`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3P-5",
+      title: "rg -n <id_ name> . (the id_ prefix, in the pattern position)",
+      command: `rg -n ${ID_KEY_NAME} .`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+  ],
+  "admitted",
+);
+
+// --- F3 file operand: the same names in a file-operand position are targets --------------------------
+// F3O-1, F3O-2, F3O-4, F3O-5 are RED today: a BARE name never matches (the exact-name rule needs a
+// directory component and the patterns are ignored). F3O-3 is GREEN today for the wrong reason: the
+// directory-qualified policy key name is refused by the exact-name rule alone, so it cannot show that the
+// pattern rule works; F3O-6 is its pattern-only companion and is RED today.
+
+defineRows(
+  "TR-S2-T3 F3 file operand: a secret-looking name in a file-operand position is a target",
+  [
+    {
+      id: "F3O-1",
+      title: "cat <key name> (Ruling 97: refuses under the production pattern set)",
+      command: `cat ${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3O-2",
+      title: "rg -n foo <key name> (the second positional is a file operand)",
+      command: `rg -n foo ${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3O-3",
+      title: "grep foo docs/<key name> (a directory-qualified file operand; also the exact-name rule)",
+      command: `grep foo docs/${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3O-4",
+      title: "type <key name> (PowerShell: type is Get-Content)",
+      command: `type ${POLICY_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: PWSH,
+    },
+    {
+      id: "F3O-5",
+      title: "rg -n foo -- <id_ name> (after --, every word is an operand)",
+      command: `rg -n foo -- ${ID_KEY_NAME}`,
+      targets: withPatterns(),
+      tools: BOTH,
+    },
+    {
+      id: "F3O-6",
+      title: "grep foo docs/<pattern-only name> (extra: only the pattern rule can refuse this one)",
+      command: `grep foo docs/${PATTERN_ONLY_NAME}`,
+      targets: withPatterns(),
       tools: BOTH,
     },
   ],
