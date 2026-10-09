@@ -7,7 +7,7 @@
 
 **Register 2026-10-09:** Critic tier per the ADR-0014 amendment (Rulings 156, 158).
 
-**Current 2026-10-09:** START HERE — [wrap-up handover](../specs/sprint-alfred-epic/plans/handover-2026-10-09-interim-wrapup.md) (WSL, Codex/agy; no stamp yet). Nothing PO-accepted.
+**Current 2026-10-09:** START HERE — [wrap-up handover](../specs/sprint-alfred-epic/plans/handover-2026-10-09-interim-wrapup.md) (WSL, Codex/agy; interim stamp `4edb5d869`). Nothing PO-accepted.
 
 ## Archived history
 

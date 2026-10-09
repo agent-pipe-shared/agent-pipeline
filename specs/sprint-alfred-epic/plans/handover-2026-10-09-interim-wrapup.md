@@ -3,6 +3,8 @@
 Runner-neutral. Written by the Claude Elephant on the main PC at the end of its budget (Ruling 164). The next session runs
 under **WSL** with **Codex** or **Antigravity (agy)**. Nothing here is PO-accepted. **No interim stamp exists yet**: the PO
 accepted wrapping up without one, so that no started block is half-finished in a candidate (Ruling 162).
+**Update:** at the PO's request the current state was stamped anyway so it can be installed — stamp `4edb5d869`,
+candidate `0.7.0+claude.20261009071314.ef4778ea` (details §5). §4 is the path to the NEXT stamp.
 
 Canonical anchors (read in this order): this file → `0.7-execution-order.md` Rulings 162–164 (newest at the bottom of
 the "Ruling" list) → `po-list-2026-10-08.md` (decisions, signatures) → `toil-log-2026-10-06-07.md` (T124–T129). The previous handover
@@ -90,4 +92,25 @@ Elephant captures: LE-F2 pattern run, E2E-ONB-A2 matrix, MECH-HAIKU after-captur
 
 ## 5. Late returns (appended by the Elephant before close)
 
-(none yet)
+- **Interim stamp (PO request after Ruling 164):** stamp commit `4edb5d869` = local candidate
+  **`0.7.0+claude.20261009071314.ef4778ea`** (stamped HEAD `ef4778ead`). Install from that commit (committed bytes only —
+  the uncommitted MECH-HAIKU edits are not part of it). Stamp gate (Ruling 117) re-measured at `ef4778ead`: probe 1
+  `ok mode=signature`, probe 2 `ok mode=approved-workflow-package-signature`. The tranche-2 post-images are NOT live.
+  This supersedes "no interim stamp yet" above; §4 now leads to the NEXT stamp.
+- **LE-F2 committed** `ef4778ead` (orchestrator commit; the `onboarding-init` pattern capture is still outstanding).
+- **ONB-T3 `b46403a06`:** GFW001 (F3 argv: doubled `--runner`/`--activate`, lost runner value, `--text-file` present for
+  claude), GFW002 (F4: all four applies mismatch the following `inspect`; `intake-generate-plan` lacks `--runner codex`)
+  in the new `lib/onboarding-greenfield-walk.test.mjs`; OBC299 (F7) and OBC300 (F9) in `onboarding-continuity.test.mjs`
+  (guard 300). All four red as intended, 298 neighbours green. The new test file may need a Verify-suite registration
+  (TP-13, signed package).
+- **E2E-ONB-B3 `1503a6828` (partial):** H1 split — after the sandbox commit `inspect` returns the chat route
+  (`bootstrap-acknowledge-chat-apply --plan-sha256 …`), but `bootstrap-acknowledge-plan` still returns `sign-intent`
+  (F14 narrowed to that subcommand, `scripts/project-onboarding-v3.mjs:986-991`). Walk stopped before the chat apply (own
+  error, sandbox deleted early). Next walk: rebuild per the report's "Not reached" (≈25–30 calls), skip
+  `bootstrap-acknowledge-plan`, follow `inspect`. New frictions F15–F18 (pre-commit hook execs bare `node`; GIT-03
+  trailers unannounced before the first greenfield commit; `.git` with hooks while `initializesGit` false; diagnostics vs
+  nextAction guidance).
+- **WIN-HARDEN-T2 `511f85f33`:** WPS016 red as intended → WIN-HARDEN-F2.
+- **Still alive at writing:** GREP-PUSH-F, CRITIC-CKPT-F2 (both build tranche-2 post-images; CRITIC-CKPT-F2 also edits the
+  live `agents/critic.md` — its Write grant must ship only together with the tranche-2 guard, so if it lands, it lands
+  after this stamp and goes live only with the next signed tranche).
