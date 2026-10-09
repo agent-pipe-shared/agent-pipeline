@@ -426,6 +426,47 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
   };
 }
 
+const SCRATCH_OUT_REFUSAL = "--out must name a regular file inside this root's own scratch/ directory (never outside scratch/, never through a symlink)";
+
+function outsideScratch(rel) {
+  return rel === "" || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || path.isAbsolute(rel);
+}
+
+/**
+ * ADOPT-SIGN-F: the lexical half of the `prepare --out` boundary. A relative value resolves
+ * against --root, so the check does not depend on the working directory. Returns the absolute
+ * target, or null when the target is not strictly inside `<root>/scratch/`. Touches nothing.
+ */
+function scratchOutTarget(rootDir, out) {
+  const target = path.resolve(rootDir, out);
+  return outsideScratch(path.relative(path.resolve(rootDir, "scratch"), target)) ? null : target;
+}
+
+/**
+ * ADOPT-SIGN-F: the filesystem half. Writes `bytes` to `target` only after the real parent
+ * directory is confirmed inside the real `<root>/scratch/` and the target is absent or an
+ * unlinked regular file, mirroring the guard `sign-intent` applies to its own scratch mirror
+ * writes. Returns false (having written nothing) when any of that does not hold.
+ */
+function writeScratchOut(rootDir, target, bytes) {
+  const scratchRoot = path.resolve(rootDir, "scratch");
+  try {
+    if (fs.existsSync(scratchRoot) && fs.lstatSync(scratchRoot).isSymbolicLink()) return false;
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (outsideScratch(path.relative(fs.realpathSync(scratchRoot), fs.realpathSync(path.dirname(target)))) && fs.realpathSync(path.dirname(target)) !== fs.realpathSync(scratchRoot)) return false;
+    try {
+      const existing = fs.lstatSync(target);
+      if (!existing.isFile() || existing.isSymbolicLink() || existing.nlink > 1) return false;
+    } catch (error) {
+      if (error?.code !== "ENOENT") return false;
+    }
+    fs.writeFileSync(target, bytes);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // CLI handler
 function runCli() {
   const args = process.argv.slice(2);
@@ -444,6 +485,7 @@ function runCli() {
   let rationale = "Architecture adoption decision applied via CLI";
   let json = false;
   let taskScope = null;
+  let out = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -473,6 +515,8 @@ function runCli() {
       by = args[++i];
     } else if (arg === "--rationale" && args[i + 1]) {
       rationale = args[++i];
+    } else if (arg === "--out" && args[i + 1]) {
+      out = args[++i];
     } else if (arg === "--json") {
       json = true;
     } else if (!arg.startsWith("--")) {
@@ -482,10 +526,35 @@ function runCli() {
     }
   }
 
+  if (out !== null && command !== "prepare") {
+    console.error("Error: --out is only valid with the 'prepare' command");
+    process.exit(1);
+  }
+
   switch (command) {
     case "prepare": {
+      // ADOPT-SIGN-F: the closed shell grammar admits no redirect, so the request file the PO signs is
+      // written by `prepare` itself. The boundary is checked BEFORE the request is built and before
+      // anything is written, so a refused --out leaves no file behind.
+      let outTarget = null;
+      if (out !== null) {
+        outTarget = scratchOutTarget(rootDir, out);
+        if (outTarget === null) {
+          console.error(`Error: ${SCRATCH_OUT_REFUSAL}`);
+          process.exit(1);
+        }
+      }
       const request = prepareAdoptionAuthority({ rootDir, decision, scope, rationale, expiresAt: expires, reviewDate, decidedAt, decisionRef });
-      console.log(JSON.stringify(request, null, 2));
+      // One byte string feeds both sinks, so the file is byte-identical to the stdout form by construction.
+      const bytes = `${JSON.stringify(request, null, 2)}\n`;
+      if (outTarget !== null) {
+        if (!writeScratchOut(rootDir, outTarget, bytes)) {
+          console.error(`Error: ${SCRATCH_OUT_REFUSAL}`);
+          process.exit(1);
+        }
+        console.error(`adoption request written: ${path.relative(rootDir, outTarget).split(path.sep).join("/")}`);
+      }
+      process.stdout.write(bytes);
       break;
     }
     case "status": {

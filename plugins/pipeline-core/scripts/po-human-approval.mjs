@@ -50,6 +50,7 @@ import {
 import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
 import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA, describeModelFamilyApprovalRequest } from "./model-family-approval-request.mjs";
+import { canonical as canonicalProofJson } from "../lib/po-approval-proof.mjs";
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -187,6 +188,64 @@ export function describeArchitectureInheritedSourcesRequest(record, intentSha256
       `source: ${source.sourceId} | ${source.layer} | ${source.required ? "mandatory" : "optional"} | key ${source.trustAnchor.keyReference} | public key sha256 ${source.trustAnchor.publicKeySha256}`),
     "this pins source identities and trust anchors; it does not sign the source contents, approve an ADR waiver, or authorize a release or push",
   ] };
+}
+
+const ADOPTION_APPROVAL_REQUEST_SCHEMA = "pipeline.adoption-approval-request.v1";
+
+/**
+ * ADOPT-SIGN-F: the disclosure for an architecture-adoption approval request, derived from the
+ * request file ALONE. It deliberately does not call verifyAdoptionAuthority(): that rebinds the
+ * repository fingerprint, the candidate and the live adoption snapshot of a checkout, and a PO may
+ * legitimately sign a request prepared for another root. What the PO is shown is bound to what is
+ * signed, which is all a disclosure must guarantee: intent.sha256 must equal the hash of the
+ * intent's own value, and that value must carry the hash of the very subject being displayed (plus
+ * its decision and candidate). The deeper derivation of the intent from the subject (plan and
+ * spec digests) is not repeated here; verifyAdoptionAuthority() re-derives it in full at apply
+ * time, so a request forged to be self-consistent here still cannot be applied. Disclosure, never
+ * authority. Returns null when anything does not bind, so the caller refuses before any
+ * confirmation or signing.
+ */
+function describeAdoptionApprovalRequest(record, intentSha256) {
+  if (record?.schema !== ADOPTION_APPROVAL_REQUEST_SCHEMA) return null;
+  const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const exactKeys = (value, keys) => isObject(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const sha = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+  const oid = (value) => typeof value === "string" && /^[a-f0-9]{40,64}$/u.test(value);
+  const dateOrNull = (value) => value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/u.test(value));
+  const nonEmptyText = (value) => typeof value === "string" && value.trim() !== "";
+  const sha256Of = (value) => createHash("sha256").update(canonicalProofJson(value)).digest("hex");
+  try {
+    const { intent, subject } = record;
+    if (!exactKeys(record, ["schema", "mode", "intent", "subject", "subjectSha256"])
+      || !["signature", "chat-attributed-unattested"].includes(record.mode)
+      || !exactKeys(intent, ["value", "sha256"]) || !isObject(intent.value)
+      || intent.sha256 !== intentSha256 || sha256Of(intent.value) !== intent.sha256
+      || !isObject(subject) || !sha(record.subjectSha256) || sha256Of(subject) !== record.subjectSha256
+      || intent.value.kind !== "architecture-adoption" || intent.value.policyRevision !== "adoption-authority-v1"
+      || intent.value.subjectSha256 !== record.subjectSha256 || intent.value.decision !== subject.decision
+      || !["approved-scoped", "deferred", "partial"].includes(subject.decision)
+      || !Array.isArray(subject.scope) || subject.scope.length === 0 || !subject.scope.every(nonEmptyText)
+      || !nonEmptyText(subject.decisionRef) || !nonEmptyText(subject.rationale)
+      || typeof subject.decidedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/u.test(subject.decidedAt)
+      || !dateOrNull(subject.expiresAt) || !dateOrNull(subject.reviewDate) || !sha(subject.repositoryFingerprint)
+      || !exactKeys(subject.candidate, ["commit", "tree"]) || !oid(subject.candidate.commit) || !oid(subject.candidate.tree)
+      || sha256Of(intent.value.candidate) !== sha256Of(subject.candidate)) return null;
+    // Free text is rendered through JSON.stringify so a hostile request cannot add a line of its own.
+    return { resolved: true, lines: [
+      "action: record this architecture adoption decision for the repository identified below",
+      `decision: ${subject.decision}`,
+      `decision ref: ${JSON.stringify(subject.decisionRef)}`,
+      ...subject.scope.map((entry) => `scope: ${JSON.stringify(entry)}`),
+      `rationale: ${JSON.stringify(subject.rationale.trim())}`,
+      `decided at: ${subject.decidedAt}`,
+      `expires at: ${subject.expiresAt ?? "none"}`,
+      `review date: ${subject.reviewDate ?? "none"}`,
+      `candidate commit: ${subject.candidate.commit}`,
+      `repository fingerprint: ${subject.repositoryFingerprint}`,
+      `request mode: ${record.mode}`,
+      "this signs the decision only; applying it, and any push or release, need their own approval",
+    ] };
+  } catch { return null; }
 }
 
 function currentGitCandidate(repository) {
@@ -2049,6 +2108,12 @@ function executeHumanApproval(args, dependencies = {}) {
         // disclosure, human confirmation, key access and signing.
         if (!SHA.test(record.approvalIntent?.sha256 ?? "")) fail("--request design-workflow JSON must carry approvalIntent.sha256 (64 lowercase hexadecimal characters)");
         args.intentSha256 = record.approvalIntent.sha256;
+      } else if (record?.schema === ADOPTION_APPROVAL_REQUEST_SCHEMA) {
+        // ADOPT-SIGN-F: an adoption request carries its digest at intent.sha256 (no top-level
+        // intentSha256 alias exists). Whether that digest binds the subject is judged below, by
+        // describeAdoptionApprovalRequest(), before any confirmation or signing.
+        if (!SHA.test(record.intent?.sha256 ?? "")) fail("--request adoption JSON must carry intent.sha256 (64 lowercase hexadecimal characters)");
+        args.intentSha256 = record.intent.sha256;
       } else {
         if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
         args.intentSha256 = record.intentSha256;
@@ -2088,6 +2153,7 @@ function executeHumanApproval(args, dependencies = {}) {
     const inheritedSources = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
     const modelFamilyApproval = scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA
       ? describeModelFamilyApprovalRequest(scratchRequestRecord, { rootDir: repository }) : null;
+    const adoptionApproval = describeAdoptionApprovalRequest(scratchRequestRecord, intentSha256);
     // A scratch request which claims the bootstrap-acknowledgement schema is
     // never a generic, opaque `sign-intent` request. In particular, do not
     // fall through to the generic GMW/HGO disclosure route when its action
@@ -2111,6 +2177,9 @@ function executeHumanApproval(args, dependencies = {}) {
     if (scratchRequestRecord?.schema === "pipeline.organization-architecture-config-request.v1" && inheritedSources === null) {
       fail("the inherited architecture-source request does not bind its exact registry and intent digest");
     }
+    if (scratchRequestRecord?.schema === ADOPTION_APPROVAL_REQUEST_SCHEMA && adoptionApproval === null) {
+      fail("the adoption approval request does not bind its exact subject and intent digest");
+    }
     if (portableAgyAuthorship !== null) {
       const checkPortable = dependencies.checkPortableAgyAuthorshipRequest
         ?? checkPortableAgyAuthorshipRequestOnHost;
@@ -2128,7 +2197,7 @@ function executeHumanApproval(args, dependencies = {}) {
         fail("the portable Critic export request is not bound to a current consumed private Critic review");
       }
     }
-    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources ?? modelFamilyApproval
+    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources ?? modelFamilyApproval ?? adoptionApproval
       ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
