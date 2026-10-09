@@ -547,16 +547,16 @@ export function applyTrustAnchorBootstrap({
     && currentAnchors[0].publicKeySha256 === authority.publicKeySha256;
   if (currentAnchors.length > 0 && !anchoredAlready) return fail("TRUST-ANCHOR-REPOSITORY-CONFLICT");
 
-  if (recoveringNewAuthority) {
-    try {
-      atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
-        schema: "pipeline.po-key-directory.v1",
-        poKeyDirectory: targetDirectory,
-        updatedAt: new Date().toISOString(),
-      }, null, 2)}\n`);
-    } catch {
-      return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
-    }
+  // Bootstrap owns the repository pointer on every path that reaches here: the setup child writes the machine
+  // plane only (decision AC), so the pointer binding this repository to its key directory is written here.
+  try {
+    atomicReplaceFile(repositoryPointerPath, `${JSON.stringify({
+      schema: "pipeline.po-key-directory.v1",
+      poKeyDirectory: targetDirectory,
+      updatedAt: new Date().toISOString(),
+    }, null, 2)}\n`);
+  } catch {
+    return fail("TRUST-ANCHOR-REPOSITORY-POINTER-WRITE-FAILED");
   }
   const repositoryPointer = parseJsonFile(repositoryPointerPath, read);
   if (resolve(repositoryPointer?.poKeyDirectory ?? ".") !== targetDirectory) {
