@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, keyDirectoryUnsetFinding, outside, parseHumanArgs as parseHumanArgsUnguarded, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, resolvePoKeyDirectory, runForkDispositionApproval as runForkDispositionApprovalUnguarded, runHumanApproval as runHumanApprovalUnguarded } from "./po-human-approval.mjs";
 import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
@@ -76,7 +76,94 @@ function withFixtureHome(dependencies = {}) {
   rmSync(join(DEFAULT_FIXTURE_HOME, ".agent-pipeline"), { recursive: true, force: true });
   return { ...dependencies, homedirFn: () => DEFAULT_FIXTURE_HOME };
 }
-const runHumanApproval = (argv, dependencies) => runHumanApprovalUnguarded(argv, withFixtureHome(dependencies));
+/**
+ * TR-S1-T3 (Ruling 78): the central encrypted-key lever. After TR-S1-F, every verb that reads the
+ * registered PO key refuses a key that is not passphrase-protected, so a fixture key is no longer
+ * "an unencrypted keyFixture() key". Rather than ~60 per-case edits, this wrapper acts on each call
+ * that reads a key. It finds the key directory the way production does (resolvePoKeyDirectory: flag,
+ * environment, machine plane, legacy store) and, for setup --existing-key, the source key. Then:
+ *  1. an UNENCRYPTED po-private.pem is re-encrypted IN PLACE with LEVER_PASSPHRASE, from the SAME
+ *     keypair (po-public.pem, trust-policy.json and the committed trust anchors stay valid);
+ *  2. `isTTY: true` is injected unless the case set its own (an encrypted key needs an attended
+ *     terminal, po-human-approval.mjs assertAttendedTerminalWhenPassphraseKey);
+ *  3. the spawn seam (the case's own, else real spawnSync) gets `-passin pass:<LEVER_PASSPHRASE>`
+ *     appended to every openssl call that names the key (production has no -passin; real OpenSSL would
+ *     prompt). Stubs that sign or derive with node:crypto (r76Spy, fakeSetupSpawn) honour `-passin`.
+ * Nothing is injected unless a key encrypted under LEVER_PASSPHRASE was found, so keys of other
+ * passphrases (encryptedKeyFixture), trap files and absent keys behave exactly as before. A case whose
+ * SUBJECT is the unencrypted key opts out with plainKey(dependencies); tr1Spawn spawns carry the same
+ * marker (the TR-S1-T pins' own setup helper). The original readFileSync is captured so the R7-6
+ * "trap key is never opened" filesystem spy cannot see the lever.
+ */
+const LEVER_PASSPHRASE = "tr-s1-t3-lever-fixture-passphrase";
+const KEEP_KEY_PLAIN = Symbol("tr-s1-t3-keep-key-plain");
+const plainKey = (dependencies = {}) => ({ ...dependencies, [KEEP_KEY_PLAIN]: true });
+const LEVER_VERBS = new Set(["setup", "sign-intent", "authorize-critical", "approve", "approve-critical", "approve-fork-disposition"]);
+const leverReadFile = readFileSync;
+function leverKeyPaths(argv, dependencies) {
+  if (!LEVER_VERBS.has(argv[0])) return [];
+  const flag = (name) => { const index = argv.indexOf(name); return index >= 0 ? argv[index + 1] : undefined; };
+  const paths = [];
+  try {
+    const found = resolvePoKeyDirectory({ explicit: flag("--directory"), repoRoot: flag("--repo-root"), dependencies });
+    if (found.status === "resolved" && typeof found.directory === "string") paths.push(join(found.directory, "po-private.pem"));
+  } catch { /* an unresolvable directory has no key for the lever to touch */ }
+  const source = argv[0] === "setup" ? flag("--existing-key") : undefined;
+  if (typeof source === "string" && source !== "") paths.push(resolve(source));
+  return paths.filter((path) => existsSync(path));
+}
+function applyKeyLever(argv, dependencies) {
+  if (dependencies[KEEP_KEY_PLAIN] === true || dependencies.spawn?.[KEEP_KEY_PLAIN] === true) return dependencies;
+  const keyPaths = leverKeyPaths(argv, dependencies);
+  let engaged = false;
+  for (const keyPath of keyPaths) {
+    let pem;
+    try { pem = leverReadFile(keyPath, "utf8"); } catch { continue; }
+    if (pem.includes("-----BEGIN PRIVATE KEY-----")) {
+      writeFileSync(keyPath, createPrivateKey(pem).export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: LEVER_PASSPHRASE }));
+      engaged = true;
+    } else if (pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")) {
+      try { createPrivateKey({ key: pem, format: "pem", passphrase: LEVER_PASSPHRASE }); engaged = true; } catch { /* encrypted under the case's own passphrase: leave it alone */ }
+    }
+  }
+  if (!engaged) return dependencies;
+  const base = dependencies.spawn ?? spawnSync;
+  const spawn = (executable, args, options) => {
+    const list = Array.isArray(args) ? args : [];
+    const namesKey = executable === "openssl" && !list.includes("-passin")
+      && list.some((entry) => /po-private\.pem$/u.test(String(entry)) || keyPaths.includes(resolve(String(entry))));
+    return base(executable, namesKey ? [...list, "-passin", `pass:${LEVER_PASSPHRASE}`] : args, options);
+  };
+  return { ...dependencies, isTTY: dependencies.isTTY ?? true, spawn, [LEVER_ENGAGED]: true };
+}
+/**
+ * TR-S1-T4 disclosure adapter (Ruling 83). Opt-in per case with disclosureChannel(carrier); acts only when the case
+ * is marked AND applyKeyLever re-encrypted its key (LEVER_ENGAGED). The lists of what moved (the five cases whose
+ * "subject retired by TR-S1 (Ruling 78)", the 16 whose "channel moved from prompt to stdout disclosure (Ruling 83)",
+ * the literal-word measurement) live in the TR-S1-T pin header further down this file, next to amendment A4.
+ */
+const LEVER_ENGAGED = Symbol("tr-s1-t4-lever-engaged");
+const DISCLOSURE_CHANNEL = Symbol("tr-s1-t4-disclosure-channel");
+const disclosureChannel = (carrier = {}) => { carrier[DISCLOSURE_CHANNEL] = true; return carrier; };
+function callWithLever(argv, dependencies, unguarded) {
+  const leveraged = applyKeyLever(argv, dependencies);
+  const marked = dependencies?.[DISCLOSURE_CHANNEL] === true || dependencies?.spawn?.[DISCLOSURE_CHANNEL] === true;
+  const stub = marked && leveraged[LEVER_ENGAGED] === true ? leveraged.readConfirmation : undefined;
+  if (typeof stub !== "function") return unguarded(argv, leveraged);
+  const hadOwnWrite = Object.hasOwn(process.stdout, "write");
+  const priorWrite = process.stdout.write;
+  process.stdout.write = function disclosureCapture(chunk, ...rest) {
+    stub(String(chunk));
+    const done = rest.find((entry) => typeof entry === "function");
+    if (done) done();
+    return true;
+  };
+  try { return unguarded(argv, leveraged); } finally {
+    if (hadOwnWrite) process.stdout.write = priorWrite; else delete process.stdout.write;
+  }
+}
+const runHumanApproval = (argv, dependencies) => callWithLever(argv, withFixtureHome(dependencies), runHumanApprovalUnguarded);
+const runForkDispositionApproval = async (argv, dependencies = {}) => callWithLever(argv, dependencies, runForkDispositionApprovalUnguarded);
 const parseHumanArgs = (argv, dependencies) => parseHumanArgsUnguarded(argv, withFixtureHome(dependencies));
 
 function nestedDwpSigningRequest() {
@@ -152,9 +239,9 @@ test("AC-19 sign-intent presents the exact inherited registry before signing", {
     })}\n`);
     const prompts = [];
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
-      "--directory", dirs.directory, "--request", path], {
+      "--directory", dirs.directory, "--request", path], disclosureChannel({
       readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
-    });
+    }));
     assert.equal(result.ok, true);
     assert.equal(result.intentSha256, intentSha256);
     assert.match(prompts[0], /organization-adrs \| organization \| mandatory/u);
@@ -419,8 +506,10 @@ function thrown(fn) {
 function fakeSetupSpawn(executable, args) {
   if (executable === "openssl" && args[0] === "genpkey") {
     const outIndex = args.indexOf("-out");
+    // TR-S1-T3: the real command is `genpkey -aes-256-cbc`, so the stand-in key is encrypted too
+    // (LEVER_PASSPHRASE, the one the central lever signs with).
     const { privateKey } = generateKeyPairSync("ed25519", {
-      privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      privateKeyEncoding: { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase: LEVER_PASSPHRASE },
       publicKeyEncoding: { type: "spki", format: "pem" },
     });
     writeFileSync(args[outIndex + 1], privateKey);
@@ -429,7 +518,12 @@ function fakeSetupSpawn(executable, args) {
   if (executable === "openssl" && args[0] === "pkey" && args.includes("-pubout")) {
     const inPath = args[args.indexOf("-in") + 1];
     const outPath = args[args.indexOf("-out") + 1];
-    const publicKey = createPublicKey(createPrivateKey(readFileSync(inPath, "utf8")))
+    // TR-S1-T3: an encrypted key is read with the `-passin` the lever appended, else LEVER_PASSPHRASE.
+    const passinIndex = args.indexOf("-passin");
+    const pem = readFileSync(inPath, "utf8");
+    const publicKey = createPublicKey(createPrivateKey(pem.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----")
+      ? { key: pem, format: "pem", passphrase: passinIndex >= 0 ? String(args[passinIndex + 1]).replace(/^pass:/u, "") : LEVER_PASSPHRASE }
+      : pem))
       .export({ type: "spki", format: "pem" });
     writeFileSync(outPath, publicKey);
     return { status: 0 };
@@ -638,7 +732,7 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-fixture").digest("hex");
     const confirmationPrompts = [];
-    const dependencies = { readConfirmation: (prompt) => { confirmationPrompts.push(prompt); return "approve"; } };
+    const dependencies = disclosureChannel({ readConfirmation: (prompt) => { confirmationPrompts.push(prompt); return "approve"; } });
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
     assert.equal(result.ok, true);
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
@@ -651,10 +745,10 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     const signerOnDisk = JSON.parse(readFileSync(result.paths.signer, "utf8"));
     assert.deepEqual(signerOnDisk, result.signer);
 
-    assert.equal(confirmationPrompts.length, 1, "sign-intent must ask for exactly one explicit confirmation before signing");
-    assert.match(confirmationPrompts[0], new RegExp(intentSha256, "u"), "the confirmation prompt must name the exact digest being authorized");
-    assert.match(confirmationPrompts[0], /guard-lift\/guard-override/u, "the confirmation prompt must state the generic consequence class");
-    assert.match(confirmationPrompts[0], /type exactly "approve"/iu, "the confirmation prompt must require an explicit typed token, not a bare y/n");
+    assert.equal(confirmationPrompts.length, 1, "sign-intent must present exactly one disclosure before signing (Ruling 83: on the encrypted path it arrives on stdout, not through a typed prompt)");
+    assert.match(confirmationPrompts[0], new RegExp(intentSha256, "u"), "the disclosure must name the exact digest being authorized");
+    assert.match(confirmationPrompts[0], /guard-lift\/guard-override/u, "the disclosure must state the generic consequence class");
+    // TR-S1-T4 (Ruling 78(b), :634 note): the typed-token instruction assertion is gone -- the encrypted path prints no confirmation.
 
     const proofPath = join(dirs.directory, `proof-${intentSha256}.json`);
     // NVA-CLI-FEEDBACK-1: the success result states the absolute paths it just
@@ -770,8 +864,8 @@ test("sign-intent discloses the exact redacted Agy authorship export and its non
     const prompts = [];
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
       "--directory", dirs.directory, "--request", path],
-    { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
-      checkPortableAgyAuthorshipRequest: () => true });
+    disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+      checkPortableAgyAuthorshipRequest: () => true }));
     assert.equal(result.ok, true);
     assert.equal(result.intentSha256, request.intentSha256);
     assert.equal(prompts.length, 1);
@@ -841,8 +935,8 @@ test("sign-intent discloses a bound portable Critic export and no release author
     const prompts = [];
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
       "--directory", dirs.directory, "--request", path],
-    { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
-      checkPortableCriticExportRequest: () => true });
+    disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+      checkPortableCriticExportRequest: () => true }));
     assert.equal(result.ok, true);
     assert.equal(result.intentSha256, request.intentSha256);
     assert.equal(prompts.length, 1);
@@ -906,7 +1000,7 @@ test("sign-intent discloses the exact reviewed PRD, specification, and checkpoin
     const result = runHumanApproval([
       "sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
       "--request", `scratch/bootstrap-plan-acknowledgement-request-${exactIntent}.json`,
-    ], { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } });
+    ], disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }));
     assert.equal(result.ok, true);
     assert.equal(prompts.length, 1);
     const [prompt] = prompts;
@@ -1175,14 +1269,14 @@ test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-cancel-fixture").digest("hex");
     const spy = r76Spy("healthy");
-    const dependencies = {
+    // TR-S1-T5 (Ruling 78(b)): subject retired by TR-S1 -- the typed confirmation on an UNENCRYPTED key is refused
+    // outright once the gate lands, so a mismatched answer now meets the typed gate refusal (A1). RED until TR-S1-F.
+    const dependencies = plainKey({
       readConfirmation: () => "nope",
       spawn: spy.spawn,
-    };
-    assert.throws(
-      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
-      /approval cancelled: explicit confirmation was not given/,
-    );
+    });
+    const error = thrown(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies));
+    tr1AssertTypedRefusal(error, "sign-intent (b): a mismatched confirmation on an unencrypted key");
     assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
@@ -1396,9 +1490,12 @@ test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a miss
     keyFixture(dirs.directory);
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.tty-sign-unprotected-key-fixture").digest("hex");
-    const dependencies = { isTTY: false, readConfirmation: () => "approve" };
-    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
-    assert.equal(result.ok, true, "an unprotected key never makes OpenSSL prompt, so signing must succeed with no TTY attached");
+    // TR-S1-T5 (Ruling 78(b)): subject retired by TR-S1 -- signing with an UNPROTECTED key is refused outright with a
+    // typed code (A1), TTY or not, so the old "signing must succeed with no TTY" assertion is re-pointed. RED until TR-S1-F.
+    const dependencies = plainKey({ isTTY: false, readConfirmation: () => "approve" });
+    const error = thrown(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies));
+    tr1AssertTypedRefusal(error, "sign-intent (b): an unprotected key with no TTY");
+    assert.deepEqual(tr1ReadDirectory(dirs.directory).filter((name) => /^(proof|signer|signature|intent)/u.test(name)), [], "TR-S1-T sign-intent (b): no intent, signature, proof or signer artifact may be written for an unprotected key");
   } finally {
     cleanup(dirs);
   }
@@ -1427,9 +1524,45 @@ test("NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key is unaffected by a miss
  *  A3. The unreadable key of pin 5 is exercised on the --existing-key route in two shapes: a directory
  *      where the key file should be (every read fails, no seam involved) and an injected readFile that
  *      denies exactly that path (EACCES). Both pass the existence check, so they reach the detector.
- *  A4. Existing cases that register keyFixture() (an UNENCRYPTED key) and expect sign-intent or
- *      authorize-critical to proceed will be refused once the gate lands. They are left unchanged here
- *      (briefing); migrating them to encryptedKeyFixture() is test maintenance for a separate dispatch.
+ *  A4 (amended by Rulings 78 and 83). Existing cases that register keyFixture() (an UNENCRYPTED key) and
+ *      expect sign-intent or authorize-critical to proceed would be refused once the gate lands. They are
+ *      moved onto an encrypted key by the central lever (applyKeyLever, TR-S1-T3, above), or re-pointed:
+ *      the three lists below account for every case that did not simply move.
+ *
+ * subject retired by TR-S1 (Ruling 78): the typed confirmation on an UNENCRYPTED key. After TR-S1-F that
+ * attended path is refused outright, so these five cases are NOT moved. Each runs under plainKey() and asserts
+ * the typed gate refusal (A1 pattern) plus its old no-OpenSSL / no-artifact assertions; each stays RED until
+ * TR-S1-F lands (pins 1, 3, 4, 5 and these five are the expected reds of an un-gated run):
+ *   - "sign-intent cancels on a mismatched confirmation ..."
+ *   - "NVA-W5-TTYSIGN: sign-intent for an UNPROTECTED key ..." (the old "signing succeeds with no TTY"
+ *     assertion cannot coexist with the refusal and is replaced by it; a no-artifact assertion is added)
+ *   - "NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel ..."
+ *   - "sign-intent cancels on an empty confirmation answer ..."
+ *   - "NVA-BL-74: cancellation semantics are unchanged under the German prompt ..."
+ *
+ * channel moved from prompt to stdout disclosure (Ruling 83): on the encrypted path sign-intent prints the
+ * disclosure (header, data lines, consequence) to stdout and never calls readConfirmation (NVA-SIGNONCE-1,
+ * printDisclosureOnly in po-human-approval.mjs). These 16 cases keep their subject (disclosure content,
+ * language frame, order) and opt in with disclosureChannel(): AC-19 inherited registry; sign-intent end-to-end;
+ * Agy export; Critic export; bootstrap acknowledgement; NVA-SIGENTRY-1 (two); the four reason/scope/expiry
+ * disclosure cases (states the reason, no record resolves, tampered record, bounded); NVA-BL-74 German frame,
+ * English fallback and identical-data-lines; R7-6d(iii); R7-6f(i).
+ * The adapter (callWithLever, above) is OPT-IN and per case. It acts only when the case is marked AND the lever
+ * re-encrypted its key (so production genuinely skips the typed prompt); it swaps process.stdout.write for a
+ * collector during the call and hands each captured chunk, verbatim, to the case's own readConfirmation stub at
+ * the moment production wrote it (so the order against spawns is preserved), ignoring the stub's answer.
+ * Unmarked cases never receive a prompt production did not present. The typed-token INSTRUCTION line is not part
+ * of the disclosure on this channel (Ruling 91(b)); the assertions on that line alone (sign-intent end-to-end,
+ * the reason/scope/expiry case, the German frame, the English fallback, the identical-data-lines loop) were
+ * dropped or re-pointed at the consequence sentence. Every other assertion in those cases stays.
+ *
+ * Literal-word measurement (Ruling 78(b)): authorize-critical and approve/approve-critical call
+ * requireExplicitConfirmation unconditionally (po-human-approval.mjs), encrypted key or not, so the two
+ * "still requires the literal word approve" cases MOVE with the lever and are green without any edit.
+ *
+ * Acceptance shape (Ruling 91(a)): under a TYPED simulated gate the pins and the five retired-subject cases
+ * assert exactly the typed refusal and turn GREEN; only NVA-SWEEP-F2f-REWORK stays red. Without a gate the
+ * reds are pins 1, 3, 4, 5, the five retired-subject cases and NVA-SWEEP-F2f-REWORK.
  * Fixtures are throwaway node:crypto keys in mkdtemp directories: no real home, no real key directory,
  * no network, no real OpenSSL (every spawn goes through an injected stub).
  * ------------------------------------------------------------------------- */
@@ -1472,6 +1605,8 @@ function tr1Spawn(passphrase = null) {
     }
     return answerOpensslProbe(executable, a);
   };
+  // TR-S1-T3: the pins' own setup helper keeps the central lever off: their SUBJECT is the unencrypted key.
+  spawn[KEEP_KEY_PLAIN] = true;
   return { spawn, calls };
 }
 
@@ -1555,7 +1690,7 @@ test("TR-S1-T pin 4: sign-intent refuses a REGISTERED unencrypted key with a typ
     const spy = r76Spy("healthy");
     const error = thrown(() => runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
-      { readConfirmation: () => "approve", spawn: spy.spawn },
+      plainKey({ readConfirmation: () => "approve", spawn: spy.spawn }),
     ));
     tr1AssertTypedRefusal(error, "sign-intent with a registered unencrypted key");
     assert.deepEqual(r76KeyPathSpawns(spy), [], "TR-S1-T sign-intent: OpenSSL must never be handed the unencrypted key");
@@ -1610,14 +1745,14 @@ test("NVA-SIGNONCE-1: an unencrypted private key still requires and can cancel o
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-signonce-unencrypted-fixture").digest("hex");
     const spy = r76Spy("healthy");
-    const dependencies = {
+    // TR-S1-T5 (Ruling 78(b)): subject retired by TR-S1 -- an unencrypted key no longer reaches the typed confirmation;
+    // the attended path is refused outright with a typed code (A1). RED until TR-S1-F.
+    const dependencies = plainKey({
       readConfirmation: () => "definitely not approve",
       spawn: spy.spawn,
-    };
-    assert.throws(
-      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
-      /approval cancelled: explicit confirmation was not given/,
-    );
+    });
+    const error = thrown(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies));
+    tr1AssertTypedRefusal(error, "sign-intent (b): NVA-SIGNONCE-1 a non-matching answer on an unencrypted key");
     assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled for a key with no passphrase");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
   } finally {
@@ -1988,14 +2123,14 @@ test("sign-intent cancels on an empty confirmation answer the same way as a mism
     anchorFixtureKey(dirs.repoRoot, dirs.directory);
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-empty-fixture").digest("hex");
     const spy = r76Spy("healthy");
-    const dependencies = {
+    // TR-S1-T5 (Ruling 78(b)): subject retired by TR-S1 -- an empty answer on an UNENCRYPTED key meets the typed gate
+    // refusal (A1) exactly as a mismatched one does. RED until TR-S1-F.
+    const dependencies = plainKey({
       readConfirmation: () => "",
       spawn: spy.spawn,
-    };
-    assert.throws(
-      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies),
-      /approval cancelled: explicit confirmation was not given/,
-    );
+    });
+    const error = thrown(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies));
+    tr1AssertTypedRefusal(error, "sign-intent (b): an empty answer on an unencrypted key");
     assert.deepEqual(r76KeyPathSpawns(spy), [], "OpenSSL must never be invoked once confirmation is cancelled");
   } finally {
     cleanup(dirs);
@@ -2828,7 +2963,7 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     assert.equal(result.ok, true);
     assert.equal(result.intentSha256, armed.intent.sha256);
@@ -2860,7 +2995,7 @@ test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO req
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     const [prompt] = prompts;
     assert.ok(prompt.includes(unrelated), "the digest is still named");
@@ -2881,7 +3016,7 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     assert.equal(result.ok, true);
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
@@ -2894,7 +3029,7 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
     assert.ok(prompt.includes("GS-6") && prompt.includes("TP-1"), "the recorded scope must be shown");
     assert.ok(prompt.includes(new Date(prepared.subject.expiresAtMs).toISOString()), "the recorded expiry must be shown");
     assert.ok(prompt.includes("guard-lift"), "the recorded action kind must be shown");
-    assert.match(prompt, /type exactly "approve"/iu, "the typed-token gate stays the last thing asked");
+    // TR-S1-T4 (Ruling 83): the typed-token instruction line is not part of the stdout disclosure, so its assertion is gone.
 
     const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(proof.intentSha256, prepared.intent.sha256, "the signature still covers the digest, nothing the summary said");
@@ -2913,7 +3048,7 @@ test("sign-intent says so plainly when no record resolves for the digest, and in
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     const [prompt] = prompts;
     assert.ok(prompt.includes(unrelated), "the digest is still named");
@@ -2941,7 +3076,7 @@ test("a tampered record cannot change what is signed: the summary disappears, th
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     const [prompt] = prompts;
     assert.equal(prompt.includes("a much smaller change than it really is"), false, "an edited record must not be displayed at all");
@@ -2967,7 +3102,7 @@ test("the disclosure stays bounded: an oversized reason and scope cannot flood o
     const prompts = [];
     runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     const lines = prompts[0].split("\n");
     assert.ok(lines.length <= gmw.GMW_SUMMARY_MAX_LINES + 4, `prompt of ${lines.length} lines exceeds the stated bound`);
@@ -4150,7 +4285,7 @@ test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, 
     const prompts = [];
     const result = runHumanApproval(
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
-      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
     );
     assert.equal(result.ok, true);
     assert.equal(prompts.length, 1, "still exactly one human confirmation, in any language");
@@ -4158,9 +4293,8 @@ test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, 
     assert.doesNotMatch(prompts[0], ENGLISH_FRAME, "the English frame must not also be printed");
     assert.match(prompts[0], /Passphrase/u, "the German frame must still warn before the passphrase prompt");
     assert.match(prompts[0], /nicht mehr rückgängig/u, "the German frame must still state the irreversible consequence");
-    // The token itself is NOT translated: the German instruction quotes the exact
-    // English word the human types, and nothing else is offered as an alternative.
-    assert.match(prompts[0], /Tippen Sie exakt "approve"/u, "the German prompt must quote the stable English token verbatim");
+    // TR-S1-T4 (Ruling 83): the German typed-token instruction ("Tippen Sie exakt ...") is not part of the stdout
+    // disclosure of the encrypted path, so its assertion is gone; the token itself was never translated.
     // The summary lines are caller-supplied data and stay language-independent.
     assert.match(prompts[0], new RegExp(intentSha256, "u"), "the digest must be named in every language");
     assert.match(prompts[0], /guard-lift\/guard-override/u, "the data lines are untranslated by design");
@@ -4181,15 +4315,15 @@ test("NVA-BL-74: cancellation semantics are unchanged under the German prompt --
       stateFixture(dirs.repoRoot, { language: "de" });
       const intentSha256 = createHash("sha256").update(`nva-bl-74-cancel-${answer}`).digest("hex");
       const spy = r76Spy("healthy");
-      assert.throws(
-        () => runHumanApproval(
-          ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
-          { readConfirmation: () => answer, spawn: spy.spawn },
-        ),
-        /approval cancelled: explicit confirmation was not given/u,
-        `${JSON.stringify(answer)} must cancel under the German prompt`,
-      );
-      assert.deepEqual(r76KeyPathSpawns(spy), [], `${JSON.stringify(answer)}: OpenSSL must never be invoked once confirmation is cancelled`);
+      // TR-S1-T4 (Ruling 78(b)): subject retired by TR-S1 -- the typed confirmation on an UNENCRYPTED key is refused
+      // outright once the gate lands, so every answer now meets the typed gate refusal (A1) instead of the cancel.
+      // RED until TR-S1-F.
+      const error = thrown(() => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+        plainKey({ readConfirmation: () => answer, spawn: spy.spawn }),
+      ));
+      tr1AssertTypedRefusal(error, `sign-intent (b): ${JSON.stringify(answer)} on an unencrypted key under the German frame`);
+      assert.deepEqual(r76KeyPathSpawns(spy), [], `${JSON.stringify(answer)}: OpenSSL must never be handed the unencrypted key`);
       for (const artifact of [`proof-${intentSha256}.json`, `signature-${intentSha256}.bin`, `intent-${intentSha256}.txt`]) {
         assert.equal(existsSync(join(dirs.directory, artifact)), false, `${JSON.stringify(answer)}: no ${artifact} may exist after a cancelled confirmation`);
       }
@@ -4222,12 +4356,13 @@ test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malfor
       const prompts = [];
       const result = runHumanApproval(
         ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
-        { ...(scenario.dependencies ?? {}), readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+        disclosureChannel({ ...(scenario.dependencies ?? {}), readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
       );
       assert.equal(result.ok, true, scenario.label);
       assert.equal(prompts.length, 1, `${scenario.label}: the gate must still ask exactly once`);
       assert.match(prompts[0], ENGLISH_FRAME, `${scenario.label}: must fall back to the English frame`);
-      assert.match(prompts[0], /type exactly "approve"/iu, `${scenario.label}: the English frame must be complete, not truncated`);
+      // TR-S1-T4 (Ruling 83): completeness is now judged on the disclosure itself (the typed-token instruction is not on this channel).
+      assert.match(prompts[0], /cannot be undone once signed/u, `${scenario.label}: the English frame must be complete, not truncated`);
       assert.match(prompts[0], new RegExp(intentSha256, "u"), `${scenario.label}: the digest must still be named`);
     } finally {
       cleanup(dirs);
@@ -4246,7 +4381,7 @@ test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompt
       const prompts = [];
       runHumanApproval(
         ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", "c".repeat(64)],
-        { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+        disclosureChannel({ readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } }),
       );
       rendered[language] = prompts[0];
     } finally {
@@ -4254,15 +4389,14 @@ test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompt
     }
   }
   // Everything between the first line and the last two frame lines is data: identical
-  // in both languages, byte for byte.
+  // in both languages, byte for byte. (TR-S1-T4, Ruling 83: the stdout disclosure is header + data + consequence
+  // plus the trailing newline of the write, so slice(1, -2) still removes exactly the frame lines.)
   const dataLines = (prompt) => prompt.split("\n").slice(1, -2);
   assert.deepEqual(dataLines(rendered.de), dataLines(rendered.en),
     "the translated frame must not alter, reorder or drop a single summary line");
   assert.match(rendered.de, GERMAN_FRAME);
   assert.match(rendered.en, ENGLISH_FRAME);
-  for (const prompt of Object.values(rendered)) {
-    assert.match(prompt, /"approve"/u, "every language must instruct the same English token");
-  }
+  // TR-S1-T4 (Ruling 83): the "every language instructs the same English token" loop is gone with the typed-token instruction line.
 });
 
 /**
@@ -4603,7 +4737,10 @@ function r76Spy(mode = "healthy", events = []) {
     if (mode === "signing-spawn-fails" && isSign && touchesPoKey) return { status: 53, stdout: "", stderr: "" };
     try {
       if (isSign) {
-        writeFileSync(flag("-out"), sign(null, readFileSync(flag("-in")), createPrivateKey(readFileSync(flag("-inkey")))));
+        // TR-S1-T3: an encrypted key is opened with the `-passin pass:<x>` the central lever appended.
+        const passin = flag("-passin");
+        const keyPem = readFileSync(flag("-inkey"));
+        writeFileSync(flag("-out"), sign(null, readFileSync(flag("-in")), createPrivateKey(passin === undefined ? keyPem : { key: keyPem, format: "pem", passphrase: passin.replace(/^pass:/u, "") })));
         return { status: 0, stdout: "", stderr: "" };
       }
       if (isVerify) {
@@ -4819,6 +4956,7 @@ test("R7-6c: a failing signing spawn reports its exit code", () => {
 test("R7-6d(iii) (sign-intent's own defence-in-depth probe): a probe spawn without any key path runs before the first prompt and before the signing spawn", () => {
   const env = r76Env();
   const spy = r76Spy("healthy", env.events);
+  disclosureChannel(spy.spawn);
   try {
     r76KeyFixture(env);
     const outcome = r76Sign(env, spy);
@@ -4960,6 +5098,7 @@ test("R7-6e (dynamic, decoy): a decoy openssl in the repository root and in the 
 test("R7-6f(i): a key directory whose public key matches the committed trust anchor yields ok: the probe passes and signing proceeds", () => {
   const env = r76Env();
   const spy = r76Spy("healthy", env.events);
+  disclosureChannel(spy.spawn);
   try {
     r76KeyFixture(env);
     const outcome = r76Sign(env, spy);
