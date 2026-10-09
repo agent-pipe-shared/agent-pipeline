@@ -1,0 +1,606 @@
+command: node scratch/alfred-v8-validator-postimage-check.mjs
+label: complete-v8-validator-postimage-FD3-r2
+exitCode: 0
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+{"inputDigests":[{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"plugins/pipeline-core/lib/design-approval-binding.mjs","sha256":"c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf"},{"path":"plugins/pipeline-core/lib/design-approval-route.test.mjs","sha256":"9b319aa0b41ad7918caba095d2dd49a80e32867da60273efff78c9f977334249"},{"path":"plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs","sha256":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/design-approval-route.test.mjs","sha256":"245c4fbc9a1c63dd1b73619a227ebc18c56ceeb2600117b6747901e933cf680f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","sha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"}],"graph":"scratch/alfred-v8-validator-f-20261009-graph-r2","qualification":"isolated public graph only; shared source and tests unchanged"}
+SUITE unchanged50: node --test --test-isolation=none --test-reporter=tap plugins/pipeline-core/lib/design-approval-route.test.mjs
+TAP version 13
+# Subtest: ADR0085-ROUTE-001 R1 re-read: design-workflow-package.mjs exports the re-read function
+ok 1 - ADR0085-ROUTE-001 R1 re-read: design-workflow-package.mjs exports the re-read function
+  ---
+  duration_ms: 23.127822
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-002 R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+ok 2 - ADR0085-ROUTE-002 R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+  ---
+  duration_ms: 5.692189
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-003 R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+ok 3 - ADR0085-ROUTE-003 R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+  ---
+  duration_ms: 3.53731
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-004 R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+ok 4 - ADR0085-ROUTE-004 R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+  ---
+  duration_ms: 3.589979
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-005 R5 re-read: package bytes changed after the approval are refused (item 1)
+ok 5 - ADR0085-ROUTE-005 R5 re-read: package bytes changed after the approval are refused (item 1)
+  ---
+  duration_ms: 2.928918
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-006 R6 re-read: a missing package file is a typed refusal
+ok 6 - ADR0085-ROUTE-006 R6 re-read: a missing package file is a typed refusal
+  ---
+  duration_ms: 2.407916
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-007 R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+ok 7 - ADR0085-ROUTE-007 R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+  ---
+  duration_ms: 2.731261
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-008 R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+ok 8 - ADR0085-ROUTE-008 R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+  ---
+  duration_ms: 3.51623
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-009 R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+ok 9 - ADR0085-ROUTE-009 R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+  ---
+  duration_ms: 7.0966
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-010 R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+ok 10 - ADR0085-ROUTE-010 R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+  ---
+  duration_ms: 4.484306
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-011 R11 re-read: a package of another feature is refused
+ok 11 - ADR0085-ROUTE-011 R11 re-read: a package of another feature is refused
+  ---
+  duration_ms: 2.8775
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-012 R12 re-read: malformed approval inputs are a typed input refusal
+ok 12 - ADR0085-ROUTE-012 R12 re-read: malformed approval inputs are a typed input refusal
+  ---
+  duration_ms: 2.230759
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-013 V0 v8: pipeline.plan-approval.v8 is the current approval schema
+ok 13 - ADR0085-ROUTE-013 V0 v8: pipeline.plan-approval.v8 is the current approval schema
+  ---
+  duration_ms: 4.159381
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-014 V1 v8: a signature-mode record with a proof is valid
+ok 14 - ADR0085-ROUTE-014 V1 v8: a signature-mode record with a proof is valid
+  ---
+  duration_ms: 0.782609
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-015 V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+ok 15 - ADR0085-ROUTE-015 V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+  ---
+  duration_ms: 0.395184
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-016 V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+ok 16 - ADR0085-ROUTE-016 V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+  ---
+  duration_ms: 0.446793
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-017 V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+ok 17 - ADR0085-ROUTE-017 V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+  ---
+  duration_ms: 0.331306
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-018 V5 v8: the mode must be exactly signature or chat
+ok 18 - ADR0085-ROUTE-018 V5 v8: the mode must be exactly signature or chat
+  ---
+  duration_ms: 0.489263
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-019 V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+ok 19 - ADR0085-ROUTE-019 V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+  ---
+  duration_ms: 0.368015
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-020 V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+ok 20 - ADR0085-ROUTE-020 V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+  ---
+  duration_ms: 0.319835
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-021 V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+ok 21 - ADR0085-ROUTE-021 V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+  ---
+  duration_ms: 0.477753
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-022 V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+ok 22 - ADR0085-ROUTE-022 V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+  ---
+  duration_ms: 0.397594
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-023 V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+ok 23 - ADR0085-ROUTE-023 V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+  ---
+  duration_ms: 0.470253
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-024 V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+ok 24 - ADR0085-ROUTE-024 V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+  ---
+  duration_ms: 0.177097
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-025 L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+ok 25 - ADR0085-ROUTE-025 L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+  ---
+  duration_ms: 0.247267
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-026 L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+ok 26 - ADR0085-ROUTE-026 L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+  ---
+  duration_ms: 0.168168
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-027 L3 classification: other or malformed records are unknown
+ok 27 - ADR0085-ROUTE-027 L3 classification: other or malformed records are unknown
+  ---
+  duration_ms: 0.132478
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-028 L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+ok 28 - ADR0085-ROUTE-028 L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+  ---
+  duration_ms: 0.248126
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-029 S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 29 - ADR0085-ROUTE-029 S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 8.284583
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-030 S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 30 - ADR0085-ROUTE-030 S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 3.713547
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-031 S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 31 - ADR0085-ROUTE-031 S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 4.264929
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-032 S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 32 - ADR0085-ROUTE-032 S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 9.161991
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-033 S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 33 - ADR0085-ROUTE-033 S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 6.35034
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-034 S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 34 - ADR0085-ROUTE-034 S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 4.630865
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-035 S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 35 - ADR0085-ROUTE-035 S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 4.533426
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-036 S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 36 - ADR0085-ROUTE-036 S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 5.823978
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-037 S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 37 - ADR0085-ROUTE-037 S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 2.486514
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-038 S10 stored verifier: a signature made with another key over the same intent is refused
+ok 38 - ADR0085-ROUTE-038 S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 5.248796
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-039 S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 39 - ADR0085-ROUTE-039 S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 5.443183
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-040 FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+ok 40 - ADR0085-ROUTE-040 FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+  ---
+  duration_ms: 13.273042
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-041 FINAL-READER accepts the explicit rebind path with readiness execution disabled
+ok 41 - ADR0085-ROUTE-041 FINAL-READER accepts the explicit rebind path with readiness execution disabled
+  ---
+  duration_ms: 5.003329
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-042 FINAL-READER refuses a forged stored signature after its valid positive control
+ok 42 - ADR0085-ROUTE-042 FINAL-READER refuses a forged stored signature after its valid positive control
+  ---
+  duration_ms: 7.0347
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-043 FINAL-READER refuses changed source bytes after its valid positive control
+ok 43 - ADR0085-ROUTE-043 FINAL-READER refuses changed source bytes after its valid positive control
+  ---
+  duration_ms: 6.439699
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-044 FINAL-READER refuses package and presentation digest drift after valid positive controls
+ok 44 - ADR0085-ROUTE-044 FINAL-READER refuses package and presentation digest drift after valid positive controls
+  ---
+  duration_ms: 10.137556
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-045 FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+ok 45 - ADR0085-ROUTE-045 FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+  ---
+  duration_ms: 5.935016
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-046 V12 v8: the fixture binding independently validates through U3 and its canonical digest matches
+ok 46 - ADR0085-ROUTE-046 V12 v8: the fixture binding independently validates through U3 and its canonical digest matches
+  ---
+  duration_ms: 0.271366
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-047 V13 v8: a missing, null or malformed feature binding is refused
+ok 47 - ADR0085-ROUTE-047 V13 v8: a missing, null or malformed feature binding is refused
+  ---
+  duration_ms: 0.326246
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-048 V14 v8: binding and nested source and receipt key sets are closed
+ok 48 - ADR0085-ROUTE-048 V14 v8: binding and nested source and receipt key sets are closed
+  ---
+  duration_ms: 0.613512
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-049 V15 v8: a shape-valid binding with a mismatched approval digest is refused in both modes
+ok 49 - ADR0085-ROUTE-049 V15 v8: a shape-valid binding with a mismatched approval digest is refused in both modes
+  ---
+  duration_ms: 0.614142
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-050 V16 v8: mini accepts both design keys null and refuses either half-null or missing key
+ok 50 - ADR0085-ROUTE-050 V16 v8: mini accepts both design keys null and refuses either half-null or missing key
+  ---
+  duration_ms: 0.372474
+  type: 'test'
+  ...
+1..50
+# tests 50
+# suites 0
+# pass 50
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 208.57439
+
+
+{"suite":"unchanged50","exitCode":0,"signal":null,"setupError":null,"completion":"{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DECLARED\",\"caseIds\":[\"ADR0085-ROUTE-001\",\"ADR0085-ROUTE-002\",\"ADR0085-ROUTE-003\",\"ADR0085-ROUTE-004\",\"ADR0085-ROUTE-005\",\"ADR0085-ROUTE-006\",\"ADR0085-ROUTE-007\",\"ADR0085-ROUTE-008\",\"ADR0085-ROUTE-009\",\"ADR0085-ROUTE-010\",\"ADR0085-ROUTE-011\",\"ADR0085-ROUTE-012\",\"ADR0085-ROUTE-013\",\"ADR0085-ROUTE-014\",\"ADR0085-ROUTE-015\",\"ADR0085-ROUTE-016\",\"ADR0085-ROUTE-017\",\"ADR0085-ROUTE-018\",\"ADR0085-ROUTE-019\",\"ADR0085-ROUTE-020\",\"ADR0085-ROUTE-021\",\"ADR0085-ROUTE-022\",\"ADR0085-ROUTE-023\",\"ADR0085-ROUTE-024\",\"ADR0085-ROUTE-025\",\"ADR0085-ROUTE-026\",\"ADR0085-ROUTE-027\",\"ADR0085-ROUTE-028\",\"ADR0085-ROUTE-029\",\"ADR0085-ROUTE-030\",\"ADR0085-ROUTE-031\",\"ADR0085-ROUTE-032\",\"ADR0085-ROUTE-033\",\"ADR0085-ROUTE-034\",\"ADR0085-ROUTE-035\",\"ADR0085-ROUTE-036\",\"ADR0085-ROUTE-037\",\"ADR0085-ROUTE-038\",\"ADR0085-ROUTE-039\",\"ADR0085-ROUTE-040\",\"ADR0085-ROUTE-041\",\"ADR0085-ROUTE-042\",\"ADR0085-ROUTE-043\",\"ADR0085-ROUTE-044\",\"ADR0085-ROUTE-045\",\"ADR0085-ROUTE-046\",\"ADR0085-ROUTE-047\",\"ADR0085-ROUTE-048\",\"ADR0085-ROUTE-049\",\"ADR0085-ROUTE-050\"],\"caseCount\":50,\"caseSetSha256\":\"8e796dd5cd037517f4d6fffbf510c726446c341c32d4d522e054d39e3c40ef7e\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-001\",\"ordinal\":0,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-002\",\"ordinal\":1,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-003\",\"ordinal\":2,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-004\",\"ordinal\":3,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-005\",\"ordinal\":4,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-006\",\"ordinal\":5,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-007\",\"ordinal\":6,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-008\",\"ordinal\":7,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-009\",\"ordinal\":8,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-010\",\"ordinal\":9,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-011\",\"ordinal\":10,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-012\",\"ordinal\":11,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-013\",\"ordinal\":12,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-014\",\"ordinal\":13,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-015\",\"ordinal\":14,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-016\",\"ordinal\":15,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-017\",\"ordinal\":16,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-018\",\"ordinal\":17,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-019\",\"ordinal\":18,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-020\",\"ordinal\":19,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-021\",\"ordinal\":20,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-022\",\"ordinal\":21,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-023\",\"ordinal\":22,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-024\",\"ordinal\":23,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-025\",\"ordinal\":24,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-026\",\"ordinal\":25,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-027\",\"ordinal\":26,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-028\",\"ordinal\":27,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-029\",\"ordinal\":28,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-030\",\"ordinal\":29,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-031\",\"ordinal\":30,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-032\",\"ordinal\":31,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-033\",\"ordinal\":32,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-034\",\"ordinal\":33,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-035\",\"ordinal\":34,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-036\",\"ordinal\":35,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-037\",\"ordinal\":36,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-038\",\"ordinal\":37,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-039\",\"ordinal\":38,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-040\",\"ordinal\":39,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-041\",\"ordinal\":40,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-042\",\"ordinal\":41,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-043\",\"ordinal\":42,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-044\",\"ordinal\":43,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-045\",\"ordinal\":44,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-046\",\"ordinal\":45,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-047\",\"ordinal\":46,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-048\",\"ordinal\":47,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-049\",\"ordinal\":48,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"DISPOSED\",\"id\":\"ADR0085-ROUTE-050\",\"ordinal\":49,\"disposition\":\"pass\"}\n{\"schema\":\"pipeline.test-case-completion.v1\",\"event\":\"TERMINAL\",\"declaredCount\":50,\"disposedCount\":50,\"caseIds\":[\"ADR0085-ROUTE-001\",\"ADR0085-ROUTE-002\",\"ADR0085-ROUTE-003\",\"ADR0085-ROUTE-004\",\"ADR0085-ROUTE-005\",\"ADR0085-ROUTE-006\",\"ADR0085-ROUTE-007\",\"ADR0085-ROUTE-008\",\"ADR0085-ROUTE-009\",\"ADR0085-ROUTE-010\",\"ADR0085-ROUTE-011\",\"ADR0085-ROUTE-012\",\"ADR0085-ROUTE-013\",\"ADR0085-ROUTE-014\",\"ADR0085-ROUTE-015\",\"ADR0085-ROUTE-016\",\"ADR0085-ROUTE-017\",\"ADR0085-ROUTE-018\",\"ADR0085-ROUTE-019\",\"ADR0085-ROUTE-020\",\"ADR0085-ROUTE-021\",\"ADR0085-ROUTE-022\",\"ADR0085-ROUTE-023\",\"ADR0085-ROUTE-024\",\"ADR0085-ROUTE-025\",\"ADR0085-ROUTE-026\",\"ADR0085-ROUTE-027\",\"ADR0085-ROUTE-028\",\"ADR0085-ROUTE-029\",\"ADR0085-ROUTE-030\",\"ADR0085-ROUTE-031\",\"ADR0085-ROUTE-032\",\"ADR0085-ROUTE-033\",\"ADR0085-ROUTE-034\",\"ADR0085-ROUTE-035\",\"ADR0085-ROUTE-036\",\"ADR0085-ROUTE-037\",\"ADR0085-ROUTE-038\",\"ADR0085-ROUTE-039\",\"ADR0085-ROUTE-040\",\"ADR0085-ROUTE-041\",\"ADR0085-ROUTE-042\",\"ADR0085-ROUTE-043\",\"ADR0085-ROUTE-044\",\"ADR0085-ROUTE-045\",\"ADR0085-ROUTE-046\",\"ADR0085-ROUTE-047\",\"ADR0085-ROUTE-048\",\"ADR0085-ROUTE-049\",\"ADR0085-ROUTE-050\"],\"caseSetSha256\":\"8e796dd5cd037517f4d6fffbf510c726446c341c32d4d522e054d39e3c40ef7e\",\"dispositionsSha256\":\"c15136da1733ffee774ac36449759b05fdac7067b64d8fd0402b3b1ffa14f847\",\"counts\":{\"pass\":50,\"fail\":0,\"skip\":0,\"todo\":0}}\n"}
+SUITE unchanged-E2E-route1-2-4-decisionV: node --test --test-reporter=tap --test-name-pattern=^(route [124]:|decision V:) plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+TAP version 13
+# Subtest: route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+ok 1 - route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+  ---
+  duration_ms: 1204.641546
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# Subtest: route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+ok 2 - route 2: sign, approve-plan --design-approval-request, and a pipeline.plan-approval.v8 record
+  ---
+  duration_ms: 0.446504
+  type: 'test'
+  ...
+# present-plan exit 0; stderr: 
+# approve-plan exit 0; stderr: 
+# Subtest: route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+ok 3 - route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+  ---
+  duration_ms: 0.203127
+  type: 'test'
+  ...
+# Subtest: decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+ok 4 - decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+  ---
+  duration_ms: 694.461079
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP2-INFLIGHT-PRESENTATION-RETIRED: use present-plan --review-receipt
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1947.217235
+
+
+{"suite":"unchanged-E2E-route1-2-4-decisionV","exitCode":0,"signal":null,"setupError":null,"completion":""}
+SUITE unchanged-E2E-boundary-and-retirement-dependencies: node --test --test-reporter=tap --test-name-pattern=^(route 3:|retired:) plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+TAP version 13
+# Subtest: route 3: the boundary library admits the approved v8 record
+not ok 1 - route 3: the boundary library admits the approved v8 record
+  ---
+  duration_ms: 1234.165078
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:310:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    the boundary must admit the v8 record: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:322:10)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# designAdvisoryAdmission: {"ok":false,"code":"DAA-PUBLIC-UNAVAILABLE"}
+# Subtest: retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+ok 2 - retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+  ---
+  duration_ms: 694.844444
+  type: 'test'
+  ...
+# present-plan exit 2; stderr: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+# Subtest: retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+ok 3 - retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+  ---
+  duration_ms: 702.381358
+  type: 'test'
+  ...
+# approve-plan exit 2; stderr: DWP-APPROVAL-REQUEST-RETIRED: use present-plan --review-receipt
+# Subtest: retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+not ok 4 - retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 143.454432
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:386:3'
+  failureType: 'testCodeFailure'
+  error: 'output names DESIGN-ADVISORY-COURSE-RETIRED'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# design-advisory-coordinator.mjs exit 2; output: DESIGN-ADVISORY-COORDINATOR-FAILED: error: DAC-CLI-RUNNER
+# Subtest: retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+not ok 5 - retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 28.817773
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:386:3'
+  failureType: 'testCodeFailure'
+  error: 'output names DESIGN-ADVISORY-COURSE-RETIRED'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# design-advisory-admission.mjs exit 2; output: DESIGN-ADVISORY-ADMISSION-FAILED: DAA-CLI-USAGE: usage: design-advisory-admission.mjs <plan|apply|inspect> --repo-root <path> --feature <id> --plan <repo-path> --spec <repo-path> [--receipt-id <id> --native-available <true|false> --decision <accept|decline> --rationale-file <repo-path> --expected-pu
+# Subtest: retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+not ok 6 - retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 23.233172
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:386:3'
+  failureType: 'testCodeFailure'
+  error: 'output names DESIGN-COURSE-RETIRED'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# design-course-session.mjs exit 2; output: DESIGN-COURSE-ROOT-UNSAFE
+# Subtest: retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+not ok 7 - retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 21.587495
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:386:3'
+  failureType: 'testCodeFailure'
+  error: 'output names DESIGN-COURSE-RETIRED'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# design-course-coordinator.mjs exit 2; output: DESIGN-COURSE-CLI-USAGE
+# Subtest: retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+not ok 8 - retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3)
+  ---
+  duration_ms: 140.083749
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:386:3'
+  failureType: 'testCodeFailure'
+  error: 'output names DESIGN-COURSE-RETIRED'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:395:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# runner-design-readiness-bootstrap.mjs exit 64; output: DESIGN-READINESS-RUNNER-BOOTSTRAP-FAILED: usage: runner-design-readiness-bootstrap.mjs --runner <claude|antigravity> --repo-root <absolute-path> --dispatch-id <id> --queue-revision <n> --receipt <repo-path> --source <input|prd|spec|design|traceability> <repo-path> (repeat --source five times) [--adv
+# Subtest: retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+not ok 9 - retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+  ---
+  duration_ms: 0.776529
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:400:1'
+  failureType: 'testCodeFailure'
+  error: "lib/retired-design-codes.mjs imports: Cannot find module '<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/lib/retired-design-codes.mjs' imported from <repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs"
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-validator-f-20261009-graph-r2/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:402:10)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 2
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3039.560259
+
+
+{"suite":"unchanged-E2E-boundary-and-retirement-dependencies","exitCode":1,"signal":null,"setupError":null,"completion":""}
+{"finalInputDigests":[{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"plugins/pipeline-core/lib/design-approval-binding.mjs","sha256":"c161e1d0d1423d3d757439a0b212c119f0af22220105081b47831ca17c297daf"},{"path":"plugins/pipeline-core/lib/design-approval-route.test.mjs","sha256":"9b319aa0b41ad7918caba095d2dd49a80e32867da60273efff78c9f977334249"},{"path":"plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs","sha256":"a4d6fb7ab24bddb98810ae4a3b2bedd40a755df9694fe29f49ad7dfbbfc34e4f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","sha256":"bf3a73246f79ea94f3f3a3cf0cdbb23eeedf2e5fcefd52e4e31984ea4e3f5b7f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/design-approval-route.test.mjs","sha256":"245c4fbc9a1c63dd1b73619a227ebc18c56ceeb2600117b6747901e933cf680f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","sha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs","sha256":"12f37a7bded3971fe2b5e64202bbe5cd73d48930000000629f140b0c84097538"}],"inputImmutability":true}
+NARROW BASELINE/POSTIMAGE DIFF
+diff --git a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs
+index d10fba540..37df6541c 100644
+--- a/plugins/pipeline-core/lib/plan-spec-state-v2.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs
+@@ -7,6 +7,7 @@
+  */
+ import { createHash } from "node:crypto";
+ import { validateContinuityState } from "./continuity-state.mjs";
++import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
+ 
+ const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
+ const LEGACY_SUBMISSION_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+@@ -131,8 +132,8 @@ const V7_CURRENT_APPROVAL_KEYS = [
+   "designWorkflowPackageSha256",
+   "designWorkflowApproval",
+ ];
+-// v8 (ADR-0085 C4): one designApproval record replaces the four v7 design
+-// fields. v7 stays readable through validPreviousCurrentPlanApproval.
++// v8 (ADR-0085 C4): a U3 binding and its designApproval record replace the
++// four v7 design fields. v7 stays readable through validPreviousCurrentPlanApproval.
+ const CURRENT_APPROVAL_KEYS = [
+   "schema",
+   "approvedBy",
+@@ -141,6 +142,7 @@ const CURRENT_APPROVAL_KEYS = [
+   "profileSha256",
+   "poGateAuthority",
+   "priorInvalidationSha256",
++  "designApprovalBinding",
+   "designApproval",
+ ];
+ const V6_CURRENT_APPROVAL_KEYS = V7_CURRENT_APPROVAL_KEYS.filter((key) => key !== "designWorkflowApproval");
+@@ -412,11 +414,18 @@ export function validCurrentPlanApproval(value) {
+     && SHA256.test(value.submissionSha256)
+     && SHA256.test(value.profileSha256)
+     && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
+-    // null is the mini-profile shape (no design review, so no design approval).
+-    && (value.designApproval === null || validDesignApproval(value.designApproval))
++    && validDesignApprovalPair(value.designApprovalBinding, value.designApproval)
+     && validAuthority(value.poGateAuthority);
+ }
+ 
++function validDesignApprovalPair(binding, approval) {
++  // Mini has neither design object; a half-null pair is never a stored envelope.
++  if (binding === null || approval === null) return binding === null && approval === null;
++  if (!validDesignApproval(approval)) return false;
++  const checked = validateDesignApprovalBinding(binding);
++  return checked.ok && checked.bindingSha256 === approval.bindingSha256;
++}
++
+ export function validPreviousCurrentPlanApproval(value) {
+   const shared = isNonBlankString(value?.approvedBy)
+     && isCanonicalIso(value?.approvedAt)
+
+{"results":[{"label":"unchanged50","exitCode":0,"setupError":null},{"label":"unchanged-E2E-route1-2-4-decisionV","exitCode":0,"setupError":null},{"label":"unchanged-E2E-boundary-and-retirement-dependencies","exitCode":1,"setupError":null}],"reusableParkedPath":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/plan-spec-state-v2.mjs","independentReview":"pending","poAcceptance":"open"}
+
+--- stderr ---

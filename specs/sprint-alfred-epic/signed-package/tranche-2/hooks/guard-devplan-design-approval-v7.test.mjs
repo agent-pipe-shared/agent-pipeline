@@ -43,7 +43,7 @@
  *     test-design-workflow-fixture.mjs): the boundary's approved re-read passes
  *     requireReadinessExecution:false, so no readiness host execution is verified there;
  *   - the PO signature is a generated Ed25519 key over the intent of the real approval request;
- *     project/critical-human-proof.json is absent, so the boundary passes no trust anchors;
+ *     a matching public anchor is committed before the candidate/request (Ruling164);
  *   - the package, readiness and failure evidence are committed (tracked), as in a fresh clone.
  *
  * Assumptions named, not fixed by the note: (a) the claude no-child shape stands for "this repo's v7
@@ -56,7 +56,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -73,6 +73,7 @@ import { designWorkflowAdvisorExceptionBinding, readApprovedDesignWorkflowPackag
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { createNativeInitialAdvisorExecution } from "../lib/native-initial-advisor-execution.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { exportCodexDesignAdvisorArtifacts } from "../scripts/codex-design-advisor-bootstrap.mjs";
 import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
@@ -117,7 +118,20 @@ async function buildLiveShapedV7Fixture(t) {
   // so enrolling after the state file is written is recorded as `declined` (retained history), never `active`.
   enrollFixture(root);
   const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", timeout: 20_000 }).trim();
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project/critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [],
+    trustAnchors: [{ keyReference: "local-po-key", publicKeySha256: sha256(publicKeyPem) }],
+  }));
+  git("add", "--", "project/critical-human-proof.json");
+  git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "Track the fixture public trust anchor");
+  const trust = readCriticalHumanProofPolicy(root);
+  assert.equal(trust.ok, true);
+  assert.equal(trust.trustAnchors.length, 1);
   const candidate = observeAdvisorCandidate(root);
+  const dispatch = { ...f.args.dispatch, candidateCommit: candidate.commit, candidateTree: candidate.tree };
   const sourcePaths = Object.fromEntries(Object.entries(f.sources).map(([name, s]) => [name, s.path]));
   const sources = observeInitialAdvisorSources({ repoRoot: root, candidate, sourcePaths }).sources;
   const route = { model: null, effort: null, sourceSha256: designAdvisorValueSha256(loadRunnerProfilesV3Registry()), candidateCommit: candidate.commit };
@@ -125,7 +139,7 @@ async function buildLiveShapedV7Fixture(t) {
   // The real native-runner no-child Advisor-unavailable course. This writes the private course store.
   const failure = await coordinateInitialDesignAdvisory({
     repoRoot: root, runner: "claude", featureId: FEATURE_ID, authoringDispatchId: "elephant-author", sources: f.sources,
-    reason: "risk-review", profile: "feature", dispatch: f.args.dispatch, route,
+    reason: "risk-review", profile: "feature", dispatch, route,
     hostExecution: createNativeInitialAdvisorExecution({ runner: "claude" }),
   });
   assert.equal(failure.status, "unavailable-pending-final-approval", JSON.stringify(failure));
@@ -196,17 +210,16 @@ async function buildLiveShapedV7Fixture(t) {
   });
   assert.equal(prepared.ok, true, JSON.stringify(prepared));
   assert.equal(prepared.packageRead.packageSha256, packageSha256);
-  const { privateKey } = generateKeyPairSync("ed25519");
   const proof = {
     schema: "pipeline.po-approval-proof.v1", intentSha256: prepared.request.approvalIntent.sha256, keyReference: "local-po-key",
-    publicKey: createPublicKey(privateKey).export({ type: "spki", format: "pem" }).toString(),
+    publicKey: publicKeyPem,
     signatureBase64: sign(null, Buffer.from(prepared.request.approvalIntent.sha256), privateKey).toString("base64"),
   };
   const verified = verifyDesignWorkflowPackageApproval({
-    repoRoot: root, request: prepared.request, proof, anchors: [], packagePath: PACKAGE_PATH, featureId: FEATURE_ID,
+    repoRoot: root, request: prepared.request, proof, anchors: trust.trustAnchors, packagePath: PACKAGE_PATH, featureId: FEATURE_ID,
     planPath, planSha256, specPath, specSha256, readCandidate, allowUnrelatedCommits: true,
   });
-  assert.equal(verified.ok, true, `fixture signature must verify with no anchors: ${JSON.stringify(verified)}`);
+  assert.equal(verified.ok, true, `fixture signature must verify against the committed anchor: ${JSON.stringify(verified)}`);
   const exceptionBinding = designWorkflowAdvisorExceptionBinding(readDesignWorkflowPackageFromRepository({
     repoRoot: root, packagePath: PACKAGE_PATH, readCandidate, requireCurrentCandidate: false, requireReadinessExecution: false,
   }));

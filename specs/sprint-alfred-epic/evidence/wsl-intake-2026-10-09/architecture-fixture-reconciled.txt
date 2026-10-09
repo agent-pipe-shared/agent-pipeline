@@ -1,0 +1,555 @@
+command: node scratch/verify-ALFRED-ARCH-FIXTURE-T-20261009.mjs
+label: ALFRED-ARCH-FIXTURE-T-20261009
+exitCode: 1
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+{"schema":"pipeline.architecture-fixture-reconciliation.v1","inputs":{"plugins/pipeline-core/lib/architecture-design.test.mjs":"302a222814f749ceced2422be0dd8b1d35b7fb6680cfcb2e6f5de62b05053691","plugins/pipeline-core/lib/architecture-design.mjs":"2ca715d8789dcdcf2890e7ee5578c9b6ed413bcb7c985d271dcf45cff54061e6","specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"},"output":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.test.mjs","postimageSha256":"63f85a3eb953d16342df0efa6171491ea1a801ba554ae992dd2212605bca0532","delta":"Add the actual reread API as an unused fail-closed export, retaining the legacy export for live architecture; all thirteen case names and assertion bodies remain byte-identical.","boundedScratchCorrection":"Retain both actual caller APIs rather than replacing the legacy export."}
+GRAPH live SUITE architecture13
+TAP version 13
+# Subtest: architecture package explicitly carries bounded modules and renders only design artifacts
+ok 1 - architecture package explicitly carries bounded modules and renders only design artifacts
+  ---
+  duration_ms: 5.417136
+  type: 'test'
+  ...
+# Subtest: closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input
+ok 2 - closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input
+  ---
+  duration_ms: 0.986339
+  type: 'test'
+  ...
+# Subtest: compact greenfield package derives redundant fitness rows and zero baseline
+ok 3 - compact greenfield package derives redundant fitness rows and zero baseline
+  ---
+  duration_ms: 0.434101
+  type: 'test'
+  ...
+# architecture design authoring bytes: 1149 -> 766
+# Subtest: field-local diagnostics identify the single invalid architecture input
+ok 4 - field-local diagnostics identify the single invalid architecture input
+  ---
+  duration_ms: 0.430191
+  type: 'test'
+  ...
+# Subtest: brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval
+ok 5 - brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval
+  ---
+  duration_ms: 2.136405
+  type: 'test'
+  ...
+# Subtest: materialization transaction restores exact scaffold after a partial staged write
+ok 6 - materialization transaction restores exact scaffold after a partial staged write
+  ---
+  duration_ms: 7.342495
+  type: 'test'
+  ...
+# Subtest: materialization transaction preserves a target raced by another writer and restores earlier outputs
+ok 7 - materialization transaction preserves a target raced by another writer and restores earlier outputs
+  ---
+  duration_ms: 5.658351
+  type: 'test'
+  ...
+# Subtest: authority CAS change after first publication rolls back and a changed lock refuses all writes
+ok 8 - authority CAS change after first publication rolls back and a changed lock refuses all writes
+  ---
+  duration_ms: 5.830678
+  type: 'test'
+  ...
+# Subtest: hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry
+ok 9 - hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry
+  ---
+  duration_ms: 7.432024
+  type: 'test'
+  ...
+# Subtest: hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check
+ok 10 - hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check
+  ---
+  duration_ms: 3.743771
+  type: 'test'
+  ...
+# Subtest: hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted
+ok 11 - hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted
+  ---
+  duration_ms: 10.108158
+  type: 'test'
+  ...
+# Subtest: hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed)
+ok 12 - hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed)
+  ---
+  duration_ms: 8.61693
+  type: 'test'
+  ...
+# Subtest: hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository
+ok 13 - hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository
+  ---
+  duration_ms: 1.941339
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 141.515737
+
+{"graph":"live","suite":"architecture13","command":["node","--test","--test-reporter=tap","plugins/pipeline-core/lib/architecture-design.test.mjs"],"exitCode":0,"setupError":null,"setupFailures":0,"declaredTests":13,"reachedAssertionCases":13,"passed":13,"failed":0,"fd3Bytes":0}
+GRAPH live SUITE portableFinalReader17
+TAP version 13
+# Subtest: S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 1 - S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 41.944309
+  type: 'test'
+  ...
+# Subtest: S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 2 - S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 6.472693
+  type: 'test'
+  ...
+# Subtest: S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 3 - S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 6.689329
+  type: 'test'
+  ...
+# Subtest: S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 4 - S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 14.365479
+  type: 'test'
+  ...
+# Subtest: S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 5 - S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 7.273937
+  type: 'test'
+  ...
+# Subtest: S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 6 - S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 5.159192
+  type: 'test'
+  ...
+# Subtest: S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 7 - S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 5.856006
+  type: 'test'
+  ...
+# Subtest: S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 8 - S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 8.405133
+  type: 'test'
+  ...
+# Subtest: S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 9 - S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 3.494106
+  type: 'test'
+  ...
+# Subtest: S10 stored verifier: a signature made with another key over the same intent is refused
+ok 10 - S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 6.010894
+  type: 'test'
+  ...
+# Subtest: S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 11 - S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 6.6415
+  type: 'test'
+  ...
+# Subtest: FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+not ok 12 - FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+  ---
+  duration_ms: 9.402913
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:906:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: default final verification after transfer: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:911:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:907:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FINAL-READER accepts the explicit rebind path with readiness execution disabled
+not ok 13 - FINAL-READER accepts the explicit rebind path with readiness execution disabled
+  ---
+  duration_ms: 3.426717
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:916:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: explicit rebind without readiness execution: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:918:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:917:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FINAL-READER refuses a forged stored signature after its valid positive control
+not ok 14 - FINAL-READER refuses a forged stored signature after its valid positive control
+  ---
+  duration_ms: 3.120405
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:923:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: positive control before forged-signature denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:925:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:924:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FINAL-READER refuses changed source bytes after its valid positive control
+not ok 15 - FINAL-READER refuses changed source bytes after its valid positive control
+  ---
+  duration_ms: 3.062166
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:938:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: positive control before source-drift denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:940:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:939:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FINAL-READER refuses package and presentation digest drift after valid positive controls
+not ok 16 - FINAL-READER refuses package and presentation digest drift after valid positive controls
+  ---
+  duration_ms: 3.075355
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:947:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: positive control before package-digest denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:949:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:948:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+not ok 17 - FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+  ---
+  duration_ms: 2.8489
+  type: 'test'
+  location: '<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:963:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: positive control before Advisor-exception denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertAccepted (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+    file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:965:5
+    async file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+    async withRepo (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+    async withFinalReaderApproval (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-fixture-ALFRED-ARCH-FIXTURE-T-20261009/live/plugins/pipeline-core/lib/design-approval-route.test.mjs:964:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 11
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 193.959946
+
+{"graph":"live","suite":"portableFinalReader17","command":["node","--test","--test-reporter=tap","--test-name-pattern=^(S[0-9]+ stored verifier|FINAL-READER)","plugins/pipeline-core/lib/design-approval-route.test.mjs"],"exitCode":1,"setupError":null,"setupFailures":0,"declaredTests":17,"reachedAssertionCases":17,"passed":11,"failed":6,"fd3Bytes":0}
+GRAPH parked SUITE architecture13
+TAP version 13
+# Subtest: architecture package explicitly carries bounded modules and renders only design artifacts
+ok 1 - architecture package explicitly carries bounded modules and renders only design artifacts
+  ---
+  duration_ms: 5.626601
+  type: 'test'
+  ...
+# Subtest: closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input
+ok 2 - closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input
+  ---
+  duration_ms: 1.160035
+  type: 'test'
+  ...
+# Subtest: compact greenfield package derives redundant fitness rows and zero baseline
+ok 3 - compact greenfield package derives redundant fitness rows and zero baseline
+  ---
+  duration_ms: 0.495559
+  type: 'test'
+  ...
+# architecture design authoring bytes: 1149 -> 766
+# Subtest: field-local diagnostics identify the single invalid architecture input
+ok 4 - field-local diagnostics identify the single invalid architecture input
+  ---
+  duration_ms: 0.50075
+  type: 'test'
+  ...
+# Subtest: brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval
+ok 5 - brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval
+  ---
+  duration_ms: 2.172105
+  type: 'test'
+  ...
+# Subtest: materialization transaction restores exact scaffold after a partial staged write
+ok 6 - materialization transaction restores exact scaffold after a partial staged write
+  ---
+  duration_ms: 6.960514
+  type: 'test'
+  ...
+# Subtest: materialization transaction preserves a target raced by another writer and restores earlier outputs
+ok 7 - materialization transaction preserves a target raced by another writer and restores earlier outputs
+  ---
+  duration_ms: 6.622011
+  type: 'test'
+  ...
+# Subtest: authority CAS change after first publication rolls back and a changed lock refuses all writes
+ok 8 - authority CAS change after first publication rolls back and a changed lock refuses all writes
+  ---
+  duration_ms: 6.678179
+  type: 'test'
+  ...
+# Subtest: hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry
+ok 9 - hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry
+  ---
+  duration_ms: 9.374953
+  type: 'test'
+  ...
+# Subtest: hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check
+ok 10 - hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check
+  ---
+  duration_ms: 3.715302
+  type: 'test'
+  ...
+# Subtest: hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted
+ok 11 - hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted
+  ---
+  duration_ms: 9.49939
+  type: 'test'
+  ...
+# Subtest: hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed)
+ok 12 - hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed)
+  ---
+  duration_ms: 9.108168
+  type: 'test'
+  ...
+# Subtest: hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository
+ok 13 - hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository
+  ---
+  duration_ms: 2.720724
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 157.260327
+
+{"graph":"parked","suite":"architecture13","command":["node","--test","--test-reporter=tap","plugins/pipeline-core/lib/architecture-design.test.mjs"],"exitCode":0,"setupError":null,"setupFailures":0,"declaredTests":13,"reachedAssertionCases":13,"passed":13,"failed":0,"fd3Bytes":0}
+GRAPH parked SUITE portableFinalReader17
+TAP version 13
+# Subtest: S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 1 - S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 34.848348
+  type: 'test'
+  ...
+# Subtest: S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 2 - S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 4.77778
+  type: 'test'
+  ...
+# Subtest: S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 3 - S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 5.786058
+  type: 'test'
+  ...
+# Subtest: S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 4 - S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 12.674834
+  type: 'test'
+  ...
+# Subtest: S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 5 - S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 7.65626
+  type: 'test'
+  ...
+# Subtest: S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 6 - S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 5.681781
+  type: 'test'
+  ...
+# Subtest: S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 7 - S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 5.980674
+  type: 'test'
+  ...
+# Subtest: S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 8 - S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 8.164469
+  type: 'test'
+  ...
+# Subtest: S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 9 - S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 2.974717
+  type: 'test'
+  ...
+# Subtest: S10 stored verifier: a signature made with another key over the same intent is refused
+ok 10 - S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 5.846858
+  type: 'test'
+  ...
+# Subtest: S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 11 - S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 6.465054
+  type: 'test'
+  ...
+# Subtest: FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+ok 12 - FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+  ---
+  duration_ms: 17.484113
+  type: 'test'
+  ...
+# Subtest: FINAL-READER accepts the explicit rebind path with readiness execution disabled
+ok 13 - FINAL-READER accepts the explicit rebind path with readiness execution disabled
+  ---
+  duration_ms: 5.605952
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses a forged stored signature after its valid positive control
+ok 14 - FINAL-READER refuses a forged stored signature after its valid positive control
+  ---
+  duration_ms: 8.947073
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses changed source bytes after its valid positive control
+ok 15 - FINAL-READER refuses changed source bytes after its valid positive control
+  ---
+  duration_ms: 6.840507
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses package and presentation digest drift after valid positive controls
+ok 16 - FINAL-READER refuses package and presentation digest drift after valid positive controls
+  ---
+  duration_ms: 12.264973
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+ok 17 - FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+  ---
+  duration_ms: 6.65846
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 209.751006
+
+{"graph":"parked","suite":"portableFinalReader17","command":["node","--test","--test-reporter=tap","--test-name-pattern=^(S[0-9]+ stored verifier|FINAL-READER)","plugins/pipeline-core/lib/design-approval-route.test.mjs"],"exitCode":0,"setupError":null,"setupFailures":0,"declaredTests":17,"reachedAssertionCases":17,"passed":17,"failed":0,"fd3Bytes":0}
+{"sourceAndOriginalTestImmutable":true,"unchangedAssertionBodies":true,"allGreen":false,"independentReview":"pending","poAcceptance":"pending"}
+
+--- stderr ---
+
+
+
+

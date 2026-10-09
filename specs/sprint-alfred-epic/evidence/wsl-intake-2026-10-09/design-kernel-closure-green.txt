@@ -1,0 +1,188 @@
+command: node scratch/kernel-f-compose-20261009.mjs verify
+label: ALFRED-RETIRE-KERNEL-F-20261009-full-immutable-assertions
+exitCode: 1
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+{
+  "baselineSha256": "4ce67ad49ece327e65f5d63a769c4e0e81c88e2e4ceb0c5379f63b8e0e26e8f2",
+  "patchedSha256": "48f8c988660d6b7508aabbb365ba29fdbef51571e163b3d7215e3f9f2f80ad72",
+  "postimageSha256": "b0ec85c5ba52a0a42aa7be1f7bc04c2eb07b88f3876071ad0729f512da1c4fc1",
+  "patchSha256": "d3d281214d9ac470eac0568e13c595b896b99ff983f798ee04f61d9945bf2e89",
+  "patchAdditions": [
+    "plugins/pipeline-core/lib/agy-central-refresh.mjs",
+    "plugins/pipeline-core/lib/agy-central-snapshot.mjs",
+    "plugins/pipeline-core/lib/agy-start-hint.mjs",
+    "plugins/pipeline-core/lib/checkpoint-push-approval.mjs",
+    "plugins/pipeline-core/lib/continuity-authority-drift.mjs",
+    "plugins/pipeline-core/lib/critical-action-authorization.mjs",
+    "plugins/pipeline-core/lib/fs-durability.mjs",
+    "plugins/pipeline-core/lib/git-null-device.mjs",
+    "plugins/pipeline-core/lib/guard/env-dump-lane.mjs",
+    "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+    "plugins/pipeline-core/lib/hook-currentness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
+    "plugins/pipeline-core/scripts/toolchain-preflight.mjs"
+  ],
+  "addedPaths": [
+    "plugins/pipeline-core/lib/design-approval-binding.mjs",
+    "plugins/pipeline-core/lib/design-consistency-check.mjs",
+    "plugins/pipeline-core/lib/design-review-receipt.mjs",
+    "plugins/pipeline-core/lib/rebind-approval.mjs",
+    "plugins/pipeline-core/lib/retired-design-codes.mjs"
+  ],
+  "patchRuns": [
+    {
+      "command": [
+        "patch",
+        "--dry-run",
+        "--batch",
+        "--forward",
+        "--fuzz=0",
+        "-p1",
+        "-i",
+        "<repo-root>/specs/sprint-alfred-epic/signed-package/tranche-2/guard-maintenance-window.kernel-list.patch"
+      ],
+      "status": 0,
+      "stdout": "checking file plugins/pipeline-core/lib/guard-maintenance-window.mjs\nHunk #1 succeeded at 717 (offset 3 lines).\n",
+      "stderr": "",
+      "fd3": "",
+      "error": null
+    },
+    {
+      "command": [
+        "patch",
+        "--batch",
+        "--forward",
+        "--fuzz=0",
+        "-p1",
+        "-i",
+        "<repo-root>/specs/sprint-alfred-epic/signed-package/tranche-2/guard-maintenance-window.kernel-list.patch"
+      ],
+      "status": 0,
+      "stdout": "patching file plugins/pipeline-core/lib/guard-maintenance-window.mjs\nHunk #1 succeeded at 717 (offset 3 lines).\n",
+      "stderr": "",
+      "fd3": "",
+      "error": null
+    }
+  ]
+}
+{"command":["<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","--test","--test-reporter=tap","plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs"],"status":1,"fd3":""}
+TAP version 13
+# PASS GMWKC01 NEVER_LIFTABLE_KERNEL_PATHS is transitively closed under first-party relative imports
+# PASS GMWKC08 the closure check reports EVERY violation in one run, not only the first (in-memory fixtures, one per violation kind)
+# PASS GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)
+# PASS GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)
+# FAIL GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry: AssertionError [ERR_ASSERTION]: 5 NEVER_LIFTABLE_KERNEL_PATHS entries are not mentioned in docs/guard-maintenance-window-threat-model.md's "Protected assets" section:
+# plugins/pipeline-core/lib/design-approval-binding.mjs
+# plugins/pipeline-core/lib/design-consistency-check.mjs
+# plugins/pipeline-core/lib/design-review-receipt.mjs
+# plugins/pipeline-core/lib/rebind-approval.mjs
+# plugins/pipeline-core/lib/retired-design-codes.mjs
+# 5 !== 0
+#     at file://<repo-root>/scratch/kernel-f-20261009-v2/mirror/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:766:10
+#     at check (file://<repo-root>/scratch/kernel-f-20261009-v2/mirror/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:481:5)
+#     at file://<repo-root>/scratch/kernel-f-20261009-v2/mirror/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:749:1
+#     at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+#     at async node:internal/modules/esm/loader:639:26
+#     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+# PASS GMWKC03a DOC_PATH_TOKEN_RE matches nested kernel paths and stays strict otherwise
+# PASS GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassifiable dynamic import() in real code (positive control for GMWKC05's comment fix)
+# PASS GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher
+# PASS GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents
+# PASS GMWKC07 supplementary completion policy and consumer are never liftable project kernel roots
+# guard-maintenance-window-kernel-closure: 9 passed, 1 failed
+# Subtest: plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+not ok 1 - plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+  ---
+  duration_ms: 277.776892
+  type: 'test'
+  location: '<repo-root>/scratch/kernel-f-20261009-v2/mirror/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 282.411599
+
+
+{"command":["<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","--test","--test-reporter=tap","plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs"],"status":0,"fd3":""}
+TAP version 13
+# Subtest: GSC01 the module files of lib/guard are exactly the modules of the split map
+ok 1 - GSC01 the module files of lib/guard are exactly the modules of the split map
+  ---
+  duration_ms: 1.067965
+  type: 'test'
+  ...
+# Subtest: GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle
+ok 2 - GSC02 module imports point only at lower layers, never at the facade, and the graph has no cycle
+  ---
+  duration_ms: 2.8918
+  type: 'test'
+  ...
+# Subtest: GSC03 the facade's export surface is exactly the pinned 40-name table (name and typeof)
+ok 3 - GSC03 the facade's export surface is exactly the pinned 40-name table (name and typeof)
+  ---
+  duration_ms: 131.930188
+  type: 'test'
+  ...
+# Subtest: GSC04 once the facade is wired to lib/guard it is a thin facade of at most 500 lines
+ok 4 - GSC04 once the facade is wired to lib/guard it is a thin facade of at most 500 lines
+  ---
+  duration_ms: 0.479544
+  type: 'test'
+  ...
+# Subtest: GSC05 every lib/guard module is a never-liftable kernel path
+ok 5 - GSC05 every lib/guard module is a never-liftable kernel path
+  ---
+  duration_ms: 0.223537
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 184.605045
+
+
+
+--- stderr ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: source/package input drift: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs
++ actual - expected
+
++ '61d7de4af2cf192d92bb6e875321f6accf81071d932d2a67e11cb7c9ecc02f7b'
+- 'e11f1a405b59bed85a7b712860548c0c4a6888529af541a9636ac54b7e64973d'
+
+    at file://<repo-root>/scratch/kernel-f-compose-20261009.mjs:55:48
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '61d7de4af2cf192d92bb6e875321f6accf81071d932d2a67e11cb7c9ecc02f7b',
+  expected: 'e11f1a405b59bed85a7b712860548c0c4a6888529af541a9636ac54b7e64973d',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

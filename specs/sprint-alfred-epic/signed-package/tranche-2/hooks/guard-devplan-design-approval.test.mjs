@@ -41,7 +41,7 @@
  *   C6  mini profile, both keys null, no design artifact -> admitted         R (blocked, lifecycle)
  *   C7  exactly one key null -> refused under any code                      R (the paired control
  *       in the same case, a valid v8 record, is blocked today; see A10)
- *   FX1 the signature proof verifies against the empty anchor set            G (fixture self-check)
+ *   FX1 the signature proof verifies against the committed matching anchor   G (fixture self-check)
  *   FX2 the configured mode resolves from the committed file                 G (fixture self-check)
  *
  * Assumptions -- fields and shapes the rulings do not fix (each is a judgment the
@@ -66,9 +66,9 @@
  *   A6  The intent candidate is the fixture HEAD commit and tree. Ruling 77 (b) names no
  *       candidate-versus-HEAD step, so a boundary that ignores the candidate and one that
  *       compares it to HEAD both admit the valid cases.
- *   A7  The signature fixture ships no trust-policy file. With project/critical-human-proof.json
- *       absent the boundary passes an empty anchor set, and verifyAgainstTrustAnchors then
- *       derives the trust policy from the proof's own key (FX1 pins that this verifies).
+ *   A7  Ruling164 supersedes the empty-anchor assumption. Signature positives commit a v3
+ *       policy containing the matching public PEM digest before constructing the request.
+ *       TA1-TA3 separately exercise absent policy, empty anchors and an unpinned signing key.
  *   A8  The configured mode is the committed `gates.human_approval` of the repo-root
  *       pipeline.user.yaml (readHumanApprovalMode). C6 leaves the file absent (default
  *       signature) to show that the mini profile needs no mode agreement. FX2 pins the
@@ -150,7 +150,7 @@ function writeText(dir, relativePath, text) {
 }
 
 /** A git repository, enrolled in governance, whose HEAD commits README.md and, when given, the user config. */
-function createRepository(mods, config) {
+function createRepository(mods, config, anchors = null) {
   const dir = mkdtempSync(join(tmpdir(), "guard-devplan-v8-"));
   ALL_DIRS.push(dir);
   git(dir, ["init", "--quiet"]);
@@ -163,6 +163,13 @@ function createRepository(mods, config) {
   assert.equal(active.state, "active", "fixture enrollment must become active");
   writeText(dir, "README.md", "fixture\n");
   const tracked = ["README.md"];
+  if (anchors !== null) {
+    writeText(dir, mods.policy.CRITICAL_HUMAN_PROOF_POLICY_PATH, JSON.stringify({
+      schema: mods.policy.CRITICAL_HUMAN_PROOF_POLICY_V3,
+      requiredKinds: ["push"], waivedKinds: [], trustAnchors: anchors,
+    }));
+    tracked.push(mods.policy.CRITICAL_HUMAN_PROOF_POLICY_PATH);
+  }
   if (config !== null) {
     writeText(dir, "pipeline.user.yaml", `gates:\n  human_approval: ${config}\n`);
     tracked.push("pipeline.user.yaml");
@@ -187,7 +194,7 @@ function buildBinding(mods) {
   };
 }
 
-function buildRecord(mods, dir, binding, mode) {
+function buildRecord(mods, dir, binding, mode, signer) {
   const validated = mods.binding.validateDesignApprovalBinding(binding);
   assert.equal(validated.ok, true, `fixture binding must validate: ${JSON.stringify(validated)}`);
   const candidate = { commit: git(dir, ["rev-parse", "HEAD"]), tree: git(dir, ["rev-parse", "HEAD^{tree}"]) };
@@ -204,7 +211,7 @@ function buildRecord(mods, dir, binding, mode) {
     proof: null,
   };
   if (mode === "signature") {
-    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const { publicKey, privateKey } = signer;
     const proof = {
       schema: "pipeline.po-approval-proof.v1",
       intentSha256: requested.intentSha256,
@@ -222,8 +229,13 @@ function buildRecord(mods, dir, binding, mode) {
  * Build a repository whose state carries a v8 approval. `mutate(handle)` may edit `handle.approval`
  * or the files under `handle.dir` before the state is written.
  */
-function writeFixture(mods, { profile = "feature", mode = "chat", config = null, mutate = () => {} } = {}) {
-  const dir = createRepository(mods, config);
+function writeFixture(mods, { profile = "feature", mode = "chat", config = null, trustPolicy = "matching", mutate = () => {} } = {}) {
+  const signer = mode === "signature" ? generateKeyPairSync("ed25519") : null;
+  const anchorKey = trustPolicy === "unpinned" ? generateKeyPairSync("ed25519").publicKey : signer?.publicKey;
+  const anchors = signer === null || trustPolicy === "missing" ? null : trustPolicy === "empty" ? [] : [{
+    keyReference: "fixture-po-key", publicKeySha256: sha256(anchorKey.export({ type: "spki", format: "pem" })),
+  }];
+  const dir = createRepository(mods, config, anchors);
   const mini = profile === "mini";
   writeText(dir, ".claude/pipeline.yaml", MANIFEST_BLOCKING);
   writeText(dir, PRD_PATH, PRD_BYTES);
@@ -242,7 +254,7 @@ function writeFixture(mods, { profile = "feature", mode = "chat", config = null,
     submittedAt: "2026-10-09T09:30:00.000Z",
   };
   const binding = mini ? null : buildBinding(mods);
-  const record = mini ? null : buildRecord(mods, dir, binding, mode);
+  const record = mini ? null : buildRecord(mods, dir, binding, mode, signer);
   const approval = {
     schema: "pipeline.plan-approval.v8",
     approvedBy: APPROVED_BY,
@@ -277,9 +289,9 @@ function writeFixture(mods, { profile = "feature", mode = "chat", config = null,
   return handle;
 }
 
-function runGuard(dir) {
+function runGuard(dir, filePath = "src/foo.ts") {
   const result = spawnSync(process.execPath, [GUARD], {
-    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "src/foo.ts", old_string: "a", new_string: "b" } }),
+    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath, old_string: "a", new_string: "b" } }),
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
     timeout: 30_000,
@@ -377,12 +389,49 @@ test("C7 refuse mixed state (exactly one of the two design keys null), paired wi
 });
 
 // ---- fixture self-checks (green controls: they show a red case is not red for a fixture reason) ----
-test("FX1 fixture: the signature proof verifies against the empty anchor set", async () => {
+test("FX1 fixture: the signature proof verifies against the committed matching anchor", async () => {
   const mods = await loadModules();
-  const { record } = writeFixture(mods, { mode: "signature", config: "chat" });
-  const verified = mods.policy.verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors: [], proof: record.proof });
+  const { dir, record } = writeFixture(mods, { mode: "signature", config: "chat" });
+  const trust = mods.policy.readCriticalHumanProofPolicy(dir);
+  assert.equal(trust.ok, true);
+  assert.equal(trust.trustAnchors.length, 1);
+  assert.equal(git(dir, ["show", `HEAD:${mods.policy.CRITICAL_HUMAN_PROOF_POLICY_PATH}`]),
+    JSON.stringify({ schema: mods.policy.CRITICAL_HUMAN_PROOF_POLICY_V3, requiredKinds: ["push"], waivedKinds: [], trustAnchors: trust.trustAnchors }));
+  const verified = mods.policy.verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors: trust.trustAnchors, proof: record.proof });
   assert.equal(verified.verified, true, `proof must verify: ${JSON.stringify(verified)}`);
   assert.equal(verified.proofSha256, record.proofSha256);
+});
+
+for (const [id, trustPolicy] of [["TA1", "missing"], ["TA2", "empty"]]) {
+  test(`${id} refuse signature with ${trustPolicy} policy anchors and name the setup remedy`, async () => {
+    const mods = await loadModules();
+    const { dir, record } = writeFixture(mods, { mode: "signature", config: "signature", trustPolicy });
+    const trust = mods.policy.readCriticalHumanProofPolicy(dir);
+    assert.equal(trust.ok, true, "fixture must reach the actual policy reader");
+    assert.deepEqual(trust.trustAnchors ?? [], []);
+    const selfSigned = mods.policy.verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors: [], proof: record.proof });
+    assert.equal(selfSigned.verified, true, "the negative holds a real detached signature, not a malformed proof");
+    for (const path of ["src/foo.ts", join(dir, "src/foo.ts")]) {
+      const run = runGuard(dir, path);
+      assertRefusedWith(run, "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP", id);
+      assert.match(run.stderr, /setup/iu, `${id}: refusal must name the setup step`);
+    }
+  });
+}
+
+test("TA3 refuse a self-generated signing key outside the committed anchor set", async () => {
+  const mods = await loadModules();
+  const { dir, record } = writeFixture(mods, { mode: "signature", config: "signature", trustPolicy: "unpinned" });
+  const trust = mods.policy.readCriticalHumanProofPolicy(dir);
+  assert.equal(trust.ok, true);
+  assert.equal(trust.trustAnchors.length, 1);
+  assert.equal(mods.policy.verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors: [], proof: record.proof }).verified, true);
+  const verified = mods.policy.verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors: trust.trustAnchors, proof: record.proof });
+  assert.equal(verified.verified, false);
+  assert.equal(verified.code, "PO-APPROVAL-TRUST-MISMATCH");
+  for (const path of ["src/foo.ts", join(dir, "src/foo.ts")]) {
+    assertRefusedWith(runGuard(dir, path), "DAA-PO-APPROVAL-TRUST-MISMATCH", "TA3");
+  }
 });
 
 test("FX2 fixture: the configured mode resolves from the committed user config", async () => {

@@ -1,0 +1,362 @@
+command: node scratch/trust-anchor-run.mjs
+label: trust-anchor-independent-controls-and-new-negatives
+exitCode: 1
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+source snapshot guard-devplan-policy sha256: ee4726c2f441c150da22604bdfb8b66bce458d1f049253c07bd21cfd3bcd8221
+test sha256: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs 7efef2b3a92508741b57a1361328be0fffd61033dab3da9217054ebdf1728199
+test sha256: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs 521cb62b77e31c60ce032617be208304235ebb5f577974b1970cd1524d40b7f1
+Unchanged pre-edit baseline capture:
+command: node scratch/trust-anchor-run.mjs baseline
+label: trust-anchor-baseline-controls
+exitCode: 1
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+source snapshot guard-devplan-policy sha256: ee4726c2f441c150da22604bdfb8b66bce458d1f049253c07bd21cfd3bcd8221
+test sha256: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs dba4f1459637951f458c088410e10e8e61f0d73200da7f9cf9543b9424269726
+test sha256: specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval-v7.test.mjs e11f1a405b59bed85a7b712860548c0c4a6888529af541a9636ac54b7e64973d
+stage: baseline/control
+TAP version 13
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+    # Subtest: control: live-shaped v7 record, course store present -> both lanes admit (green today)
+    ok 1 - control: live-shaped v7 record, course store present -> both lanes admit (green today)
+      ---
+      duration_ms: 231.772284
+      type: 'test'
+      ...
+    # Subtest: target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+    ok 2 - target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+      ---
+      duration_ms: 187.43808
+      type: 'test'
+      ...
+    1..2
+ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 983.812889
+  type: 'test'
+  ...
+# Subtest: C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+not ok 2 - C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+  ---
+  duration_ms: 484.207122
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:309:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    C2: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    assertAdmitted (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:293:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:312:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: FX1 fixture: the signature proof verifies against the empty anchor set
+ok 3 - FX1 fixture: the signature proof verifies against the empty anchor set
+  ---
+  duration_ms: 218.513637
+  type: 'test'
+  ...
+# Subtest: FX2 fixture: the configured mode resolves from the committed user config
+ok 4 - FX2 fixture: the configured mode resolves from the committed user config
+  ---
+  duration_ms: 621.101268
+  type: 'test'
+  ...
+1..4
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1377.487458
+FD3 completion: {"stage":"baseline/control","status":1,"signal":null,"fd3":"","spawnError":null}
+source/test hash immutability: passed
+
+--- stderr ---
+
+stage: positive/control and preserved boundary
+TAP version 13
+# Subtest: v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+    # Subtest: control: live-shaped v7 record, course store present -> both lanes admit (green today)
+    ok 1 - control: live-shaped v7 record, course store present -> both lanes admit (green today)
+      ---
+      duration_ms: 231.896639
+      type: 'test'
+      ...
+    # Subtest: target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+    ok 2 - target: the same record with the course store absent (fresh clone) -> both lanes admit (RED today)
+      ---
+      duration_ms: 202.016611
+      type: 'test'
+      ...
+    1..2
+ok 1 - v7 plan approval with an Advisor-unavailable exception: devplan boundary with the private course store absent (ADR-0085 Ruling 77(c))
+  ---
+  duration_ms: 984.746615
+  type: 'test'
+  ...
+# Subtest: C1 admit  v8 chat record under configured chat
+not ok 2 - C1 admit  v8 chat record under configured chat
+  ---
+  duration_ms: 476.927286
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:314:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    C1: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    assertAdmitted (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:305:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:317:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+not ok 3 - C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)
+  ---
+  duration_ms: 373.096499
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:321:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    C2: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    assertAdmitted (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:305:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:324:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+not ok 4 - C3 refuse v8 chat record under configured signature with DAA-PO-APPROVAL-MODE-MISMATCH
+  ---
+  duration_ms: 379.038929
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:328:1'
+  failureType: 'testCodeFailure'
+  error: 'C3: the refusal must name DAA-PO-APPROVAL-MODE-MISMATCH in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:331:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+not ok 5 - C4 refuse binding drift (binding sha differs from designApproval.bindingSha256) with DAA-DESIGN-APPROVAL-BINDING-DRIFT
+  ---
+  duration_ms: 354.89885
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:335:1'
+  failureType: 'testCodeFailure'
+  error: 'C4: the refusal must name DAA-DESIGN-APPROVAL-BINDING-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:349:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+not ok 6 - C5 refuse companion drift (bound companion edited after approval) with DAA-DESIGN-SOURCE-DRIFT
+  ---
+  duration_ms: 346.763252
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:353:1'
+  failureType: 'testCodeFailure'
+  error: 'C5: the refusal must name DAA-DESIGN-SOURCE-DRIFT in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:363:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C6 admit  mini profile with both design keys null and no design artifact
+not ok 7 - C6 admit  mini profile with both design keys null and no design artifact
+  ---
+  duration_ms: 343.825223
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:367:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    C6: expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    assertAdmitted (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:305:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:372:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+not ok 8 - C7 refuse mixed state (exactly one of the two design keys null), paired with an admitted control
+  ---
+  duration_ms: 361.376101
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:376:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    C7 control (the same record with both keys present): expected the write to be admitted (exit 0), got exit 2: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    assertAdmitted (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:305:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:379:3)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: FX1 fixture: the signature proof verifies against the committed matching anchor
+ok 9 - FX1 fixture: the signature proof verifies against the committed matching anchor
+  ---
+  duration_ms: 210.588373
+  type: 'test'
+  ...
+# Subtest: FX2 fixture: the configured mode resolves from the committed user config
+ok 10 - FX2 fixture: the configured mode resolves from the committed user config
+  ---
+  duration_ms: 608.036171
+  type: 'test'
+  ...
+1..10
+# tests 12
+# suites 0
+# pass 5
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3513.198621
+FD3 completion: {"stage":"positive/control and preserved boundary","status":1,"signal":null,"fd3":"{\"status\":1,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","spawnError":null}
+stage: new actual-policy negatives
+TAP version 13
+1..0
+# Subtest: <repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs
+ok 1 - <repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs
+  ---
+  duration_ms: 183.597378
+  type: 'test'
+  ...
+# Subtest: TA1 refuse signature with missing policy anchors and name the setup remedy
+not ok 2 - TA1 refuse signature with missing policy anchors and name the setup remedy
+  ---
+  duration_ms: 484.221982
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:406:3'
+  failureType: 'testCodeFailure'
+  error: 'TA1: the refusal must name DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:416:7)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: TA2 refuse signature with empty policy anchors and name the setup remedy
+not ok 3 - TA2 refuse signature with empty policy anchors and name the setup remedy
+  ---
+  duration_ms: 360.474606
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:406:3'
+  failureType: 'testCodeFailure'
+  error: 'TA2: the refusal must name DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:416:7)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: TA3 refuse a self-generated signing key outside the committed anchor set
+not ok 4 - TA3 refuse a self-generated signing key outside the committed anchor set
+  ---
+  duration_ms: 366.95661
+  type: 'test'
+  location: '<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:422:1'
+  failureType: 'testCodeFailure'
+  error: 'TA3: the refusal must name DAA-PO-APPROVAL-TRUST-MISMATCH in stderr, got: BLOCKED (guard-devplan, plugin pipeline-core): Feature "authority-feature" lifecycle is "awaiting-approval". Plan: specs/feature/prd.md File: src/foo.ts Why: Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    assertRefusedWith (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:310:10)
+    TestContext.<anonymous> (file://<repo-root>/scratch/trust-anchor-test-mirror/plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs:433:5)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 1
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1272.093235
+FD3 completion: {"stage":"new actual-policy negatives","status":1,"signal":null,"fd3":"{\"status\":1,\"signal\":null,\"spawnError\":null,\"completed\":true}\n","spawnError":null}
+source/test hash immutability: passed
+
+--- stderr ---

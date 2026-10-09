@@ -1,0 +1,12 @@
+command: node harness/scripts/check-verify-case-completion.mjs
+label: ALFRED-REGISTRY-F2-20261009-closing
+exitCode: 2
+head: 3dc9beac66d3067105945d9affab2a93fab91797
+tree: 9ed5e66c28685b19337cf384e5fd9512a41caa5d
+dirty: true
+--- stdout ---
+
+--- stderr ---
+VULNERABLE-UNREGISTERED gitleaks-repair-ignore-cli-tests plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs
+VULNERABLE-UNREGISTERED hardened-private-directory-install-tests plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs
+Verify case-completion registry invalid: 2 finding(s).
