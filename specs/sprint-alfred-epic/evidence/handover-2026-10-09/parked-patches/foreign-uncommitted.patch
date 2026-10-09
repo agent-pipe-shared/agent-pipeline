@@ -1,0 +1,58 @@
+# staged part
+diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
+index 8ae150da0..58a19ebb9 100644
+--- a/harness/scripts/pipeline-state.test.mjs
++++ b/harness/scripts/pipeline-state.test.mjs
+@@ -845,7 +845,21 @@ function initializeLifecycleContinuity(dir, featureId, planPath) {
+   );
+ }
+ 
++// submit-plan resolves the onboarding intake scope through `git rev-parse --git-common-dir`; outside a
++// repository that throws and the fail-closed catch reports PROFILE-AUTHORITY-INVALID. Directories that reach
++// submit-plan are made repositories here, never in freshDir (PS11 and close-feature-git-error need a non-Git dir).
++function initFixtureGitRepoForSubmitPlan(dir) {
++  if (existsSync(join(dir, ".git"))) return;
++  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
++  const initialized = git("init", "-q");
++  if (initialized.status !== 0) throw new Error(`fixture git init failed: ${initialized.stderr}`);
++  git("config", "user.email", "goldfish@example.invalid");
++  git("config", "user.name", "Goldfish");
++  git("commit", "-q", "--allow-empty", "-m", "init");
++}
++
+ function submitAndApprove(dir, planPath) {
++  initFixtureGitRepoForSubmitPlan(dir);
+   const activeFeature = readState(dir).state.activeFeature;
+   const initialized = initializeLifecycleContinuity(dir, activeFeature.id, planPath);
+   const deps = lifecycleDeps(dir, planPath);
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs
+index 69dd5aa33..5f5fa0f11 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs
+@@ -386,6 +386,12 @@ export function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
+     "--text-file-sha256": isHexDigest,
+     "--text-turn-ref": isClaudeIntakeReference,
+     "--answers-json": nonEmptyTrimmedNotFlag,
++    // R5 (AC-30): the answers-file route of the two design-question commands. Inert on its own:
++    // the admitted flag SET still comes only from MUTATING_ONBOARDING_ARGV_SHAPES, and
++    // matchFlagSpec() refuses any flag the shape does not list, so these entries admit nothing
++    // until the shape table names the two flags.
++    "--answers-file": nonEmptyTrimmedNotFlag,
++    "--answers-file-sha256": isHexDigest,
+     "--plan-sha256": isHexDigest,
+     "--proof": nonEmptyTrimmedNotFlag,
+     "--git-author-name": nonEmptyTrimmedNotFlag,
+
+# unstaged part (apply after the staged part)
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 7964fd426..310dc80c7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -420,6 +420,7 @@ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs';
+ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
++import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+ import {retirementArchiveEntry,prepareEnrollmentRetirement,validateRetirementArchive,validateRetirementJournal,retirementValueSha256,advanceEnrollmentRetirement,bindEnrollmentFreshConsent,retirementResult} from '../lib/enrollment-retirement-coordinator.mjs';

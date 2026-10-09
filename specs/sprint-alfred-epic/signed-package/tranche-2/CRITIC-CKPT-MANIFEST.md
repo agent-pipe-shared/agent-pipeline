@@ -171,3 +171,57 @@ refusal cases (b), (c), (d), (e), (f at call 1), (f at call 20), each because th
 reported) gave 15 tests, 6 pass, 9 fail, 241 s; it was overwritten by the final-body run above.
 
 Independent Critic review: pending.
+
+## CRITIC-CKPT-F (production side of the T2 and T3 pins)
+
+Dispatch: CRITIC-CKPT-F2-20261009 (the earlier CRITIC-CKPT-F-20261009 stopped without a commit on the DP26/DP27 pin; the test-only
+predecessor `e28888585` re-pinned the Critic definition at 65 turns). Source: Rulings 157, 159, 161. No test file, no
+`dispatch-budget-core.mjs`, no `agents/plan-verifier.md`, no live hook and no DP25 / default base cap is touched.
+
+- Guard post-image: `hooks/guard-dispatch-budget.mjs`, base sha256 `f7649839d83cfaad1f4163269a07284e91efe71751e3b3634f09b92ccbfa4c4f`
+  (87604 bytes), new sha256 `360a645e4b77f32bd18971d8a94463a02cd49536e12f966bd4d03cb5018f7a33` (90377 bytes, LF, 1556 lines). Five
+  anchored replacements, each checked to occur exactly once on the base: (1) the header bullet, (2) `CRITIC_NOTES_PATTERN` now
+  `scratch/dispatch/critic-<id>/critic-notes.md` (directory must start with `critic-`, the T2 (d4) pin) plus the exported
+  `CRITIC_WRITE_CONFINED_CODE = "DISPATCH-BUDGET-CRITIC-WRITE-CONFINED"`, (3) the `closingNotesClause` wording plus the new
+  `criticWriteConfined` verdict and `writesOutsideCriticNotes` predicate, (4) the checkpoint-notice wording, (5) the confinement
+  inside `advanceCounter`'s `if (budget.allowed) {`, before the checkpoint notice.
+- Design (forced by the pins): the confinement sits BEHIND the budget decision. A Critic Write/Edit/NotebookEdit outside its own
+  notes file is refused (exit 2, code above, counted) at every call the budget admits, so T3 sees a typed non-EXHAUSTED refusal before
+  the cap, while a write after the allowance still reaches the budget's own refusal and T2 (d2)-(d4) keep `DISPATCH-BUDGET-EXHAUSTED`.
+  A Critic dispatch-record Write inside the allowance is a counted closing act that the confinement then refuses (accepted; the
+  Critic's hand-back is `critic-notes.md`). An empty target path is outside the notes file.
+- `agents/critic.md` (in tree, not the installed plugin copy): `maxTurns` 65 (working cap `min(50, 65 - 15)` = 50, notice at call 40),
+  `tools: Read, Grep, Glob, Bash, Write, Edit`, comments at the old lines 8-9 and 30 rewritten, one body sentence added
+  ("Your only writable file is scratch/dispatch/critic-<id>/critic-notes.md; ..."). The installed copy differs
+  (`DUTY-NOT-RUNTIME-LIVE`), so the live runtime sees this only after a plugin refresh.
+- No `tool.mjs build` of T3 was run. The post-image was copied to the T3 redirect location
+  `scratch/dispatch-wip/CRITIC-CKPT-T3/post/hooks/guard-dispatch-budget.mjs` (git-ignored), which the scratch test entry serves under the
+  live guard URL (sidecar line `CKPT3-REDIRECT-FIRED` in every capture).
+
+Results (WSL, `<repo-root-in-wsl>`, `CLAUDECODE=1`, `timeout 540`, through `capture-evidence.mjs`, scratch entry
+`scratch/dispatch-wip/CRITIC-CKPT-T3/guard-dispatch-budget.ckpt3.test.mjs`):
+
+| Run | Pattern | Result | Artifact |
+|---|---|---|---|
+| T2 + T3 pins | `CRITIC-CKPT-T[23]` | wrapped exit 0; 16 tests, 16 pass, 0 fail (was 6 pass, 10 fail); 326.9 s | `evidence/CRITIC-CKPT-F2-20261009/green.txt` |
+| neighbourhood 1 | `TR-G` | wrapped exit 0 | `evidence/CRITIC-CKPT-F2-20261009/neighbourhood-tr-g.txt` |
+| neighbourhood 2 | `^(?!.*(TR-G\|CRITIC-CKPT))` | wrapped exit 1; 122 tests, 117 pass, 3 fail, 2 skipped. The 3 fails are the baseline reds recorded above: the two 10 s runner timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded) and `R7-11a`. No new red. | `evidence/CRITIC-CKPT-F2-20261009/neighbourhood-rest.txt` |
+
+Native: `node --test plugins/pipeline-core/lib/dispatch-policy.test.mjs` through `capture-evidence.mjs`, wrapped exit 0 (DP26 and DP27 green
+at 65); the capture was written to `evidence/CRITIC-CKPT-F2-20261009/dispatch-policy.txt` but is NOT committed, because
+`capture-evidence.mjs` reported an absolute host path in it outside its redaction boundary. `node --test harness/scripts/check-consumer-safe-paths.test.mjs`
+exit 0 (9 tests, 9 pass).
+
+Open items for the dispatcher (not fixed here, outside the briefed scope):
+
+- `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` (native, exit 1) compares the on-disk raw sha256 of
+  six files with `codex-isolated-critic-protected-preimage.v1.json`. It was already red for five paths this change did not touch
+  (`harness/review-protocol.md`, `scripts/codex-critic-host.mjs`, `skills/critic-review/SKILL.md`, `roles/critic.md`,
+  `templates/prompts/critic-review.md`) and now also names `agents/critic.md`; the refresh of that inventory has to include the new
+  `agents/critic.md` hash.
+- `agents/critic.md` still says, in the bootstrap section, "For native isolation, confirm that no write tools are available; otherwise
+  stop with bootstrap failure". With `Write, Edit` in `tools` that sentence now contradicts the definition; the briefed step list
+  did not include it, so it is left for the next canon slice.
+- `scripts/afk-claude-host.test.mjs:118` rewrites a `tools: Read, Grep, Glob` pair; whether it touches `critic.md` was not read.
+
+Independent Critic review: pending.

@@ -1,0 +1,77 @@
+@@@ OLD
+ * - Critic notes lane: the Critic's closing lane also admits its own
+ *   `scratch/dispatch/<subdir>/critic-notes.md` (that exact file name only).
+@@@ NEW
+ * - Critic notes lane: the Critic's closing lane also admits its own
+ *   `scratch/dispatch/critic-<id>/critic-notes.md` (that exact file name only).
+ * - Critic write confinement (CRITIC-CKPT-F2, Rulings 157/159/161): a dispatched Critic's Write/Edit/NotebookEdit is refused
+ *   with DISPATCH-BUDGET-CRITIC-WRITE-CONFINED at every call the budget admits (before the working cap and inside the closing
+ *   allowance) unless it targets that one notes file. The refusal is counted like any other call and sits BEHIND the budget
+ *   decision, so a write after the allowance still answers the budget's own exhaustion code.
+@@@ END
+@@@ OLD
+// `scratch/dispatch/<subdir>/critic-notes.md` (critic-review.md CR-06-D). Exact
+// shape only: one safe subdirectory segment (never `.`/`..`, no separators) and
+// that one file name, admitted for the Critic agent type alone.
+const CRITIC_NOTES_PATTERN = /^scratch\/dispatch\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/critic-notes\.md$/u;
+export const GRANT_REFUSAL_CODE = "DISPATCH-BUDGET-GRANT-ORCHESTRATOR-ONLY";
+@@@ NEW
+// `scratch/dispatch/critic-<id>/critic-notes.md` (critic-review.md CR-06-D; the fresh per-dispatch directory
+// agents/critic.md tells it to create). Exact shape only: one safe subdirectory segment that starts with `critic-`
+// (never `.`/`..`, no separators) and that one file name, admitted for the Critic agent type alone. The prefix is the
+// CRITIC-CKPT-T2 (d4) pin: `scratch/dispatch/other/critic-notes.md` is not the Critic's own scratchpad.
+const CRITIC_NOTES_PATTERN = /^scratch\/dispatch\/critic-[A-Za-z0-9][A-Za-z0-9._-]{0,120}\/critic-notes\.md$/u;
+export const GRANT_REFUSAL_CODE = "DISPATCH-BUDGET-GRANT-ORCHESTRATOR-ONLY";
+export const CRITIC_WRITE_CONFINED_CODE = "DISPATCH-BUDGET-CRITIC-WRITE-CONFINED";
+@@@ END
+@@@ OLD
+    ? ", (4) write your own scratch/dispatch/<subdir>/critic-notes.md (that exact file name only)"
+    : "";
+}
+@@@ NEW
+    ? ", (4) write your own scratch/dispatch/critic-<id>/critic-notes.md (that exact file name only)"
+    : "";
+}
+
+/**
+ * CRITIC-CKPT-F2 (Rulings 157/159/161): the refusal for a dispatched Critic whose Write/Edit/NotebookEdit targets anything
+ * but its own notes file. A `tools` frontmatter list cannot confine a path, so the confinement is this guard's. Its text
+ * names neither the budget's exhaustion code nor its exhausted-allowance sentence: the cap is not what refused the call.
+ */
+function criticWriteConfined({ agentId, agentType }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${CRITIC_WRITE_CONFINED_CODE}: this dispatch (${agentType}, agent ${agentId}) tried to write a file other than its own notes file. `
+      + "A Critic is read-only toward the repository; its one writable file is scratch/dispatch/critic-<id>/critic-notes.md (Write or Edit, that exact file name only). "
+      + "Persist your material there, or return your report as text.\n",
+  );
+}
+
+/** Does this Write/Edit/NotebookEdit call aim anywhere but the Critic's own notes file? An empty target path is outside it. */
+function writesOutsideCriticNotes(input, rootDir) {
+  const toolName = String(input?.tool_name ?? "");
+  if (!WRITE_TOOLS.includes(toolName)) return false;
+  const filePath = String(writeTargetPath(input?.tool_input, toolName) ?? "");
+  const rel = (isAbsolute(filePath) ? relative(rootDir, filePath) : filePath).replaceAll("\\", "/");
+  return !CRITIC_NOTES_PATTERN.test(rel);
+}
+@@@ END
+@@@ OLD
+into your own scratch/dispatch/<subdir>/critic-notes.md; (3) end your turn
+@@@ NEW
+into your own scratch/dispatch/critic-<id>/critic-notes.md; (3) end your turn
+@@@ END
+@@@ OLD
+  if (budget.allowed) {
+    // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
+@@@ NEW
+  if (budget.allowed) {
+    // CRITIC-CKPT-F2 (Rulings 157/159/161): behind the budget decision on purpose. A write after the allowance is already
+    // answered by the budget's own exhaustion refusal (CRITIC-CKPT-T2 (d2)-(d4)); only a call the budget admits reaches
+    // this line, and a Critic write to anything but its notes file is then refused with a typed code (CRITIC-CKPT-T3).
+    if (isCriticAgentType(identity.agentType) && writesOutsideCriticNotes(input, rootDir)) {
+      return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
+    }
+    // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
+@@@ END

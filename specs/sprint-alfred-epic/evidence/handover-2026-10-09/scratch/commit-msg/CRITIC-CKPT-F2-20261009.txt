@@ -1,0 +1,21 @@
+feat(guard-dispatch-budget): confine the Critic's Write to its own notes file; Critic definition 65 turns with Write/Edit (tranche-2)
+
+CRITIC-CKPT-F2 (Rulings 157/159/161), the production side of the CRITIC-CKPT-T2 and
+-T3 pins.
+
+Guard post-image (tranche-2 package, not the live hook): a dispatched Critic's
+Write/Edit/NotebookEdit is refused with DISPATCH-BUDGET-CRITIC-WRITE-CONFINED
+unless it targets scratch/dispatch/critic-<id>/critic-notes.md. The confinement
+sits behind the budget decision, so a write after the closing allowance still
+answers DISPATCH-BUDGET-EXHAUSTED (T2 d2-d4) while a write before the cap gets
+the typed confinement code (T3). The notes pattern now requires a critic-
+prefixed directory (T2 d4). The notes wording in the closing clause, the
+checkpoint notice and the header follows.
+
+agents/critic.md: maxTurns 50 -> 65 (working cap 50 = 65 - 15), tools gain
+Write and Edit (confined by the guard above), comments and one body sentence
+updated. agents/plan-verifier.md, dispatch-budget-core.mjs, every test file and
+the live hooks are untouched.
+
+AI-Assisted: true
+Dispatch: CRITIC-CKPT-F2-20261009 (goldfish)

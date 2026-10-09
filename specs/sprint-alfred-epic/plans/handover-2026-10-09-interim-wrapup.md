@@ -126,6 +126,30 @@ Elephant captures: LE-F2 pattern run, E2E-ONB-A2 matrix, MECH-HAIKU after-captur
   trailers unannounced before the first greenfield commit; `.git` with hooks while `initializesGit` false; diagnostics vs
   nextAction guidance).
 - **WIN-HARDEN-T2 `511f85f33`:** WPS016 red as intended → WIN-HARDEN-F2.
-- **Still alive at writing:** GREP-PUSH-F, CRITIC-CKPT-F2 (both build tranche-2 post-images; CRITIC-CKPT-F2 also edits the
+- **GREP-PUSH-F (stopped, briefing contradiction; post-image committed as tranche-2 WIP):**
+  `signed-package/tranche-2/lib/git-cmd.mjs` (base sha256 `e6ae412c…`, post `0130bcd6…`; exports `hasFailClosedMarker`;
+  `markerRuleIsInert` exempts quoted markers in single-line `git commit|grep|log|show|diff|status`). Measured: PGM-A01..A27
+  and PGM-R01..R22 all green (49/49), guard-git 258/258; red besides the PG-CHECKPOINT pair: **PGC-T38b/c and PGC-T82b/c**,
+  which are byte-identical to PGM-A08 / near-identical to PGM-A03 with the opposite expectation. Next: a test-only re-aim
+  slice (ALLOW or drop as duplicates) in the tranche-2 guard-push test post-image, plus the live `lib/git-cmd.test.mjs`
+  accepted-false-positive pins (~960-967, e.g. quoted `git commit -m "$(date)"`) captured with `--test-reporter=tap`,
+  then the F commit record. WSL suite runs need up to ~1000 s (run in background). Manifest §5 has the details.
+- **CRITIC-CKPT-F2 (green, commit failed on an index lock; committed now by the Elephant as tranche-2 WIP):** guard
+  post-image `signed-package/tranche-2/hooks/guard-dispatch-budget.mjs` (sha256 `360a645e…`, confinement inside
+  `if (budget.allowed)`, code `DISPATCH-BUDGET-CRITIC-WRITE-CONFINED`), CRITIC-CKPT manifest section, and the `agents/critic.md`
+  post-image at `signed-package/tranche-2/agents/critic.md` (65 turns, Write/Edit). T2/T3 16/16, neighbourhood no new
+  red, DP26/DP27 green WITH the critic.md change. The LIVE `agents/critic.md` is back at HEAD (grant ships only with the
+  signed guard), so DP26/DP27 stay red until the tranche goes live. Its dispatch record falsely says "completed, commit
+  done" (written before the failed commit; immutable) — this entry is the correction. Open: `codex-isolated-critic-
+  protected-preimage` inventory needs the new critic.md hash; critic.md's "no write tools" bootstrap sentence needs a canon
+  slice.
+- **Parked uncommitted edits:** `specs/sprint-alfred-epic/evidence/handover-2026-10-09/parked-patches/` (README inside):
+  MECH-HAIKU-F.patch, CRITIC-CKPT-F2-critic-md.patch, foreign-uncommitted.patch. The MECH-HAIKU and critic.md files were
+  reset to HEAD. The three foreign files (`scripts/pipeline-state.mjs`, `lib/guard/sanctioned-args-onboarding.mjs`,
+  `harness/scripts/pipeline-state.test.mjs`) are guard-protected against an agent reset; the PO resets them for the push.
+- **Onboarding matrix E2E-ONB-A2 additional reds:** `scripts/design-workflow-signing-default` 5/5 fail;
+  `lib/project-onboarding-v3` timed out at 540 s (needs a longer cap or shards). Earlier: `lib/architecture-entry-readiness`
+  5 fail, `lib/codex-design-readiness-host-store.shared-parent` 1, `lib/design-workflow-evidence-descendant` 1.
+- **Still alive at writing:** (superseded — see the two entries above) GREP-PUSH-F, CRITIC-CKPT-F2 (both build tranche-2 post-images; CRITIC-CKPT-F2 also edits the
   live `agents/critic.md` — its Write grant must ship only together with the tranche-2 guard, so if it lands, it lands
   after this stamp and goes live only with the next signed tranche).

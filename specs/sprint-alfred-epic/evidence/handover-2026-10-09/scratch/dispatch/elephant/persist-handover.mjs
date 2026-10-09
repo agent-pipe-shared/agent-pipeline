@@ -7,12 +7,16 @@ const ROOT = process.cwd();
 const DEST = "specs/sprint-alfred-epic/evidence/handover-2026-10-09";
 const MAX = 1_500_000; // bytes per file; larger files are listed, not copied
 const SOURCES = [
-  { dir: "evidence", filter: (p) => /20261009/.test(p) },
+  { dir: "evidence", filter: (p) => /20261009/.test(p) && !/GREENFIELD-T-20261009\/(after|prefix-red)\.txt$/.test(p) },
   { dir: "scratch/briefings", filter: (p) => /CONT(17|18|35|36)-20261009\.md$/.test(p) },
   { dir: "scratch/dispatch/elephant", filter: () => true },
   { dir: "scratch/dispatch-wip/CRITIC-RULE-2b", filter: (p) => /\.mjs$/.test(p) },
   { dir: "scratch/dispatch-wip/MECH-HAIKU-F", filter: (p) => /\.mjs$/.test(p) },
   { dir: "scratch/dispatch-wip/WIN-AP-S5-D", filter: () => true },
+  { dir: "scratch/dispatch-wip/GREP-PUSH-F", filter: () => true },
+  { dir: "scratch/dispatch-wip/CRITIC-CKPT-F2", filter: () => true },
+  { dir: "scratch/dispatch-wip/CRITIC-CKPT-T3", filter: () => true },
+  { dir: "scratch/commit-msg", filter: (p) => /(GREP-PUSH-F|CRITIC-CKPT-F2)/.test(p) },
   { dir: "scratch/dispatch-wip", filter: (p) => /(f3a-m2|m2-record)\.mjs$/.test(p), shallow: true },
   { dir: "scratch/commit-msg", filter: (p) => /MECH-HAIKU-F\.txt$/.test(p) },
 ];
