@@ -1,0 +1,40 @@
+command: node scratch/verify-local-candidate-stamp-r8.mjs
+label: ALFRED-LOCAL-STAMP-R8-20261009
+exitCode: 0
+head: 7f37cc916f5bdd1e9b31e3feb23afc3e4251c8f2
+tree: 701812749f195b7a9c9b416e8881d3c76ef83b69
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.local-candidate-stamp-readback.v1",
+  "passed": true,
+  "version": "0.7.0+codex.20261009161950.7f37cc91",
+  "functionalImport": "7f37cc916f5bdd1e9b31e3feb23afc3e4251c8f2",
+  "sourceIntentSha256": "035166aac23412d1d865d26487d32ce4df2f11b5469c8842c0c1085c441ce738",
+  "signedIntegration": {
+    "ok": true,
+    "code": "QUALITY-PACKAGE-INTEGRATION-POSTCOMMIT-VERIFIED",
+    "intentSha256": "035166aac23412d1d865d26487d32ce4df2f11b5469c8842c0c1085c441ce738"
+  },
+  "unchangedFunctionalMembers": 69,
+  "manifestPostimages": [
+    {
+      "path": "plugins/pipeline-core/.codex-plugin/plugin.json",
+      "sha256": "6e6ee9e72ece8abb1537117f97cca8eaa9b0cb713ed65095559ef6fd2bd3e2c4"
+    },
+    {
+      "path": "plugins/pipeline-core/.claude-plugin/plugin.json",
+      "sha256": "a2b38a74122637f0c4643c954a7dde7bbf24bc505b1d48372db0321a8a866d33"
+    }
+  ],
+  "sourceApplication": "completed",
+  "stampCommit": "pending",
+  "humanInstallation": "pending",
+  "installedReadback": "pending",
+  "independentReview": "PO-deferred for local candidate; release pending",
+  "fullVerify": "PO-deferred for local candidate; release pending",
+  "poAcceptance": "open",
+  "nativeAuthorship": "not claimed"
+}
+
+--- stderr ---
