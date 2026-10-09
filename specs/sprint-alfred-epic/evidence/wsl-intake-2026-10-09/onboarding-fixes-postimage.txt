@@ -1,0 +1,160 @@
+command: node scratch/alfred-onbf-proposal-check.mjs
+label: ALFRED-ONBF-B-PARK-20261009
+exitCode: 1
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+{"source":"plugins/pipeline-core/lib/project-onboarding-v3.mjs","sourceSha256":"d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/project-onboarding-v3.mjs","proposalSha256":"e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51"}
+syntax lib/project-onboarding-v3.mjs exit 0
+{"source":"plugins/pipeline-core/lib/onboarding-continuity.mjs","sourceSha256":"a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.mjs","proposalSha256":"512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"}
+syntax lib/onboarding-continuity.mjs exit 0
+{"source":"plugins/pipeline-core/scripts/project-onboarding-v3.mjs","sourceSha256":"b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/project-onboarding-v3.mjs","proposalSha256":"2784cb2c68bb471e045f55ad92f733d8397bafd4519058500680c5f9bcc00b05"}
+syntax scripts/project-onboarding-v3.mjs exit 0
+{"adaptation":"Scratch graph preserves all relative static imports and literal relative new-URL dependencies; substitutes only the three owned full postimages after baseline. Schema directory mirrored for runtime lookup.","graphModuleCount":378,"modules":["plugins/pipeline-core/config/control-execution-extension-namespaces.json","plugins/pipeline-core/config/lifecycle-extension-namespaces.json","plugins/pipeline-core/hooks/guard-command-grammar.mjs","plugins/pipeline-core/hooks/guard-devplan.mjs","plugins/pipeline-core/hooks/guard-dispatch-budget.mjs","plugins/pipeline-core/hooks/guard-gate-strength.mjs","plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs","plugins/pipeline-core/hooks/guard-push.mjs","plugins/pipeline-core/hooks/staleness-check.mjs","plugins/pipeline-core/lib/advisory-attempt-trail.mjs","plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs","plugins/pipeline-core/lib/advisory-receipt.mjs","plugins/pipeline-core/lib/advisory-route-selection.mjs","plugins/pipeline-core/lib/agent-decision-journal.mjs","plugins/pipeline-core/lib/agent-model-registry.mjs","plugins/pipeline-core/lib/agy-central-refresh.mjs","plugins/pipeline-core/lib/agy-central-snapshot.mjs","plugins/pipeline-core/lib/agy-final-return.mjs","plugins/pipeline-core/lib/agy-host-commit-admission.mjs","plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs","plugins/pipeline-core/lib/agy-host-observed-receipt.mjs","plugins/pipeline-core/lib/agy-host-observed-store.mjs","plugins/pipeline-core/lib/agy-session-authority.mjs","plugins/pipeline-core/lib/agy-session-dispatch.mjs","plugins/pipeline-core/lib/agy-start-hint.mjs","plugins/pipeline-core/lib/antigravity-execution-host.mjs","plugins/pipeline-core/lib/antigravity-json-spans.mjs","plugins/pipeline-core/lib/antigravity-model-host-observation.mjs","plugins/pipeline-core/lib/antigravity-plugin-topology.mjs","plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs","plugins/pipeline-core/lib/architecture-adoption-authority.mjs","plugins/pipeline-core/lib/architecture-adoption-orientation.mjs","plugins/pipeline-core/lib/architecture-decision-continuity.mjs","plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs","plugins/pipeline-core/lib/architecture-design-test-fixture.mjs","plugins/pipeline-core/lib/architecture-design.mjs","plugins/pipeline-core/lib/architecture-effective-decisions.mjs","plugins/pipeline-core/lib/architecture-entry-readiness.mjs","plugins/pipeline-core/lib/architecture-map-scaffold.mjs","plugins/pipeline-core/lib/architecture-push-currency.mjs","plugins/pipeline-core/lib/audit-bundle.mjs","plugins/pipeline-core/lib/authority-revision-proof.mjs","plugins/pipeline-core/lib/bootstrap-payload-budget.mjs","plugins/pipeline-core/lib/bound-design-line-endings.mjs","plugins/pipeline-core/lib/chat-gate-ceremony.mjs","plugins/pipeline-core/lib/checkpoint-push-approval.mjs","plugins/pipeline-core/lib/checkpoint-push-audit.mjs","plugins/pipeline-core/lib/claude-initial-prompt-pointer.mjs","plugins/pipeline-core/lib/claude-intake-prompt-capture.mjs","plugins/pipeline-core/lib/claude-model-host-observation.mjs","plugins/pipeline-core/lib/claude-task-output-read-scope.mjs","plugins/pipeline-core/lib/codex-advisor-admission.mjs","plugins/pipeline-core/lib/codex-advisor-execution.mjs","plugins/pipeline-core/lib/codex-advisor-host-record.mjs","plugins/pipeline-core/lib/codex-advisor-host-store.mjs","plugins/pipeline-core/lib/codex-advisor-request.mjs","plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs","plugins/pipeline-core/lib/codex-host-layout.mjs","plugins/pipeline-core/lib/codex-host-output-custody.mjs","plugins/pipeline-core/lib/codex-host-plugin-list.mjs","plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs","plugins/pipeline-core/lib/codex-host-process-journal.mjs","plugins/pipeline-core/lib/codex-host-process-launcher.mjs","plugins/pipeline-core/lib/codex-host-process-supervisor.mjs","plugins/pipeline-core/lib/codex-isolated-structured-host.mjs","plugins/pipeline-core/lib/codex-model-host-observation.mjs","plugins/pipeline-core/lib/codex-onboarding-app-server.mjs","plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs","plugins/pipeline-core/lib/codex-onboarding-runtime.mjs","plugins/pipeline-core/lib/codex-readiness-finalization.mjs","plugins/pipeline-core/lib/codex-readiness-host-record.mjs","plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs","plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs","plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs","plugins/pipeline-core/lib/commit-message-policy.mjs","plugins/pipeline-core/lib/consumer-baseline-verify.mjs","plugins/pipeline-core/lib/consumer-verify.mjs","plugins/pipeline-core/lib/continuity-host-adapter.mjs","plugins/pipeline-core/lib/continuity-state.mjs","plugins/pipeline-core/lib/continuity-status.mjs","plugins/pipeline-core/lib/control-execution-exchange.mjs","plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs","plugins/pipeline-core/lib/copy-safe-command.mjs","plugins/pipeline-core/lib/critic-course-admission.mjs","plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs","plugins/pipeline-core/lib/critic-diagnostic-packet.mjs","plugins/pipeline-core/lib/critic-disposition-addendum.mjs","plugins/pipeline-core/lib/critic-export-policy.mjs","plugins/pipeline-core/lib/critic-packet-governance.mjs","plugins/pipeline-core/lib/critic-review-lineage.mjs","plugins/pipeline-core/lib/critic-route-v3.mjs","plugins/pipeline-core/lib/critic-session-model-route.mjs","plugins/pipeline-core/lib/critic-skip-decision.mjs","plugins/pipeline-core/lib/critic-verify-lifecycle.mjs","plugins/pipeline-core/lib/critical-action-approval-request.mjs","plugins/pipeline-core/lib/critical-action-authorization.mjs","plugins/pipeline-core/lib/critical-human-proof-policy.mjs","plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs","plugins/pipeline-core/lib/design-advisor-course-store.mjs","plugins/pipeline-core/lib/design-advisor-course.mjs","plugins/pipeline-core/lib/design-advisor-provenance.mjs","plugins/pipeline-core/lib/design-advisory-admission.mjs","plugins/pipeline-core/lib/design-advisory-enforcement.mjs","plugins/pipeline-core/lib/design-advisory-final-approval.mjs","plugins/pipeline-core/lib/design-advisory-transaction.mjs","plugins/pipeline-core/lib/design-authoring.mjs","plugins/pipeline-core/lib/design-readiness-hashes.mjs","plugins/pipeline-core/lib/design-readiness-host-evidence.mjs","plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs","plugins/pipeline-core/lib/design-workflow-approval.mjs","plugins/pipeline-core/lib/design-workflow-package-builder.mjs","plugins/pipeline-core/lib/design-workflow-package-v2.mjs","plugins/pipeline-core/lib/design-workflow-package.mjs","plugins/pipeline-core/lib/dispatch-budget-binding.mjs","plugins/pipeline-core/lib/dispatch-budget-core.mjs","plugins/pipeline-core/lib/dispatch-policy.mjs","plugins/pipeline-core/lib/dispatch-record.mjs","plugins/pipeline-core/lib/document-hooks.mjs","plugins/pipeline-core/lib/enrollment-retirement-coordinator.mjs","plugins/pipeline-core/lib/entrypoint.mjs","plugins/pipeline-core/lib/external-push-ledger.mjs","plugins/pipeline-core/lib/feature-close-audit-receipt.mjs","plugins/pipeline-core/lib/feature-package-topology.mjs","plugins/pipeline-core/lib/fs-durability.mjs","plugins/pipeline-core/lib/gate-estimate.mjs","plugins/pipeline-core/lib/git-cmd.mjs","plugins/pipeline-core/lib/git-hook-footprint.mjs","plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs","plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs","plugins/pipeline-core/lib/git-null-device.mjs","plugins/pipeline-core/lib/governance-action-artifact.mjs","plugins/pipeline-core/lib/governance-action-events.mjs","plugins/pipeline-core/lib/governance-authority-resolver.mjs","plugins/pipeline-core/lib/governance-event-store.mjs","plugins/pipeline-core/lib/governance-event.mjs","plugins/pipeline-core/lib/governance-gate-action.mjs","plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs","plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs","plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs","plugins/pipeline-core/lib/governance-review-action.mjs","plugins/pipeline-core/lib/governance-scope.mjs","plugins/pipeline-core/lib/governance-verification-action.mjs","plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs","plugins/pipeline-core/lib/guard-devplan-policy.mjs","plugins/pipeline-core/lib/guard-handoff-offer.mjs","plugins/pipeline-core/lib/guard-maintenance-window.mjs","plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs","plugins/pipeline-core/lib/guard/command-catalogue.mjs","plugins/pipeline-core/lib/guard/constants.mjs","plugins/pipeline-core/lib/guard/denial-route.mjs","plugins/pipeline-core/lib/guard/denial-telemetry.mjs","plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs","plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs","plugins/pipeline-core/lib/guard/entry-gates.mjs","plugins/pipeline-core/lib/guard/env-dump-lane.mjs","plugins/pipeline-core/lib/guard/evaluate.mjs","plugins/pipeline-core/lib/guard/gate-strength-lane.mjs","plugins/pipeline-core/lib/guard/grammar-denials.mjs","plugins/pipeline-core/lib/guard/lifecycle-gate.mjs","plugins/pipeline-core/lib/guard/path-containment.mjs","plugins/pipeline-core/lib/guard/po-commands.mjs","plugins/pipeline-core/lib/guard/powershell-dialect.mjs","plugins/pipeline-core/lib/guard/read-scope.mjs","plugins/pipeline-core/lib/guard/rebase-lane.mjs","plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs","plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs","plugins/pipeline-core/lib/guard/shell-grammar.mjs","plugins/pipeline-core/lib/guard/verdict.mjs","plugins/pipeline-core/lib/guard/write-scope.mjs","plugins/pipeline-core/lib/hardened-private-directory.mjs","plugins/pipeline-core/lib/hook-currentness.mjs","plugins/pipeline-core/lib/human-decision-attribution.mjs","plugins/pipeline-core/lib/human-governance-decision.mjs","plugins/pipeline-core/lib/human-governance-ledger.mjs","plugins/pipeline-core/lib/human-guard-override.mjs","plugins/pipeline-core/lib/human-role-exception-decision.mjs","plugins/pipeline-core/lib/human-role-labels.mjs","plugins/pipeline-core/lib/installed-plugin-attestation.mjs","plugins/pipeline-core/lib/intake-material-reference.mjs","plugins/pipeline-core/lib/lifecycle-denial-loop.mjs","plugins/pipeline-core/lib/lifecycle-governance-events.mjs","plugins/pipeline-core/lib/machine-plane.mjs","plugins/pipeline-core/lib/manifest.mjs","plugins/pipeline-core/lib/model-family-authority.mjs","plugins/pipeline-core/lib/model-family-discovery.mjs","plugins/pipeline-core/lib/model-family-execution.mjs","plugins/pipeline-core/lib/model-family-host-store.mjs","plugins/pipeline-core/lib/model-family-invocation.mjs","plugins/pipeline-core/lib/model-family-latest-selection.mjs","plugins/pipeline-core/lib/model-family-route-source.mjs","plugins/pipeline-core/lib/model-family-runtime-host.mjs","plugins/pipeline-core/lib/model-role-approved-policy.mjs","plugins/pipeline-core/lib/model-role-dispatch.mjs","plugins/pipeline-core/lib/model-role-host-identity.mjs","plugins/pipeline-core/lib/model-role-host-observations.mjs","plugins/pipeline-core/lib/model-role-host-session.mjs","plugins/pipeline-core/lib/model-role-host-store.mjs","plugins/pipeline-core/lib/model-role-route-source.mjs","plugins/pipeline-core/lib/model-role-session.mjs","plugins/pipeline-core/lib/model-role-v3-baseline.mjs","plugins/pipeline-core/lib/native-goldfish-host-observation.mjs","plugins/pipeline-core/lib/native-goldfish-host-return.mjs","plugins/pipeline-core/lib/native-goldfish-host-state.mjs","plugins/pipeline-core/lib/native-initial-advisor-execution.mjs","plugins/pipeline-core/lib/observation-governance-bootstrap.mjs","plugins/pipeline-core/lib/onboarding-argv-shapes.mjs","plugins/pipeline-core/lib/onboarding-consent-marker.mjs","plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/onboarding-continuity.test.mjs","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","plugins/pipeline-core/lib/onboarding-initial-answers-state.mjs","plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs","plugins/pipeline-core/lib/onboarding-language-correction.mjs","plugins/pipeline-core/lib/onboarding-later-language.mjs","plugins/pipeline-core/lib/onboarding-staging-authoring.mjs","plugins/pipeline-core/lib/organization-architecture-source-store.mjs","plugins/pipeline-core/lib/organization-architecture-source.mjs","plugins/pipeline-core/lib/organization-policy.mjs","plugins/pipeline-core/lib/passive-read-policy.mjs","plugins/pipeline-core/lib/physical-scratch-boundary.mjs","plugins/pipeline-core/lib/plan-authority-staging-guard.mjs","plugins/pipeline-core/lib/plan-spec-state-v2.mjs","plugins/pipeline-core/lib/po-approval-proof.mjs","plugins/pipeline-core/lib/po-gate-authority.mjs","plugins/pipeline-core/lib/po-gate-profile-publisher.mjs","plugins/pipeline-core/lib/po-key-directory.mjs","plugins/pipeline-core/lib/portable-agy-authorship-export.mjs","plugins/pipeline-core/lib/portable-critic-export.mjs","plugins/pipeline-core/lib/private-boundary.mjs","plugins/pipeline-core/lib/private-overlay-activation.mjs","plugins/pipeline-core/lib/private-overlay-bootstrap-status.mjs","plugins/pipeline-core/lib/private-overlay-runtime-projection.mjs","plugins/pipeline-core/lib/project-authority.mjs","plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs","plugins/pipeline-core/lib/project-onboarding-v3.mjs","plugins/pipeline-core/lib/project-onboarding-v3.test.mjs","plugins/pipeline-core/lib/protected-baseline.mjs","plugins/pipeline-core/lib/protected-test-paths.mjs","plugins/pipeline-core/lib/provenance-attestation.mjs","plugins/pipeline-core/lib/provenance-envelope.mjs","plugins/pipeline-core/lib/public-core-observation.mjs","plugins/pipeline-core/lib/public-core-origin-allowlist.mjs","plugins/pipeline-core/lib/publication-authority.mjs","plugins/pipeline-core/lib/publication-bundle-v2.mjs","plugins/pipeline-core/lib/publication-bundle.mjs","plugins/pipeline-core/lib/publication-capability-preflight.mjs","plugins/pipeline-core/lib/push-destination-policy.mjs","plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs","plugins/pipeline-core/lib/rebase-authority.mjs","plugins/pipeline-core/lib/recovery-preview-attestation.mjs","plugins/pipeline-core/lib/release-promotion-envelope.mjs","plugins/pipeline-core/lib/repository-path-identity.mjs","plugins/pipeline-core/lib/requirement-traceability.mjs","plugins/pipeline-core/lib/resume-hint.mjs","plugins/pipeline-core/lib/review-economy.mjs","plugins/pipeline-core/lib/role-dispatch-preflight.mjs","plugins/pipeline-core/lib/ruleset-source.mjs","plugins/pipeline-core/lib/runner-native-continuation.mjs","plugins/pipeline-core/lib/runner-profile-migration-v2.mjs","plugins/pipeline-core/lib/runner-profile-migration-v3.mjs","plugins/pipeline-core/lib/runner-profiles-v2.mjs","plugins/pipeline-core/lib/runner-profiles-v3.mjs","plugins/pipeline-core/lib/runner-readiness-request.mjs","plugins/pipeline-core/lib/runtime-handover-projection.mjs","plugins/pipeline-core/lib/runtime-projection-v2.mjs","plugins/pipeline-core/lib/runtime-projection-v3.mjs","plugins/pipeline-core/lib/sandbox-failure.mjs","plugins/pipeline-core/lib/sandboxed-readonly-duty.mjs","plugins/pipeline-core/lib/schema-lite.mjs","plugins/pipeline-core/lib/security-capability-plan-builder.mjs","plugins/pipeline-core/lib/security-completeness-gate.mjs","plugins/pipeline-core/lib/security-evidence-evaluator.mjs","plugins/pipeline-core/lib/security-policy-resolver.mjs","plugins/pipeline-core/lib/security-scanner-diagnostics-publication.mjs","plugins/pipeline-core/lib/security-scanner-diagnostics.mjs","plugins/pipeline-core/lib/self-application-attestation-gate.mjs","plugins/pipeline-core/lib/session-cleanup-recovery.mjs","plugins/pipeline-core/lib/signed-quality-package.mjs","plugins/pipeline-core/lib/source-observation.mjs","plugins/pipeline-core/lib/successful-spawn.mjs","plugins/pipeline-core/lib/test-case-completion.mjs","plugins/pipeline-core/lib/test-tmpdir.mjs","plugins/pipeline-core/lib/threat-model-approval-request.mjs","plugins/pipeline-core/lib/threat-model.mjs","plugins/pipeline-core/lib/tool-write-target.mjs","plugins/pipeline-core/lib/trusted-tool-resolution.mjs","plugins/pipeline-core/lib/verify-case-completion-receipt.mjs","plugins/pipeline-core/lib/verify-evidence-path.mjs","plugins/pipeline-core/lib/verify-resume.mjs","plugins/pipeline-core/lib/verify-run-record.mjs","plugins/pipeline-core/lib/verify-selection.mjs","plugins/pipeline-core/lib/windows-hide-preload.mjs","plugins/pipeline-core/lib/windows-private-state.mjs","plugins/pipeline-core/lib/worktree-lifecycle.mjs","plugins/pipeline-core/lib/yaml-lite.mjs","plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json","plugins/pipeline-core/schemas/pipeline.adoption-state.v1.json","plugins/pipeline-core/schemas/pipeline.design-readiness-receipt.v1.json","plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json","plugins/pipeline-core/schemas/pipeline.module-inventory.v1.json","plugins/pipeline-core/scripts/architecture-adoption.mjs","plugins/pipeline-core/scripts/architecture-fitness.mjs","plugins/pipeline-core/scripts/architecture-remedy.mjs","plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs","plugins/pipeline-core/scripts/capture-evidence.mjs","plugins/pipeline-core/scripts/check-clone-provisioning.mjs","plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs","plugins/pipeline-core/scripts/check-runner-manifest-parity.mjs","plugins/pipeline-core/scripts/codex-app-server-health.mjs","plugins/pipeline-core/scripts/codex-app-server-model-probe.mjs","plugins/pipeline-core/scripts/codex-critic-session-route.mjs","plugins/pipeline-core/scripts/codex-host-repository-init.mjs","plugins/pipeline-core/scripts/codex-onboarding-launch.mjs","plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs","plugins/pipeline-core/scripts/codex-project-runtime-readback-host.mjs","plugins/pipeline-core/scripts/codex-sandbox-compatibility-receipt.schema.json","plugins/pipeline-core/scripts/codex-sandbox-select.mjs","plugins/pipeline-core/scripts/codex-sandbox-selection.schema.json","plugins/pipeline-core/scripts/commit-msg-hook-install.mjs","plugins/pipeline-core/scripts/consumer-verify-check.mjs","plugins/pipeline-core/scripts/continuity-status.mjs","plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs","plugins/pipeline-core/scripts/critic-packet-preflight.mjs","plugins/pipeline-core/scripts/design-course-session.mjs","plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs","plugins/pipeline-core/scripts/generate-architecture-overview.mjs","plugins/pipeline-core/scripts/governance-authority.mjs","plugins/pipeline-core/scripts/guard-human-override.mjs","plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs","plugins/pipeline-core/scripts/model-family-approval-request.mjs","plugins/pipeline-core/scripts/model-role-bootstrap.mjs","plugins/pipeline-core/scripts/model-role-dispatch-select.mjs","plugins/pipeline-core/scripts/module-inventory.mjs","plugins/pipeline-core/scripts/observation-governance-bootstrap.mjs","plugins/pipeline-core/scripts/onboarding-consent-mark.mjs","plugins/pipeline-core/scripts/onboarding-init.mjs","plugins/pipeline-core/scripts/pipeline-start-preflight.mjs","plugins/pipeline-core/scripts/pipeline-state.mjs","plugins/pipeline-core/scripts/pipeline-update-channel.mjs","plugins/pipeline-core/scripts/po-approval-gate.mjs","plugins/pipeline-core/scripts/po-approval-request.mjs","plugins/pipeline-core/scripts/po-gate-profile-repair.mjs","plugins/pipeline-core/scripts/po-human-approval.mjs","plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs","plugins/pipeline-core/scripts/portable-critic-export.mjs","plugins/pipeline-core/scripts/pre-commit-hook-install.mjs","plugins/pipeline-core/scripts/pre-push-hook-install.mjs","plugins/pipeline-core/scripts/private-overlay-activation.mjs","plugins/pipeline-core/scripts/project-authority-migration.mjs","plugins/pipeline-core/scripts/project-onboarding-v3.mjs","plugins/pipeline-core/scripts/publication-close-journal.mjs","plugins/pipeline-core/scripts/push-gate-satisfiability.mjs","plugins/pipeline-core/scripts/push-init.mjs","plugins/pipeline-core/scripts/push-prepare.mjs","plugins/pipeline-core/scripts/repair-map.mjs","plugins/pipeline-core/scripts/resume-hint.mjs","plugins/pipeline-core/scripts/rigor-floor.mjs","plugins/pipeline-core/scripts/ruleset-freshness.mjs","plugins/pipeline-core/scripts/ruleset-update-policy.mjs","plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs","plugins/pipeline-core/scripts/runner-transcript-recovery.mjs","plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs","plugins/pipeline-core/scripts/security-adapters/license-check.mjs","plugins/pipeline-core/scripts/security-adapters/osv-scanner.mjs","plugins/pipeline-core/scripts/security-adapters/semgrep.mjs","plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs","plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs","plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs","plugins/pipeline-core/scripts/security-scan.mjs","plugins/pipeline-core/scripts/session-capability-diagnose.mjs","plugins/pipeline-core/scripts/session-cleanup.mjs","plugins/pipeline-core/scripts/session-critic-finalizer.mjs","plugins/pipeline-core/scripts/settings-allowlist-merge.mjs","plugins/pipeline-core/scripts/tool-identity.mjs","plugins/pipeline-core/scripts/toolchain-preflight.mjs","plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs","plugins/pipeline-core/scripts/verify-evidence-producer.mjs","plugins/pipeline-core/scripts/verify-journal.mjs"]}
+baseline onboarding-greenfield-walk.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/gate-estimate-phase-map.v1.json'
+    at readFileSync (node:fs:441:20)
+    at file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/gate-estimate.mjs:8:30
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/gate-estimate-phase-map.v1.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (161.291496ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 166.215462
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (161.291496ms)
+  'test failed'
+
+
+baseline onboarding-continuity.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/runner-profiles-v2.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:35:32
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/runner-profiles-v2.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (149.331642ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 154.799143
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (149.331642ms)
+  'test failed'
+
+
+baseline expected RED suites 2
+proposal onboarding-greenfield-walk.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/gate-estimate-phase-map.v1.json'
+    at readFileSync (node:fs:441:20)
+    at file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/gate-estimate.mjs:8:30
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/gate-estimate-phase-map.v1.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (156.624172ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.815491
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (156.624172ms)
+  'test failed'
+
+
+proposal onboarding-continuity.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/runner-profiles-v2.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:35:32
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/config/runner-profiles-v2.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (154.722003ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 159.898213
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (154.722003ms)
+  'test failed'
+
+
+proposal failing suites 2
+
+--- stderr ---

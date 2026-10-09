@@ -1,0 +1,159 @@
+command: node scratch/alfred-onbf-diagnostic-recovery.mjs
+label: ALFRED-ONBF-DIAGNOSTIC-RECOVERY
+exitCode: 1
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+{"source":"plugins/pipeline-core/lib/project-onboarding-v3.mjs","sourceSha256":"d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/project-onboarding-v3.mjs","proposalSha256":"e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51"}
+{"source":"plugins/pipeline-core/lib/onboarding-continuity.mjs","sourceSha256":"a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.mjs","proposalSha256":"512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"}
+{"source":"plugins/pipeline-core/scripts/project-onboarding-v3.mjs","sourceSha256":"b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/project-onboarding-v3.mjs","proposalSha256":"2784cb2c68bb471e045f55ad92f733d8397bafd4519058500680c5f9bcc00b05"}
+{"adaptation":"Scratch static module/literal URL graph with unchanged schema and config directories; only three already-authored proposal modules substituted after baseline. No source, proposal, or committed test writes.","graphModuleCount":378,"assets":["plugins/pipeline-core/schemas","plugins/pipeline-core/config"]}
+baseline onboarding-greenfield-walk.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:36:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (156.282076ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.384275
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (156.282076ms)
+  'test failed'
+
+
+baseline onboarding-continuity.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:36:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (153.325367ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158.405056
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (153.325367ms)
+  'test failed'
+
+
+baseline RED suites 2
+proposal onboarding-greenfield-walk.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:36:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (162.927749ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 168.014179
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs (162.927749ms)
+  'test failed'
+
+
+proposal onboarding-continuity.test.mjs exit 1
+node:fs:441
+    return binding.readFileUtf8(path, stringToFlags(options.flag));
+                   ^
+
+Error: ENOENT: no such file or directory, open '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+    at readFileSync (node:fs:441:20)
+    at readJson (file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:20:21)
+    at file://<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/runner-profiles-v2.mjs:36:28
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '<repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/scripts/pipeline-user-v2.schema.json'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (151.523449ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 156.751379
+
+✖ failing tests:
+
+test at scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:1:1
+✖ <repo-root>/scratch/alfred-onbf-recovery-graph/plugins/pipeline-core/lib/onboarding-continuity.test.mjs (151.523449ms)
+  'test failed'
+
+
+proposal failing suites 2
+
+--- stderr ---

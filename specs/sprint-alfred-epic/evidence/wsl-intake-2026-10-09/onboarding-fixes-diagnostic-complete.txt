@@ -1,0 +1,22 @@
+command: node scratch/alfred-onbf-diagnostic-complete-r2.mjs
+label: ALFRED-ONBF-DIAG-R2-20261009
+exitCode: 1
+head: d3058587297004a9d6dd7b42b39ce432e567d256
+tree: 5b8a9c43b1d59a17ade111d69ffb338e205e12c2
+dirty: true
+--- stdout ---
+
+--- stderr ---
+file://<repo-root>/scratch/alfred-onbf-diagnostic-complete-r2.mjs:45
+    if(!next.startsWith(repo+path.sep))throw Error('static import escapes repository');
+                                             ^
+
+Error: static import escapes repository
+    at staticGraph (file://<repo-root>/scratch/alfred-onbf-diagnostic-complete-r2.mjs:45:46)
+    at staticGraph (file://<repo-root>/scratch/alfred-onbf-diagnostic-complete-r2.mjs:46:56)
+    at file://<repo-root>/scratch/alfred-onbf-diagnostic-complete-r2.mjs:49:23
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
