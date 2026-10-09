@@ -1,0 +1,25 @@
+command: node --test --test-reporter=tap --test-name-pattern "routes its later explicit language" plugins/pipeline-core/scripts/onboarding-init.test.mjs
+label: LE-F2-language-c1cde98af
+exitCode: 0
+head: c1cde98afd5b841178f3d4511f9f93fa28064519
+tree: d41928ed0ffd19cf1ef7a6b3641d55a18a2e63a3
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: host-managed consent CLI routes its later explicit language into private intake state
+ok 1 - host-managed consent CLI routes its later explicit language into private intake state
+  ---
+  duration_ms: 1247.977777
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1477.720028
+
+--- stderr ---

@@ -1,0 +1,83 @@
+command: node --test --test-reporter=tap --test-name-pattern "^RPM01 |^RPM17 |^RPM51 " plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs
+label: MECH-HAIKU-migration-c1cde98af
+exitCode: 1
+head: c1cde98afd5b841178f3d4511f9f93fa28064519
+tree: d41928ed0ffd19cf1ef7a6b3641d55a18a2e63a3
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+not ok 1 - RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization
+  ---
+  duration_ms: 5.136323
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    v0 must plan with  absent
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:157:16)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+not ok 2 - RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy
+  ---
+  duration_ms: 1.888898
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'invalid-source'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'invalid-source'
+  operator: 'strictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:676:12)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    node:internal/test_runner/test:1133:31
+    node:internal/process/task_queues:150:7
+    AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+    AsyncResource.runMicrotask (node:internal/process/task_queues:147:8)
+  ...
+# Subtest: RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+ok 3 - RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate
+  ---
+  duration_ms: 30.790346
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 1
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 232.525406
+
+--- stderr ---

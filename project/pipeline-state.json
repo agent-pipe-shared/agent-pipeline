@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-09T08:19:06.521Z",
+  "updatedAt": "2026-10-09T09:43:11.012Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -475,7 +475,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-alfred-epic",
-    "revision": 31,
+    "revision": 32,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -495,30 +495,16 @@
     "queueHead": {
       "packageId": "greenfield-0.7-remediation",
       "actionId": "complete-and-integrate-approved-slices",
-      "nextAction": "retrieve-final",
+      "nextAction": "dispatch",
       "productRetryCount": 0,
       "environmentRerouteCount": 0,
-      "dispatch": {
-        "featureId": "sprint-alfred-epic",
-        "queueRevision": 31,
-        "packageId": "greenfield-0.7-remediation",
-        "actionId": "complete-and-integrate-approved-slices",
-        "dispatchId": "ALFRED-REV5C-AUTHOR-20261007",
-        "attemptId": "attempt-1",
-        "authorityDigests": {
-          "prdSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
-          "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
-          "resultSha256": null
-        },
-        "routeRequestSha256": "24ae419fada9ed6c3dc77f866bac0decf1bb51c87c1b5e63c1bfd75be8e18466",
-        "mayDelegate": false
-      }
+      "dispatch": null
     },
     "blocker": null,
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 30,
+      "sourceRevision": 31,
       "reasonCode": "active-turn"
     },
     "recovery": null,

@@ -1,0 +1,38 @@
+command: node scratch/inspect-alfred-approval-portability.mjs
+label: ALFRED-approval-portability-c1cde98af
+exitCode: 0
+head: c1cde98afd5b841178f3d4511f9f93fa28064519
+tree: d41928ed0ffd19cf1ef7a6b3641d55a18a2e63a3
+dirty: false
+--- stdout ---
+{
+  "schema": "alfred.approval-portability-diagnostic.v1",
+  "featureId": "sprint-alfred-epic",
+  "authority": {
+    "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "specPath": "specs/sprint-alfred-epic/spec.md",
+    "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+    "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+  },
+  "installedAdmission": {
+    "ok": true,
+    "id": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+    "mode": "approved-workflow-package-signature"
+  },
+  "sourceAdmission": {
+    "ok": true,
+    "id": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+    "mode": "approved-workflow-package-signature"
+  },
+  "sourceFinalApproval": {
+    "ok": false,
+    "code": "DWP2-REPOSITORY-IDENTITY"
+  },
+  "sourceRebindFinalApproval": {
+    "ok": false,
+    "code": "DWP2-REPOSITORY-IDENTITY"
+  },
+  "stateUnchanged": true
+}
+
+--- stderr ---
