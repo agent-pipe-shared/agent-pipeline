@@ -1,0 +1,19 @@
+✔ GAA01 generic retry is closed and preserves any validated action kind (2.913809ms)
+✔ GAA02 retry rejects malformed events and non-repository paths (2.282729ms)
+✔ GAA03 preflight is physical and does not mutate missing parents (0.472955ms)
+✔ GAA04 preflight rejects existing leaves, escapes and physical symlink traversal (0.66384ms)
+✔ GAA05 writer creates, syncs and physically reads back one exact artifact (1.386487ms)
+✔ GAA06 event-only retry accepts byte-identical publication and no other existing leaf (0.924761ms)
+✔ GAA07 retry preserves a conflicting valid event (1.019288ms)
+✔ GAA08 malformed payload refuses before creating output parents (0.355638ms)
+✔ GAA09 FSYNC-T4: written result reports directoryDurability (0.996719ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15.828447
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

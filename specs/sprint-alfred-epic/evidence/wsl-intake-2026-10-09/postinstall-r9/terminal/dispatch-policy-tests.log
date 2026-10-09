@@ -1,0 +1,51 @@
+✔ DPT01 DP1 the real 2026-08-06 briefing is refused (2.448885ms)
+✔ DPT02 DP2 a references-only Critic dispatch passes (0.590682ms)
+✔ DPT03 DP3 an expectation-conclusion is refused (0.33323ms)
+✔ DPT04 DP4 an implementor characterization is refused (0.304681ms)
+✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.421642ms)
+✔ DPT06 DP6 a complete Goldfish briefing passes (0.493605ms)
+✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (0.516864ms)
+✔ DPT08 DP8 a Goldfish dispatch that names no model is refused (0.463176ms)
+✔ DPT09 DP8b every budget-bearing role binds its declared cap before launch (1.052858ms)
+✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (3.980981ms)
+✔ DPT11 DP8d a role without an adopted budget field receives no fabricated budget finding (0.34584ms)
+✔ DPT12 DP9 an unrelated subagent type is untouched (0.258012ms)
+✔ DPT13 DP10 a reworded steer passes -- the check is structural, not semantic (0.33116ms)
+✔ DPT14 DP11 the real critic-review.md template, filled, passes (1.456006ms)
+✔ DPT15 DP12 the real goldfish-task.md template, filled, passes (0.571782ms)
+✔ DPT16 DP13 every shipped role refuses an empty prompt before launch (0.718987ms)
+✔ DPT17 DP14 an unknown pipeline role is refused before launch (0.130596ms)
+✔ DPT18 DP15 Workflow requires the plugin prefix for every shipped role (0.434827ms)
+✔ DPT19 DP16 an unrelated host role remains outside the pipeline registry (0.144086ms)
+✔ DPT20 DP17 the common envelope rejects a stale candidate tree before launch (25.845924ms)
+✔ DPT21 DP18 the common envelope rejects an unusable result destination (10.355051ms)
+✔ DPT22 DP18g one malformed packet reports independent static faults before launch (0.596071ms)
+✔ DPT23 DP18h independent role-policy faults are all log-safe and prelaunch (0.889512ms)
+✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (7.799094ms)
+✔ DPT25 DP18j rejected candidate paths identify only a bounded index, never private names (6.31612ms)
+✔ DPT26 DP18b a coordinator-owned result root is validated separately from candidate inputs (29.51512ms)
+✔ DPT27 DP18d explicit file destinations preserve the validated file contract (9.902459ms)
+✔ DPT28 DP18e return and stream destinations require no fabricated result path (20.675596ms)
+✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (0.600662ms)
+✔ DPT30 DP18a required source names are literal paths, never Git pathspecs (6.214398ms)
+✔ DPT31 DP18c a modified tracked source is rejected before launch (10.178823ms)
+✔ DPT32 DP19 every shipped role fails in PREPARE with zero launcher calls (59.342864ms)
+✔ DPT33 DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged (156.294964ms)
+✔ DPT34 DP21 batch execution propagates resultRoot and preserves mixed destinations (66.404498ms)
+✔ DPT35 DP22 legacy and explicit file destinations share one collision namespace (19.211907ms)
+✔ DPT36 DP23 occupied replacement after PREPARE blocks the affected launcher (41.077153ms)
+✔ DPT37 DP23 symlink-parent replacement after PREPARE blocks the affected launcher (39.748004ms)
+✔ DPT38 DP24 required-input drift after PREPARE blocks the affected launcher (39.665317ms)
+✔ DPT39 DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24) (0.175545ms)
+✔ DPT40 DP26 the shipped Critic definition carries maxTurns 65 (Ruling 161, was 50) (0.170795ms)
+✔ DPT41 DP27 the default Critic budget binds base 30 under working cap 50 with 30 turns in reserve (Ruling 161, was 30/50/35/15) (0.353759ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 572.170641
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

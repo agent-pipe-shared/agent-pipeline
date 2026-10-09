@@ -1,0 +1,159 @@
+✖ LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones (49.487771ms)
+✖ LWSC02 returns serial-fallback-required before creating a workspace when recovery reserve is exhausted (37.522872ms)
+✖ LWSC03 times out and signals only the exact observed child, then permits exact cleanup (37.508553ms)
+✖ LWSC04 accepts an exact cancellation intent, drains the owned child, and permits cleanup (37.94791ms)
+✖ LWSC05 does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest (43.045881ms)
+✖ LWSC06 keeps a failed real child attributable and does not convert nonzero exit into success (43.630942ms)
+✖ LWSC07 classifies an ignored unauthorized write and source-checkout drift as recovery-required (44.36548ms)
+✖ LWSC08 reports a killed supervisor with a still-attributable worker as recovery-required (37.073986ms)
+✖ LWSC09 admits only one of two concurrent starts for the same exact plan (40.074323ms)
+✖ LWSC10 denies replayed cleanup and foreign workspace marker without broad deletion (44.838596ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 0
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 422.589034
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones (49.487771ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:368:38)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC02 returns serial-fallback-required before creating a workspace when recovery reserve is exhausted (37.522872ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:420:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC03 times out and signals only the exact observed child, then permits exact cleanup (37.508553ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:441:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC04 accepts an exact cancellation intent, drains the owned child, and permits cleanup (37.94791ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:458:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC05 does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest (43.045881ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:496:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC06 keeps a failed real child attributable and does not convert nonzero exit into success (43.630942ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:532:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC07 classifies an ignored unauthorized write and source-checkout drift as recovery-required (44.36548ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:555:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC08 reports a killed supervisor with a still-attributable worker as recovery-required (37.073986ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:593:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC09 admits only one of two concurrent starts for the same exact plan (40.074323ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:621:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ LWSC10 denies replayed cleanup and foreign workspace marker without broad deletion (44.838596ms)
+  Error: BOUND:pool
+      at createLocalWorkerPool (file://<repo-root>/plugins/pipeline-core/lib/local-worker-pool.mjs:84:64)
+      at createPool (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:115:10)
+      at createRequest (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:162:11)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:651:21)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)

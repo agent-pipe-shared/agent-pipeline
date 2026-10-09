@@ -1,0 +1,22 @@
+✔ DRS01 stripDispatchRecordForCritic drops narrative and model metadata, and normalizes changedFiles to bare path strings (1.61434ms)
+✔ DRS02 stripDispatchRecordForCritic passes the declared safe top-level fields through unchanged (0.249442ms)
+✔ DRS03 stripDispatchRecordForCritic drops outcome entirely, even when it carries real-corpus free-text prose (0.249362ms)
+✔ DRS04 stripDispatchRecordForCritic omits all model override fields including hyphenated prose (0.165175ms)
+✔ DRS05 stripDispatchRecordForCritic omits hyphenated model prose and rejects a hyphenated ruleset claim (0.580351ms)
+✔ DRS06 stripDispatchRecordForCritic fails closed on unsafe object paths while retaining only a safe legacy string path (0.259481ms)
+✔ DRS07 stripDispatchRecordForCritic does not throw on a record missing every optional field (0.186664ms)
+✔ DRS08 stripDispatchRecordForCritic omits report when report.changedFiles is absent, and omits modelOverride when absent (0.252142ms)
+✔ DRS09 stripDispatchRecordForCritic throws (not silently drops) on a changedFiles entry with an out-of-contract shape (0.216184ms)
+✔ DRS10 stripDispatchRecordForCritic rejects a non-object record (0.212253ms)
+✔ DRS11 stripDispatchRecordForCritic is a pure function that never mutates its input (0.231702ms)
+✔ DRS12 stripDispatchRecordForCritic accepts only the closed plugin-version form of rulesetSha (0.380368ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10.484443
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

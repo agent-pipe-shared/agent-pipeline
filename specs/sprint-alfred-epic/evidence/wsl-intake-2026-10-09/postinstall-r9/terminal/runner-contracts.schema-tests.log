@@ -1,0 +1,19 @@
+FAIL  committed registry is complete and exact -- mechanic.claude exact tuple
+PASS  committed schemas are closed and aligned
+PASS  P3B-owned modules carry exact SPDX headers
+PASS  missing runner cell is rejected
+PASS  extra duty cell is rejected
+PASS  prior alias:terra selector is rejected
+PASS  wrong Sol effort pair is rejected
+PASS  wrong Terra effort pair is rejected
+PASS  Codex Advisor substitution is rejected
+PASS  asserted Terra effective model is rejected
+PASS  non-closed schema root is rejected
+PASS  missing common metric is rejected
+PASS  wrong source or scope registry is rejected
+PASS  missing capability state is rejected
+PASS  divergent schema id is rejected
+
+14/15 cases passed.
+Failures:
+  - committed registry is complete and exact: mechanic.claude exact tuple

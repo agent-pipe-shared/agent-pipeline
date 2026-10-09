@@ -1,0 +1,282 @@
+✔ installed-and-current: a repo where this installer's own hook is present and unmodified (464.852759ms)
+✔ installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current (79.488204ms)
+✔ absent: a real repository that never had the hook installed (37.921991ms)
+✔ declined: a repository where a decline was recorded and no hook was ever installed (47.071899ms)
+✔ declined then installed: observePrePushHookInstallation returns to installed-and-current (declining is not a permanent refusal) (471.87672ms)
+✔ present-but-not-ours-or-modified: a foreign hook this installer never wrote (no marker at all) (47.205545ms)
+✔ present-but-not-ours-or-modified: our own hook was tampered with after install (323.200901ms)
+✔ degenerate (1): no git directory at all -> a defined, non-crashing result, never installCommand (20.255502ms)
+✔ degenerate (2): an unreadable marker (a directory in its place) with the hook file present -> foreign, not a crash (292.573741ms)
+✔ degenerate (3): a malformed marker (not JSON) with the hook file present -> foreign, not a crash (291.272719ms)
+✔ an injected planInstallFn failure folds into repository-unresolved rather than throwing (0.194724ms)
+✔ observePrePushHookInstallation never mutates the repository it inspects (426.423664ms)
+✔ installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir (36.584952ms)
+✖ wired: the ready path is unchanged when the hook is installed-and-current (801.200059ms)
+✖ wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command (292.547032ms)
+✖ wired: a declined repository is ready, and the result still shows the decline with its timestamp (305.315929ms)
+✖ wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1) (338.074271ms)
+✖ wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged (15.309691ms)
+✖ wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either (312.029591ms)
+✖ wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (10.069128ms)
+✔ observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen (77.64019ms)
+✔ observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen) (75.706844ms)
+✔ observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass (65.756022ms)
+✔ observeUnseenPushToRemote: no remote-tracking ref at all reports nothing (38.973191ms)
+✔ observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes (5.488025ms)
+✖ wired: an unseen push never gates readiness or the exit code, and is still visible in the result (333.189823ms)
+✖ wired: a seen push (in the log) never gates readiness either, status/exit code unaffected (369.055706ms)
+✖ wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (5.797385ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 18
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5592.360516
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:304:1
+✖ wired: the ready path is unchanged when the hook is installed-and-current (801.200059ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:315:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:305:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:328:1
+✖ wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command (292.547032ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:337:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:329:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:345:1
+✖ wired: a declined repository is ready, and the result still shows the decline with its timestamp (305.315929ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:356:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:346:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:365:1
+✖ wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1) (338.074271ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:380:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:366:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:386:1
+✖ wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged (15.309691ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:399:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:404:1
+✖ wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either (312.029591ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:413:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:405:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:419:1
+✖ wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (10.069128ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:435:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:498:1
+✖ wired: an unseen push never gates readiness or the exit code, and is still visible in the result (333.189823ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:512:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:499:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:520:1
+✖ wired: a seen push (in the log) never gates readiness either, status/exit code unaffected (369.055706ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:534:12
+      at withFreshRepo (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:521:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:540:1
+✖ wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value (5.797385ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:561:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

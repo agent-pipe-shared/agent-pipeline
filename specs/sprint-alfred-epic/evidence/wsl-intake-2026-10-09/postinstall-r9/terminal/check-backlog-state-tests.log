@@ -1,0 +1,21 @@
+PASS CBS01 the known 2026-07-20 baseline-migration commit is an accepted historical exception
+PASS CBS02 an unrelated unreachable evidence commit is drift, not blocking, and is NOT labelled the known historical batch
+PASS CBS03 the exact known commit under a different actor/kind is drift, but not labelled known — the triple must match exactly
+PASS CBS04 each of the seven additional NVA-BLDRIFT-02 historical triples is an accepted exception
+PASS CBS05 an unreachable commit outside the pinned set is drift, but not labelled known, under a newly pinned actor/kind — never a blanket waiver
+PASS CBS06 a newly pinned commit value under a different actor is drift, but not labelled known
+PASS CBS07 the pinned e21933be commit/actor pair under a third, non-pinned kind is drift, but not labelled known — kind is part of the triple too
+PASS CBS08 a tampered previousHash is INTEGRITY — it still blocks and never appears as drift
+PASS CBS09 applyBacklogItemHashRescopeAmendment succeeds when the only outstanding finding is the stale pin it resolves
+PASS CBS10 applyBacklogItemHashRescopeAmendment still refuses when an unrelated finding is also outstanding
+PASS CBS11 checkPhoenixHistoryImmutable stands down cleanly when the archival path is absent
+PASS CBS12 checkPhoenixHistoryImmutable blocks as INTEGRITY when the archived bytes drift from the pin
+PASS CBS13 checkPhoenixHistoryImmutable holds when the archived bytes match the real, currently-pinned copy
+PASS CBS14 an item carrying a valid done_when value validates cleanly
+PASS CBS15 an item carrying a genuinely unsupported field is still rejected -- widened by exactly one key, not disabled
+PASS CBS17 event 403 acceptance is bound to the exact immutable ledger entry and does not admit lookalikes
+16 passed, 1 failed
+FAIL CBS16 the real event 403 format and closure drift are explicitly accepted while all current drift is dispositioned: backlog/items/2026-10-09-empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary.md: type is not in the canonical item taxonomy; backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: item must begin with YAML frontmatter; backlog/items/2026-10-09-restricted-governance-put-re-hardens-the-root-on-every-write.md: type is not in the canonical item taxonomy; items: pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses has no transition-ledger entry
+
+false !== true
+

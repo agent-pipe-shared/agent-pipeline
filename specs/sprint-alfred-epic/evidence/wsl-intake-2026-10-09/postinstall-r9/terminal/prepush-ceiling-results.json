@@ -1,0 +1,32 @@
+{
+  "schema": "alfred.prepush-fixture-ceiling-check.v1",
+  "qualification": "isolated proposals only",
+  "results": [
+    {
+      "name": "baseline",
+      "exitCode": 1,
+      "counts": {
+        "tests": 28,
+        "pass": 18,
+        "fail": 10,
+        "skipped": 0,
+        "todo": 0
+      },
+      "postimageSha256": "054abbf0366f9e21907dcb4dbfcb936eae33bb9262fc6ad9c8af6313ceffca0d",
+      "log": "scratch/alfred-prepush-ceiling-check-20261009/baseline.txt"
+    },
+    {
+      "name": "postimage",
+      "exitCode": 0,
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "postimageSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "log": "scratch/alfred-prepush-ceiling-check-20261009/postimage.txt"
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+✖ private task snapshot binds uppercase delivered-v3 bytes without exporting record prose (96.604405ms)
+✖ uppercase task ID is safe and wrong or traversal IDs cannot select a different record (99.662568ms)
+✖ empty-tree packet base rejects a non-root authored candidate (97.614794ms)
+✖ prelaunch admission creates one claimed, digest-bound packet before the verdict exists (97.538935ms)
+✖ invalid optional Critic selection retains V3, while valid selection binds before packet creation (98.39185ms)
+✖ an admitted exact session model survives finalization without reselecting the V3 model (97.421128ms)
+✖ missing optional model selection retains the independently admitted V3 Critic route (94.645125ms)
+✖ high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable (96.4255ms)
+✖ normal fresh-session finalization consumes the prelaunch packet, reads back, and emits (97.115515ms)
+✖ a schema-invalid or contradictory verdict fails before packet or event publication (98.065703ms)
+✖ an event write failure reports source-complete and a closed identical-only retry (95.530097ms)
+✖ review action construction cannot occur before identical consume readback (98.98671ms)
+✖ findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range (86.412171ms)
+✖ dispatch record drift after admission blocks finalization (97.011911ms)
+✖ receipt validation is closed and refuses provider metadata (95.110493ms)
+✖ closed CLI admits before verdict and finalizes only that durable packet (94.399303ms)
+✖ CLI refuses a valid returned verdict when no prelaunch admission exists (97.630271ms)
+✖ CLI closes argv/request vocabulary and reports typed exit-2 errors (95.597037ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 0
+ℹ fail 18
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1739.649167
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:153:1
+✖ private task snapshot binds uppercase delivered-v3 bytes without exporting record prose (96.604405ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:154:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:186:1
+✖ uppercase task ID is safe and wrong or traversal IDs cannot select a different record (99.662568ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:189:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:199:1
+✖ empty-tree packet base rejects a non-root authored candidate (97.614794ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:200:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:209:1
+✖ prelaunch admission creates one claimed, digest-bound packet before the verdict exists (97.538935ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:210:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:229:1
+✖ invalid optional Critic selection retains V3, while valid selection binds before packet creation (98.39185ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:230:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:268:1
+✖ an admitted exact session model survives finalization without reselecting the V3 model (97.421128ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:273:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:302:1
+✖ missing optional model selection retains the independently admitted V3 Critic route (94.645125ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:303:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:331:1
+✖ high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable (96.4255ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:334:16)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:355:1
+✖ normal fresh-session finalization consumes the prelaunch packet, reads back, and emits (97.115515ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:356:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:379:1
+✖ a schema-invalid or contradictory verdict fails before packet or event publication (98.065703ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:380:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:392:1
+✖ an event write failure reports source-complete and a closed identical-only retry (95.530097ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:393:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:407:1
+✖ review action construction cannot occur before identical consume readback (98.98671ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:408:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:429:1
+✖ findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range (86.412171ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:430:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:451:1
+✖ dispatch record drift after admission blocks finalization (97.011911ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:452:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:464:1
+✖ receipt validation is closed and refuses provider metadata (95.110493ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:465:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:472:1
+✖ closed CLI admits before verdict and finalizes only that durable packet (94.399303ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:473:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:488:1
+✖ CLI refuses a valid returned verdict when no prelaunch admission exists (97.630271ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:489:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:500:1
+✖ CLI closes argv/request vocabulary and reports typed exit-2 errors (95.597037ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:83:74)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:501:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }

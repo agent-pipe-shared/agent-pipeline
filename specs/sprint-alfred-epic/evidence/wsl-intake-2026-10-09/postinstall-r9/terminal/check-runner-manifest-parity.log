@@ -1,0 +1,27 @@
+✖ checkRunnerManifestParity (0.955761ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5.011445
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/check-runner-manifest-parity.test.mjs:7:1
+✖ checkRunnerManifestParity (0.955761ms)
+  AssertionError [ERR_ASSERTION]: claude: Runner suffix mismatch
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/check-runner-manifest-parity.test.mjs:10:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

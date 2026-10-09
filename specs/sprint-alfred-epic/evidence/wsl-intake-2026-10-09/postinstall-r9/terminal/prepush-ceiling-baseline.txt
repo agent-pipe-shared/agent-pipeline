@@ -1,0 +1,421 @@
+command: <home>/.local/opt/node-v24.15.0-linux-x64/bin/node --test --test-reporter=tap <repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs
+label: coordinator-prepush-ceiling-baseline
+exitCode: 1
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: installed-and-current: a repo where this installer's own hook is present and unmodified
+ok 1 - installed-and-current: a repo where this installer's own hook is present and unmodified
+  ---
+  duration_ms: 1503.876874
+  type: 'test'
+  ...
+# Subtest: installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current
+ok 2 - installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current
+  ---
+  duration_ms: 72.726508
+  type: 'test'
+  ...
+# Subtest: absent: a real repository that never had the hook installed
+ok 3 - absent: a real repository that never had the hook installed
+  ---
+  duration_ms: 27.227072
+  type: 'test'
+  ...
+# Subtest: declined: a repository where a decline was recorded and no hook was ever installed
+ok 4 - declined: a repository where a decline was recorded and no hook was ever installed
+  ---
+  duration_ms: 32.8754
+  type: 'test'
+  ...
+# Subtest: declined then installed: observePrePushHookInstallation returns to installed-and-current (declining is not a permanent refusal)
+ok 5 - declined then installed: observePrePushHookInstallation returns to installed-and-current (declining is not a permanent refusal)
+  ---
+  duration_ms: 1341.860418
+  type: 'test'
+  ...
+# Subtest: present-but-not-ours-or-modified: a foreign hook this installer never wrote (no marker at all)
+ok 6 - present-but-not-ours-or-modified: a foreign hook this installer never wrote (no marker at all)
+  ---
+  duration_ms: 34.337611
+  type: 'test'
+  ...
+# Subtest: present-but-not-ours-or-modified: our own hook was tampered with after install
+ok 7 - present-but-not-ours-or-modified: our own hook was tampered with after install
+  ---
+  duration_ms: 1187.357578
+  type: 'test'
+  ...
+# Subtest: degenerate (1): no git directory at all -> a defined, non-crashing result, never installCommand
+ok 8 - degenerate (1): no git directory at all -> a defined, non-crashing result, never installCommand
+  ---
+  duration_ms: 4.184467
+  type: 'test'
+  ...
+# Subtest: degenerate (2): an unreadable marker (a directory in its place) with the hook file present -> foreign, not a crash
+ok 9 - degenerate (2): an unreadable marker (a directory in its place) with the hook file present -> foreign, not a crash
+  ---
+  duration_ms: 1222.606537
+  type: 'test'
+  ...
+# Subtest: degenerate (3): a malformed marker (not JSON) with the hook file present -> foreign, not a crash
+ok 10 - degenerate (3): a malformed marker (not JSON) with the hook file present -> foreign, not a crash
+  ---
+  duration_ms: 1217.444251
+  type: 'test'
+  ...
+# Subtest: an injected planInstallFn failure folds into repository-unresolved rather than throwing
+ok 11 - an injected planInstallFn failure folds into repository-unresolved rather than throwing
+  ---
+  duration_ms: 0.237146
+  type: 'test'
+  ...
+# Subtest: observePrePushHookInstallation never mutates the repository it inspects
+ok 12 - observePrePushHookInstallation never mutates the repository it inspects
+  ---
+  duration_ms: 1339.332743
+  type: 'test'
+  ...
+# Subtest: installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir
+ok 13 - installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir
+  ---
+  duration_ms: 32.196008
+  type: 'test'
+  ...
+# Subtest: wired: the ready path is unchanged when the hook is installed-and-current
+not ok 14 - wired: the ready path is unchanged when the hook is installed-and-current
+  ---
+  duration_ms: 1688.939071
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:304:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:315:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:305:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command
+not ok 15 - wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command
+  ---
+  duration_ms: 267.674214
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:328:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:337:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:329:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: a declined repository is ready, and the result still shows the decline with its timestamp
+not ok 16 - wired: a declined repository is ready, and the result still shows the decline with its timestamp
+  ---
+  duration_ms: 253.740933
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:345:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:356:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:346:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1)
+not ok 17 - wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1)
+  ---
+  duration_ms: 249.199521
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:365:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:380:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:366:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged
+not ok 18 - wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged
+  ---
+  duration_ms: 8.164345
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:386:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-blocked'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:399:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either
+not ok 19 - wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either
+  ---
+  duration_ms: 254.842279
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:404:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:413:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:405:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+not ok 20 - wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+  ---
+  duration_ms: 5.491119
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:419:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-blocked'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:435:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen
+ok 21 - observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen
+  ---
+  duration_ms: 63.125272
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen)
+ok 22 - observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen)
+  ---
+  duration_ms: 62.783957
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass
+ok 23 - observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass
+  ---
+  duration_ms: 56.736924
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: no remote-tracking ref at all reports nothing
+ok 24 - observeUnseenPushToRemote: no remote-tracking ref at all reports nothing
+  ---
+  duration_ms: 33.817587
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes
+ok 25 - observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes
+  ---
+  duration_ms: 3.916519
+  type: 'test'
+  ...
+# Subtest: wired: an unseen push never gates readiness or the exit code, and is still visible in the result
+not ok 26 - wired: an unseen push never gates readiness or the exit code, and is still visible in the result
+  ---
+  duration_ms: 279.375105
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:498:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:512:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:499:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: a seen push (in the log) never gates readiness either, status/exit code unaffected
+not ok 27 - wired: a seen push (in the log) never gates readiness either, status/exit code unaffected
+  ---
+  duration_ms: 278.298338
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:520:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:534:12
+    withFreshRepo (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:80:5)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:521:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+not ok 28 - wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+  ---
+  duration_ms: 3.511475
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:540:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-blocked'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/baseline/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs:561:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 18
+# fail 10
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11779.774663
+
+--- stderr ---

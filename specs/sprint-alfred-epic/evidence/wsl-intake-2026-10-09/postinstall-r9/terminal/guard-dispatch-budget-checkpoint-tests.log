@@ -1,0 +1,49 @@
+✔ GDBC01 consumer repo: no plugins/pipeline-core under the project root, and the guard still enforces the plugin's own tier (428.457828ms)
+✔ GDBC02 consumer repo, Critic first call: a project-root copy of the definition at another tier is never read; the plugin's own tier binds (414.247899ms)
+✔ GDBC03 resolveMaxTurns: an injected plugin root wins; the default is the guard's own plugin, never the project root (391.34422ms)
+✔ GDBC04 core: checkpoint threshold is ceil(0.8 x cap) in integer arithmetic (0.724698ms)
+✔ GDBC05 core: the notice fires at the threshold and on the last 3 working calls, never below, never on closing/denied calls (0.444146ms)
+✔ GDBC06 core: a grant raises the working cap, never beyond maxTurns - closing allowance - 1 (0.31129ms)
+✔ GDBC07 core: grant records reject malformed, oversized, tampered and duplicate-digest histories (1.784724ms)
+✔ GDBC08 hook: checkpoint notice at exactly ceil(0.8 x cap) and on the last 3 working calls; allow JSON shape; denial at the cap unchanged (1755.408827ms)
+✔ GDBC09 hook: the orchestrator is never given a notice or counted (423.853857ms)
+✖ GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (608.931911ms)
+✔ GDBC11 hook: a grant lets the same agent state continue where an ungranted agent is denied (607.679809ms)
+✔ GDBC12 hook: the granted cap is bounded by maxTurns - 1 including the closing allowance (624.905805ms)
+✔ GDBC13 hook: a malformed or tampered grant record on disk grants nothing (634.288ms)
+✔ GDBC14 hook: a dispatched agent cannot reach the grant script or the grant store; the orchestrator can (1182.839926ms)
+✔ GDBC15 grant script: refuses malformed arguments, an unknown agent and an unverifiable record; resolves the repo of its working directory (307.096327ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7388.797241
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (608.931911ms)
+  AssertionError [ERR_ASSERTION]: admitted ABS:scratch/dispatch/review-1/critic-notes.md
+  
+  2 !== 0
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs:302:12
+      at Array.forEach (<anonymous>)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs:300:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,47 @@
+✔ EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control) (564.91226ms)
+✔ EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted (551.269304ms)
+✔ EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived (394.704293ms)
+✔ EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control) (340.867028ms)
+✔ EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (335.324728ms)
+✔ EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (346.988336ms)
+✔ EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control) (353.025969ms)
+✔ EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain) (610.964498ms)
+✔ EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream) (445.285937ms)
+✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (419.224413ms)
+✔ EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control) (649.386778ms)
+✔ EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader (85.33141ms)
+✔ EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control) (62.795709ms)
+✔ EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control) (64.195814ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5229.946993
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:138:30
+✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (419.224413ms)
+  AssertionError [ERR_ASSERTION]: ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the evidence-only diff says
+  + actual - expected
+  
+    {
+  +   approval: 'refused:DAC-FINAL-ENDPOINT',
+  +   reader: 'refused:DAC-FINAL-ENDPOINT'
+  -   approval: 'refused:DWP2-CURRENT-CANDIDATE',
+  -   reader: 'refused:DWP2-CURRENT-CANDIDATE'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs:391:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

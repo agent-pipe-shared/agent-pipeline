@@ -1,0 +1,93 @@
+✔ a freshly written lock naming the current version is observed, with no warning (2.329856ms)
+✔ no lock file at all is not observed, with a clear warning naming GEMINI.md (0.288761ms)
+✔ no .git directory at all is not observed and never throws (0.195804ms)
+✔ a lock older than the freshness window is not observed, same as absent (0.907561ms)
+✔ a lock exactly at the freshness window boundary still counts as observed (inclusive) (0.707237ms)
+✔ the freshest of several session locks decides observed, even when older ones are stale (0.927771ms)
+✔ a future mtime is never trusted as evidence of freshness (0.404857ms)
+✔ a directory entry under run/ that is not a session-* name is ignored (0.345599ms)
+✔ scanning a session directory that turns out to hold no lock file at all does not throw (0.467586ms)
+✔ an injected scan failure folds into not-observed rather than throwing (fail-open) (1.468893ms)
+✔ a fresh lock naming a DIFFERENT version is not observed, exactly like an absent lock (0.646479ms)
+✔ a fresh lock with NO version field at all (an older-build body) is not observed (0.469646ms)
+✔ a fresh, version-matching lock alongside an older-build unversioned one still resolves observed via the matching entry (0.64553ms)
+✔ no currentVersion supplied at all means nothing can ever match, even a fresh version-carrying lock (0.453466ms)
+✔ an unparseable lock body (corrupted, not JSON) is not observed rather than throwing (0.473815ms)
+✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (88.458033ms)
+✔ the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready (9.191309ms)
+✔ the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed (9.21368ms)
+✔ the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed (9.346644ms)
+✔ wiring passes the preflight's own resolved version as currentVersion, not a second independently-derived one (4094.451158ms)
+✔ a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready (1176.877246ms)
+✔ a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready (1264.266934ms)
+✖ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (19.776037ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 21
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6704.936917
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:329:1
+✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (88.458033ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'hook-provisioning-blocked'
+  - 'ready'
+  
+      at file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:344:12
+      at withTempRoot (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:129:5)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:330:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-blocked',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:466:1
+✖ Codex preflight output keys and status are unchanged by this addition (byte-identical surface) (19.776037ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      'architectureOrientation',
+      'bootstrapPayload',
+      'cloneProvisioning',
+      'concurrentSessionWarning',
+  ...
+      'installedVersion',
+  +   'mandatoryHookReadiness',
+      'nextAction',
+      'pluginRoot',
+      'rulesetSource',
+      'schema',
+      'status',
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:477:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,353 @@
+✖ K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic (40.804231ms)
+✖ K3G002 actual course inspect emits advisor execute action admitted by real guard entry point (26.64492ms)
+✖ K3G003 working readiness-stage fixed argv is admitted for every supported runner (28.233147ms)
+✖ K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv (26.490383ms)
+✖ K3G005 inspect rejects extra flags and every agent signing shape including run-v2 (26.811504ms)
+✖ K3G006 mini and existing package routes remain on present-plan while absent runner stays typed (56.284953ms)
+✖ K3G007 fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result (26.763345ms)
+✖ K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor (26.800664ms)
+✖ K3G009 run-v2 rejects extra signing collision and stale or foreign curation references (27.702366ms)
+✖ K3G010 physical source and preparation aliases never gain admission (26.034657ms)
+✖ K3G011 source and current submission changes invalidate previously emitted commands (25.587262ms)
+✔ K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair (2752.270035ms)
+✔ K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags (856.159259ms)
+✖ K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request (281.799866ms)
+✔ K3G015 trusted approve-push chat argv reaches the real guard under committed global policy (157.59935ms)
+✔ K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv (5592.40656ms)
+✔ K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval (1772.41211ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 5
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11756.236021
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic (40.804231ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - [
+  -   '<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs',
+  -   '--inspect',
+  -   '--root',
+  -   '/tmp/k3-guard-regression-j6llVZ',
+  -   '--runner',
+  -   'codex'
+  - ]
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:170:16)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G002 actual course inspect emits advisor execute action admitted by real guard entry point (26.64492ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:181:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G003 working readiness-stage fixed argv is admitted for every supported runner (28.233147ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:192:29)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv (26.490383ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:213:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G005 inspect rejects extra flags and every agent signing shape including run-v2 (26.811504ms)
+  TypeError: action.argv is not iterable
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:244:64)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G006 mini and existing package routes remain on present-plan while absent runner stays typed (56.284953ms)
+  TypeError: Cannot read properties of undefined (reading 'argv')
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:269:33)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G007 fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result (26.763345ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:280:30)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor (26.800664ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:288:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G009 run-v2 rejects extra signing collision and stale or foreign curation references (27.702366ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:306:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G010 physical source and preparation aliases never gain admission (26.034657ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:324:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G011 source and current submission changes invalidate previously emitted commands (25.587262ms)
+  TypeError: Cannot read properties of undefined (reading 'slice')
+      at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:28)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request (281.799866ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+  
+  2 !== 0
+  
+      at invoke (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:430:16)
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:433:25)
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+K3G001: AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ undefined
+- [
+-   '<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs',
+-   '--inspect',
+-   '--root',
+-   '/tmp/k3-guard-regression-j6llVZ',
+-   '--runner',
+-   'codex'
+- ]
+
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:170:16)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.start (node:internal/test_runner/test:1096:17)
+    at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+K3G002: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:181:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+K3G003: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:192:29)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G004: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:213:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G005: TypeError: action.argv is not iterable
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:244:64)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G006: TypeError: Cannot read properties of undefined (reading 'argv')
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:269:33)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G007: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:280:30)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+K3G008: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:288:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+K3G009: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at laterAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:136:25)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:306:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+K3G010: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:324:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G011: TypeError: Cannot read properties of undefined (reading 'slice')
+    at advisorAction (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:115:47)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:28)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:30)
+    at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G014: AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+
+2 !== 0
+
+    at invoke (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:430:16)
+    at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:433:25)
+    at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)

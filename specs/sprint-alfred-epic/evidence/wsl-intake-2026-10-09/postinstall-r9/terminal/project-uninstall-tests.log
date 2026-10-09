@@ -1,0 +1,22 @@
+✔ UC02C001 default transaction preserves content/history and foreign bytes; retirement permits ordinary real commit and local bare push (614.075167ms)
+✔ UC02C002 refuse before mutation: foreign-hook (160.345896ms)
+✔ UC02C003 refuse before mutation: modified-key (1600.811191ms)
+✔ UC02C004 refuse before mutation: drift (223.774864ms)
+✔ UC02C005 partial shim interruption resumes by exact original entry and private journal survives removal (2051.848908ms)
+✔ UC02C006 post-decline crash is durable; repeated new-controller resume is idempotent and CLI reads the same completion (1150.781631ms)
+✔ UC02C007 re-enrollment contract retains historical scope identity and does not retire unrelated approval-store bytes (894.627059ms)
+✔ UC02C008 AC34: a foreign pre-commit hook is refused with PU-FOREIGN-HOOK-CONFLICT naming the file and nothing is removed (193.42555ms)
+✔ UC02C009 AC34: a pipeline hook chaining a foreign hook is refused with PU-FOREIGN-HOOK-CONFLICT and nothing is removed (216.830613ms)
+✔ UC02C010 AC34: control - only pipeline-owned hooks are removed and project data, backlog, specs and fixture keys stay untouched (545.198832ms)
+✔ UC02C011 AC34-T3: after a foreign-hook refusal ordinary commit and push still work and history is intact (235.108446ms)
+✔ UC02C012 AC34-T3: CLI apply prints the typed refusal with instructions (592.231627ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8486.227057
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

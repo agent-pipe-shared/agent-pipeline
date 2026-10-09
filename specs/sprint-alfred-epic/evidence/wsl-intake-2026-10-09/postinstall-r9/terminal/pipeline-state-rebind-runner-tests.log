@@ -1,0 +1,49 @@
+✔ acknowledge returned-action roundtrip carries every supported runner into markerless attended apply (47.685241ms)
+✔ acknowledge plan rejects absent and invalid runner without mutation (3.18232ms)
+✔ markerless external acknowledge apply recovers runner from plan when runner tail is omitted (12.127099ms)
+✔ submit-plan honors the exact generator-identical acknowledgement exemption (247.201586ms)
+✔ submit-plan records modified non-exempt feature bytes without granting approval (225.922764ms)
+✔ submit-plan records feature authority independently of an exempt bootstrap observation (226.500278ms)
+✔ submit-plan mini still refuses missing historical acknowledgement without mutation (216.140033ms)
+✖ inspect exposes one typed PO approval action after submit and presentation, independent of runner (238.446391ms)
+✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval with a genuinely stale, otherwise-valid authority now succeeds (6.177446ms)
+✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still fails PO-REBIND-NOT-STALE, not PO-REBIND-APPROVAL (1.377617ms)
+✔ rebind-apply: every explicit supported runner reaches all three V4 intents unchanged (11.42932ms)
+✔ rebind-apply: absent --runner resolves via CLAUDECODE at the CLI boundary (claude) (3.863569ms)
+✔ rebind-apply: absent --runner without a recognized runner marker fails closed instead of guessing codex (1.716756ms)
+✔ rebind-apply: invalid explicit --runner fails closed without mutation (1.60038ms)
+✔ decision returned-action roundtrip carries every supported runner explicitly through plan, select, and apply (18.453229ms)
+✔ decision-apply: legacy action without runner or recognized marker fails closed instead of guessing codex (3.746372ms)
+✔ rebind returned-action roundtrip recognizes both Codex session identity signals (8.727396ms)
+✔ whitespace-only Codex identity signals do not impersonate a Codex runner (2.203531ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 17
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1281.520898
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs:276:1
+✖ inspect exposes one typed PO approval action after submit and presentation, independent of runner (238.446391ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs:287:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

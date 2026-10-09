@@ -1,0 +1,25 @@
+command: node scratch/alfred-critic-capture-header-fix-r1-20261009/capture-header.test.mjs
+label: critic-capture-header-fix
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+✔ RED reader accepts an actual failed identity-bearing capture with matching candidate and digest (47.838118ms)
+✔ RED producer returns honest diagnostic evidence after executing a failed process (61.672561ms)
+✔ CONTROL digest, label, exit and candidate/source bindings remain closed (64.337246ms)
+✔ CONTROL malformed or extra capture identity headers remain rejected even with recomputed digest (66.762576ms)
+✔ CONTROL selection signature/digest and diagnostic-only boundary remain checked (18.698372ms)
+✔ CONTROL real producer rejects absent execution, dirty candidate, and existing output without replacing bytes (111.282695ms)
+✔ RED real CLI emits output and repeat invocation preserves both output artifacts (117.503495ms)
+✔ CONTROL CLI refuses preexisting JSON output before process or log creation (41.730847ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 534.062715
+
+--- stderr ---

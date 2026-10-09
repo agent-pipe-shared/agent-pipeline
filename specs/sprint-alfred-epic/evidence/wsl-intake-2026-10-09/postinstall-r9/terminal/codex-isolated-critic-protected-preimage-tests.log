@@ -1,0 +1,89 @@
+ok 1 - F1 protected inventory is closed and names the autonomous-Critic policy baseline
+ok 2 - F1 protected paths are regular in-repository files without aliasing
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   {
++     actual: '4c305136a6c71dd5b02b524b37c3b5a423e1e0cee5fe984c3983853ee6c1157f',
++     expected: '66f47ecb26596445bb6d143c50b9f74c58eb1d436350f6555a896fc803986a4a',
++     path: 'harness/review-protocol.md'
++   },
++   {
++     actual: '59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b',
++     expected: '0a267a61e65d475cc8ba58733b5775235b441d8e65fe98fe98d566c14ffbeca2',
++     path: 'plugins/pipeline-core/agents/critic.md'
++   },
++   {
++     actual: '427bd8518b2b2152558d23c65d5d0867889e5aeb6d476d1de475f376f94ba717',
++     expected: '5cae56f6e96fe0005fa4d78a1e7556469836342f27e69aaf24e0d6be9363f1eb',
++     path: 'plugins/pipeline-core/scripts/codex-critic-host.mjs'
++   },
++   {
++     actual: '7286eccd7712e6023cc252766a0b5c1e6f2f4db77c77903af4b4d582f7c31066',
++     expected: 'c55220871ce975580a436f791add6b9a4fbeedc4ea6c2343d28148009af47092',
++     path: 'plugins/pipeline-core/skills/critic-review/SKILL.md'
++   },
++   {
++     actual: 'ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0',
++     expected: '8acc1eb8adc6d86de63075e6f5f42aa06970866064e07a40297617e84e3efbb4',
++     path: 'roles/critic.md'
++   },
++   {
++     actual: 'd463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e',
++     expected: 'de3f3cf4f349a5d5de361443557f83aaa634bcd3af98d815730dc66b03960481',
++     path: 'templates/prompts/critic-review.md'
++   }
++ ]
+- []
+
+    at file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs:68:10
+    at check (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs:28:3)
+    at file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs:58:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    {
+      path: 'harness/review-protocol.md',
+      expected: '66f47ecb26596445bb6d143c50b9f74c58eb1d436350f6555a896fc803986a4a',
+      actual: '4c305136a6c71dd5b02b524b37c3b5a423e1e0cee5fe984c3983853ee6c1157f'
+    },
+    {
+      path: 'plugins/pipeline-core/agents/critic.md',
+      expected: '0a267a61e65d475cc8ba58733b5775235b441d8e65fe98fe98d566c14ffbeca2',
+      actual: '59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b'
+    },
+    {
+      path: 'plugins/pipeline-core/scripts/codex-critic-host.mjs',
+      expected: '5cae56f6e96fe0005fa4d78a1e7556469836342f27e69aaf24e0d6be9363f1eb',
+      actual: '427bd8518b2b2152558d23c65d5d0867889e5aeb6d476d1de475f376f94ba717'
+    },
+    {
+      path: 'plugins/pipeline-core/skills/critic-review/SKILL.md',
+      expected: 'c55220871ce975580a436f791add6b9a4fbeedc4ea6c2343d28148009af47092',
+      actual: '7286eccd7712e6023cc252766a0b5c1e6f2f4db77c77903af4b4d582f7c31066'
+    },
+    {
+      path: 'roles/critic.md',
+      expected: '8acc1eb8adc6d86de63075e6f5f42aa06970866064e07a40297617e84e3efbb4',
+      actual: 'ca1adea71c3fba9185336409d57c69e13526f59893be2a920806d0eb60783cc0'
+    },
+    {
+      path: 'templates/prompts/critic-review.md',
+      expected: 'de3f3cf4f349a5d5de361443557f83aaa634bcd3af98d815730dc66b03960481',
+      actual: 'd463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e'
+    }
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

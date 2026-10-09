@@ -1,0 +1,38 @@
+✔ RC03C001 all enumerated hook entries leave never-enrolled repositories inert before malformed tool hardening (4990.212403ms)
+✔ RC03C002 inactive destructive union survives through Claude and native wrappers while ordinary commits and pushes bypass project conventions (4333.43631ms)
+✔ RC03C003 active canonical consent retains native input/role and lifecycle refusals (836.583172ms)
+✔ RC03C004 actual enrolled Git record drift remains unverifiable-active and retains hardening (620.549133ms)
+✔ RC03C005 imported budget, lifecycle and Advisor-prohibition consumers return before private resolution or audit outside enrollment (87.34163ms)
+✔ RC03C006 actual Git decline suppresses all hints and budget/telemetry effects despite retained consent (1199.184808ms)
+✔ RC03C007 active repository still enforces public commit metadata policy that an inactive repository does not acquire (357.373314ms)
+✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.112205ms)
+✔ RC03C009 Antigravity slicing observes the active consumer workspace from inactive host cwd before native private state effects (209.29792ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12641.998578
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.112205ms)
+  AssertionError [ERR_ASSERTION]: unadmitted runner wiring: claude-task-output-scope-posttool.mjs
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/hook-governance-scope.test.mjs:78:142)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

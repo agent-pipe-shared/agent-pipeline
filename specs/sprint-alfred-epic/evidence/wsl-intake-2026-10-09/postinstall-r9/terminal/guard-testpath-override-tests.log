@@ -1,0 +1,51 @@
+PASS OT01 a protected test path is refused with no capability armed
+PASS OT02 signature mode refuses in-session activation and offers the signed route (ADR-0059 Decision 3/4)
+PASS OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route
+PASS OT04 chat mode offers the audited route, with a real request digest
+PASS OT05 chat mode says on its face that the override is attribution, not proof
+PASS OT06 an unusable override store leaves the refusal exactly as it was
+PASS OT07 an unrelated file is untouched by any of this
+PASS OT08 the guard consults the override before it refuses, not after
+PASS OT09 the mode is read from pipeline.user.yaml, which GS-1 protects
+PASS OT10 an armed capability admits exactly the edit it was bound to
+PASS OT11 a capability bound to a different edit does not admit this one
+PASS OT12 the capability is single-use: the same edit is refused again
+PASS OT13 an in-session write drifts the repository an armed capability is bound to, which fails closed with HGO-DRIFT
+PASS OT14 a protected test path under plugins/pipeline-core gets no plain route
+PASS OT15 an uncommitted chat setting does not admit the chat-mode continuation
+PASS OT16 the same setting, committed, is honoured
+PASS OT17 modifying a committed chat setting drops it to the strongest mode
+PASS OT18 the push proof is not waived by an uncommitted setting either
+PASS OT19 the in-session activation path itself refuses every committed mode but chat
+PASS OT20 T84 a capability spent on one hunk leaves every other hunk, and the revert, under the same refusal and route
+PASS OT22 T84 a restore from any ref but HEAD, and every other writer of the protected path, stays refused
+
+guard-testpath-override: 21 passed, 2 failed
+FAIL OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane: T84: the restore to committed bytes was refused (lane=git-working-tree-write, rule=TP-3)
++ actual - expected
+
++ {
++   candidate: 'harness/scripts/verify.mjs',
++   lane: 'git-working-tree-write',
++   rule: {
++     id: 'TP-3',
++     re: /harness\/scripts\/verify\.mjs$/iu,
++     reason: 'the single verify-gate script'
++   }
++ }
+- null
+
+FAIL OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted: T84: the committed-bytes restore of a staged file was refused (lane=git-working-tree-write, rule=TP-3)
++ actual - expected
+
++ {
++   candidate: 'harness/scripts/verify.mjs',
++   lane: 'git-working-tree-write',
++   rule: {
++     id: 'TP-3',
++     re: /harness\/scripts\/verify\.mjs$/iu,
++     reason: 'the single verify-gate script'
++   }
++ }
+- null
+

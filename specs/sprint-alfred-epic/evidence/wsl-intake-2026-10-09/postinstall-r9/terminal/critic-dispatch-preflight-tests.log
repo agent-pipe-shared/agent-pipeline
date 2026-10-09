@@ -1,0 +1,65 @@
+✔ a fifth feature-package review is refused before packet-ready from retained Git lineage (449.89631ms)
+✔ an exact evidence-only registration does not consume the fourth review's correction budget (196.399277ms)
+✔ a first versioned feature-package review remains admissible without a fabricated parent (90.706311ms)
+✔ read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence (51.176547ms)
+✔ reviewer input uses an empty governance-directory list when the manifest declares no governance block (57.664576ms)
+✔ opt-in requirement map is candidate-bound, evaluated, and passed to the Critic as a constraint (73.94043ms)
+✔ preflight rejects a specifically named absent requirement before packet-ready (62.059249ms)
+✔ preflight rejects prose/command predicates instead of executing or inferring them (59.417411ms)
+✔ preflight rejects a stale requirement map after the candidate Spec changes (59.317814ms)
+✔ current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range (61.344733ms)
+✔ current-artifact preflight keeps evidence small while admitting bounded large candidate sources (87.571334ms)
+✔ rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing (91.546763ms)
+✔ accepts the root candidate binding used by canonical Verify evidence (52.08384ms)
+✔ accepts canonical Verify evidence whose candidate field is only a run-status wrapper (50.829748ms)
+✖ first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail (89.71899ms)
+✔ failed canonical Verify admits review without satisfying final qualification (73.226872ms)
+✔ a repository with exactly one commit resolves the root commit as an ordinary base, not a refusal (44.97613ms)
+✔ a base ref that fails commit-peeling and is not the empty tree is still refused (unchanged behavior) (31.629996ms)
+✔ evidence sweep finds the misplaced regression artifact by case-insensitive substring match, across a date prefix and a role suffix (4.075504ms)
+✔ evidence sweep names each result's location class, distinguishing the ignored root directory from a tracked one (3.679104ms)
+✔ evidence sweep is advisory and non-failing: a task id with no artifacts yields an empty result, never an error (3.639338ms)
+✔ evidence sweep never touches preflightCriticDispatch()'s own binding checks or failure modes (49.513665ms)
+✔ source callback emits exactly one closed detached packet-ready observation (75.82438ms)
+✔ actual direct CLI preserves complete packet-ready and representative rejection protocols (432.515609ms)
+✔ shared argument parser preserves defaults scalar overwrites arrays and exact flag errors (0.435317ms)
+✔ request destructuring retains original getter order and exceptions before body entry (0.693458ms)
+✔ early request and base failures have no captured candidate or spec (37.694587ms)
+✔ range and path rejections retain the validated candidate before any spec readback (74.471954ms)
+✔ spec binding becomes visible only after successful actual spec readback (65.346227ms)
+✔ actual evidence and prior-evidence failures retain their owning stages and spec binding (188.0376ms)
+✔ an actual missing candidate manifest is observed before governance or spec reads (51.993451ms)
+✔ injected Git failures cover partial candidate inventory manifest governance and candidate-read branches (109.964679ms)
+✔ a successful Git exit remains admissible when a contained host adds an EPERM diagnostic (51.090491ms)
+✔ a successful EPERM Git observation remains admissible for the empty-tree read (48.444082ms)
+✔ a successful EPERM Git observation remains admissible for a byte candidate read (49.867309ms)
+✔ injected evidence containment refusal is captured without rerunning any guard (50.625775ms)
+✔ foreign thrown objects are rethrown identically without reading hostile properties (120.624448ms)
+✔ invalid synchronous observer returns and exceptions cannot change admission or read return getters (288.27074ms)
+✔ callback capture adds no Git operations and candidate never follows later ref or HEAD changes (106.633502ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 38
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3503.95227
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs:382:1
+✖ first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail (89.71899ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs:385:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'CDI-DIGEST'
+  }

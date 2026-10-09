@@ -1,0 +1,11 @@
+backlog items enumerated: 872
+- malformed: 0
+- stale-open (status open/in_progress, predicate already satisfied): 0
+- regression (status closed, predicate not satisfied): 4
+- undeclared (no done_when at all, any status): 431
+- undeclared and open/in_progress (fatal): 0
+Findings (4):
+  - REGRESSION backlog/items/2026-08-28-a-heredoc-refusal-teaches-no-substitute.md: expected contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs "heredocFileRemediation" to hold (status is closed); observed unsatisfied
+  - REGRESSION backlog/items/2026-08-28-the-guards-root-admission-compares-a-typed-path-to-a-realpathed-one.md: expected contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs "rootValueIdentityMatcher" to hold (status is closed); observed unsatisfied
+  - REGRESSION backlog/items/2026-08-29-scratch-write-exemption-does-not-cover-restart-required.md: expected contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs "RESTART_LIFECYCLE_SCRATCH_WRITE" to hold (status is closed); observed unsatisfied
+  - REGRESSION backlog/items/2026-09-03-the-unparsed-command-lane-still-carries-the-false-denial-claim.md: expected contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs "pipeline.unparsed-command-lane-caveat" to hold (status is closed); observed unsatisfied

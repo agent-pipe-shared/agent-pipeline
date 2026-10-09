@@ -1,0 +1,23 @@
+{
+  "name": "signed-quality-package-scratch-tests",
+  "path": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+  "caseCompletion": {
+    "schema": "pipeline.test-case-completion.v1",
+    "caseIds": [
+      "QPS001",
+      "QPS002",
+      "QPS003",
+      "QPS004",
+      "QPS005",
+      "QPS006",
+      "QPS007",
+      "QPS008",
+      "QPS009",
+      "QPS010",
+      "QPS011",
+      "QPS012",
+      "QPS013"
+    ],
+    "maxBytes": 16384
+  }
+}

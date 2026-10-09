@@ -1,0 +1,43 @@
+✖ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (73.537735ms)
+✖ packet refuses malformed source/digest before creation and snapshot mutation before claim (73.973271ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 152.738069
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:32:1
+✖ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (73.537735ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:20:22)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:33:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:49:1
+✖ packet refuses malformed source/digest before creation and snapshot mutation before claim (73.973271ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at fixture (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:20:22)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs:50:13)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CDI-DIGEST'
+  }

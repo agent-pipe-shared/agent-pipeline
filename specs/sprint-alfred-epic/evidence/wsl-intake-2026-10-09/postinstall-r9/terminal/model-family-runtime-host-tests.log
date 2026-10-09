@@ -1,0 +1,15 @@
+✔ MFH001 missing fixed store is physically inactive and observation creates no activation marker (1.349587ms)
+✔ MFH002 valid activation marker is observed only with readable S4 state (2.706305ms)
+✔ MFH003 corrupt marker, lost active state and symlink parent return uncertainty rather than inactive (1.796633ms)
+✔ MFH004 current identity is returned only by the trusted source and has independent session and invocation IDs (0.989489ms)
+✔ MFH005 WINMF-T: activation observation on a real git repository does not report the git common dir unavailable (13.695437ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25.701079
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

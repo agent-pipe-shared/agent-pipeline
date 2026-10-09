@@ -1,0 +1,81 @@
+ok 1 - an unregistered *.test.mjs file under a registered root is detected
+ok 2 - a registration entry naming a missing file is detected
+ok 3 - a duplicate suite name across arrays is detected and named
+ok 4 - a declared exclusion is accepted without a finding
+ok 5 - the checker exits 0 (well-formed, function level) on a well-formed fixture
+ok 6 - a registered suite is rejected immediately when its derived inventory surface is uncategorized
+ok 7 - a registered suite passes the early inventory check after exactly one capability assigns its surface
+ok 8 - a registered suite is rejected immediately when two capabilities assign its surface
+ok 9 - a duplicate surface entry inside one capability reports that capability accurately
+ok 10 - consumer projects without a product-capability inventory keep the registration-only contract
+ok 11 - CLI: exits 0 against a well-formed fixture root
+ok 12 - CLI: exits non-zero (deliberate break) against an unregistered-file fixture root
+ok 13 - the checker's own two files are not declared exclusions
+ok 14 - EXCLUSIONS is empty and every retired scheduling exclusion is registered exactly once
+ok 15 - QG-06: a well-formed exclusion (reason, owner, expiry) is honoured before its expiry day
+ok 16 - QG-06: an exclusion missing "reason" is a finding naming the file and that field, and does not suppress
+ok 17 - QG-06: an exclusion missing "owner" is a finding naming the file and that field, and does not suppress
+ok 18 - QG-06: an exclusion missing "expires" is a finding naming the file and that field, and does not suppress
+ok 19 - QG-06: an empty-string field counts as missing, not as present-but-blank
+ok 20 - QG-06: the pre-QG-06 bare reason string is rejected, not grandfathered
+ok 21 - QG-06: an unparseable expiry ("soon") is a finding, not an open-ended exclusion
+ok 22 - QG-06: an unparseable expiry ("2026-9-7") is a finding, not an open-ended exclusion
+ok 23 - QG-06: an unparseable expiry ("2026-02-30") is a finding, not an open-ended exclusion
+ok 24 - QG-06: an unparseable expiry ("07.09.2026") is a finding, not an open-ended exclusion
+ok 25 - QG-06: an unparseable expiry ("2026-09-07T00:00:00Z") is a finding, not an open-ended exclusion
+ok 26 - QG-06: an unparseable expiry ("when R1.2 closes") is a finding, not an open-ended exclusion
+ok 27 - QG-06: parseExclusionDay rejects what Date() would silently reinterpret, and accepts a real day
+ok 28 - QG-06: an exclusion whose expiry has passed is a finding naming the file and the expiry date
+ok 29 - QG-06: an expiry in the future is accepted; the same entry one day past its expiry is not
+ok 30 - QG-06: the comparison uses the injected day, not the process clock
+ok 31 - QG-06: exclusion validation runs even when verify.mjs cannot be read at all
+ok 32 - QG-06: a nonempty controlled exclusion table is self-clearing
+ok 33 - duplicateSuiteIds: an empty registration array reports no duplicates
+ok 34 - duplicateSuiteIds: a registration array with no repeated name reports no duplicates
+ok 35 - duplicateSuiteIds: one id registered twice is reported once, with count 2
+ok 36 - duplicateSuiteIds: one id registered three times reports a count of 3, not two findings
+ok 37 - duplicateSuiteIds: two distinct duplicated ids are both reported, sorted by id
+ok 38 - duplicateSuiteIds: entries sharing a name but naming different files are still duplicates
+ok 39 - duplicateSuiteIds: returns exactly the { id, count } shape the verify.mjs call site consumes
+ok 40 - duplicateSuiteIds: a duplicate spanning two of verify.mjs's registration arrays is found
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: verify wrote no evidence at all; stderr: node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/tmp/verify-suite-reg-K9Ymyl/plugins/pipeline-core/lib/git-null-device.mjs' imported from /tmp/verify-suite-reg-K9Ymyl/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:861:10)
+    at defaultResolve (node:internal/modules/esm/resolve:988:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)
+    at #resolve (node:internal/modules/esm/loader:679:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:252:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///tmp/verify-suite-reg-K9Ymyl/plugins/pipeline-core/lib/git-null-device.mjs'
+}
+
+Node.js v24.15.0
+
+    at assertReachedRegistration (file://<repo-root>/harness/scripts/check-verify-suite-registration.test.mjs:676:10)
+    at file://<repo-root>/harness/scripts/check-verify-suite-registration.test.mjs:692:3
+    at check (file://<repo-root>/harness/scripts/check-verify-suite-registration.test.mjs:21:28)
+    at file://<repo-root>/harness/scripts/check-verify-suite-registration.test.mjs:689:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: null,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

@@ -1,0 +1,187 @@
+command: <home>/.local/opt/node-v24.15.0-linux-x64/bin/node --test --test-reporter=tap <repo-root>/scratch/alfred-bootstrap-prepush-fixture-r1-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs
+label: coordinator-prepush-ceiling-postimage
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: installed-and-current: a repo where this installer's own hook is present and unmodified
+ok 1 - installed-and-current: a repo where this installer's own hook is present and unmodified
+  ---
+  duration_ms: 1582.033554
+  type: 'test'
+  ...
+# Subtest: installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current
+ok 2 - installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current
+  ---
+  duration_ms: 81.743184
+  type: 'test'
+  ...
+# Subtest: absent: a real repository that never had the hook installed
+ok 3 - absent: a real repository that never had the hook installed
+  ---
+  duration_ms: 34.290871
+  type: 'test'
+  ...
+# Subtest: declined: a repository where a decline was recorded and no hook was ever installed
+ok 4 - declined: a repository where a decline was recorded and no hook was ever installed
+  ---
+  duration_ms: 40.762438
+  type: 'test'
+  ...
+# Subtest: declined then installed: observePrePushHookInstallation returns to installed-and-current (declining is not a permanent refusal)
+ok 5 - declined then installed: observePrePushHookInstallation returns to installed-and-current (declining is not a permanent refusal)
+  ---
+  duration_ms: 1449.333011
+  type: 'test'
+  ...
+# Subtest: present-but-not-ours-or-modified: a foreign hook this installer never wrote (no marker at all)
+ok 6 - present-but-not-ours-or-modified: a foreign hook this installer never wrote (no marker at all)
+  ---
+  duration_ms: 35.491695
+  type: 'test'
+  ...
+# Subtest: present-but-not-ours-or-modified: our own hook was tampered with after install
+ok 7 - present-but-not-ours-or-modified: our own hook was tampered with after install
+  ---
+  duration_ms: 1354.079541
+  type: 'test'
+  ...
+# Subtest: degenerate (1): no git directory at all -> a defined, non-crashing result, never installCommand
+ok 8 - degenerate (1): no git directory at all -> a defined, non-crashing result, never installCommand
+  ---
+  duration_ms: 4.146417
+  type: 'test'
+  ...
+# Subtest: degenerate (2): an unreadable marker (a directory in its place) with the hook file present -> foreign, not a crash
+ok 9 - degenerate (2): an unreadable marker (a directory in its place) with the hook file present -> foreign, not a crash
+  ---
+  duration_ms: 1285.866669
+  type: 'test'
+  ...
+# Subtest: degenerate (3): a malformed marker (not JSON) with the hook file present -> foreign, not a crash
+ok 10 - degenerate (3): a malformed marker (not JSON) with the hook file present -> foreign, not a crash
+  ---
+  duration_ms: 1245.262931
+  type: 'test'
+  ...
+# Subtest: an injected planInstallFn failure folds into repository-unresolved rather than throwing
+ok 11 - an injected planInstallFn failure folds into repository-unresolved rather than throwing
+  ---
+  duration_ms: 0.227567
+  type: 'test'
+  ...
+# Subtest: observePrePushHookInstallation never mutates the repository it inspects
+ok 12 - observePrePushHookInstallation never mutates the repository it inspects
+  ---
+  duration_ms: 1370.15099
+  type: 'test'
+  ...
+# Subtest: installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir
+ok 13 - installCommand carries the installer's own documented --install verb, an absolute path to the real installer, and the inspected repo's own rootDir
+  ---
+  duration_ms: 32.554206
+  type: 'test'
+  ...
+# Subtest: wired: the ready path is unchanged when the hook is installed-and-current
+ok 14 - wired: the ready path is unchanged when the hook is installed-and-current
+  ---
+  duration_ms: 4248.298962
+  type: 'test'
+  ...
+# Subtest: wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command
+ok 15 - wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command
+  ---
+  duration_ms: 2964.212456
+  type: 'test'
+  ...
+# Subtest: wired: a declined repository is ready, and the result still shows the decline with its timestamp
+ok 16 - wired: a declined repository is ready, and the result still shows the decline with its timestamp
+  ---
+  duration_ms: 2872.905135
+  type: 'test'
+  ...
+# Subtest: wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1)
+ok 17 - wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1)
+  ---
+  duration_ms: 2892.913306
+  type: 'test'
+  ...
+# Subtest: wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged
+ok 18 - wired: a repository-unresolved cwd (this file's own pre-existing test fixtures' shape) never gates status and omits the field entirely, keeping the envelope's key set unchanged
+  ---
+  duration_ms: 6.131153
+  type: 'test'
+  ...
+# Subtest: wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either
+ok 19 - wired: a Claude-runner session observes the same hook state as any other runner (not runner-gated), and it never gates readiness either
+  ---
+  duration_ms: 2890.396161
+  type: 'test'
+  ...
+# Subtest: wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+ok 20 - wired: an injected observePrePushHookInstallationFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+  ---
+  duration_ms: 3.842671
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen
+ok 21 - observeUnseenPushToRemote: a remote-tracking ref with no matching log entry is reported unseen
+  ---
+  duration_ms: 59.727023
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen)
+ok 22 - observeUnseenPushToRemote: a remote-tracking ref whose commit IS in the log is not reported (seen)
+  ---
+  duration_ms: 57.279853
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass
+ok 23 - observeUnseenPushToRemote: a repository with no log at all reports nothing rather than reporting everything as a bypass
+  ---
+  duration_ms: 54.040045
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: no remote-tracking ref at all reports nothing
+ok 24 - observeUnseenPushToRemote: no remote-tracking ref at all reports nothing
+  ---
+  duration_ms: 32.573977
+  type: 'test'
+  ...
+# Subtest: observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes
+ok 25 - observeUnseenPushToRemote: repository-unresolved (no git repo at all) reports nothing, never crashes
+  ---
+  duration_ms: 3.631613
+  type: 'test'
+  ...
+# Subtest: wired: an unseen push never gates readiness or the exit code, and is still visible in the result
+ok 26 - wired: an unseen push never gates readiness or the exit code, and is still visible in the result
+  ---
+  duration_ms: 2918.386217
+  type: 'test'
+  ...
+# Subtest: wired: a seen push (in the log) never gates readiness either, status/exit code unaffected
+ok 27 - wired: a seen push (in the log) never gates readiness either, status/exit code unaffected
+  ---
+  duration_ms: 2897.677089
+  type: 'test'
+  ...
+# Subtest: wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+ok 28 - wired: an injected observeUnseenPushToRemoteFn is honored, proving the call site actually forwards cwd rather than a hardcoded value
+  ---
+  duration_ms: 0.80301
+  type: 'test'
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 30676.499176
+
+--- stderr ---

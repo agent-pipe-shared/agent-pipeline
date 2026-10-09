@@ -1,0 +1,287 @@
+✔ Critic policy permits autonomous review after its plan and Critic-boundary gates (0.875724ms)
+✔ all four owned schemas parse and close their root vocabulary (0.915711ms)
+✔ request binds exact ordered physical inputs and rejects closed-schema drift (7.549934ms)
+✔ request materialization rejects symlinks (0.884503ms)
+✔ request materialization rejects hard links without requiring symlink capability (0.885023ms)
+✖ journal begins before model start and enforces the lifecycle vocabulary (2.008309ms)
+✖ heartbeat, PID liveness and noisy output are not semantic progress (1.577041ms)
+✖ stream budgets are fixed at one MiB per stream (1.128006ms)
+✖ verdict bytes make retries impossible and success requires validated binding (0.990686ms)
+✖ invalid or misbound verdict can terminate only as verdict-schema-error (1.125635ms)
+✖ verdict schema-error is forbidden before verdict-received (0.93281ms)
+✖ cleanup decisions rebind boot, PID, start identity and process group (1.68548ms)
+✖ cleanup ownership refusal dominates the requested terminal (0.732045ms)
+✖ journal replay is idempotent, hash-chained and CAS guarded (0.795824ms)
+✖ an injected CAS race is detected before replacement (0.686759ms)
+✖ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (0.79ms)
+✖ crash after verdict-file write still forbids a second model run (0.582756ms)
+✖ unconfirmed directory durability fails closed when the receipt artifact is published (0.861775ms)
+✔ claims require evidence exactly for proven or disproven states (0.489293ms)
+✖ receipt sanitizer rejects private paths, accounts and remotes (0.602875ms)
+✖ file persistence uses mode 0600 and refuses a torn postimage (1.514627ms)
+✔ verdict validator closes nested vocabulary and exact request bindings (0.653901ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 7
+ℹ fail 15
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33.595556
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:318:1
+✖ journal begins before model start and enforces the lifecycle vocabulary (2.008309ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:319:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:333:1
+✖ heartbeat, PID liveness and noisy output are not semantic progress (1.577041ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:334:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:374:1
+✖ stream budgets are fixed at one MiB per stream (1.128006ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:375:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:393:1
+✖ verdict bytes make retries impossible and success requires validated binding (0.990686ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:394:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:429:1
+✖ invalid or misbound verdict can terminate only as verdict-schema-error (1.125635ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:430:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:444:1
+✖ verdict schema-error is forbidden before verdict-received (0.93281ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:445:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:450:1
+✖ cleanup decisions rebind boot, PID, start identity and process group (1.68548ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:451:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:465:1
+✖ cleanup ownership refusal dominates the requested terminal (0.732045ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:466:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:473:1
+✖ journal replay is idempotent, hash-chained and CAS guarded (0.795824ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:474:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:494:1
+✖ an injected CAS race is detected before replacement (0.686759ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:495:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:503:1
+✖ unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication (0.79ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:504:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:525:1
+✖ crash after verdict-file write still forbids a second model run (0.582756ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:526:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:535:1
+✖ unconfirmed directory durability fails closed when the receipt artifact is published (0.861775ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:536:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:557:1
+✖ receipt sanitizer rejects private paths, accounts and remotes (0.602875ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at setupMemory (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:184:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:558:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }
+
+test at plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:570:1
+✖ file persistence uses mode 0600 and refuses a torn postimage (1.514627ms)
+  IsolatedCriticContractError: journal does not match its closed schema
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:111:9)
+      at validateLite (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:148:22)
+      at validateJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:469:3)
+      at createJournal (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs:603:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs:573:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'F3-SCHEMA',
+    details: [ '$.request: unsupported $ref; expected a bounded local JSON pointer' ]
+  }

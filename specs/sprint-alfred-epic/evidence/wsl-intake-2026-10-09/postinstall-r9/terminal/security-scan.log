@@ -1,0 +1,9 @@
+gitleaks: FINDINGS [findings] (46 findings)
+osv-scanner: SKIPPED [success] (0 findings) -- no package sources in project (osv-scanner: "No package sources found", exit 128)
+semgrep: OK [success] (0 findings) -- coverage: degraded (4 files partially parsed)
+license-check: OK [success] (0 findings)
+
+Verdict: BLOCKING (thresholds: critical, high) -> exit 2
+Evidence written: <repo-root>/evidence/security-latest.json
+v2 evidence written: <repo-root>/evidence/security-latest.v2.json
+v2 policy-complete verdict (reporting-only, does NOT affect exit 2): clean (0 offending required capabilities)

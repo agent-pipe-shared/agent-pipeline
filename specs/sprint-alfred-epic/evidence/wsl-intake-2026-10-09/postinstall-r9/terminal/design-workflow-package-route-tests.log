@@ -1,0 +1,43 @@
+✔ R4-T0-6 control: the unmutated fixture is admitted when no route input is supplied (fixture validity, current behaviour) (5.664834ms)
+✔ R4-T0-6 a readiness route reported unavailable refuses presentation with DWP-READINESS-ROUTE-UNAVAILABLE (1.312659ms)
+✔ R4-T0-6 a readiness route reported fallback-self-dispatch refuses presentation with DWP-READINESS-FALLBACK-EVIDENCE (1.002249ms)
+✔ R4-T0-6 a native readiness route keeps the package admissible and non-authorizing (0.99528ms)
+✖ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (2.652358ms)
+✔ R4-T0-7 an Advisor answered through consult is admitted WITH the derived fallback-self-dispatch label (1.477794ms)
+✔ R4-T0-7 the label cannot be supplied by the caller (0.544353ms)
+✔ R4-T0-8 control: the unavailable-Advisor fixture is otherwise admissible (1.699028ms)
+✔ R4-T0-8 an exception rationale asserting a fact the receipt does not contain is refused (1.138155ms)
+✔ R4-T0-8 a rationale generated from receipt facts is accepted (2.508732ms)
+✔ R4-T0-9 control: three distinct dispatch bindings are admitted (1.422286ms)
+✔ R4-T0-9 readiness evidence whose full binding equals the authoring dispatch is refused as self-review (0.886922ms)
+✔ R4-T0-9 Advisor evidence whose full binding equals the authoring dispatch is refused as self-review (0.895463ms)
+✔ R4-T0-9 an equal native subagent id alone, under otherwise distinct bindings, is refused as self-review (0.95723ms)
+✔ R4-T0-9 regression: a readiness dispatch id equal to the authoring id keeps its existing code DWP-READINESS-BINDING (0.95629ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 29.183953
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-workflow-package-route.test.mjs:159:1
+✖ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (2.652358ms)
+  AssertionError [ERR_ASSERTION]: refusal wording must not change
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-workflow-package-route.test.mjs:161:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

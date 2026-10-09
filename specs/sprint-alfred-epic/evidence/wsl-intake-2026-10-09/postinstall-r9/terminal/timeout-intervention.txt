@@ -1,0 +1,32 @@
+command: node scratch/stop-stalled-alfred-suite-groups.mjs --apply
+label: alfred-owned-suite-timeout-intervention
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+{
+  "schema": "alfred.verify-suite-timeout-intervention.v1",
+  "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+  "outerVerifyStopped": false,
+  "qualification": "failed/interrupted suites; no PASS claim",
+  "action": "SIGTERM-owned-detached-suite-groups",
+  "suites": [
+    {
+      "file": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "reason": "encrypted fixture OpenSSL child has waited over 30 minutes without passin; observed PID201548",
+      "elapsedSeconds": 2259,
+      "startId": "60498",
+      "pid": 172594
+    },
+    {
+      "file": "plugins/pipeline-core/scripts/verify-journal.test.mjs",
+      "reason": "suite exceeded 30 minutes; no live child process and no terminal receipt",
+      "elapsedSeconds": 1901,
+      "startId": "96319",
+      "pid": 303382
+    }
+  ]
+}
+
+--- stderr ---

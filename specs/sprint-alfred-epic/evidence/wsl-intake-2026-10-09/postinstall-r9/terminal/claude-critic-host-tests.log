@@ -1,0 +1,27 @@
+PASS CLH01 builds exact native argv with bare, CLI schema, fixed read-only tools and shell-free execution
+PASS CLH02 Claude packet execution accepts an admitted session model only with the same sealed session readback
+PASS CLH03 rejects an unbound selected Claude route before any model probe or export
+PASS CLH04 optional Claude selector failure uses only the exact validated V3 route
+PASS CLH05 refuses a stale Claude packet instead of guessing after V3 fallback
+PASS CLH06 preflights and reuses one exact executable identity without PATH or shell
+PASS CLH07 does not turn timeout or verdict bytes into a fallback
+PASS CLH08 rejects a packet without dispatch references before claim, export or native probe
+PASS CLH09 rejects an occupied result destination before claim, export or native probe
+PASS CLH10 binds the real preflight packet and launched native prompt to the exact candidate inputs
+PASS CLH11 rechecks the result destination immediately before the real native review launch
+file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13
+function fail(code) { const error = new Error(code); error.code = code; throw error; }
+                                    ^
+
+Error: CDI-DIGEST
+    at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+    at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+    at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+    at repository (file://<repo-root>/plugins/pipeline-core/scripts/critic-claude-host.test.mjs:76:19)
+    at file://<repo-root>/plugins/pipeline-core/scripts/critic-claude-host.test.mjs:298:16
+    at check (file://<repo-root>/plugins/pipeline-core/scripts/critic-claude-host.test.mjs:26:28)
+    at file://<repo-root>/plugins/pipeline-core/scripts/critic-claude-host.test.mjs:297:1 {
+  code: 'CDI-DIGEST'
+}
+
+Node.js v24.15.0

@@ -1,0 +1,10 @@
+PASS NB01 writeTargetPath prefers file_path, accepts notebook_path, else empty
+PASS NB02 every write matcher in hooks.json names NotebookEdit
+PASS NB03 a NotebookEdit in a governed repo without a ready bootstrap is refused
+PASS NB04 NotebookEdit is treated exactly like Edit by the admission gate
+PASS NB05 a NotebookEdit with no usable path fails closed rather than allowing
+PASS NB06 guard-gate-strength sees a NotebookEdit target (GS-6)
+PASS NB08 the shared reader is the only place naming notebook_path
+
+notebook-write-coverage: 7 passed, 1 failed
+FAIL NB07 no write guard reads tool_input.file_path directly any more: guard-lifecycle-ready.mjs does not use the shared write-target reader

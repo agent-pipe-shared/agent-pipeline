@@ -1,0 +1,58 @@
+ok 1 - closed profile receipt and canonical serialization bind the validated projection
+ok 2 - narrow PO-language projection ignores runner schema while requiring an exact language pair
+ok 3 - profile-only readback validates the receipt without pipeline-state, PRD or Spec inputs
+ok 4 - profile-only readback rejects missing, stale and non-0600 receipts
+ok 5 - profile-only readback rejects symlinked receipt, source and runtime inputs
+ok 6 - profile-only readback follows the existing registered linked-worktree authority
+ok 7 - profile-only failures and evidence never expose machine-local paths or raw profile bytes
+ok 8 - source, runtime, common receipt and one marked PRD form one valid authority
+ok 9 - pipeline-start can validate the shared profile when no feature is active
+ok 10 - a mixed project authority (neutral manifest present without neutral State while legacy State remains) fails the state authority closed instead of silently reading the legacy State
+ok 11 - a missing project authority (no legacy or neutral manifest at the current checkout) fails the state authority closed
+ok 12 - validatePoGateAuthorityForRepository propagates the fail-closed state authority code for a mixed project authority
+ok 13 - an internally consistent legacy linked-worktree language cannot override the primary receipt
+ok 14 - a stale primary projection invalidates the common receipt
+ok 15 - missing, non-0600 and noncanonical receipts all fail closed with repair guidance
+ok 16 - symlinked receipt leaves and parents fail before receipt content is trusted
+ok 17 - a relocated primary root or mismatched repository fingerprint makes the receipt stale
+ok 18 - zero and multiple child PRDs fail exact active-directory cardinality
+ok 19 - spec, design and SDP artifacts do not affect PRD cardinality
+ok 20 - a wrong planPath and a traversal path cannot become PRD authority
+ok 21 - an unregistered current checkout cannot borrow the primary authority
+ok 22 - symlinked feature directories and PRD leaves fail physical-path validation
+ok 23 - missing, duplicate and wrong-language markers fail before approval
+ok 24 - a documentLanguage marker admits a non-de/en PRD without moving the operator-facing profile
+ok 25 - without a documentLanguage marker, the PRD language must still equal the operator-facing profile
+ok 26 - the technical Spec marker has closed single-line lowercase grammar
+ok 27 - the PO plan acknowledgement marker must be present exactly once
+ok 28 - a PRD carrying the language marker, the Spec marker and the acknowledgement marker exactly once each passes
+ok 29 - technical Spec marker binds the neighboring spec.md bytes and detects drift
+ok 30 - invalid UTF-8 in the primary profile or PRD text fails closed
+ok 31 - a bound plan digest detects a stale post-validation PRD
+ok 32 - a bound Spec digest alone accepts the current PRD's neighboring spec.md
+Plan submitted by "coordinator" on 2026-07-18T18:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature/prd_feature.md(eb603ed913c6...)+specs/feature/spec.md(a4a3e6a77385...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+DWP-PRESENT-RETIRED: use present-plan --review-receipt
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+2 !== 0
+
+    at submitFixturePlan (file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:712:10)
+    at file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:722:5
+    at withFixture (file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:244:12)
+    at file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:717:3
+    at check (file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:57:3)
+    at file://<repo-root>/plugins/pipeline-core/lib/po-gate-authority.test.mjs:716:1 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

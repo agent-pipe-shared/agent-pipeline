@@ -1,0 +1,21 @@
+✖ K19001 course inspection exposes runner-specific readiness and preserves typed native Advisor unavailability (1.122114ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5.107769
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K19001 course inspection exposes runner-specific readiness and preserves typed native Advisor unavailability (1.122114ms)
+  TypeError: Cannot read properties of undefined (reading 'status')
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-coordinator.test.mjs:29:33)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)

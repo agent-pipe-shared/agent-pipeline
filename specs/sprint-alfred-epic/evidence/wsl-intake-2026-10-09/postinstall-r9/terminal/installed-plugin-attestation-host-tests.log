@@ -1,0 +1,43 @@
+✔ IPH01 post-install readback is runner-neutral and writes path-free receipts that the core verifies (584.822ms)
+✔ IPH02 terminal-template attestation producer preserves Codex setupAction argv and verifies its receipt (172.741389ms)
+✔ IPH03 Codex accepts an exact real-directory marketplace copy bound to its clean Git source (227.215036ms)
+✔ IPH04 readback is request-selected and a changed installed copy cannot reuse a receipt (143.061876ms)
+✔ IPH05 receipt storage inside source or installed trees is rejected (22.409053ms)
+✔ IPH06 dirty source, stale copy, and embedded credential origin fail before a receipt survives (152.082071ms)
+✔ IPH07 bootstrap fails closed when its bound host locator is missing or stale (110.081189ms)
+✔ IPH08 unsupported provider and unsorted or escaping protected paths are refused (22.645944ms)
+✖ IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed (368.310577ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1808.347908
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed (368.310577ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.start-preflight.v1","status":"hook-provisioning-required","statusScope":"plugin-distribution-identity-and-mandatory-local-hooks","version":"1.2.3-test.1","installedVersion":"1.2.3-test.1","installedSource":"local-development","installedPluginAttestation":{"schema":"pipeline.installed-plugin-attestation-bootstrap.v1","status":"not-required","reasonCodes":[]},"executionBoundary":"default","pluginRoot":"/tmp/ipa-host-fFAAc2/installed/pipeline-core/1.2.3-test.1","rulesetSource":{"schema":"pipeline.ruleset-source.v1","runner":"codex","selectedPlugin":{"id":"pipeline-core@agent-pipeline-local","version":"1.2.3-test.1"},"source":{"class":"local-development"},"loadedIdentity":{"status":"available","algorithm":"content-sha256","value":"303b075d1472cdbaeabf0ddac8d90ba3e81e49f398ff9089e32a7736f463d860"},"installedIdentity":{"status":"available","algorithm":"content-sha256","value":"303b075d1472cdbaeabf0ddac8d90ba3e81e49f398ff9089e32a7736f463d860"}},"handoff":"none","concurrentSessionWarning":null,"architectureOrientation":{"schema":"pipeline.architecture-adoption-orientation.v1","status":"adoption-required","root":"/tmp/ipa-host-fFAAc2/source","adoption":{"state":"adoption-required","scope":null,"decisionRef":null,"coverageClass":"unavailable","confidence":"estimated"},"physicalMap":{"greenfieldScaffold":false,"status":"missing"},"guidance":"No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation.","nextAction":{"kind":"command","executable":"node","argv":["/tmp/ipa-host-fFAAc2/installed/pipeline-core/1.2.3-test.1/scripts/architecture-adoption.mjs","propose","--root","/tmp/ipa-host-fFAAc2/source","--json"],"mutation":false,"requiresConfirmation":false,"executionBoundary":"default","expected":{"schema":"pipeline.adoption-proposal.v1"}}},"effectiveDecisions":{"schema":"pipeline.architecture-decision-bootstrap-observation.v1","area":"project","status":"blocked","code":"ARCH-CONTINUITY-SOURCE-UNRESOLVED","projectionSha256":null,"decisionCount":0,"findingCount":1,"taskScopeResolved":false},"dutyNotRuntimeLive":{"status":"in-force"},"nextAction":{"kind":"command","executable":"<home>/.local/opt/node-v24.15.0-linux-x64/bin/node","argv":["/tmp/ipa-host-fFAAc2/installed/pipeline-core/1.2.3-test.1/scripts/clone-hook-readiness.mjs","--root","/tmp/ipa-host-fFAAc2/source","--apply"],"mutation":true,"requiresConfirmation":true,"executionBoundary":"default","expected":{"schema":"pipeline.mandatory-hook-readiness.v1","status":"ready"}},"cloneProvisioning":{"schema":"pipeline.clone-provisioning-report.v1","status":"provisioning-required","checks":[{"id":"pre-push-hook","status":"install","path":"/tmp/ipa-host-fFAAc2/source/.git/hooks/pre-push","repairAction":"node plugins/pipeline-core/scripts/pre-push-hook-install.mjs --install"},{"id":"pre-commit-hook","status":"install","path":"/tmp/ipa-host-fFAAc2/source/.git/hooks/pre-commit","repairAction":"node plugins/pipeline-core/scripts/pre-commit-hook-install.mjs --install"},{"id":"commit-msg-hook","status":"install","path":"/tmp/ipa-host-fFAAc2/source/.git/hooks/commit-msg","repairAction":"node plugins/pipeline-core/scripts/commit-msg-hook-install.mjs --install"},{"id":"po-profile-receipt","status":"absent","path":"/tmp/ipa-host-fFAAc2/source/.git/agent-pipeline/po-gate/profile-receipt.json","repairAction":"node setup.mjs --publish-po-profile"},{"id":"private-state-directory","status":"absent","path":"/tmp/ipa-host-fFAAc2/source/.git/agent-pipeline","repairAction":"mkdir -p /tmp/ipa-host-fFAAc2/source/.git/agent-pipeline"}]},"mandatoryHookReadiness":{"status":"provisioning-required","code":"HOOK-READINESS-INSTALL-REQUIRED","required":[{"id":"pre-commit-hook","status":"install","path":"/tmp/ipa-host-fFAAc2/source/.git/hooks/pre-commit","repairAction":"node plugins/pipeline-core/scripts/pre-commit-hook-install.mjs --install"},{"id":"commit-msg-hook","status":"install","path":"/tmp/ipa-host-fFAAc2/source/.git/hooks/commit-msg","repairAction":"node plugins/pipeline-core/scripts/commit-msg-hook-install.mjs --install"}]},"bootstrapPayload":{"schema":"pipeline.bootstrap-payload-receipt.v1","mode":"normal","retainedChecks":["lifecycle","authority","calibration","handover","verify","continuation","architecture"],"originalMeasurement":{"schema":"pipeline.bootstrap-payload-measurement.v1","metric":"utf8-byte-upper-bound","exactModelTokens":false,"mode":"normal","runner":"runner-neutral","bytes":2553,"upperBoundUnits":2553,"maxUpperBoundUnits":45000,"withinBudget":true,"digestSha256":"0b0e62cbdce50c7f9ee9f556b376beaac2f340132fc11744306367e08b90a9c4"},"emittedMeasurement":{"schema":"pipeline.bootstrap-payload-measurement.v1","metric":"utf8-byte-upper-bound","exactModelTokens":false,"mode":"normal","runner":"runner-neutral","bytes":2553,"upperBoundUnits":2553,"maxUpperBoundUnits":45000,"withinBudget":true,"digestSha256":"0b0e62cbdce50c7f9ee9f556b376beaac2f340132fc11744306367e08b90a9c4"},"overBudget":false,"truncated":false}}
+  + actual - expected
+  
+  + 'hook-provisioning-required'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs:288:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'hook-provisioning-required',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

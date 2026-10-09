@@ -1,0 +1,49 @@
+{
+  "trackedFiles": 6273,
+  "sourceSnapshotUnchanged": true,
+  "liveRootUnchanged": true,
+  "rootStatus": "",
+  "changedGraphPaths": [
+    "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs"
+  ],
+  "debtCaseBlocksByteEqual": true,
+  "caseCount": 18,
+  "runs": [
+    {
+      "name": "postimage-full",
+      "exit": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "name": "debt-open",
+      "exit": 0,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "name": "debt-recovery",
+      "exit": 0,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "name": "debt-unavailable",
+      "exit": 0,
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:33 -> ../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md: target is not tracked
+DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:48 -> ../specs/sprint-nova-epic/implementation/git-boundary-threat-model.json: target is not tracked
+DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:7 -> adr/0058-guard-maintenance-window.md: target is not tracked
+Documentation contracts failed: 3 finding(s).

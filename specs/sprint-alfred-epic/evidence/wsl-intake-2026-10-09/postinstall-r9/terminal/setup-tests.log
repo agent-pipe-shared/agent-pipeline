@@ -1,0 +1,832 @@
+PASS  advisor export consent: byte-bounded patch supports enabled-default absence, decline, and approval
+PASS  advisor export consent: disclosure names exported data and explicit opt-out with a copyable setup command
+PASS  advisor export consent: setup reports the approved/disabled status without raw export data
+pipeline.user.v3 and its runner-neutral advisory runtime projections are current; setup performed no writes.
+Advisory is disabled: advisor export consent is explicitly declined.
+To review the disclosure and configure consent, run:
+  node setup.mjs --configure-advisor-export
+Toolchain prerequisites: ready.
+  node: ready (version 24.15.0)
+  git: ready (version 2.50.1)
+  Setup did not install or modify any tool.
+Advisor export is repository-scoped and enabled by default.
+The configured same-runner advisor receives one advisory question and the allowlisted repository candidate material needed to answer it.
+It does not authorize secrets, credentials, unrelated paths, raw question/answer persistence, or a runner/model substitution.
+Set advisor_export.consent to declined to opt out; only an explicit decline keeps Advisory off without starting a probe or child.
+Advisor export consent recorded as approved.
+PASS  run: no-flag V3 check stays read-only and explicit opt-out prompt keeps advisory enabled by default
+PASS  run: projection-current V3 cannot bypass native readback through root setup
+PASS  validateCompiledPipelineYaml: generated default projection passes canonical validation
+PASS  PO profile receipt: validated primary projection publishes canonical mode-0600 receipt
+PASS  PO profile receipt: atomic replacement leaves no adjacent temp
+PASS  PO profile receipt: publisher result exposes digests but no machine path
+PASS  PO profile receipt: source/runtime disagreement fails before common-dir mutation
+PASS  PO profile receipt: linked setup fails without copying or rewriting its branch profile
+Repository-scoped PO profile receipt published for language de.
+pipeline.user.v3 and its runner-neutral advisory runtime projections are current; setup performed no writes.
+Advisory is disabled: advisor export consent is explicitly declined.
+To review the disclosure and configure consent, run:
+  node setup.mjs --configure-advisor-export
+Toolchain prerequisites: ready.
+  node: ready (version 24.15.0)
+  git: ready (version 2.50.1)
+  Setup did not install or modify any tool.
+PASS  run: explicit PO receipt publication accepts V3 language authority without coupling normal verification
+PASS  setup toolchain report includes versions, blocked claims, executable prerequisite chains, and the no-install boundary
+PASS  setup toolchain report treats execution boundaries as observations rather than missing installations
+PASS  run: a v1 source is migration-only and setup leaves source/runtime byte-identical
+PASS  run: a new install is lifecycle-classified and fails closed instead of creating legacy defaults
+PASS  run: lifecycle remediation omits typed action data from logs
+PASS  V3 migration diagnostic names all explicit review and activation steps
+PASS  run: --force cannot bypass explicit V3 migration activation
+PASS  run: missing non-V3 source is never compiled and leaves every runtime target unchanged
+PASS  run: empty non-V3 source is never compiled and leaves every runtime target unchanged
+PASS  run: unknown non-V3 source is never compiled and leaves every runtime target unchanged
+PASS  validatePolicyLockPreflight: mandate/strict fail before setup mutation; advisory warns and unbound is inert
+PASS  run: legacy source stops at the P3B migration gate before policy or runtime mutation
+PASS  run: matching legacy overlay still cannot authorize a v1 compiler write
+PASS  run: repeated legacy setup attempts are byte-identical without reading machine-local mapping
+PASS  validateSharedLock: exact 40-hex lock matches checked-out Public Core
+PASS  validateSharedLock: missing lock fails closed
+PASS  validateSharedLock: abbreviated lock fails closed
+PASS  validateSharedLock: mismatch fails before mutation
+PASS  three-scope fixtures: consumer has no overlay and therefore safe-stops
+PASS  three-scope fixtures: maintainer lock is anonymous full 40-hex
+PASS  three-scope fixtures: ignored mapping is never a setup projection
+PASS  run: legacy source does not invoke the v1 manifest compiler and leaves all targets byte-identical
+PASS  validateCompiledPipelineYaml: semantic release error is rejected before compiler writes
+PASS  resolveCompiledRuntimeTargets: a neutral-authority project gets project/ write targets
+PASS  resolveCompiledRuntimeTargets: a legacy-authority project still gets .claude/ write targets (never silently migrated by running setup)
+PASS  resolveCompiledRuntimeTargets: a 'missing'-status project with only a legacy calibration (no manifest anywhere) still gets .claude/ write targets, not orphaned onto project/
+PASS  resolveCompiledRuntimeTargets: a pristine project (no authority manifest at either tier) is deliberately seeded at the neutral tier
+PASS  resolveCompiledRuntimeTargets: an ambiguous/broken authority state (e.g. mixed) falls back to the legacy target instead of guessing
+PASS  applyAboPreset pro: worktypes.design is sonnet (no opus)
+PASS  applyAboPreset pro: worktypes.feature.advisor stays off
+PASS  applyAboPreset pro: worktypes.mini.advisor is sonnet (no bigger model available)
+PASS  applyAboPreset pro: models.implement sonnet/medium
+PASS  applyAboPreset pro: models.deep sonnet/xhigh
+PASS  applyAboPreset max: worktypes.design is opus/high (design_phase) + opus/high (execution_phase, 2026-07-10 routing revision: no more effort:max in execution_phase)
+PASS  applyAboPreset max: worktypes.feature.execution_phase is sonnet/high (2026-07-10 routing revision)
+PASS  applyAboPreset max: worktypes.feature.advisor is opus (2026-07-10 routing revision)
+PASS  applyAboPreset max: worktypes.mini.advisor is opus
+PASS  applyAboPreset max: worktypes.mini execution_phase/design_phase are both high (no leftover max)
+PASS  applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness, models UNCHANGED)
+PASS  applyAboPreset max: matches buildDefaultAnswers() worktypes + models
+PASS  applyAboPreset pro: execution_phase effort is high everywhere (2026-07-10 routing revision, no more max)
+PASS  applyAboPreset api/eigene fallback: shares the max preset (opus/high design)
+PASS  applyAboPreset unrecognized tier: falls back to the max preset
+PASS  applyAutonomyPreset konservativ: gated / feature-branch
+PASS  applyAutonomyPreset autonom: standing-approved / direct-main
+PASS  applyAutonomyPreset case/prefix-insensitive ('Autonomous') -> autonom branch
+PASS  applyAutonomyPreset undefined -> conservative default
+PASS  resolveRoutingAnswers: empty tier answer KEEPS the existing personalized worktypes (no clobber by the generic preset -- Critic finding #2)
+PASS  resolveRoutingAnswers: empty tier answer KEEPS the existing personalized models
+PASS  resolveRoutingAnswers: empty autonomy answer KEEPS the existing personalized autonomy
+PASS  resolveRoutingAnswers: explicit tier answer ('pro') applies the fresh preset, overriding previous (deliberate override)
+PASS  resolveRoutingAnswers: explicit autonomy answer ('autonomous') applies standing-approved/direct-main
+PASS  resolveRoutingAnswers: explicit autonomous preset nudges feature.advisor to opus
+PASS  resolveRoutingAnswers: does not mutate the caller's `previous.worktypes` object
+PASS  resolveRoutingAnswers: returned worktypes DOES carry the nudge
+PASS  resolveRoutingAnswers: fresh install (defaults as previous) + empty answers == applyAboPreset('max') (no-op vs. old behaviour)
+PASS  normalizeLang: 'en' -> en
+PASS  normalizeLang: 'de' -> de
+PASS  normalizeLang: unsupported value has no fallback
+PASS  normalizeLang: missing value has no fallback
+PASS  validateHumanFacingLanguage: rejects empty source value fail-closed
+PASS  validateHumanFacingLanguage: rejects unsupported source value fail-closed
+PASS  renderUserYaml: idempotent (same answers -> byte-identical text twice)
+PASS  renderUserYaml(buildDefaultAnswers()) remains v1-only and cannot overwrite committed V3 authority
+PASS  renderUserYaml: reflects customized public setup intent
+PASS  renderUserYaml: never renders identity or platform coordinates
+PASS  renderUserYaml: direct routing is the sole top-level source
+PASS  renderUserYaml: disabled design advisor stays an explicit off sentinel
+PASS  renderUserYaml: feature advisor carries a nested direct selector
+PASS  renderUserYaml: Codex implementation carries the canonical model ID without a fabricated ID
+PASS  renderUserYaml: carries the commented release: starter example
+PASS  renderUserYaml: release starter is placed after gates:, before the Advanced/autonomous example
+PASS  renderUserYaml: no LIVE (uncommented) release: key -- stays inert by default
+PASS  answersFromParsed: null parsed -> defaults
+PASS  answersFromParsed: non-object parsed -> defaults
+PASS  answersFromParsed: partial merge overrides public setup intent
+PASS  answersFromParsed: partial merge overrides autonomy.push_policy
+PASS  answersFromParsed: partial merge keeps autonomy.branch_model from defaults
+PASS  answersFromParsed: untouched top-level blocks (language) stay at defaults
+PASS  answersFromParsed: partial worktypes.feature.advisor override applied
+PASS  answersFromParsed: worktypes.feature.design_phase/execution_phase kept from defaults (partial worktype object)
+PASS  answersFromParsed: untouched worktypes (design, mini) stay at defaults
+PASS  answersFromParsed: partial models.deep.effort override applied
+PASS  answersFromParsed: models.deep.model kept from defaults (partial tier object)
+PASS  answersFromParsed: untouched models tiers (implement, mechanic, review) stay at defaults
+PASS  answersFromParsed: no release key in parsed -> no release key in result
+PASS  answersFromParsed: buildDefaultAnswers() itself carries no release key
+PASS  answersFromParsed: a present release section is threaded through unchanged
+PASS  answersFromParsed: a non-object release is dropped, not passed through
+PASS  shortHash: deterministic (same input -> same hash)
+PASS  shortHash: different input -> different hash
+PASS  shortHash: 16 hex chars
+PASS  generatedMarker: embeds the sourceHash
+PASS  extractRecordedHash: round-trips the embedded hash
+PASS  extractRecordedHash: no marker present -> null
+PASS  extractRecordedHash: non-string input -> null
+PASS  decideCompileAction: file absent -> write/initial
+PASS  decideCompileAction: exists but unparseable -> warn/unparseable
+PASS  decideCompileAction: existing bytes == wanted bytes -> skip/up-to-date
+PASS  decideCompileAction: committed baseline (no recorded hash) -> write/baseline
+PASS  decideCompileAction: recorded hash != current source hash -> write/source-changed
+PASS  decideCompileAction: recorded hash == current hash but bytes differ -> warn/drift
+PASS  resolveWarnDisposition: force + interactive -> write-forced (skips the confirm prompt)
+PASS  resolveWarnDisposition: force + non-interactive -> write-forced (allows the otherwise-refused clobber)
+PASS  resolveWarnDisposition: no force + interactive -> prompt (unchanged existing behaviour)
+PASS  resolveWarnDisposition: no force + non-interactive -> refuse (still never silently clobbers a hand-edit)
+PASS  parseArgv: no flags -> defaults=false, force=false, help=false
+PASS  parseArgv: --force -> force=true
+PASS  parseArgv: --yes -> force=true (alias)
+PASS  parseArgv: --defaults --force -> both true
+PASS  parseArgv: --defaults alone -> force stays false
+PASS  parseArgv: explicit adapter migration is opt-in, never a normal-setup default
+PASS  parseArgv: explicit PO-profile publication is opt-in and standalone
+PASS  parseArgv: advisor export configuration is explicit and standalone
+PASS  compileSettingsJson: projects the generic agent-pipeline marketplace mapping
+PASS  compileSettingsJson: no existing state -> synthesizes statusLine/enabledPlugins
+PASS  compileSettingsJson: gated (default) push_policy -> NO permissions key (ADR-0017 no bleed-over)
+PASS  compileSettingsJson: $generated marker embeds the sourceHash
+PASS  compileSettingsJson: standing-approved push_policy -> permissions.allow contains both git push* entries
+PASS  compileSettingsJson: standing-approved -> statusLine/enabledPlugins still present
+PASS  compileSettingsJson: preserves unrelated existing top-level fields
+PASS  compileSettingsJson: preserves the caller's own statusLine untouched
+PASS  compileSettingsJson: preserves a pre-existing sibling marketplace entry
+PASS  compileSettingsJson: replaces a legacy agent-pipeline mapping with the generic binding
+PASS  compilePipelineJson: no existing state -> synthesizes project/verify/handover
+PASS  compilePipelineJson: autonomy field mirrors answers.autonomy.push_policy
+PASS  compilePipelineJson: branchModel mirrors answers.autonomy.branch_model
+PASS  compilePipelineJson: wipLimit mirrors answers.autonomy.wip_limit
+PASS  compilePipelineJson: claudeMdMaxLines mirrors answers.gates.claude_md_max_lines
+PASS  compilePipelineJson: $generated marker embeds the sourceHash
+PASS  compilePipelineJson: preserves existing unrelated fields (project, customField, constraints)
+PASS  compilePipelineJson: overwrites autonomy/branchModel/wipLimit/claudeMdMaxLines from answers regardless
+PASS  renderPipelineYaml: full feature execution route mirrors direct worktype routing
+PASS  renderPipelineYaml: all six profile-phase routes are projected
+PASS  renderPipelineYaml: goldfish model-routing mirrors direct implement duty
+FAIL  renderPipelineYaml: goldfish_mechanic mirrors direct mechanic duty — # pipeline.yaml -- declarative pipeline manifest (project-authority-resolved location, schema pipeline.manifest.v0).
+# GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: hashGHI)
+# ADDITIVE to the project-authority calibration file (project calibration) -- disjoint field sets.
+# Validate with: node harness/scripts/validate-manifest.mjs
+
+schema: pipeline.manifest.v0
+
+language:
+  human_facing: en
+
+session:
+  keep_awake: false
+
+phases:
+  - name: design
+    enabled: true
+  - name: implementation
+    enabled: true
+  - name: security-scan
+    enabled: true
+  - name: ui-design
+    enabled: true
+    condition: has_ui
+
+gates:
+  dev-plan:
+    mode: warn
+    type: human
+  push:
+    mode: blocking
+    type: human
+    approval: required
+  security:
+    mode: off
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+      rules_dir: governance/examples/policies/semgrep
+
+modelRouting:
+  # Generated Claude compatibility projection: authority=4db7f19aed7fcd3b mappings=cbc1315e7f410f6b runner=claude source=pipeline.user.yaml routing.v1.
+  # Do not edit this block as an independent routing authority.
+  elephant_design_design:
+    model: opus
+    effort: high
+  elephant_design_execution:
+    model: opus
+    effort: high
+  elephant_feature_design:
+    model: opus
+    effort: high
+  elephant_feature_execution:
+    model: opus
+    effort: high
+  advisor_feature:
+    model: opus
+    effort: not-applicable
+  elephant_mini_design:
+    model: sonnet-5
+    effort: high
+  elephant_mini_execution:
+    model: sonnet-5
+    effort: high
+  advisor_mini:
+    model: opus
+    effort: not-applicable
+  goldfish:
+    model: sonnet-5
+    effort: medium
+  goldfish_mechanic:
+    model: haiku
+    effort: medium
+  goldfish_deep:
+    model: sonnet-5
+    effort: xhigh
+  critic:
+    model: haiku
+    effort: high
+
+runnerRoutes:
+  # Generated provider-neutral projection: authority=4db7f19aed7fcd3b mappings=cbc1315e7f410f6b runner=codex source=pipeline.user.yaml routing.v1.
+  # Alias resolution is not provider/model attestation; only a valid route receipt can attest it.
+  worktype_design_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_design_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_implement:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: medium
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_mechanic:
+    runner: claude
+    selector:
+      kind: alias
+      value: haiku
+    effort: medium
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_deep:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_review:
+    runner: claude
+    selector:
+      kind: alias
+      value: haiku
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_codex_design:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-6-astra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_independent_critic:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_implementation:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_goldfish:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_mechanic:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_deep:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+
+profiles:
+  active: full-sdlc
+  quick:
+    phases:
+      - implementation
+  full-sdlc:
+    phases:
+      - design
+      - implementation
+      - security-scan
+      - ui-design
+
+governance:
+  guidelines_path: governance/examples/guidelines
+  policies_path: governance/examples/policies
+
+flags:
+  has_ui: false
+
+PASS  renderPipelineYaml: goldfish_deep mirrors direct deep duty (MP-27 3-tier completeness)
+PASS  renderPipelineYaml: critic model-routing mirrors direct review duty
+PASS  renderPipelineYaml: dev-plan gate mode mirrors gates.dev_plan
+PASS  renderPipelineYaml: security gate mode mirrors gates.security
+PASS  renderPipelineYaml: push approval is 'required' when push_policy is gated
+PASS  renderPipelineYaml: sourceHash embedded in the GENERATED header comment
+PASS  renderPipelineYaml: human-facing language projects from the source answers
+PASS  renderPipelineYaml: projects another accepted language deterministically
+PASS  renderPipelineYaml: generated de projection validates through the canonical runtime schema
+PASS  renderPipelineYaml: push approval is 'standing-approved' when push_policy is standing-approved
+PASS  renderPipelineYaml: no answers.release -> compiled manifest carries NO release: section at all
+PASS  renderPipelineYaml: a present answers.release DOES render a release: section
+PASS  renderPipelineYaml: release.environments.test.adapter present
+PASS  renderPipelineYaml: release.environments.prod.promotion present (human-gate)
+PASS  renderPipelineYaml: release.adapters.vercel-prod.trigger.refs rendered as a YAML list item
+PASS  renderPipelineYaml: release.adapters credentials rendered (never inline secret values, SEC-08)
+PASS  renderPipelineYaml: compiled release: section re-parses via yaml-lite back to the same shape
+PASS  renderPipelineYaml: compiled release: section validates against pipeline-manifest.schema.json's release shape
+PASS  classifyAgentsAdapter: absent remains absent
+PASS  classifyAgentsAdapter: exact public legacy metadata and integrity is the only mutable state
+PASS  classifyAgentsAdapter: exact migrated pointer is byte-idempotent
+PASS  classifyAgentsAdapter: current map-enabled adapter is a recognized v2 migration
+PASS  classifyAgentsAdapter: exact legacy-index dirty pointer transition is idempotently migrated
+PASS  classifyAgentsAdapter: generic dirty pointer is not accepted
+PASS  classifyAgentsAdapter: private-coordinate never becomes a migration target
+PASS  classifyAgentsAdapter: /absolute/path never becomes a migration target
+PASS  classifyAgentsAdapter: credential=value never becomes a migration target
+PASS  classifyAgentsAdapter: host: local never becomes a migration target
+PASS  classifyAgentsAdapter: account: user never becomes a migration target
+PASS  classifyAgentsAdapter: model: synthetic never becomes a migration target
+PASS  classifyAgentsAdapter: session: synthetic never becomes a migration target
+PASS  classifyAgentsAdapter: unknown-user-content never becomes a migration target
+PASS  inspectAgentsAdapter: same-size unknown remains manual/PO without content-hash ingestion
+PASS  AGENTS adapter authority: valid runtime manifest, bound pipeline-start identity and Operating Model are required together
+PASS  AGENTS adapter migration: known legacy writes the current canonical adapter exactly once
+PASS  AGENTS adapter migration: absent performs zero writes
+PASS  AGENTS adapter migration: migrated performs zero writes
+PASS  AGENTS adapter migration: manual-po-gate performs zero writes
+PASS  AGENTS adapter migration: invalid pipeline-start authority stops before target mutation
+PASS  AGENTS adapter migration: real first-write then rerun succeeds with zero second write
+
+187 passed, 1 failed
+Failures:
+  - renderPipelineYaml: goldfish_mechanic mirrors direct mechanic duty: # pipeline.yaml -- declarative pipeline manifest (project-authority-resolved location, schema pipeline.manifest.v0).
+# GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: hashGHI)
+# ADDITIVE to the project-authority calibration file (project calibration) -- disjoint field sets.
+# Validate with: node harness/scripts/validate-manifest.mjs
+
+schema: pipeline.manifest.v0
+
+language:
+  human_facing: en
+
+session:
+  keep_awake: false
+
+phases:
+  - name: design
+    enabled: true
+  - name: implementation
+    enabled: true
+  - name: security-scan
+    enabled: true
+  - name: ui-design
+    enabled: true
+    condition: has_ui
+
+gates:
+  dev-plan:
+    mode: warn
+    type: human
+  push:
+    mode: blocking
+    type: human
+    approval: required
+  security:
+    mode: off
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+      rules_dir: governance/examples/policies/semgrep
+
+modelRouting:
+  # Generated Claude compatibility projection: authority=4db7f19aed7fcd3b mappings=cbc1315e7f410f6b runner=claude source=pipeline.user.yaml routing.v1.
+  # Do not edit this block as an independent routing authority.
+  elephant_design_design:
+    model: opus
+    effort: high
+  elephant_design_execution:
+    model: opus
+    effort: high
+  elephant_feature_design:
+    model: opus
+    effort: high
+  elephant_feature_execution:
+    model: opus
+    effort: high
+  advisor_feature:
+    model: opus
+    effort: not-applicable
+  elephant_mini_design:
+    model: sonnet-5
+    effort: high
+  elephant_mini_execution:
+    model: sonnet-5
+    effort: high
+  advisor_mini:
+    model: opus
+    effort: not-applicable
+  goldfish:
+    model: sonnet-5
+    effort: medium
+  goldfish_mechanic:
+    model: haiku
+    effort: medium
+  goldfish_deep:
+    model: sonnet-5
+    effort: xhigh
+  critic:
+    model: haiku
+    effort: high
+
+runnerRoutes:
+  # Generated provider-neutral projection: authority=4db7f19aed7fcd3b mappings=cbc1315e7f410f6b runner=codex source=pipeline.user.yaml routing.v1.
+  # Alias resolution is not provider/model attestation; only a valid route receipt can attest it.
+  worktype_design_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_design_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_implement:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: medium
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_mechanic:
+    runner: claude
+    selector:
+      kind: alias
+      value: haiku
+    effort: medium
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_deep:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_review:
+    runner: claude
+    selector:
+      kind: alias
+      value: haiku
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_codex_design:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-6-astra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_independent_critic:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_implementation:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_goldfish:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_mechanic:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-luna
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+  duty_codex_deep:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: official-model-docs
+
+profiles:
+  active: full-sdlc
+  quick:
+    phases:
+      - implementation
+  full-sdlc:
+    phases:
+      - design
+      - implementation
+      - security-scan
+      - ui-design
+
+governance:
+  guidelines_path: governance/examples/guidelines
+  policies_path: governance/examples/policies
+
+flags:
+  has_ui: false
+
+setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.
+setup.mjs: a projection-only V3 result is not operational readiness; current native Codex runtime readback is required.
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: --force/--yes cannot authorize a V3 authority write; use the explicit V3 apply --activate workflow.
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding has no automatic repair available in this environment.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.
+setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. The detected legacy source is accepted only as a V3 migration input.
+No source or runtime projection was written.
+Inspect and review the digest-only plan before explicit activation:
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+  node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate

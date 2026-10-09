@@ -1,0 +1,52 @@
+PASS  TP01 block  Edit on configured protected test file
+PASS  TP02 block  Edit on a shipped baseline guard hook
+PASS  TP03 block  Write on configured protected test file (Write tool, not just Edit)
+PASS  TP04 block  path with backslashes (Windows) still matches (normalization)
+PASS  TP05 block  missing project config still keeps the shipped minimum active
+PASS  TP06 block  broken JSON is baseline-only and cannot remove static protection
+PASS  TP07 allow  no file_path at all
+PASS  TP08 block  explicit config id is used in the block message
+PASS  TP09 real armed GMW window scoped to TP-1 lifts the matching Edit
+PASS  TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule
+PASS  TP10 block  chat mode names its own next step (authorize --activate), not signature's
+PASS  TP11 block  chat mode's own next step still names authorize --activate given a relative path
+PASS  TP12 block  a route-less denial (Pipeline source) names the planner status it actually got
+PASS  TP13 block  the same fixture still offers a real route for an ordinary protected path
+PASS  TP15 block  test path refusal clearly states route-available-via-briefed-authorization
+PASS  TP16 block  non-test path refusal clearly states no-route-for-this-target
+PASS  TP17 allow  briefed test-change authorization admits exact target with matching digest
+PASS  TP18 block  briefed test-change authorization blocks when presenting mismatching digest
+PASS  TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes)
+PASS  TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again
+PASS  TP21 block  T84 the decision for the file does not depend on how its path is spelled
+✔ TPC001 TP01 block  Edit on configured protected test file (771.550434ms)
+✔ TPC002 TP02 block  Edit on a shipped baseline guard hook (224.62263ms)
+✔ TPC003 TP03 block  Write on configured protected test file (Write tool, not just Edit) (233.668191ms)
+✔ TPC004 TP04 block  path with backslashes (Windows) still matches (normalization) (226.557185ms)
+✔ TPC005 TP05 block  missing project config still keeps the shipped minimum active (230.485049ms)
+✔ TPC006 TP06 block  broken JSON is baseline-only and cannot remove static protection (486.727146ms)
+✔ TPC007 TP07 allow  no file_path at all (172.872497ms)
+✔ TPC008 TP08 block  explicit config id is used in the block message (490.286267ms)
+✔ TPC009 TP09 real armed GMW window scoped to TP-1 lifts the matching Edit (774.21886ms)
+✔ TPC010 TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule (801.792767ms)
+✔ TPC011 TP10 block  chat mode names its own next step (authorize --activate), not signature's (560.851378ms)
+✔ TPC012 TP11 block  chat mode's own next step still names authorize --activate given a relative path (231.351286ms)
+✔ TPC013 TP12 block  a route-less denial (Pipeline source) names the planner status it actually got (538.495226ms)
+✔ TPC014 TP13 block  the same fixture still offers a real route for an ordinary protected path (247.937411ms)
+✔ TPC015 TP15 block  test path refusal clearly states route-available-via-briefed-authorization (213.538053ms)
+✔ TPC016 TP16 block  non-test path refusal clearly states no-route-for-this-target (230.827389ms)
+✔ TPC017 TP17 allow  briefed test-change authorization admits exact target with matching digest (645.501551ms)
+✔ TPC018 TP18 block  briefed test-change authorization blocks when presenting mismatching digest (296.894257ms)
+✔ TPC019 TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes) (1259.599127ms)
+✔ TPC020 TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again (1127.362398ms)
+✔ TPC021 TP21 block  T84 the decision for the file does not depend on how its path is spelled (890.430065ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10661.723949
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

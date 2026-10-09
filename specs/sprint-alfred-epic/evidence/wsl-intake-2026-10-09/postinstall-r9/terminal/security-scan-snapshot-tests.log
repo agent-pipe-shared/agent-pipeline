@@ -1,0 +1,76 @@
+✔ control: clean tree, default mode scans HEAD and passes (fixture validity, GREEN today) (105.824921ms)
+✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (52.978308ms)
+✖ T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (53.133623ms)
+✔ T32 pin 2 (GREEN today, guards the kept behaviour): shared-tree mode still refuses a dirty tree (51.342292ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 267.505979
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:144:1
+✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (52.978308ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      commit: '6625f93129d9086063a4822234380e423df8972d',
+  +   exitCode: 2,
+  -   exitCode: 0,
+      scanners: [
+        {
+          findingCount: 0,
+  +       status: 'ERROR',
+  -       status: 'PASS',
+          tool: 'license-check'
+        }
+      ],
+      tree: '52199202f481506dfc1bee9971b0a7f1f842dfdd'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:151:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:163:1
+✖ T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (53.133623ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      commit: '20eaec80f2a5513004a6317bf86f499f46dcb1bc',
+      exitCode: 2,
+      scanners: [
+        {
+  +       findingCount: 0,
+  +       status: 'ERROR',
+  -       findingCount: 1,
+  -       status: 'FINDINGS',
+          tool: 'license-check'
+        }
+      ],
+      tree: 'de7192f7b546439511b58fe1bb6b99d578b0a31f'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs:169:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

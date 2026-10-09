@@ -1,0 +1,65 @@
+✖ producer captures real failed targeted result while full Verify remains explicitly not-run (72.718512ms)
+✖ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (73.824736ms)
+✖ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (108.295021ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 259.508719
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:28:1
+✖ producer captures real failed targeted result while full Verify remains explicitly not-run (72.718512ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:31:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:47:1
+✖ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (73.824736ms)
+  Error: CDI-DIGEST
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+      at validateCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+      at produceCriticDiagnostic (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:56:24)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    code: 'CDI-DIGEST'
+  }
+
+test at plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:60:1
+✖ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (108.295021ms)
+  AssertionError [ERR_ASSERTION]: CDI-DIGEST
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs:66:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

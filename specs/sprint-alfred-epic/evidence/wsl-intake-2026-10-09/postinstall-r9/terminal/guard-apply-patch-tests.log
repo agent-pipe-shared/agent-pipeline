@@ -1,0 +1,45 @@
+ok 1 - valid Add/Update/Delete/Move paths are extracted and checked
+ok 2 - every extracted path is subjected to the configured write guard
+ok 3 - multi-file patches use bounded parallel guard fan-out
+ok 4 - mixed parallel and repository-serial denials retain patch-input order
+ok 5 - every governed patch target requires dispatch-ready lifecycle without path exemptions
+ok 6 - invalid JSON, missing command and ambiguous envelopes block
+ok 7 - content before the first operation and unknown patch headers block
+ok 8 - empty, traversal, doubled-separator and whitespace paths block
+ok 9 - Move to is accepted only after Update File
+ok 10 - only guard-lifecycle-ready.mjs receives an explicit --runner codex argument; guard-testpath.mjs and guard-devplan.mjs keep their bare argv
+ok 11 - architectural invariant: evaluateLifecycleReadyGuard's own outer tool-name gate still does not recognize apply_patch -- a raw, untranslated call reaching it directly is admitted unconditionally even against a governed path that the identical path in translated Edit shape blocks (regression pin for backlog: raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate; if this ever stops holding, guard-apply-patch.mjs's translate-first comment needs re-reading before anyone relies on the outer gate alone)
+ok 12 - architectural invariant: guard-apply-patch.mjs's spawn loop synthesizes a bare Edit shape for guard-lifecycle-ready.mjs, never the original apply_patch tool_name or command envelope (regression pin: this is the only translation boundary before evaluateLifecycleReadyGuard, which does not itself recognize apply_patch)
+ok 13 - a generated checkpoint native patch cannot use a scratch alias to author product code before plan approval
+ok 14 - a generated checkpoint native patch cannot use a scratch alias to mutate authority before plan approval
+ok 15 - a generated checkpoint native patch rejects both symlinked scratch root and external scratch aliases
+ok 16 - EOF01 canonical Update and renamed Update terminate at exact End of File
+ok 17 - EOF02 orphan Add Delete and empty Update EOF markers fail closed
+ok 18 - EOF03 duplicate and nonterminal EOF markers fail closed
+ok 19 - EOF04 unknown headers and all original path checks remain closed
+ok 20 - EOF05 terminal marker resets only at a new file operation
+ok 21 - EOF06 terminal EOF preserves plain Update acknowledgement facts and protected rename destinations
+ok 22 - EOF07 inactive governance remains an unconditional hook no-op
+ok 23 - RCM01 renamed acknowledgement content reaches the writer-only denial with and without EOF
+ok 24 - RCM02 innocuous renamed content never claims an acknowledgement fact
+ok 25 - RCM03 a fact observed before Move to also protects its destination
+ok 26 - RCM04 rename facts stay within their own file operation
+not ok - the lifecycle guard is invoked per patched path with an explicit codex runner even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority, second production caller)
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(runnerStart >= 0 && runnerEnd > runnerStart)
+
+    at runLifecycleWithObservedCaller (file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:167:10)
+    at file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:429:20
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:282:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:424:1
+not ok - a genuinely empty V3 onboarding root reaches the native Codex apply-patch chain and admits generated staging authoring before plan approval
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/greenfield-native-guard-yl9df3","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"b078321a022848f014213c9c82c12badbd88365f5e13c4e10acf11bc57091db1","readbackSha256":"c721e42ac82aac725c73bad19254d93d44e6de4961ab906692e0a1284546daf6"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"command","executable":"node","argv":["<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs","bootstrap-bind-plan","--root","/tmp/greenfield-native-guard-yl9df3","--runner","codex"],"mutation":false,"requiresConfirmation":false,"expected":{"schema":"pipeline.codex-onboarding-kickoff-promotion-plan.v1","statuses":["bootstrap-binding-required"]},"pendingAsks":[{"kind":"collect-input","inputs":[{"name":"gitAuthorName","encoding":"utf8","trim":true,"minBytes":1,"maxBytes":320,"singleLine":true,"rejectNul":true},{"name":"gitAuthorEmail","encoding":"utf8","trim":true,"minBytes":1,"maxBytes":320,"singleLine":true,"rejectNul":true},{"name":"humanApprovalMode","encoding":"utf8","trim":true,"minBytes":1,"maxBytes":32,"singleLine":true,"rejectNul":true},{"name":"advisorExportConsent","encoding":"utf8","trim":true,"minBytes":8,"maxBytes":8,"singleLine":true,"rejectNul":true}],"mutation":false,"requiresConfirmation":false,"reviewedDefaults":{"runner":{"value":"codex","source":"explicit-caller","requiresConfirmation":true},"language":{"value":"en","source":"confirmed-intake-checkpoint","requiresConfirmation":false},"gitIdentity":{"user.name":{"value":null,"source":"absent","scope":null},"user.email":{"value":null,"source":"absent","scope":null}},"humanApproval":{"value":"chat","source":"machine-plane-or-fail-closed-default","requiresConfirmation":true},"advisorExportConsent":{"value":"declined","source":"fresh-project-no-export-default","requiresConfirmation":true}},"guidance":"Collect the initial PO round; the existing intake checkpoint already confirms en, so do not ask language again. Ask separately within this same round whether scoped repository material may be exported to a same-runner Advisor for a concrete consultation: approved or declined. Declined is preselected and causes no export; do not infer approval from Pipeline installation. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, confirmed language and Advisor choice, applies the shared human-approval policy for design/plan and push, reuses the already materialized public anchor, and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.","applyAction":{"kind":"command","executable":"node","argv":["<repo-root>/plugins/pipeline-core/scripts/onboarding-init.mjs","--root","/tmp/greenfield-native-guard-yl9df3","--runner","codex","--git-author-name","<PO_GIT_AUTHOR_NAME>","--git-author-email","<PO_GIT_AUTHOR_EMAIL>","--human-approval","<signature|chat>","--advisor-export-consent","<approved|declined>","--language","en"],"mutation":true,"requiresConfirmation":true,"expected":{"schema":"pipeline.onboarding-init.v1","statuses":["ready","collect-input","pending-asks","unsupported-next-action"]}},"expected":{"schema":"pipeline.onboarding-init.v1","outcomes":["ready","collect-input","pending-asks","unsupported-next-action"]}}]},"diagnostics":[{"path":"$.continuity","code":"bootstrap_binding_required","message":"staging PRD/spec/design-input are generated but not yet bound as authority","guidance":"review the read-only bootstrap-bind-plan action, then apply it"}]}
++ actual - expected
+
++ 'command'
+- 'architecture-design-required'
+
+    at file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:525:12
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:282:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs:472:1

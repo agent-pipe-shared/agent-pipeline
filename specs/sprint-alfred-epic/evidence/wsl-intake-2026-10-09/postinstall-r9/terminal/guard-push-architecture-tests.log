@@ -1,0 +1,34 @@
+✖ GPA001 stale map blocks strict push and explicit checkpoint persists typed debt (497.119365ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 500.846915
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ GPA001 stale map blocks strict push and explicit checkpoint persists typed debt (497.119365ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.
+  Reason: CHECKPOINT-APPROVAL-STATE-MISSING (the pipeline state record is missing or unreadable, so no approval can be verified).
+  Run: push-init.mjs --checkpoint prints the single attended authorize-critical command for this commit; record the result with approve-push, then retry the push.
+  
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/guard-push-architecture.test.mjs:48:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,77 @@
+{
+  "schema": "materializer-permanent-regression-evidence.v1",
+  "testSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+  "preservedBefore": {
+    "plugins/pipeline-core/lib/signed-quality-package.mjs": "d6ab8b735fb3745b6bb980047250cbc99b7ca02d761c6ee9ebde0b658cd62128",
+    "plugins/pipeline-core/lib/signed-quality-package.test.mjs": "b4d6a11694f026e470dcb5782c3b27e284cb54602b0c2c42f44f51ecaced75e6",
+    "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237",
+    ".git/index": "1363651ef0ff2006ace81117b8b99ca24250021d84168c8c5d8c0d84b1e89186",
+    "scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs": "aaadd6e354788eb141d4d3c25db44f3d9617c8502b5923ad55713317aefc87c6",
+    "scratch/alfred-materializer-scratch-fix-r1-20261009/signed-quality-package.mjs": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00"
+  },
+  "runs": {
+    "red": {
+      "exitCode": 1,
+      "counts": {
+        "pass": 4,
+        "fail": 9,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": [
+        "QPS001",
+        "QPS002",
+        "QPS003",
+        "QPS004",
+        "QPS005",
+        "QPS006",
+        "QPS007",
+        "QPS008",
+        "QPS009",
+        "QPS010",
+        "QPS011",
+        "QPS012",
+        "QPS013"
+      ],
+      "fd3Bytes": 2201,
+      "records": 15,
+      "fixtureCleanup": true
+    },
+    "green": {
+      "exitCode": 0,
+      "counts": {
+        "pass": 13,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": [
+        "QPS001",
+        "QPS002",
+        "QPS003",
+        "QPS004",
+        "QPS005",
+        "QPS006",
+        "QPS007",
+        "QPS008",
+        "QPS009",
+        "QPS010",
+        "QPS011",
+        "QPS012",
+        "QPS013"
+      ],
+      "fd3Bytes": 2202,
+      "records": 15,
+      "fixtureCleanup": true
+    }
+  },
+  "preservedAfter": {
+    "plugins/pipeline-core/lib/signed-quality-package.mjs": "d6ab8b735fb3745b6bb980047250cbc99b7ca02d761c6ee9ebde0b658cd62128",
+    "plugins/pipeline-core/lib/signed-quality-package.test.mjs": "b4d6a11694f026e470dcb5782c3b27e284cb54602b0c2c42f44f51ecaced75e6",
+    "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237",
+    ".git/index": "1363651ef0ff2006ace81117b8b99ca24250021d84168c8c5d8c0d84b1e89186",
+    "scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs": "aaadd6e354788eb141d4d3c25db44f3d9617c8502b5923ad55713317aefc87c6",
+    "scratch/alfred-materializer-scratch-fix-r1-20261009/signed-quality-package.mjs": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00"
+  },
+  "overlayCleanup": true
+}

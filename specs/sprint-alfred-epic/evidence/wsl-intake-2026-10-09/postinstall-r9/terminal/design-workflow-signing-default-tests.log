@@ -1,0 +1,128 @@
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (106.946075ms)
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (86.127732ms)
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (95.20142ms)
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (94.459995ms)
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (93.814617ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 486.453541
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (106.946075ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED"}
+  
+  false !== true
+  
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:61:120)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:67:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (86.127732ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED"}
+  
+  false !== true
+  
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:61:120)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:75:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (95.20142ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED"}
+  
+  false !== true
+  
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:61:120)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:84:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (94.459995ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED"}
+  
+  false !== true
+  
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:61:120)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:97:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (93.814617ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DWP-ADVISOR-EXCEPTION-RATIONALE-UNBACKED"}
+  
+  false !== true
+  
+      at fixture (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:61:120)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs:105:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,105 @@
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (1112.300824ms)
+✔ VCR02 the closed classifier distinguishes vulnerable and separately registered cases (3.380164ms)
+✔ VCR03 missing, new, duplicate, and stale registry entries fail closed (0.97013ms)
+✔ VCR04 unknown fields and missing backlog reasons cannot widen the registry (1.228932ms)
+✔ VCR05 a touched legacy suite must migrate in the same candidate (2.112854ms)
+✔ VCR06 base/candidate mode reads the candidate registry and enforces same-candidate migration (221.738062ms)
+✔ VCR07 required needs both the suite protocol and the Verify-side completion policy (5.851408ms)
+✔ VCR08 required cannot claim an unreachable helper call as normal suite setup (92.634759ms)
+✔ VCR09 required cannot alias a recorder or use an open registration configuration (1771.608952ms)
+✔ VCR10 required must resolve the import to the shipped completion helper (1.208463ms)
+✔ VCR11 every Verify array entry must use the closed literal registration grammar (2.310178ms)
+✔ VCR12 the candidate schema is loaded and enforced in worktree and Git blob modes (127.756506ms)
+✔ VCR13 a newly registered existing suite cannot enter as legacy (135.103813ms)
+✔ VCR14 the CLI rejects unpaired refs and unknown arguments (61.337806ms)
+✔ VCR15 required declarative suite is admitted from canonical closed JSON with real protocol (1.378347ms)
+✔ VCR16 required declarative registration still needs an explicit completion policy (1.047188ms)
+✔ VCR17 required declarative registration still needs actual reachable shipped protocol (0.96436ms)
+✔ VCR18 canonical declarative schema and unknown fields fail closed (4.504279ms)
+✔ VCR19 declarative path and full runtime completion policy constraints are enforced (9.810855ms)
+✔ VCR20 duplicate suite IDs and missing files fail while distinct IDs may share a canonical file (4.171886ms)
+✔ VCR21 physical declarative directory and outside-repository alias cannot become absence (1.804094ms)
+✔ VCR22 candidate JSON, policy and suite bytes cannot borrow matching working-tree bytes (386.888698ms)
+✔ VCR23 candidate declarative symlink and wildcard suite paths cannot borrow regular blobs (260.072339ms)
+✔ VCR24 new declarative registration cannot give an existing suite a legacy exemption (137.243589ms)
+✔ VCR25 base declarative registrations remain present in same-candidate migration inventory (148.345085ms)
+✔ VCR26 closed shorthand registration is admitted and produces an actual inherited-FD terminal receipt (39.722684ms)
+✔ VCR27 supplementary policy admits required completion without mutating an existing declarative row (1.498732ms)
+✔ VCR28 unknown, duplicate, malformed and conflicting supplementary policies fail the canonical gate (5.062533ms)
+✔ VCR29 candidate-bound supplementary JSON cannot borrow worktree policy or hide required historical absence (261.582333ms)
+✔ VCR30 published supplementary policy cannot be ignored when no matching declarative rows exist (1.075306ms)
+✔ VCR31 strict declarative monotone extension passes the full exact prior policy object to the augmentation loader (1.190493ms)
+✔ VCR32 static boolean case-presence markers cannot authorize a monotone policy extension (1.048748ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 31
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4815.561414
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (1112.300824ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      [
+        'audit-pack-tests',
+        'plugins/pipeline-core/scripts/audit-pack.test.mjs',
+        'top-level-assertions',
+  ...
+      [
+  -     'clone-hook-readiness-tests',
+  -     'plugins/pipeline-core/scripts/clone-hook-readiness.test.mjs',
+  -     'top-level-assertions',
+  -     11
+  -   ],
+  -   [
+  -     'commit-msg-hook-install-tests',
+  -     'plugins/pipeline-core/scripts/commit-msg-hook-install.test.mjs',
+  -     'top-level-assertions',
+  -     96
+  -   ],
+  -   [
+        'design-authoring-tests',
+        'plugins/pipeline-core/lib/design-authoring.test.mjs',
+        'top-level-assertions',
+        12
+      ],
+  ...
+        'top-level-assertions',
+  +     65
+  -     49
+      ],
+      [
+        'design-workflow-package-builder-tests',
+        'plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs',
+        'top-level-assertions',
+  ...
+        'top-level-assertions',
+  +     49
+  -     35
+      ],
+      [
+        'runtime-handover-projection-tests',
+        'plugins/pipeline-core/lib/runtime-handover-projection.test.mjs',
+        'top-level-assertions',
+  
+      at Object.run (file://<repo-root>/harness/scripts/check-verify-case-completion.test.mjs:239:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

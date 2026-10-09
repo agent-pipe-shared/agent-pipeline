@@ -1,0 +1,20 @@
+PASS  SELF-CHECK top-level autoUpdate key is detected
+PASS  SELF-CHECK autoUpdate key nested several levels deep (object-in-object) is detected
+PASS  SELF-CHECK autoUpdate key nested inside an array element is detected
+PASS  SELF-CHECK a realistic settings.json shape WITHOUT autoUpdate returns false
+PASS  SELF-CHECK primitives/null/plain-arrays never crash and report false
+PASS  SELF-CHECK findAutoUpdateKeyPaths reports the exact key path for a nested hit
+PASS  SELF-CHECK findAutoUpdateKeyPaths reports ALL hits when the key appears more than once
+PASS  SELF-CHECK isTrackedSettingsPath accepts a root .claude/settings.json line
+PASS  SELF-CHECK isTrackedSettingsPath accepts a nested example/template settings.json line
+PASS  SELF-CHECK isTrackedSettingsPath rejects unrelated tracked files
+NOTE  git ls-files unavailable (exit 128) -- falling back to fixed list: .claude/settings.json
+PASS  SELF-CHECK trackedSettingsPaths falls back to the fixed list outside any git repo
+PASS  SELF-CHECK FALLBACK covers the real git-tracked settings-path set (drift guard)
+PASS  SCAN  .claude/settings.json has no committed autoUpdate key (ADR-0001 D2)
+FAIL  SCAN  .claude/settings.json binds pipeline-core@agent-pipeline to the public marketplace -- enabled=false; marketplace=null
+PASS  SCAN  .claude/settings.json never pre-allows git push without that portable binding
+
+14/15 cases passed.
+Failures:
+  - SCAN  .claude/settings.json binds pipeline-core@agent-pipeline to the public marketplace: enabled=false; marketplace=null

@@ -1,0 +1,226 @@
+✔ parseJsonStdout: normal case -- clean JSON stdout with no leading prompt text parses straight through (1.424096ms)
+✔ parseJsonStdout: recovers the trailing JSON object from stdout carrying a leading human-readable prompt (0.135306ms)
+✔ parseJsonStdout: F2 regression -- a leading '{' at index 0 with no valid full-string-tail JSON returns {ok:false} instead of hanging (0.157065ms)
+✔ parseJsonStdout: no '{' anywhere in stdout returns {ok:false} without looping (0.076138ms)
+✔ parseJsonStdout: missing stdout field defaults to empty string and returns {ok:false} (0.161085ms)
+✔ fakeSetupSpawn: intercepts 'openssl genpkey' and writes a real, readable Ed25519 private key (1.702247ms)
+✔ fakeSetupSpawn: intercepts 'openssl pkey -pubout' and derives a matching public key from the private key on disk (0.803885ms)
+✔ fakeSetupSpawn: every other openssl invocation falls through to a real spawnSync (unrecognized args return a real status) (5.649404ms)
+✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (8154.673724ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8170.533348
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs:123:1
+✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (8154.673724ms)
+  AssertionError [ERR_ASSERTION]: {
+    "schema": "pipeline.measure-tofu-push-e2e.v1",
+    "outcome": "onboarding-not-ready",
+    "steps": [
+      {
+        "step": "setup",
+        "ok": true,
+        "code": "PO-HUMAN-AUTHORITY-READY"
+      },
+      {
+        "step": "onboarding",
+        "outcome": "unanswerable-collect-input",
+        "turns": 2
+      }
+    ],
+    "onboarding": {
+      "schema": "pipeline.measure-fresh-repo-onboarding-turns.v1",
+      "root": "<repo-root>/scratch/measure-tofu-e2e-fresh-Jr7NEN",
+      "runner": "claude",
+      "outcome": "unanswerable-collect-input",
+      "turns": 2,
+      "driverStepsChained": 4,
+      "repairSubcommands": 0,
+      "rounds": [
+        {
+          "turn": 1,
+          "outcome": "pending-asks",
+          "driverStepsThisRound": 3,
+          "resolved": "answered-initial-answers",
+          "appliedExitCode": 0
+        },
+        {
+          "turn": 2,
+          "outcome": "collect-input",
+          "driverStepsThisRound": 1,
+          "resolved": "unanswerable",
+          "names": [
+            "language",
+            "profile"
+          ]
+        }
+      ],
+      "final": {
+        "schema": "pipeline.project-onboarding.v4",
+        "status": "intake-required",
+        "root": "<repo-root>/scratch/measure-tofu-e2e-fresh-Jr7NEN",
+        "runner": "claude",
+        "intent": "onboarding",
+        "repository": {
+          "status": "local-valid-writable",
+          "mode": "local",
+          "gitVersion": "2.53.0",
+          "initializesGit": false,
+          "rootWritable": "passed",
+          "sessionCapability": "not-required",
+          "worktreeCapability": "not-required"
+        },
+        "runtime": {
+          "status": "readback-not-applicable",
+          "sourceSha256": "110fdaef2cf7be99fbae0f16919af04a4d8e494ea8b318e66ea5c3086d372e1f",
+          "targetsSha256": "7edcc0562bce0dbe210bc3828eb5a9d322437edccbc507c160d5cad743b2ff83",
+          "barrierSha256": null,
+          "readbackSha256": null
+        },
+        "continuity": {
+          "status": "absent-pristine",
+          "stateSha256": null,
+          "handoverSha256": null,
+          "historySha256": null
+        },
+        "appServer": {
+          "required": false,
+          "status": "not-applicable",
+          "code": null
+        },
+        "runnerPermissions": {
+          "target": ".claude/settings.local.json",
+          "status": "pending-runtime-initialization",
+          "lanes": [
+            "Bash",
+            "PowerShell"
+          ],
+          "exactEntries": []
+        },
+        "nextAction": {
+          "kind": "collect-input",
+          "inputs": [
+            {
+              "name": "language",
+              "encoding": "utf8",
+              "trim": true,
+              "minBytes": 2,
+              "maxBytes": 2,
+              "singleLine": true,
+              "rejectNul": true
+            },
+            {
+              "name": "profile",
+              "encoding": "utf8",
+              "trim": true,
+              "minBytes": 4,
+              "maxBytes": 7,
+              "singleLine": true,
+              "rejectNul": true
+            }
+          ],
+          "mutation": false,
+          "requiresConfirmation": false,
+          "reviewedDefaults": {
+            "language": {
+              "value": "en",
+              "source": "confirmed-initial-answer",
+              "requiresConfirmation": true
+            }
+          },
+          "guidance": "apply explicit consent and only the still-unresolved typed values listed in inputs. Keep this first consent action separate from material capture. The native UserPromptSubmit hook may have supplied an opaque reference for the current turn; after consent is durably applied, use the following intake-capture action with that exact reference. Do not copy prompt text, transcript paths, or derive a reference. If the reference is unavailable, use existingFileApplyAction only for material already in a regular repository file. The earlier confirmed onboarding language was en; present it as a default, but accept a different explicitly confirmed intake language. Replace only typed placeholders with matching answers. Git author fields are omitted when repository-local Git already resolves them.",
+          "applyAction": {
+            "kind": "command",
+            "executable": "node",
+            "argv": [
+              "<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+              "intake-consent-apply",
+              "--root",
+              "<repo-root>/scratch/measure-tofu-e2e-fresh-Jr7NEN",
+              "--granted",
+              "--language",
+              "<PO_INTAKE_LANGUAGE>",
+              "--profile",
+              "<PO_INTAKE_PROFILE>",
+              "--activate",
+              "--runner",
+              "claude"
+            ],
+            "mutation": true,
+            "requiresConfirmation": true,
+            "expected": {
+              "schema": "pipeline.onboarding-intake-consent-apply.v1",
+              "statuses": [
+                "applied"
+              ]
+            }
+          },
+          "existingFileApplyAction": {
+            "kind": "command",
+            "executable": "node",
+            "argv": [
+              "<repo-root>/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+              "intake-consent-apply",
+              "--root",
+              "<repo-root>/scratch/measure-tofu-e2e-fresh-Jr7NEN",
+              "--granted",
+              "--language",
+              "<PO_INTAKE_LANGUAGE>",
+              "--profile",
+              "<PO_INTAKE_PROFILE>",
+              "--activate",
+              "--runner",
+              "claude"
+            ],
+            "mutation": true,
+            "requiresConfirmation": true,
+            "expected": {
+              "schema": "pipeline.onboarding-intake-consent-apply.v1",
+              "statuses": [
+                "applied"
+              ]
+            }
+          },
+          "expected": {
+            "schema": "pipeline.project-onboarding.v4",
+            "statuses": [
+              "intake-required"
+            ]
+          }
+        },
+        "diagnostics": [
+          {
+            "path": "$.continuity",
+            "code": "intake_required",
+            "message": "no private intake checkpoint exists yet",
+            "guidance": "collect consent (and any still-missing git author/language/profile values), then review the read-only intake-consent-apply action"
+          }
+        ]
+      }
+    }
+  }
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs:126:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

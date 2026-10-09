@@ -1,0 +1,44 @@
+✔ fresh and existing roots advance through portable seed and runtime initialization (4512.765118ms)
+✔ read-only host-control paths receive portable host-managed onboarding (1386.629663ms)
+✔ an existing linked Git worktree is adopted without replacing its .git pointer (2731.406629ms)
+✔ ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs (6453.434935ms)
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (13073.649454ms)
+ℹ codex: verified original intake {"sha256":"7f20392cdcb17ff87149ff7de331b483a8e53d81a1bead1da97c1b9f156165f4","byteLength":67,"consentGranted":true,"captureRoute":"returned-consent-with-explicit-description","nativeReference":false}
+ℹ codex: real hooked bootstrap candidate {"commit":"b543453d9ab35ab48106276e5e8d0eadababe5c5","tree":"8c48b75d41504970edb8f1d623e6bca21b440d0f"}
+ℹ codex: real hooked five-source design candidate {"commit":"2cb1d01218a747b06d99fe9a1784f5ae1cdf9e7e","tree":"2451a313092b863b899fd4154f24b3803ca63b01"}
+ℹ codex: exact requested readiness route {"authoringRunner":"codex","requestedRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"2cb1d01218a747b06d99fe9a1784f5ae1cdf9e7e"},"registeredCell":{"state":"default","selector":{"kind":"alias","value":"sonnet"},"effort":"high","unavailable":"defer","evidence":"dispatch-receipt"},"registrySha256":"c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac","reasonFieldPresent":false,"explanation":"The resolver returns the frozen registered candidate-bound duty cell state; it does not probe a live provider."}
+ℹ codex: assigned local readiness host {"authoringRunner":"codex","reviewRunner":"claude","route":{"dutyId":"readiness","runner":"claude","model":"sonnet","effort":"high","state":"default","sourceSha256":"503f1c8c500401b4912ccde333e129ec628a4945292ea9464cc55adbc016c1c6","candidateCommit":"2cb1d01218a747b06d99fe9a1784f5ae1cdf9e7e"},"assignment":"existing-v1-local-host","nativeProviderAvailabilityClaim":false}
+ℹ codex: canonical fixture readiness {"reviewRunner":"claude","candidate":{"commit":"2cb1d01218a747b06d99fe9a1784f5ae1cdf9e7e","tree":"2451a313092b863b899fd4154f24b3803ca63b01"},"selectionId":"drh_aaca8e15ada7a9f840fe7669ef3ca07d","assurance":"host-observed-local","providerAttestation":false}
+﹣ legacy helper-driven intake-to-implementation path (superseded by the driver-only E2E above) (0.445216ms) # SKIP
+ℹ tests 6
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 28166.541364
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:780:1
+✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (13073.649454ms)
+  AssertionError [ERR_ASSERTION]: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+  
+  2 !== 0
+  
+      at freshDriver (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1042:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs:1459:27)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

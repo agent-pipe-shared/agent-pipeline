@@ -1,0 +1,21 @@
+✔ QPS001 control: verify retains signature/byte behavior and cleans actual worktree (53.793682ms)
+✔ QPS002 target Scratch placement: verify (52.074203ms)
+✔ QPS003 cached version-container siblings unchanged: verify (48.562298ms)
+✔ QPS004 control: apply retains signature/byte behavior and cleans actual worktree (56.294699ms)
+✔ QPS005 target Scratch placement: apply (53.535164ms)
+✔ QPS006 cached version-container siblings unchanged: apply (54.312885ms)
+✔ QPS007 control: failure retains signature/byte behavior and cleans actual worktree (50.05446ms)
+✔ QPS008 target Scratch placement: failure (48.663947ms)
+✔ QPS009 cached version-container siblings unchanged: failure (52.344469ms)
+✔ QPS010 control: invalid signature, exact source binding and no overwrite (32.666083ms)
+✔ QPS011 unsafe Scratch safely rejects signed apply: regular-file (42.804622ms)
+✔ QPS012 unsafe Scratch safely rejects signed apply: sibling-symlink (40.767938ms)
+✔ QPS013 unsafe Scratch safely rejects signed apply: dangling-symlink (43.798899ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 638.392327

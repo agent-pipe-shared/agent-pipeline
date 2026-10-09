@@ -1,0 +1,103 @@
+✖ Codex readiness bootstrap dispatches exact committed sources and publishes one exclusive receipt (2.329345ms)
+✖ the bootstrap receipt is consumable by the physical final-package reader without changing its host binding (0.973449ms)
+✖ Codex readiness bootstrap refuses a physical source change before model execution (0.865782ms)
+✖ Codex readiness bootstrap discards output when the candidate changes during review (0.660998ms)
+✖ Codex readiness bootstrap rejects duplicate source roles and flags before resolving a model (0.992598ms)
+✖ Codex readiness bootstrap honors an explicitly declined advisor export before resolving or invoking a provider (0.92714ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 0
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16.78807
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:107:1
+✖ Codex readiness bootstrap dispatches exact committed sources and publishes one exclusive receipt (2.329345ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:112:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:122:1
+✖ the bootstrap receipt is consumable by the physical final-package reader without changing its host binding (0.973449ms)
+  Error: ENOENT: no such file or directory, open '/tmp/codex-design-readiness-bootstrap-GACxdW/evidence/design/readiness.json'
+      at Object.openSync (node:fs:561:18)
+      at readFileSync (node:fs:445:35)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:127:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/tmp/codex-design-readiness-bootstrap-GACxdW/evidence/design/readiness.json'
+  }
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:182:1
+✖ Codex readiness bootstrap refuses a physical source change before model execution (0.865782ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:187:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /differs from the selected Git candidate/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:191:1
+✖ Codex readiness bootstrap discards output when the candidate changes during review (0.660998ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:196:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /candidate or readiness source changed/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:201:1
+✖ Codex readiness bootstrap rejects duplicate source roles and flags before resolving a model (0.992598ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:206:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /usage: codex-design-readiness-bootstrap/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:212:1
+✖ Codex readiness bootstrap honors an explicitly declined advisor export before resolving or invoking a provider (0.92714ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs:220:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /not enabled by pipeline.user.yaml/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }

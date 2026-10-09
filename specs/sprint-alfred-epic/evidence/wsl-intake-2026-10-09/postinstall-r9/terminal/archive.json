@@ -1,0 +1,690 @@
+{
+  "schema": "alfred.postinstall-terminal-checkpoint.v1",
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+  "fullVerify": {
+    "status": "failed",
+    "receipts": 822,
+    "passed": 736,
+    "failed": 86,
+    "interruptedSuiteNames": [
+      "onboarding-init-tests",
+      "nova-verify-journal-tests"
+    ],
+    "ownerCleanup": "not inferred; outer command reports VERIFY-OWNER-CLEANUP-REQUIRED"
+  },
+  "sourceIntegration": false,
+  "independentReview": "pending",
+  "poAcceptance": "open",
+  "records": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/full-verify.txt",
+      "sourceSha256": "5668ef5408d3c8818f151a1367a3f8504edd0633c72eddf58ecbe3c5c3131916",
+      "archivedSha256": "5668ef5408d3c8818f151a1367a3f8504edd0633c72eddf58ecbe3c5c3131916",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/index.json",
+      "sourceSha256": "a5e24e647c4a77c6c64a615de272e99b59f8d91a572127be166efeb67cf0e162",
+      "archivedSha256": "a5e24e647c4a77c6c64a615de272e99b59f8d91a572127be166efeb67cf0e162",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/timeout-intervention.json",
+      "sourceSha256": "dc61bf1d07d2415d6340325b9d6ce60ef37bef7e2f328897c0c4efcd913e8bd5",
+      "archivedSha256": "dc61bf1d07d2415d6340325b9d6ce60ef37bef7e2f328897c0c4efcd913e8bd5",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/timeout-intervention.txt",
+      "sourceSha256": "bf7c1bd1d55259d0858de2602df6c8af0d9b3756388ab3a7895d573d031383c0",
+      "archivedSha256": "bf7c1bd1d55259d0858de2602df6c8af0d9b3756388ab3a7895d573d031383c0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/advisory-host-bridge-tests.log",
+      "sourceSha256": "3c9476c2e15e2cdc5182fc6789aa3187f1f727607991a2673a153864d46c3514",
+      "archivedSha256": "3c9476c2e15e2cdc5182fc6789aa3187f1f727607991a2673a153864d46c3514",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/antigravity-pretool-guard-tests.log",
+      "sourceSha256": "9d6cac8f6cb825eaedb43f6ce032e99581094322f29fa8ba4e42232d87386058",
+      "archivedSha256": "9d6cac8f6cb825eaedb43f6ce032e99581094322f29fa8ba4e42232d87386058",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/architecture-entry-readiness-tests.log",
+      "sourceSha256": "a2e19367ecd830a317f4deb38dcf4ef6ddb0484631022814b006ade55e33add9",
+      "archivedSha256": "a2e19367ecd830a317f4deb38dcf4ef6ddb0484631022814b006ade55e33add9",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/backlog-done-predicate-check.log",
+      "sourceSha256": "243f4ed138144ec9eccfeb27fd7e99f677fd8a773543d53cb14681d5fff7402a",
+      "archivedSha256": "243f4ed138144ec9eccfeb27fd7e99f677fd8a773543d53cb14681d5fff7402a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/backlog-ledger-reconciliation-tests.log",
+      "sourceSha256": "b273048fa993db708fdebc752f1e5fa2b21c3015b9c483548915edef4f5aa95f",
+      "archivedSha256": "b273048fa993db708fdebc752f1e5fa2b21c3015b9c483548915edef4f5aa95f",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/backlog-state-check.log",
+      "sourceSha256": "adde39c6143150428b3e88838b1b7d50027a46f5ddefbca1135cdd28c048a3d4",
+      "archivedSha256": "adde39c6143150428b3e88838b1b7d50027a46f5ddefbca1135cdd28c048a3d4",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/bootstrap-source-attestation-acceptance-tests.log",
+      "sourceSha256": "91ddf1f7b7475a4ca221f7d3e8f1ec86b472f9f1154d2d5bb93dc99e47df1ea9",
+      "archivedSha256": "91ddf1f7b7475a4ca221f7d3e8f1ec86b472f9f1154d2d5bb93dc99e47df1ea9",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/check-backlog-state-tests.log",
+      "sourceSha256": "2e97f23b6656fbd822b29fc213871de81432e1b011eb4ba51894d895147b30ff",
+      "archivedSha256": "2e97f23b6656fbd822b29fc213871de81432e1b011eb4ba51894d895147b30ff",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/check-runner-manifest-parity.log",
+      "sourceSha256": "da17384c44f7dab592b98c7e1177f18a065242e8b8fbaccd211430f144c21bd6",
+      "archivedSha256": "da17384c44f7dab592b98c7e1177f18a065242e8b8fbaccd211430f144c21bd6",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/claude-critic-host-tests.log",
+      "sourceSha256": "3cfa175d7b967f4ac8c6489bbeb89366f91b03f4f42d1048193ebb80cc9cb035",
+      "archivedSha256": "3cfa175d7b967f4ac8c6489bbeb89366f91b03f4f42d1048193ebb80cc9cb035",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/codex-design-readiness-bootstrap-tests.log",
+      "sourceSha256": "381964130aefafd04a2eb9a6dbc952eb76641e412c747e30fc9121593bc4d609",
+      "archivedSha256": "381964130aefafd04a2eb9a6dbc952eb76641e412c747e30fc9121593bc4d609",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/codex-isolated-critic-contract-tests.log",
+      "sourceSha256": "c12a9a1558c420ac30e6cab3428f15ce6068bcaea4beb8c872a303ae8f7281e2",
+      "archivedSha256": "c12a9a1558c420ac30e6cab3428f15ce6068bcaea4beb8c872a303ae8f7281e2",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/codex-isolated-critic-protected-preimage-tests.log",
+      "sourceSha256": "202e842cc748481103f50597a8b2d1353e8f586e6ffa8cb93ef60099d323238a",
+      "archivedSha256": "202e842cc748481103f50597a8b2d1353e8f586e6ffa8cb93ef60099d323238a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/codex-pretool-guard-tests.log",
+      "sourceSha256": "0a02a8b2c0bf4867c8f340b4f61831954c19594a7314e5f5ccfeb720971a5036",
+      "archivedSha256": "0a02a8b2c0bf4867c8f340b4f61831954c19594a7314e5f5ccfeb720971a5036",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/codex-readiness-shared-parent-tests.log",
+      "sourceSha256": "07962c48c8ccd3644c491016b8ef956b2fc3e56848783582b8f9a5ef2899f5ed",
+      "archivedSha256": "07962c48c8ccd3644c491016b8ef956b2fc3e56848783582b8f9a5ef2899f5ed",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/commit-msg-hook-install-tests.log",
+      "sourceSha256": "637420ab672fe13d0a85c0ea72b89f0722df883e5392893c23a8d933b2909325",
+      "archivedSha256": "637420ab672fe13d0a85c0ea72b89f0722df883e5392893c23a8d933b2909325",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/control-placement-tests.log",
+      "sourceSha256": "c699ddee9c90e0a51ad819af2c99a70d11fefd6a90cbf8e19fd35e122bfebdde",
+      "archivedSha256": "c699ddee9c90e0a51ad819af2c99a70d11fefd6a90cbf8e19fd35e122bfebdde",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-diagnostic-evidence-tests.log",
+      "sourceSha256": "651b9e78d22cb152cea15ff3fc147c8b409e2dcddc799b9ed939197e1f23e063",
+      "archivedSha256": "651b9e78d22cb152cea15ff3fc147c8b409e2dcddc799b9ed939197e1f23e063",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-diagnostic-packet-tests.log",
+      "sourceSha256": "93a8aff9a5f5ad1e3e759b8fd636ed64a415ccba42369262463e0476266d1346",
+      "archivedSha256": "93a8aff9a5f5ad1e3e759b8fd636ed64a415ccba42369262463e0476266d1346",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-dispatch-preflight-tests.log",
+      "sourceSha256": "b4bdc8055e3591af6eaf5ae062db13e1d1600a3fa95ff00611ed6f349016d46b",
+      "archivedSha256": "b4bdc8055e3591af6eaf5ae062db13e1d1600a3fa95ff00611ed6f349016d46b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-skip-coverage-check.log",
+      "sourceSha256": "1e6525ad994d3d65a13c3687143e21327e7c7f38c06b8b9fd9c4faa2796f64a5",
+      "archivedSha256": "1e6525ad994d3d65a13c3687143e21327e7c7f38c06b8b9fd9c4faa2796f64a5",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/deferred-backlog-check.log",
+      "sourceSha256": "292f26c42fcd17aa0a244f7416a6e1a9323c8f92867316b183df741b8b15c1c7",
+      "archivedSha256": "292f26c42fcd17aa0a244f7416a6e1a9323c8f92867316b183df741b8b15c1c7",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-advisory-admission-cli-tests.log",
+      "sourceSha256": "221c72c0af13ec4b25d2b95a23792d5388f5957dcffa9904a3f3d21dbaf9ec68",
+      "archivedSha256": "221c72c0af13ec4b25d2b95a23792d5388f5957dcffa9904a3f3d21dbaf9ec68",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-advisory-coordinator-v2-tests.log",
+      "sourceSha256": "b5af5ab95ed6fb43e094e070a4db5b31179d110d4231028ad105b6ac7ad7b781",
+      "archivedSha256": "b5af5ab95ed6fb43e094e070a4db5b31179d110d4231028ad105b6ac7ad7b781",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-course-command-admission-tests.log",
+      "sourceSha256": "2581ee9bc1af187e606b4293cd278dad078c8891196568b754cf6f57c3a2b563",
+      "archivedSha256": "2581ee9bc1af187e606b4293cd278dad078c8891196568b754cf6f57c3a2b563",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-course-coordinator-tests.log",
+      "sourceSha256": "2c9c2374ccfadbd5a6f1840e7a3cafff03914313ec37adc597a2670714ed3d61",
+      "archivedSha256": "2c9c2374ccfadbd5a6f1840e7a3cafff03914313ec37adc597a2670714ed3d61",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-course-session-tests.log",
+      "sourceSha256": "10780229cce092ae907e815512a730e1230ce0cfa3d68b8307bd12b5c124d293",
+      "archivedSha256": "10780229cce092ae907e815512a730e1230ce0cfa3d68b8307bd12b5c124d293",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-workflow-evidence-descendant-tests.log",
+      "sourceSha256": "74e245af8c52b5b3f770379d0f2c648586f25ff074b4beed54af875b6fb3c6e0",
+      "archivedSha256": "74e245af8c52b5b3f770379d0f2c648586f25ff074b4beed54af875b6fb3c6e0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-workflow-package-route-tests.log",
+      "sourceSha256": "be3ef39108ed9cabb224dcaf573bc6cabbad4d4dc530913d145bd24ee95ed642",
+      "archivedSha256": "be3ef39108ed9cabb224dcaf573bc6cabbad4d4dc530913d145bd24ee95ed642",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/design-workflow-signing-default-tests.log",
+      "sourceSha256": "5e52b87d996a03078b01d13499b3b890da73e9c65e7456d9e932f9efdfe98740",
+      "archivedSha256": "5e52b87d996a03078b01d13499b3b890da73e9c65e7456d9e932f9efdfe98740",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/dispatch-policy-tests.log",
+      "sourceSha256": "d0088ae5008045a89df639ce312b10e30397e9bb8c7e28af501c57cd2e09943b",
+      "archivedSha256": "d0088ae5008045a89df639ce312b10e30397e9bb8c7e28af501c57cd2e09943b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/dispatch-record-strip-for-critic-tests.log",
+      "sourceSha256": "7b842ef24959f835bff929ff3d5f32d097059c55b9eca328a4c3980b9dbfdcdc",
+      "archivedSha256": "7b842ef24959f835bff929ff3d5f32d097059c55b9eca328a4c3980b9dbfdcdc",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/doc-contract-check.log",
+      "sourceSha256": "d38c22bdaa79fe81a85d48a4ba75873fac1ef090712d115224cc1e986658d2f8",
+      "archivedSha256": "d38c22bdaa79fe81a85d48a4ba75873fac1ef090712d115224cc1e986658d2f8",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/doc-contract-tests.log",
+      "sourceSha256": "31e174cc5af43e6089b16ec863c5824b81adc52f4599fc7d32326d9612145382",
+      "archivedSha256": "31e174cc5af43e6089b16ec863c5824b81adc52f4599fc7d32326d9612145382",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/governance-action-artifact-tests.log",
+      "sourceSha256": "e681fe69c7050a8cb2e246acf792a5462ad90c991bb853cefc20aead545e5085",
+      "archivedSha256": "e681fe69c7050a8cb2e246acf792a5462ad90c991bb853cefc20aead545e5085",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-apply-patch-tests.log",
+      "sourceSha256": "21e9b848410c2d1227d38839fe56351a8e2ba30f523b5a0abe8a1de0ec9e986a",
+      "archivedSha256": "21e9b848410c2d1227d38839fe56351a8e2ba30f523b5a0abe8a1de0ec9e986a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-devplan-tests.log",
+      "sourceSha256": "15147c00e92ecf220fb65053b064ef248d2abd7f3391cfbe24addae4bbf2aa65",
+      "archivedSha256": "15147c00e92ecf220fb65053b064ef248d2abd7f3391cfbe24addae4bbf2aa65",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-dispatch-budget-checkpoint-tests.log",
+      "sourceSha256": "0cb84dec9c338429a1b9be09efb04e0fffb07ff6695a7a71763ccb3d435e23bf",
+      "archivedSha256": "0cb84dec9c338429a1b9be09efb04e0fffb07ff6695a7a71763ccb3d435e23bf",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-dispatch-tests.log",
+      "sourceSha256": "065fd15dbabcfe5368637197b5d3bbbbb62b44de6734c173661ef057eb6a71d6",
+      "archivedSha256": "065fd15dbabcfe5368637197b5d3bbbbb62b44de6734c173661ef057eb6a71d6",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-lifecycle-ready-tests.log",
+      "sourceSha256": "1d070ec58a2c2541314df11c59df9f706a008c09d53398a2babeecb8af7be11b",
+      "archivedSha256": "1d070ec58a2c2541314df11c59df9f706a008c09d53398a2babeecb8af7be11b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-push-architecture-tests.log",
+      "sourceSha256": "fb06903be6cb84a931f315134a70a87293af3344055ad36f43ec0f888173d1c7",
+      "archivedSha256": "fb06903be6cb84a931f315134a70a87293af3344055ad36f43ec0f888173d1c7",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-testpath-override-tests.log",
+      "sourceSha256": "5f860c69d5e97cbce1ad53e2a1db76e4b481aeb326f2ac30a2710c2267b40bb0",
+      "archivedSha256": "5f860c69d5e97cbce1ad53e2a1db76e4b481aeb326f2ac30a2710c2267b40bb0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/guard-testpath-tests.log",
+      "sourceSha256": "d36d1940a0645a2ce9e4057324357de2f98b4e3960ad8910d35980414d3184c5",
+      "archivedSha256": "d36d1940a0645a2ce9e4057324357de2f98b4e3960ad8910d35980414d3184c5",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/hook-governance-scope-tests.log",
+      "sourceSha256": "9246f862d970d1a632ba243670a1389a4df4077647c558a319f22ec4af02a762",
+      "archivedSha256": "9246f862d970d1a632ba243670a1389a4df4077647c558a319f22ec4af02a762",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/installed-plugin-attestation-host-tests.log",
+      "sourceSha256": "1d45a2c99840055f357cf99aa57a407dd7f5acf9be96ddc712d92e8d832719e7",
+      "archivedSha256": "1d45a2c99840055f357cf99aa57a407dd7f5acf9be96ddc712d92e8d832719e7",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/license-contract-check.log",
+      "sourceSha256": "930b0ae8a5b5f75e2ba0ffb3e8ef28c99dfdec256525e32e1221dd3d5ed4dfed",
+      "archivedSha256": "930b0ae8a5b5f75e2ba0ffb3e8ef28c99dfdec256525e32e1221dd3d5ed4dfed",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/lifecycle-recovery-contract-tests.log",
+      "sourceSha256": "4633aa4bd252bc0ce5ecbe2cdf3e1f9500d4374a2faa432a78b8bd29acafce16",
+      "archivedSha256": "4633aa4bd252bc0ce5ecbe2cdf3e1f9500d4374a2faa432a78b8bd29acafce16",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/local-worker-supervisor-cli-tests.log",
+      "sourceSha256": "d34c861b5823304e7f930a33b6ab2555a3de70d22fe0d6a635610729e28243e6",
+      "archivedSha256": "d34c861b5823304e7f930a33b6ab2555a3de70d22fe0d6a635610729e28243e6",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/local-worker-supervisor-core-tests.log",
+      "sourceSha256": "462c48dd60991494b95519237fb21ba044051f255b8012df0b41a63e0204f313",
+      "archivedSha256": "462c48dd60991494b95519237fb21ba044051f255b8012df0b41a63e0204f313",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/measure-tofu-push-e2e-tests.log",
+      "sourceSha256": "ac8541e1fa8715409a6efdaf2b3af52a1b97e490e4ba380f1d9bb57d4150622f",
+      "archivedSha256": "ac8541e1fa8715409a6efdaf2b3af52a1b97e490e4ba380f1d9bb57d4150622f",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/model-family-runtime-host-tests.log",
+      "sourceSha256": "88f451fe5c74c18da33bce16cf64a5afe5e9354c25e0390bf4aff21ec1caaa25",
+      "archivedSha256": "88f451fe5c74c18da33bce16cf64a5afe5e9354c25e0390bf4aff21ec1caaa25",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/no-autoupdate-key-tests.log",
+      "sourceSha256": "b4624445e52c84114b1bb4f8da4bee68ccbf85fa81755f536e0f5680650d6664",
+      "archivedSha256": "b4624445e52c84114b1bb4f8da4bee68ccbf85fa81755f536e0f5680650d6664",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/notebook-write-coverage-tests.log",
+      "sourceSha256": "6721849ae66fb7785c5f07055ce60524673b53650fd4dc925170f6f150885287",
+      "archivedSha256": "6721849ae66fb7785c5f07055ce60524673b53650fd4dc925170f6f150885287",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/nova-verify-journal-tests.log",
+      "sourceSha256": "469fc89ace0391f3f04d99afbd3affcb400967063a4b3ea2cc9436406e882f91",
+      "archivedSha256": "469fc89ace0391f3f04d99afbd3affcb400967063a4b3ea2cc9436406e882f91",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/onboarding-continuity-tests.log",
+      "sourceSha256": "c6d6f775e8be78f651340800e43d3e9a7c040e08bbc94d2b62a008f664b4e934",
+      "archivedSha256": "c6d6f775e8be78f651340800e43d3e9a7c040e08bbc94d2b62a008f664b4e934",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/onboarding-init-tests.log",
+      "sourceSha256": "7c596a35b5aa0f12f13da94268525a75b655e9437a32a01879a1045063284d5c",
+      "archivedSha256": "7c596a35b5aa0f12f13da94268525a75b655e9437a32a01879a1045063284d5c",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/phase3-sdlc-coherence-tests.log",
+      "sourceSha256": "eb7ba7772328822eb095005473db465f889e4bb72af64a46b5fb9c2ee09ade9b",
+      "archivedSha256": "eb7ba7772328822eb095005473db465f889e4bb72af64a46b5fb9c2ee09ade9b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/pipeline-start-preflight-antigravity-hard-enforcement-tests.log",
+      "sourceSha256": "848d9530a2f0bd8e5e38147a2a0948cf2db389d2cb4f65d7111a392bd433fb0d",
+      "archivedSha256": "848d9530a2f0bd8e5e38147a2a0948cf2db389d2cb4f65d7111a392bd433fb0d",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/pipeline-start-preflight-pre-push-observation-tests.log",
+      "sourceSha256": "b47d3b7514bf8992c82fb2dda88bf32d3f3d777ba375d533dc5864fe439a4556",
+      "archivedSha256": "b47d3b7514bf8992c82fb2dda88bf32d3f3d777ba375d533dc5864fe439a4556",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/pipeline-state-rebind-runner-tests.log",
+      "sourceSha256": "a4b1ef3ab6b214b17c491d63182a05940ffcc1e0f1da074e5762f66ac9473579",
+      "archivedSha256": "a4b1ef3ab6b214b17c491d63182a05940ffcc1e0f1da074e5762f66ac9473579",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/pipeline-state-tests.log",
+      "sourceSha256": "12ef8ebbc50a77160dfd4a0074eedc7e49d51016990fc5dc6dac968ce7303e13",
+      "archivedSha256": "12ef8ebbc50a77160dfd4a0074eedc7e49d51016990fc5dc6dac968ce7303e13",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/po-gate-authority-fixture-tests.log",
+      "sourceSha256": "8678ad2c96e58927d2042f908b5d7747fac15de046643e0006bef459678bd65e",
+      "archivedSha256": "8678ad2c96e58927d2042f908b5d7747fac15de046643e0006bef459678bd65e",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/po-human-approval-tests.log",
+      "sourceSha256": "5a197db882aa29414633f7e3531305e739cd2c557b485452f587cf229f50ed8a",
+      "archivedSha256": "5a197db882aa29414633f7e3531305e739cd2c557b485452f587cf229f50ed8a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/product-capability-inventory-tests.log",
+      "sourceSha256": "f8104ce60e90ca5b8a75ff2804fbcfca9bbbe0d30ed61710c051b2665ecc1e0c",
+      "archivedSha256": "f8104ce60e90ca5b8a75ff2804fbcfca9bbbe0d30ed61710c051b2665ecc1e0c",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/project-onboarding-e2e-tests.log",
+      "sourceSha256": "d871c902e4aa77e56de1c6c47b0aae60bb53a4eca40b57cb80315426765797c3",
+      "archivedSha256": "d871c902e4aa77e56de1c6c47b0aae60bb53a4eca40b57cb80315426765797c3",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/project-onboarding-v3-argv-closure-tests.log",
+      "sourceSha256": "8207c46bfe459ecd029872cde370214fa00f1631bee241c741a3c5f7b4860a02",
+      "archivedSha256": "8207c46bfe459ecd029872cde370214fa00f1631bee241c741a3c5f7b4860a02",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/project-onboarding-v3-tests.log",
+      "sourceSha256": "2e62987839b756bf6795e4fded351431371f221f05c05313e09544ebe0456d24",
+      "archivedSha256": "2e62987839b756bf6795e4fded351431371f221f05c05313e09544ebe0456d24",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/project-uninstall-tests.log",
+      "sourceSha256": "850d7074c6f21b1210d5fe9e2121ad6bc70dc024e1e5d66569843714fee5c3be",
+      "archivedSha256": "850d7074c6f21b1210d5fe9e2121ad6bc70dc024e1e5d66569843714fee5c3be",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/routing-projection-tests.log",
+      "sourceSha256": "bf5b741b3f1c6aa23824818b7b5189ba1ac73e6b6929bb842a9760843e017501",
+      "archivedSha256": "bf5b741b3f1c6aa23824818b7b5189ba1ac73e6b6929bb842a9760843e017501",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/runner-contracts.schema-tests.log",
+      "sourceSha256": "2e63b35bf0ac2920c8616960872eacbeae04f3fd7e276c31c5f6425309846ed4",
+      "archivedSha256": "2e63b35bf0ac2920c8616960872eacbeae04f3fd7e276c31c5f6425309846ed4",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/runner-design-readiness-bootstrap-tests.log",
+      "sourceSha256": "2605da14821950e5c9526dcb59da6d119db706b914345da04349953d216d3da7",
+      "archivedSha256": "2605da14821950e5c9526dcb59da6d119db706b914345da04349953d216d3da7",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/runner-profile-migration-v3-tests.log",
+      "sourceSha256": "b9c7adfdab251514918157bd8250585d7cd508b6fda663a468dae356d5d44f40",
+      "archivedSha256": "b9c7adfdab251514918157bd8250585d7cd508b6fda663a468dae356d5d44f40",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/scoped-verify-registration-tests.log",
+      "sourceSha256": "6564c15da377d57330ff1d0839badf334217b973507885edb057fbba8a7f1d39",
+      "archivedSha256": "6564c15da377d57330ff1d0839badf334217b973507885edb057fbba8a7f1d39",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/scripts-pipeline-state-tests.log",
+      "sourceSha256": "ec5a6515852803ea7eeca7d1994b21d8f26cff63f29d411f158a323279e1e32a",
+      "archivedSha256": "ec5a6515852803ea7eeca7d1994b21d8f26cff63f29d411f158a323279e1e32a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/security-scan.log",
+      "sourceSha256": "95e41a7c06afa7883536abb7ec39752e45f89effa2004363eaaa5dbe1ce62273",
+      "archivedSha256": "95e41a7c06afa7883536abb7ec39752e45f89effa2004363eaaa5dbe1ce62273",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/security-scan-snapshot-tests.log",
+      "sourceSha256": "980b09004d7bcc9d9c08047dffb38a4f06f3b2e070b2e7982793e9e8bd681360",
+      "archivedSha256": "980b09004d7bcc9d9c08047dffb38a4f06f3b2e070b2e7982793e9e8bd681360",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/session-cleanup-binding-tests.log",
+      "sourceSha256": "1bc936a5e5e72e46dc6cfc7e77a13af06d24a03f8f32c9894e22d9f002af2f3b",
+      "archivedSha256": "1bc936a5e5e72e46dc6cfc7e77a13af06d24a03f8f32c9894e22d9f002af2f3b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/session-critic-finalizer-tests.log",
+      "sourceSha256": "4a9aa3f886444a21ca39ee2c91ced53356bb922e6cde71166ad8a982895c4a1a",
+      "archivedSha256": "4a9aa3f886444a21ca39ee2c91ced53356bb922e6cde71166ad8a982895c4a1a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/setup-tests.log",
+      "sourceSha256": "6dfb9ace876f3a421e17a5683c8d00af614faec7084c6753650e9e799d42f8c7",
+      "archivedSha256": "6dfb9ace876f3a421e17a5683c8d00af614faec7084c6753650e9e799d42f8c7",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/spec-readiness-host-tests.log",
+      "sourceSha256": "1da1d6af297218451c398915787db6f64340ba453376287fe901cd2d16b0fd88",
+      "archivedSha256": "1da1d6af297218451c398915787db6f64340ba453376287fe901cd2d16b0fd88",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/stop-fanout-tests.log",
+      "sourceSha256": "c474100fdd977f6d5c6ba9f30eb0f0db3bae189a0d6cc5d2c095d99b5646e93f",
+      "archivedSha256": "c474100fdd977f6d5c6ba9f30eb0f0db3bae189a0d6cc5d2c095d99b5646e93f",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/toolchain-preflight-tests.log",
+      "sourceSha256": "009405960d628484201372ddf10f13aab3eaa9f18e1d8437ba7e630d1773c083",
+      "archivedSha256": "009405960d628484201372ddf10f13aab3eaa9f18e1d8437ba7e630d1773c083",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/verify-case-completion-registry-tests.log",
+      "sourceSha256": "6f1f9f7a8519e599dd6cf5895eab2d96aedb1257626f10ac6e41ab949aa93ed0",
+      "archivedSha256": "6f1f9f7a8519e599dd6cf5895eab2d96aedb1257626f10ac6e41ab949aa93ed0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/verify-suite-registration-tests.log",
+      "sourceSha256": "d569ca632133df6e8324d2be79dbfc939eeee0d303c9d24b0658d312e6e76472",
+      "archivedSha256": "d569ca632133df6e8324d2be79dbfc939eeee0d303c9d24b0658d312e6e76472",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/windows-assurance-verify-registration-tests.log",
+      "sourceSha256": "513f36c1b2d9f2cfafa22cc997c0e3f523dcfbe114dac6f9175c50c862b77cf9",
+      "archivedSha256": "513f36c1b2d9f2cfafa22cc997c0e3f523dcfbe114dac6f9175c50c862b77cf9",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/windows-private-state-tests.log",
+      "sourceSha256": "2749918d45e6aa9a28b122f2f69e2b86068220feb25a2706b14fc779d456b57b",
+      "archivedSha256": "2749918d45e6aa9a28b122f2f69e2b86068220feb25a2706b14fc779d456b57b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/answers-validator.mjs",
+      "sourceSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "archivedSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/answers-validator-evidence.json",
+      "sourceSha256": "8f378d73ba83be089a6b005e1430daad283f0c35070587e45a4dfd1df3dd2a7d",
+      "archivedSha256": "8f378d73ba83be089a6b005e1430daad283f0c35070587e45a4dfd1df3dd2a7d",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/answers-validator-diff.txt",
+      "sourceSha256": "96efe05e2e8348cdb16df6fda34c48a6684a10643502fed6a9fb44bb9cd03863",
+      "archivedSha256": "cba3f223dfc018e9ac57899aec257906b73e238d30af463e24660ba410b3bd86",
+      "sourceBytesExact": false
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/answers-validator-argv.txt",
+      "sourceSha256": "ca0a6fdc6e2ac180616c2d615aec6a86a2127d792f5b2f93b7c062d40f7bccc0",
+      "archivedSha256": "ca0a6fdc6e2ac180616c2d615aec6a86a2127d792f5b2f93b7c062d40f7bccc0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/answers-validator-classifier.txt",
+      "sourceSha256": "9956b6189ba690e81e01dc564d4771cc0dba1f287e0955dbe62ecc2d7e283530",
+      "archivedSha256": "9956b6189ba690e81e01dc564d4771cc0dba1f287e0955dbe62ecc2d7e283530",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-reader.mjs",
+      "sourceSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "archivedSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-reader-green.txt",
+      "sourceSha256": "2d157d42adb347755005043630e7743af55b8e396a1b4eba1fbcb704e77c8d04",
+      "archivedSha256": "2d157d42adb347755005043630e7743af55b8e396a1b4eba1fbcb704e77c8d04",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/critic-diagnostic-green.txt",
+      "sourceSha256": "eb50b73d24b0c21af97dd0a550ae9485b3702d69425aa1c5261f1753853c0ba8",
+      "archivedSha256": "eb50b73d24b0c21af97dd0a550ae9485b3702d69425aa1c5261f1753853c0ba8",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/legacy-candidate-reader.mjs",
+      "sourceSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "archivedSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/legacy-candidate-audit.md",
+      "sourceSha256": "90ba2cb1757d31a11a0293d78824af886a4f4439d280a0cadefd18fc85761a89",
+      "archivedSha256": "90ba2cb1757d31a11a0293d78824af886a4f4439d280a0cadefd18fc85761a89",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/architecture-debt-test.mjs",
+      "sourceSha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "archivedSha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/architecture-debt-audit.json",
+      "sourceSha256": "16671eb555966e64e6a94c66dc66111a5df4642f0d288957a8f2f11608d83542",
+      "archivedSha256": "16671eb555966e64e6a94c66dc66111a5df4642f0d288957a8f2f11608d83542",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/prepush-test.mjs",
+      "sourceSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "archivedSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/prepush-ceiling-results.json",
+      "sourceSha256": "84eb006057fdea0ef11e7068cf016532c468f8f8de68bd2a980470405c02f6e6",
+      "archivedSha256": "84eb006057fdea0ef11e7068cf016532c468f8f8de68bd2a980470405c02f6e6",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/prepush-ceiling-baseline.txt",
+      "sourceSha256": "61c73b0d5160ea06a1010c916e726c52d295f3f236ef857af32e02fc0a90bbe3",
+      "archivedSha256": "61c73b0d5160ea06a1010c916e726c52d295f3f236ef857af32e02fc0a90bbe3",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/prepush-ceiling-green.txt",
+      "sourceSha256": "1ebf52216d26c9308bd0dce889b277e812c7f9a50877a4e1f823da920f001e83",
+      "archivedSha256": "1ebf52216d26c9308bd0dce889b277e812c7f9a50877a4e1f823da920f001e83",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/materializer-permanent-test.mjs",
+      "sourceSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "archivedSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/materializer-permanent-registration.json",
+      "sourceSha256": "4f0774d18b0be36e8e35c8b796226e23fe038cc940991c6e5a5136c4eaf7bb60",
+      "archivedSha256": "4f0774d18b0be36e8e35c8b796226e23fe038cc940991c6e5a5136c4eaf7bb60",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/materializer-permanent-results.json",
+      "sourceSha256": "4da9b47aeaf6619ed5effb466fb9f8edaefb423eafb404f4303818ca2b79bc21",
+      "archivedSha256": "4da9b47aeaf6619ed5effb466fb9f8edaefb423eafb404f4303818ca2b79bc21",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/materializer-permanent-red.txt",
+      "sourceSha256": "d7bd043f71bff3ec3463be125704493e691f062b3e757f499dd2d1c74dbaf78d",
+      "archivedSha256": "d7bd043f71bff3ec3463be125704493e691f062b3e757f499dd2d1c74dbaf78d",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/terminal/materializer-permanent-green.txt",
+      "sourceSha256": "d96910fd88b9feb4ce619be446837ff13d555443da6e7bc815ac4f73b23c517c",
+      "archivedSha256": "d96910fd88b9feb4ce619be446837ff13d555443da6e7bc815ac4f73b23c517c",
+      "sourceBytesExact": true
+    }
+  ]
+}

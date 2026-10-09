@@ -1,0 +1,25 @@
+{
+  "schema": "goldfish.isolated-source-fix-evidence.v1",
+  "taskId": "ALFRED-ONBOARDING-ANSWER-VALIDATORS-FIX-R1",
+  "base": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "changedSource": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+  "sourcePreimageSha256": "ddd890c3f6f38456231811c718c4aed5b1a9cbcdbd9f0fee4a244f380443b3fa",
+  "sourceSha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+  "dependentShapeDeclarationSha256": "494955d7dd939f732bffa3b1d5686a16f1b0d4de6371c110e24d8031644a56ff",
+  "diffExitCode": 1,
+  "diffFile": "source-postimage.diff",
+  "verification": [
+    {
+      "label": "argv-closure",
+      "command": "node --test plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs",
+      "exitCode": 0,
+      "output": "argv-closure-summary.log"
+    },
+    {
+      "label": "classifier-r5-13",
+      "command": "node --test --test-name-pattern=R5-13 plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0,
+      "output": "classifier-r5-13-summary.log"
+    }
+  ]
+}

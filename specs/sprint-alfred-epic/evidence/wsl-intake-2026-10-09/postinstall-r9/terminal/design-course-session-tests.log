@@ -1,0 +1,139 @@
+✔ K3C001 Advisor command selection stays on the canonical producer for all runners (2.477662ms)
+✔ K3C002 readiness uses the existing runner producer and requires Codex's host descriptor (1.010897ms)
+✔ K3C003 native Advisor exception requires hash-matched terminal no-child evidence (1.714636ms)
+✖ K3C004 full-course execution requires explicit confirmation (0.94739ms)
+✖ K3C005 submission inspection derives committed five-source refs and agent-owned authoring without inheriting Git context (51.234553ms)
+✖ K3C006 confirmed course reaches one unsigned final package through actual producer-result contracts (1.141644ms)
+✖ K3C007 R7-3b: the inspection's advisor command names a tracked output prefix under specs/<feature-id>/evidence/ (2.123313ms)
+✖ K3C008 R7-3b: the --run-v2 course accepts and writes every digest-bound artifact under the tracked prefix (0.827604ms)
+✖ K3C009 R7-3: a git-ignored preparation path is refused as a bound path (1.113895ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 3
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.893628
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C004 full-course execution requires explicit confirmation (0.94739ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'DESIGN-COURSE-RETIRED'
+  - 'DESIGN-COURSE-EXECUTION-EXPLICIT-CONFIRMATION-REQUIRED'
+                   ^
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:88:10)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'DESIGN-COURSE-RETIRED',
+    expected: 'DESIGN-COURSE-EXECUTION-EXPLICIT-CONFIRMATION-REQUIRED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C005 submission inspection derives committed five-source refs and agent-owned authoring without inheriting Git context (51.234553ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'advisor-ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:138:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'advisor-ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C006 confirmed course reaches one unsigned final package through actual producer-result contracts (1.141644ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:213:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C007 R7-3b: the inspection's advisor command names a tracked output prefix under specs/<feature-id>/evidence/ (2.123313ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+  + actual - expected
+  
+  + undefined
+  - 'advisor-ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:308:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'advisor-ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C008 R7-3b: the --run-v2 course accepts and writes every digest-bound artifact under the tracked prefix (0.827604ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:366:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3C009 R7-3: a git-ignored preparation path is refused as a bound path (1.113895ms)
+  AssertionError [ERR_ASSERTION]: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+  + actual - expected
+  
+  + 'DESIGN-COURSE-RETIRED'
+  - 'DESIGN-COURSE-BOUND-PATH-IGNORED'
+                   ^
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/design-course-session.test.mjs:445:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'DESIGN-COURSE-RETIRED',
+    expected: 'DESIGN-COURSE-BOUND-PATH-IGNORED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

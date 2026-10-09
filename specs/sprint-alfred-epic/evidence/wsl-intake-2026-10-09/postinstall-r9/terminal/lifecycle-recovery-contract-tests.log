@@ -1,0 +1,57 @@
+✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)
+✔ NVA-B8: only the fresh, complete published action crosses the executable boundary (534.740714ms)
+✔ the rejected-planner diagnostic offers, and the guard admits, no action (AC-6 branch b) (1834.787102ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4357.550443
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-recovery-contract.test.mjs:76:1
+✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)
+  AssertionError [ERR_ASSERTION]: po_authority_rebind_writer_unavailable
+  + actual - expected
+  
+    {
+  +   exitCode: 2,
+  +   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature "kickoff-8fed00b58c45fed6" lifecycle is "draft".\n' +
+  +     'Plan: specs/kickoff-8fed00b58c45fed6/prd_kickoff-8fed00b58c45fed6.md\n' +
+  +     'File: .pipeline-opaque-execution\n' +
+  +     'Why: The feature is still in draft design and has no implementation authority.\n' +
+  +     'Detected as a shell write to a dev-plan-gated path (lane: opaque-script-execution).\n' +
+  +     'Why: an implementing Goldfish MUST NOT write implementation before the plan is approved (roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach for cannot decide whether it applies.\n' +
+  +     "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, or the active feature's own plan path while still in draft -- or wait for the sanctioned lifecycle transition named in the Why line above.\n" +
+  +     '\n' +
+  +     'Human override available for this exact command (one use; audited; the human confirms):\n' +
+  +     'Step: plan\n' +
+  +     'POSIX:\n' +
+  +     "CMD='<home>/.local/opt/node-v24.15.0-linux-x64/bin/node /home/'\n" +
+  +     "CMD=${CMD}'skar667/src/agent-pipeline-share_alfred/plugins/'\n" +
+  +     "CMD=${CMD}'pipeline-core/scripts/guard-human-override.mjs plan --repo '\n" +
+  +     'CMD=${CMD}\'\'"\'"\'/tmp/project onboarding v3 matrix with \'\n' +
+  +     'CMD=${CMD}\'spaces-4ygAI1\'"\'"\' --request-sha256 \'\n' +
+  +     "CMD=${CMD}'5453814a4db85e7b4a07a4f1bb257cade36b69e8b8fe6b074737b27e562f'\n" +
+  +     "CMD=${CMD}'8db3'\n" +
+  +     'eval "$CMD"\n' +
+  +     'The plan JSON gives the mode-specific nextAction; follow each returned action. The PO signs with a human-held Ed25519 key in an attended external terminal; this session only prepares digests and verifies the proof.\n'
+  -   exitCode: 0,
+  -   stderr: ''
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-recovery-contract.test.mjs:114:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

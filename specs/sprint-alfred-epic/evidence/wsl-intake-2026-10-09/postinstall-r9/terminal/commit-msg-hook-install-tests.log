@@ -1,0 +1,34 @@
+✔ CMI001 installed hook allows a valid contiguous Pipeline provenance block (1276.315505ms)
+✔ CMI002 installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes (320.728837ms)
+✔ CMI003 installed hook blocks provenance split by a blank line (1360.618598ms)
+✔ CMI004 installed hook blocks marker-only provenance (1312.119501ms)
+✔ CMI005 installed hook blocks dispatch-only provenance (1388.943147ms)
+✔ CMI006 installed hook blocks provider and session correlation (1324.755159ms)
+✔ CMI007 installed hook blocks an unprovenanced commit in a Pipeline-managed repository (1364.573895ms)
+✔ CMI008 installed hook blocks a shell-script-wrapped commit without Pipeline provenance (1312.943385ms)
+✔ CMI009 absent policy defaults to blocking incomplete signaled provenance (1423.685227ms)
+✔ CMI010 warn policy reports incomplete signaled provenance but allows the commit (1390.758735ms)
+✔ CMI011 off policy does not produce provenance findings (1386.202626ms)
+✔ CMI012 off policy still blocks provider and session correlation (1387.164107ms)
+✔ CMI013 applyInstall refuses a foreign commit-msg hook without changing it (351.702737ms)
+✔ CMI014 install, managed upgrade and removal preserve ownership checks (1119.513715ms)
+✔ CMI015 commit hook blocks unapproved staged implementation paths but still permits documentation (2987.486908ms)
+✔ CMI016 upgrade and removal refuse a modified managed hook (736.27164ms)
+✔ CMI017 upgrade and removal refuse a modified managed implementation (687.248277ms)
+✔ CMI018 generated hook fails closed when Git's message file is unreadable (1382.649526ms)
+✔ CMI019 generated hook fails closed when its install-bound policy module is unavailable (1512.180277ms)
+✔ CMI020 decline marker has the same reversible, non-overwriting contract as the other hook installers (976.90617ms)
+✔ CMI021 installed hook permits first permissions settings but rejects new hook authority (2342.428056ms)
+✔ CMI022 installed hook compares settings hooks against Git base and exact staged deletions (2940.749807ms)
+✔ CMI023 --install CLI: a typed refusal thrown by the install path is reported as its own code (PB-WINDOWS-ASSURANCE), exit 1 (90.195706ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30398.041159
+# frozen plugin copy in use: commit-msg-hook-plugin-5IpBA9
+
+[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION

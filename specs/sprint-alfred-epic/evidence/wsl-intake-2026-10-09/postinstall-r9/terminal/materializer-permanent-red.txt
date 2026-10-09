@@ -1,0 +1,239 @@
+✔ QPS001 control: verify retains signature/byte behavior and cleans actual worktree (57.760719ms)
+✖ QPS002 target Scratch placement: verify (53.641762ms)
+✖ QPS003 cached version-container siblings unchanged: verify (48.792904ms)
+✔ QPS004 control: apply retains signature/byte behavior and cleans actual worktree (55.45369ms)
+✖ QPS005 target Scratch placement: apply (54.459902ms)
+✖ QPS006 cached version-container siblings unchanged: apply (54.182695ms)
+✔ QPS007 control: failure retains signature/byte behavior and cleans actual worktree (48.908143ms)
+✖ QPS008 target Scratch placement: failure (48.111543ms)
+✖ QPS009 cached version-container siblings unchanged: failure (48.566987ms)
+✔ QPS010 control: invalid signature, exact source binding and no overwrite (32.633501ms)
+✖ QPS011 unsafe Scratch safely rejects signed apply: regular-file (62.417619ms)
+✖ QPS012 unsafe Scratch safely rejects signed apply: sibling-symlink (62.035875ms)
+✖ QPS013 unsafe Scratch safely rejects signed apply: dangling-symlink (61.921125ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 4
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 698.419293
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS002 target Scratch placement: verify (53.641762ms)
+  AssertionError [ERR_ASSERTION]: actual materializer worktree must be beneath TARGET repository Scratch
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:98:14)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS003 cached version-container siblings unchanged: verify (48.792904ms)
+  AssertionError [ERR_ASSERTION]: materializer must not create a sibling in simulated installed version container
+  + actual - expected
+  
+    [
+  +   'tmp',
+      'version'
+    ]
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:102:81)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS005 target Scratch placement: apply (54.459902ms)
+  AssertionError [ERR_ASSERTION]: actual materializer worktree must be beneath TARGET repository Scratch
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:98:14)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS006 cached version-container siblings unchanged: apply (54.182695ms)
+  AssertionError [ERR_ASSERTION]: materializer must not create a sibling in simulated installed version container
+  + actual - expected
+  
+    [
+  +   'tmp',
+      'version'
+    ]
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:102:81)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS008 target Scratch placement: failure (48.111543ms)
+  AssertionError [ERR_ASSERTION]: actual materializer worktree must be beneath TARGET repository Scratch
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:98:14)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS009 cached version-container siblings unchanged: failure (48.566987ms)
+  AssertionError [ERR_ASSERTION]: materializer must not create a sibling in simulated installed version container
+  + actual - expected
+  
+    [
+  +   'tmp',
+      'version'
+    ]
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:102:81)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS011 unsafe Scratch safely rejects signed apply: regular-file (62.417619ms)
+  AssertionError [ERR_ASSERTION]: safe rejection before temporary allocation or real worktree add, with exact preservation
+  + actual - expected
+  
+    {
+  +   cacheUnchanged: false,
+  -   cacheUnchanged: true,
+      destinationUnchanged: true,
+  +   explicitRejection: false,
+  +   noActualWorktreeAdd: false,
+  +   noTemporaryAllocation: false,
+  -   explicitRejection: true,
+  -   noActualWorktreeAdd: true,
+  -   noTemporaryAllocation: true,
+      registrationsClean: true,
+      scratchUnchanged: true,
+  +   targetStatusUnchanged: false,
+  +   targetSubjectUnchanged: false
+  -   targetStatusUnchanged: true,
+  -   targetSubjectUnchanged: true
+    }
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:161:12)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS012 unsafe Scratch safely rejects signed apply: sibling-symlink (62.035875ms)
+  AssertionError [ERR_ASSERTION]: safe rejection before temporary allocation or real worktree add, with exact preservation
+  + actual - expected
+  
+    {
+  +   cacheUnchanged: false,
+  -   cacheUnchanged: true,
+      destinationUnchanged: true,
+  +   explicitRejection: false,
+  +   noActualWorktreeAdd: false,
+  +   noTemporaryAllocation: false,
+  -   explicitRejection: true,
+  -   noActualWorktreeAdd: true,
+  -   noTemporaryAllocation: true,
+      registrationsClean: true,
+      scratchUnchanged: true,
+  +   targetStatusUnchanged: false,
+  +   targetSubjectUnchanged: false
+  -   targetStatusUnchanged: true,
+  -   targetSubjectUnchanged: true
+    }
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:161:12)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ QPS013 unsafe Scratch safely rejects signed apply: dangling-symlink (61.921125ms)
+  AssertionError [ERR_ASSERTION]: safe rejection before temporary allocation or real worktree add, with exact preservation
+  + actual - expected
+  
+    {
+  +   cacheUnchanged: false,
+  -   cacheUnchanged: true,
+      destinationUnchanged: true,
+  +   explicitRejection: false,
+  +   noActualWorktreeAdd: false,
+  +   noTemporaryAllocation: false,
+  -   explicitRejection: true,
+  -   noActualWorktreeAdd: true,
+  -   noTemporaryAllocation: true,
+      registrationsClean: true,
+      scratchUnchanged: true,
+  +   targetStatusUnchanged: false,
+  +   targetSubjectUnchanged: false
+  -   targetStatusUnchanged: true,
+  -   targetSubjectUnchanged: true
+    }
+  
+      at Object.run (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs:161:12)
+      at async TestContext.<anonymous> (file://<repository>/scratch/alfred-materializer-permanent-regression-r1-20261009/red-overlay-OFg0Vf/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

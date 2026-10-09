@@ -1,0 +1,63 @@
+✔ Claude and Antigravity invocations keep source content out of stdin and disable or bound tool access (2.383992ms)
+✔ Antigravity stream rejects tool-bearing and incomplete executions (0.460535ms)
+✖ Claude and Antigravity bootstraps publish host-observed receipts bound to committed sources (18.354634ms)
+✖ declined export stops before route, executable resolution, or runner launch (15.537634ms)
+✖ source drift during the child run prevents publishing a readiness receipt (17.824816ms)
+✔ hotfix 7: claude --json-schema parses to the input schema minus the top-level $schema/$id, and the input schema is not mutated (1.055136ms)
+✔ hotfix 7: claude argv differs from the antigravity/plain shape only in the --json-schema value, and a schema without the metadata is passed through byte for byte (0.324849ms)
+✔ hotfix 7: antigravity still carries the full schema and the argument validation is unchanged (0.299491ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.071211
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:152:1
+✖ Claude and Antigravity bootstraps publish host-observed receipts bound to committed sources (18.354634ms)
+  AssertionError [ERR_ASSERTION]: claude
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:157:12)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:201:1
+✖ declined export stops before route, executable resolution, or runner launch (15.537634ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:209:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /provider export is not enabled/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:214:1
+✖ source drift during the child run prevents publishing a readiness receipt (17.824816ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs:219:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /differs from the selected Git candidate/u,
+    operator: 'rejects',
+    diff: 'simple'
+  }

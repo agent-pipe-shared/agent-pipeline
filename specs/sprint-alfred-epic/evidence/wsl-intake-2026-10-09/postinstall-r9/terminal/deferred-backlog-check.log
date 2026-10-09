@@ -1,0 +1,11 @@
+deferred defects: 5 (as of 2026-10-09)
+due: 5 overdue, 0 today, 0 scheduled, 0 unscheduled
+revisit condition missing: 1
+- backlog/items/2026-08-07-approval-mechanisms-require-out-of-session-po-acts.md: age 63d; due 2026-09-06 (overdue); sprint undeclared; revisit MISSING
+- backlog/items/2026-08-08-po-authority-decision-offers-a-prd-option-that-is-always-unavailable.md: age 62d; due 2026-09-07 (overdue); sprint undeclared; revisit Nova session, per the item's own explicit scoping.
+- backlog/items/2026-08-08-the-gate-strength-override-route-is-advertised-but-never-offered.md: age 62d; due 2026-09-07 (overdue); sprint undeclared; revisit Nova session picks it up per its own filing.
+- backlog/items/2026-08-08-the-ledger-reconciler-writes-before-the-items-are-validated.md: age 62d; due 2026-09-07 (overdue); sprint undeclared; revisit a general backlog-tooling hardening session.
+- backlog/items/2026-08-09-the-dispatch-record-smuggles-the-implementor-report-into-every-critic-review.md: age 61d; due 2026-09-08 (overdue); sprint undeclared; revisit a general template-hardening session.
+ERROR backlog/items/2026-10-09-empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary.md: type is not in the canonical item taxonomy
+ERROR backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: item must begin with YAML frontmatter
+ERROR backlog/items/2026-10-09-restricted-governance-put-re-hardens-the-root-on-every-write.md: type is not in the canonical item taxonomy

@@ -1,0 +1,38 @@
+PASS RBL02 an item absent from the ledger gets a null -> open entry
+PASS RBL03 a multi-step gap emits every intermediate step, never a jump
+PASS RBL04 a closing entry carries the item's own closure commit, not the reconciling HEAD
+PASS RBL05 a closure whose evidence file is missing is blocked, and nothing is written
+PASS RBL06 a self-closure naming a commit this repository does not have is blocked
+PASS RBL07 a file status behind the ledger is refused — an entry is never rewound
+PASS RBL08 an applied reconciliation satisfies the backlog state checker
+PASS RBL09 a second run is a no-op — reconciliation is idempotent
+PASS RBL11 existing ledger bytes are never rewritten — the write is append-only
+PASS RBL12 a closing entry's reason names the closure sync, not the generic disclaimer
+PASS RBL13 a closure whose evidence exists but is untracked is blocked, and nothing is written
+PASS RBL14 staging that same evidence clears the refusal — no commit required
+PASS RBL15 the trackedness reader is three-valued — outside a work tree it answers indeterminate
+PASS RBL10 the transaction journal does not survive a successful apply
+PASS RBL16 (D5) a closing entry's evidence.commit is normalized to the full 40-character OID, never the item's abbreviated form
+PASS RBL17 (D6) the writer refuses to append an event that would fail the checker's own event validator
+PASS RBL18 a fresh item's first (open) ledger event's evidence.commit genuinely contains the item file
+PASS RBL19 an item file not yet reachable from the baseline is refused, not silently cited as evidence
+PASS RBL20 the generated index.json projects an item's own tracking value verbatim, and omits it when absent
+PASS RBL21 the generated index.json marks a Decision: deferred Triage item as deferred: true
+PASS RBL22 an item with no Triage section, or a Triage Decision that is not deferred, projects deferred: false
+PASS RBL13 an open -> rejected transition reconciles cleanly, admitting open first
+PASS RBL14 an open -> deferred transition reconciles cleanly from an already-open ledger entry
+PASS RBL15 a rejected/deferred target is refused when the ledger's current status is in_progress, not open
+PASS RBL23 requested reconciliation action binds the physically observed pre-action candidate and closed plan digest
+PASS RBL24 event target preflight failure leaves every reconciliation source byte unchanged
+PASS RBL25 physical target readback failure rolls back the transaction and emits no event
+PASS RBL26 independent ledger/projection rejection rolls back and emits no event
+PASS RBL27 a post-source event conflict preserves source and owner bytes and returns an event-only retry
+PASS RBL28 a reconciliation replay is a no-op and does not emit another action
+PASS RBL29 an unavailable pre-action Git candidate refuses the event before source mutation
+PASS RBL30 the reconciliation request digest changes with either the closed plan or target set
+
+32 passed, 1 failed
+FAIL RBL01 this repository needs no reconciliation: backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: no usable item id
+
+false !== true
+

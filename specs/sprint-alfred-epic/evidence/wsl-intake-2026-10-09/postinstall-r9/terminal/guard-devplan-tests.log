@@ -1,0 +1,65 @@
+PASS  DP01 allow  no manifest at all
+PASS  DP02 allow  manifest present but gate dev-plan absent
+PASS  DP03 allow  gate mode off
+PASS  DP04 allow  no state file at all
+PASS  DP05 allow  no activeFeature in state
+PASS  DP06 block approved design before explicit implementation phase
+PASS  DP06b allow exact approved implementation
+PASS  DP07 block  unapproved + non-exempt path -> names feature id
+PASS  DP08 allow  default exempt prefix "docs/"
+PASS  DP08 allow  default exempt prefix "specs/"
+PASS  DP08 allow  default exempt prefix ".claude/"
+PASS  DP08 allow  default exempt prefix "backlog/"
+PASS  DP08 allow  default exempt prefix "scratch/"
+PASS  DP27 allow  draft-phase write under scratch/
+PASS  DP27b block draft-phase write to a real source path is unchanged
+PASS  DP28 allow  scratch/ write while the neutral State is refused as unportable
+PASS  DP28b block  same fixture still refuses a non-scratch write
+PASS  DP29 block  scratch/../src traversal is not exempt
+PASS  DP29b block  a file literally named scratch is not exempt
+PASS  DP29c block  a sibling directory named scratchpad is not exempt
+PASS  DP29d allow  a nested path under scratch/ is exempt
+PASS  DP30 allow exact dispatch receipt before approval
+PASS  DP30b block unrelated evidence before approval
+PASS  DP30c block dispatch receipt traversal
+PASS  DP30d block empty dispatch receipt id
+PASS  DP09 allow  the activeFeature.planPath itself
+PASS  DP10 allow  custom exemptPaths from manifest honored
+PASS  DP10b block  non-exempt path in same custom-exempt fixture still blocks
+PASS  DP11 warn  mode warn, unapproved + non-exempt -> exit 1
+PASS  DP12 warn  malformed state JSON surfaces as WARN, not block
+PASS  DP13 block  Write tool covered alongside Edit
+PASS  DP14 block  backslash path still matches non-exempt (blocked)
+PASS  DP14b allow  backslash path under an exempt prefix (Windows docs\ variant)
+PASS  DP15 warn  malformed manifest YAML surfaces as WARN, not block
+PASS  DP16 allow  absolute exempt path (backslash, drive letter) under docs/
+PASS  DP17 block  absolute non-exempt path inside root
+PASS  DP18 allow  absolute path outside the project root (sibling tree, same drive)
+PASS  DP19 allow  absolute path resolving to the activeFeature.planPath itself
+PASS  DP20 allow  absolute path resolving under manifest exemptPaths (custom/)
+PASS  DP20b block  different absolute non-exempt path in same custom-exempt fixture still blocks
+PASS  DP21 allow  mixed-separator absolute exempt path
+PASS  DP21b block  mixed-separator absolute non-exempt path still blocks
+PASS  DP22 block  relative traversal out of docs/ (docs/../src/foo.ts) is NOT exempt
+PASS  DP22b allow  traversal that resolves back under docs/ (docs/../docs/state.md) stays exempt
+PASS  DP23 block  backslash relative traversal out of docs\ is NOT exempt
+PASS  DP24 block  absolute path with a traversal segment resolving outside docs/ is NOT exempt
+PASS  DP25 allow  draft exact PRD authority
+PASS  DP25b allow  draft exact Spec authority
+PASS  DP25c block  draft implementation path remains gated
+PASS  DP26 block  awaiting-approval exact PRD authority
+PASS  DP26b block  awaiting-approval exact Spec authority
+PASS  DP27 block  legacy/v2 approval + present-but-unresolvable decision reference fails closed
+PASS  DP28 allow  legacy/v2 approval + genuinely ledger-granted decision reference agrees
+file://<repo-root>/plugins/pipeline-core/hooks/guard-devplan.test.mjs:67
+    if (!direct.stderr.includes("reopen-design")) throw new Error(direct.stderr);
+                                                        ^
+
+Error: [guard-devplan] implementation requires a valid design approval (DAA-PUBLIC-UNAVAILABLE).
+Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.
+Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution.
+
+    at verifyAdvisorLanes (file://<repo-root>/plugins/pipeline-core/hooks/guard-devplan.test.mjs:67:57)
+    at file://<repo-root>/plugins/pipeline-core/hooks/guard-devplan.test.mjs:872:3
+
+Node.js v24.15.0

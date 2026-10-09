@@ -1,0 +1,55 @@
+✔ derives one stable control per unique hooks.json command and covers the shipped Alfred catalog (1.041011ms)
+✔ accepts complete exact rows only and requires prose compensation (1.59741ms)
+✔ fails closed without a usable A1 record and rejects contradicted runner-hook claims (1.104267ms)
+✔ allows runner-hook claims only with a current matching A1 fires record (0.27123ms)
+✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (1.640527ms)
+✔ AC-2: known protected-surface mutation-route gaps are explicit A2 debt, not silent coverage claims (0.304837ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10.372751
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/control-placement.test.mjs:70:1
+✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (1.640527ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    [
+      'alfred:a1-enforcement-conformance',
+      'alfred:a2-control-placement',
+      'alfred:a4-plan-authority-sealing',
+      'alfred:a5-closed-evidence-integrity',
+  ...
+      'alfred:e3-cross-runner-agy-host',
+  -   'hook:posttooluse:claude-task-output-scope-posttool',
+      'hook:posttooluse:native-goldfish-host',
+      'hook:pretooluse:guard-advisor-prohibition',
+      'hook:pretooluse:guard-devplan',
+      'hook:pretooluse:guard-dispatch',
+      'hook:pretooluse:guard-dispatch-budget',
+  ...
+      'hook:stop:stop-suggest',
+  -   'hook:userpromptsubmit:claude-intake-prompt-capture'
+    ]
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/control-placement.test.mjs:74:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [Array],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,165 @@
+✔ consumer operation documents reject source-checkout plugin commands (2.1531ms)
+✔ local marketplace development guides retain an explicit maintainer boundary (0.257251ms)
+✔ fenced code is removed without losing line structure (0.241822ms)
+✔ HTML comments are removed to a fixed point without preserving nested delimiters (0.095267ms)
+✔ anchors implement unicode, explicit ids, setext, and duplicate suffixes (1.095785ms)
+✔ collectAnchors scopes to the half above a DE-REFERENCE-BELOW marker (0.241552ms)
+✔ a link into the German half of a bilingual doc fails the anchor check (3.632851ms)
+✔ inline and reference links are extracted while fenced fakes are ignored (0.218373ms)
+✔ inline code spans are blanked without losing line structure (0.185444ms)
+✔ a regex character class in a single-backtick code span is not read as a reference-style link (0.193644ms)
+✔ a genuine broken reference-style link outside any code span is still reported missing-reference (0.151825ms)
+✔ a code-span look-alike does not suppress a genuine broken reference-style link on the same line (0.098567ms)
+✔ minimal repository passes (1.870919ms)
+✔ missing file and missing anchor fail (1.358006ms)
+✔ same-document fragments resolve against the source file (0.91011ms)
+✔ external URLs are never fetched and directory links are accepted (1.153332ms)
+✔ absolute and escaping paths fail closed (1.244759ms)
+✔ untracked Markdown sources are outside the exact-tree scan (13.008026ms)
+✔ excluded instruction path is filtered before every source and target read (150.207595ms)
+✔ internal symlink aliases cannot bypass the excluded instruction path (154.448328ms)
+✔ isExcludedRepoPath: archived and immutable reader evidence are directory-prefix exclusions, AGENTS.md stays exact-match only (0.163905ms)
+✔ a Markdown source under docs/state-archive/ is never scanned, even when its internal links would otherwise fail (175.353279ms)
+✔ an immutable reader-review report is never scanned as public documentation (2.029509ms)
+✔ a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback (0.847052ms)
+✔ untracked targets fail even when present in the worktree (0.904001ms)
+✔ generated enforcement document derives the three runner schemas without classifying guards (2.191088ms)
+✔ generated enforcement registration order uses UTF-8 bytes, not the host locale (0.108847ms)
+✔ generated enforcement document changes with a manifest and rejects malformed registrations (2.578915ms)
+✔ manifest table cells encode pipes, backticks, newlines, and HTML-looking input (1.062375ms)
+✔ a stale tracked enforcement page fails the existing documentation contract (2.382253ms)
+✔ source manifest identity keeps a deleted enforcement page fail-closed (1.52531ms)
+✔ a tracked enforcement page stays checked when one source manifest is removed (2.516088ms)
+✔ enforcement contract reports malformed source manifests (1.879349ms)
+✔ enforcement generator CLI rejects unknown, duplicate, and contradictory flags without writing (28.508239ms)
+✔ invalid UTF-8 and injected reads fail closed (127.948633ms)
+✔ symlink targets escaping the repository fail closed (1.039897ms)
+✔ malformed, duplicate, and invalid handover calibration fail (4.732114ms)
+✔ handover must be tracked regular Markdown and not a symlink (1.430834ms)
+✔ CLAUDE requires the calibrated state only and handover requires backlink (2.4564ms)
+✔ CLI fails closed when Git enumeration is unavailable (36.490809ms)
+✖ stateful design checklist is complete on both required documentation surfaces (1796.543911ms)
+✔ repository documentation gate still enforces a missing operative stateful-design phrase (1355.043097ms)
+✔ pipeline-shaped repositories require both stateful-design surfaces even when neither is tracked (0.954058ms)
+✔ a generic repository ignores a lone canonical-named templates/spec.md surface (0.780664ms)
+✔ a generic repository ignores a lone canonical-named roles/elephant.md surface (0.793164ms)
+✔ a lone templates/spec.md stateful-design surface fails closed (0.809484ms)
+✔ a lone roles/elephant.md stateful-design surface fails closed (0.865402ms)
+✔ stateful-design phrases hidden only in fenced code fail on templates/spec.md (0.819724ms)
+✔ stateful-design phrases hidden only in fenced code fail on roles/elephant.md (1.589768ms)
+✔ stateful-design phrases hidden only in HTML comment fail on templates/spec.md (0.59729ms)
+✔ stateful-design phrases hidden only in HTML comment fail on roles/elephant.md (1.650006ms)
+✔ stateful-design phrases moved from the operative section fail on templates/spec.md (0.725936ms)
+✔ stateful-design phrases moved from the operative section fail on roles/elephant.md (0.731306ms)
+✖ current repository integration passes and excludes the instruction path (1345.048501ms)
+✔ reader binding scope is the approved lexical set of active public documents (0.094907ms)
+✔ reader binding accepts a record-only candidate and ignores worktree edits (1425.49852ms)
+✔ reader binding fails malformed records and stale covered documentation (618.984092ms)
+✔ reader binding fails each covered-input drift and a deleted covered document (1964.290819ms)
+✔ reader binding fails missing or tampered reports and disposition (2145.923448ms)
+✔ reader binding rejects corrupt record identity, coverage, and evidence paths (899.652071ms)
+✔ reader binding rejects a reviewed commit outside candidate ancestry (257.627614ms)
+✔ reader binding requires explicit empty findings and reachable resolution commits (1628.205573ms)
+✔ reader binding refuses non-regular covered blobs and malformed CLI arguments (142.390326ms)
+✔ reader snapshot rejects covered blobs above the fixed byte cap (61.682624ms)
+✔ reader binding CLI emits one snapshot or check JSON object and fails an isolated missing-record fixture (578.033813ms)
+✔ each immutable snapshot exclusion suppresses its own exact normalized missing-reference occurrence (8.671986ms)
+✔ an immutable snapshot exclusion does not suppress the same reference id at another line (0.796025ms)
+✔ an immutable snapshot exclusion does not suppress the same line and id in another source (0.694627ms)
+✔ an immutable snapshot exclusion suppresses only one same-line occurrence (0.703357ms)
+✔ a stale immutable snapshot exclusion is reported deterministically (0.729587ms)
+✔ ordinary broken reference-style links still fail with immutable snapshot exclusions configured (0.716397ms)
+✖ successful CLI output exposes the immutable snapshot exclusion count (1563.891817ms)
+✔ a vendored link exclusion suppresses only its own listed destination (0.864953ms)
+✔ a vendored link exclusion is bound to its own source file (1.029377ms)
+✔ a vendored link exclusion that stops matching is reported, and stays inert where its file is absent (1.327448ms)
+✔ every shipped vendored link exclusion is justified by a byte-identical origin whose links resolve (7.988468ms)
+ℹ tests 76
+ℹ suites 0
+ℹ pass 73
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16600.418931
+
+✖ failing tests:
+
+test at harness/scripts/check-doc-contracts.test.mjs:772:1
+✖ stateful design checklist is complete on both required documentation surfaces (1796.543911ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:33 -> ../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md: target is not tracked',
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:48 -> ../specs/sprint-nova-epic/implementation/git-boundary-threat-model.json: target is not tracked',
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:7 -> adr/0058-guard-maintenance-window.md: target is not tracked'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/harness/scripts/check-doc-contracts.test.mjs:774:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at harness/scripts/check-doc-contracts.test.mjs:954:1
+✖ current repository integration passes and excludes the instruction path (1345.048501ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:33 -> ../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md: target is not tracked',
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:48 -> ../specs/sprint-nova-epic/implementation/git-boundary-threat-model.json: target is not tracked',
+  +   'specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:7 -> adr/0058-guard-maintenance-window.md: target is not tracked'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file://<repo-root>/harness/scripts/check-doc-contracts.test.mjs:956:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at harness/scripts/check-doc-contracts.test.mjs:1231:1
+✖ successful CLI output exposes the immutable snapshot exclusion count (1563.891817ms)
+  AssertionError [ERR_ASSERTION]: DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:33 -> ../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md: target is not tracked
+  DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:48 -> ../specs/sprint-nova-epic/implementation/git-boundary-threat-model.json: target is not tracked
+  DOC-CONTRACT specs/sprint-alfred-epic/signed-package/tranche-1/docs/guard-maintenance-window-threat-model.md:7 -> adr/0058-guard-maintenance-window.md: target is not tracked
+  Documentation contracts failed: 3 finding(s).
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/harness/scripts/check-doc-contracts.test.mjs:1233:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

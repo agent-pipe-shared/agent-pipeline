@@ -1,0 +1,33 @@
+✖ Readiness shared parent: actual sanctioned GUID mint leaves0755 shared parent and private descendants unchanged (15.938253ms)
+✔ Readiness shared parent: common0775 and0777 reject before creating namespace without chmod repair (8.672924ms)
+✔ Readiness shared parent: shared0775 and0777 reject before duty creation without chmod repair (7.211441ms)
+✔ Readiness shared parent: physical common/shared aliases and private0755 duty still refuse (5.681739ms)
+✔ Readiness shared parent: common and shared mode drift gates context reads and write admission (18.023106ms)
+✔ Readiness shared parent: exact common and shared inode replacement invalidates an existing store (9.237728ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 70.472839
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/codex-design-readiness-host-store.shared-parent.test.mjs:14:1
+✖ Readiness shared parent: actual sanctioned GUID mint leaves0755 shared parent and private descendants unchanged (15.938253ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  448 !== 493
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/codex-design-readiness-host-store.shared-parent.test.mjs:16:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 448,
+    expected: 493,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

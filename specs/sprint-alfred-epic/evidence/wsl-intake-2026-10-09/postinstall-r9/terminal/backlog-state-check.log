@@ -1,0 +1,26 @@
+DRIFT backlog state: ledger event 403: evidence.commit must be a full lowercase Git commit OID (known accepted ledger event 403 abbreviated OID)
+DRIFT backlog state: ledger event 645: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 646: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 647: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 648: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 649: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 650: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 651: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 652: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 653: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 654: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 655: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 656: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 657: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 658: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 659: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 660: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 661: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 662: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 663: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: ledger event 664: evidence.commit is not a reachable local Git commit (known accepted 2026-07-19..2026-07-22 historical batch)
+DRIFT backlog state: items: pipeline.codex-read-only-steps-escalate-individually-instead-of-once closure_commit must equal its final ledger evidence.commit (known accepted ledger event 403 abbreviated OID)
+FAIL backlog state: backlog/items/2026-10-09-empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary.md: type is not in the canonical item taxonomy
+FAIL backlog state: backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: item must begin with YAML frontmatter
+FAIL backlog state: backlog/items/2026-10-09-restricted-governance-put-re-hardens-the-root-on-every-write.md: type is not in the canonical item taxonomy
+FAIL backlog state: items: pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses has no transition-ledger entry

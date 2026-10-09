@@ -1,0 +1,13 @@
+FAIL: plugins/pipeline-core/lib/continuity-authority-drift.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/continuity-authority-drift.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/critic-lane-fallback.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/critic-lane-fallback.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/fs-durability.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/legacy-owner-custody.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/legacy-owner-custody.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/recovery-refusal-registry.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/lib/scratch-retention.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
+FAIL: plugins/pipeline-core/scripts/scratch-sweep.test.mjs lacks an SPDX SUL-1.0 header in its first three lines
