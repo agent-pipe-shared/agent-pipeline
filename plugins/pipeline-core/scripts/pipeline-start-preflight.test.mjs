@@ -58,7 +58,13 @@ const ROOT_PROJECT = resolve("/project");
 // TR-J-T2b: a symlink needs a privilege some hosts withhold (EPERM on Windows without it). The
 // attempt itself is the probe: the case is skipped, with this typed reason, only when symlinkSync
 // throws EPERM. Any other error is rethrown, and there is no platform check.
-const SYMLINK_EPERM_SKIP_REASON = "SYMLINK-EPERM: symlinkSync was refused with EPERM on this host; the assertions that need the symlink were not run";
+// Typed skip for the owner-runtime warning cases (PHX-WP-AAC01-MULTISESSION). The session owner's
+// start identity comes from `localProcessStartIdentity` in lib/worktree-lifecycle.mjs, which reads
+// /proc and is Linux-only: off Linux every freshly registered descriptor carries a null
+// ownerRuntime, so a LIVE other session can never be observed. Tracked defect (not a test fault):
+// backlog item 2026-10-09-concurrent-session-warning-never-fires-on-native-windows.
+const OWNER_RUNTIME_LINUX_ONLY_SKIP_REASON = "OWNER-RUNTIME-LINUX-ONLY: localProcessStartIdentity reads /proc and is Linux-only, so off Linux a registered session descriptor has a null ownerRuntime and cannot be observed live or reused (backlog 2026-10-09-concurrent-session-warning-never-fires-on-native-windows)";
+const SYMLINK_EPERM_SKIP_REASON ="SYMLINK-EPERM: symlinkSync was refused with EPERM on this host; the assertions that need the symlink were not run";
 function symlinkOrSkip(t, target, linkPath, type) {
   try {
     symlinkSync(target, linkPath, type);
@@ -229,6 +235,13 @@ function preflight(options) {
       projectionSha256: "a".repeat(64), decisions: [], activeExceptions: [],
       findings: [{ code: "legacy-decision-without-sidecar", path: "docs/adr/legacy.md" }],
     }),
+    // Hermetic stand-in for the real onboarding gate (the default of the
+    // `requireProjectOnboardingReadyFn` seam). Without it the real gate runs
+    // against the live checkout and, for runner codex, answers
+    // `runtime-attestation-required`, which turns the refresh-advisory cases
+    // into onboarding-action cases. It sits BEFORE `...options`, so a case that
+    // asserts onboarding behaviour still overrides it with its own fn.
+    requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }),
     ...options,
   });
 }
@@ -1746,6 +1759,11 @@ test("F4(b): runner codex reaches the real observeCodexPublicCoreIdentity defaul
       pluginList: () => JSON.stringify({ installed: [] }),
       read: () => JSON.stringify({ version: "0.0.1+fixture" }),
       scriptUrl: fixture.scriptUrl,
+      // This case calls observePipelineStartPreflight directly, so the
+      // preflight() helper's hermetic onboarding default never reaches it. Same
+      // stand-in, passed here: the case is about the refresh advisory, not about
+      // whether this machine's live checkout is onboarded.
+      requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }),
     });
     // The identical fixture that lets runner "claude" succeed (F4(a) above)
     // fails closed here: observeCodexPublicCoreIdentity performs an
@@ -1870,7 +1888,9 @@ function buildConcurrencyRepoFixture() {
   return gitRoot;
 }
 
-test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change", () => {
+test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change", {
+  skip: process.platform !== "linux" ? OWNER_RUNTIME_LINUX_ONLY_SKIP_REASON : false,
+}, () => {
   const gitRoot = buildConcurrencyRepoFixture();
   try {
     const mine = startSessionDescriptor(gitRoot, {
@@ -1923,7 +1943,9 @@ test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a ty
   }
 });
 
-test("PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning", () => {
+test("PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning", {
+  skip: process.platform !== "linux" ? OWNER_RUNTIME_LINUX_ONLY_SKIP_REASON : false,
+}, () => {
   const gitRoot = buildConcurrencyRepoFixture();
   try {
     const mine = startSessionDescriptor(gitRoot, {
@@ -1981,6 +2003,50 @@ test("PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved d
     assert.equal(result.concurrentSessionWarning, null,
       "not-live/reused/unavailable/unobserved descriptors must never be treated as a live concurrent session");
     assert.equal(result.status, "ready");
+  } finally {
+    rmSync(gitRoot, { recursive: true, force: true });
+  }
+});
+
+// Runs on EVERY host: a descriptor whose ownerRuntime is null (what a non-Linux host registers, and
+// what a Linux host registers for an unresolvable owner pid) is inconclusive evidence. It must never
+// surface as a live concurrent session, and it must change nothing else in the preflight result.
+// The null is written explicitly, so the case does not depend on which host produced the descriptor.
+test("PHX-WP-AAC01-MULTISESSION: a descriptor with a null ownerRuntime never warns; status/nextAction never change", () => {
+  const gitRoot = buildConcurrencyRepoFixture();
+  try {
+    const mine = startSessionDescriptor(gitRoot, {
+      sessionId: "session-this-one-null-runtime",
+      ownerNonce: "owner-nonce-mine-0000000003",
+    });
+    const preflightOptions = {
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: gitRoot,
+      currentSessionId: mine.sessionId,
+      checkCloneProvisioningFn: readyCloneProvisioning,
+    };
+    const beforeOther = preflight(preflightOptions);
+    assert.equal(beforeOther.concurrentSessionWarning, null, "only this session's own descriptor is registered so far");
+    assert.equal(beforeOther.status, "ready");
+
+    const other = startSessionDescriptor(gitRoot, {
+      sessionId: "session-null-owner-runtime",
+      ownerNonce: "owner-nonce-null-runtime-000001",
+    });
+    const otherDescriptor = JSON.parse(readFileSync(other.path, "utf8"));
+    otherDescriptor.ownerRuntime = null;
+    writeFileSync(other.path, `${JSON.stringify(otherDescriptor, null, 2)}\n`, { mode: 0o600 });
+    assert.equal(JSON.parse(readFileSync(other.path, "utf8")).ownerRuntime, null,
+      "the fixture really carries a null ownerRuntime on this host");
+
+    const afterOther = preflight(preflightOptions);
+    assert.equal(afterOther.concurrentSessionWarning, null,
+      "an unavailable owner runtime must never be treated as a live concurrent session");
+    assert.equal(afterOther.status, "ready");
+    assert.equal(afterOther.status, beforeOther.status);
+    assert.deepEqual(afterOther.nextAction, beforeOther.nextAction);
   } finally {
     rmSync(gitRoot, { recursive: true, force: true });
   }
