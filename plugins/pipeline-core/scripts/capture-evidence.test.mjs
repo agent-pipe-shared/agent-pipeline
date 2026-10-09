@@ -670,3 +670,28 @@ test("EVID-T: a child exiting 3 still records exitCode 3 and the CLI exits 3", (
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("EVID-T / T60 characterisation pin (TR-I-T, GREEN today): one artifact header carries head, tree and dirty together, in order", () => {
+  // TOILRES row T60 reported "captures carry no commit identity". The identity lines landed first
+  // (the EVID-T cases above and the header regex near the top of this file), so this case is a
+  // characterisation pin, not a RED one. The overlap with the single-field cases is intentional:
+  // it asserts all three on ONE artifact, from a dirty fixture, so a later change that drops or
+  // reorders any of the three fails here with the whole header in the diff.
+  const dir = makeTempRepo();
+  try {
+    writeFileSync(join(dir, "tracked.txt"), "two\n");
+    const { result, artifact } = runCliIn(dir, "process.exit(0)");
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(artifact, "artifact must be written");
+    const lines = artifact.split("\n");
+    const header = lines.slice(0, lines.indexOf("--- stdout ---"));
+    assert.deepEqual(header.map((entry) => entry.slice(0, entry.indexOf(":"))), ["command", "label", "exitCode", "head", "tree", "dirty"]);
+    assert.deepEqual(header.slice(3), [
+      `head: ${gitIn(dir, ["rev-parse", "HEAD"])}`,
+      `tree: ${gitIn(dir, ["rev-parse", "HEAD^{tree}"])}`,
+      "dirty: true",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
