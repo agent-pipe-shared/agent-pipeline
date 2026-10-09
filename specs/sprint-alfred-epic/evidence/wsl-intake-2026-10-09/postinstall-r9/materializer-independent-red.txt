@@ -1,0 +1,184 @@
+command: node --test --test-reporter=tap scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs
+label: independent-materializer-scratch-red
+exitCode: 1
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: green control: verify retains signature/byte behavior and cleans actual worktree
+ok 1 - green control: verify retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 51.359825
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: verify
+not ok 2 - RED target Scratch placement: verify
+  ---
+  duration_ms: 52.236368
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:57:3'
+  failureType: 'testCodeFailure'
+  error: 'actual materializer worktree must be beneath TARGET repository Scratch'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:61:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RED cached version-container siblings unchanged: verify
+not ok 3 - RED cached version-container siblings unchanged: verify
+  ---
+  duration_ms: 47.938653
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:64:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    materializer must not create a sibling in simulated installed version container
+    + actual - expected
+    
+      [
+    +   'tmp',
+        'version'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'version'
+  actual:
+    0: 'tmp'
+    1: 'version'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:65:81)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: green control: apply retains signature/byte behavior and cleans actual worktree
+ok 4 - green control: apply retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 51.660116
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: apply
+not ok 5 - RED target Scratch placement: apply
+  ---
+  duration_ms: 51.330306
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:57:3'
+  failureType: 'testCodeFailure'
+  error: 'actual materializer worktree must be beneath TARGET repository Scratch'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:61:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RED cached version-container siblings unchanged: apply
+not ok 6 - RED cached version-container siblings unchanged: apply
+  ---
+  duration_ms: 52.917636
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:64:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    materializer must not create a sibling in simulated installed version container
+    + actual - expected
+    
+      [
+    +   'tmp',
+        'version'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'version'
+  actual:
+    0: 'tmp'
+    1: 'version'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:65:81)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: green control: failure retains signature/byte behavior and cleans actual worktree
+ok 7 - green control: failure retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 46.17192
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: failure
+not ok 8 - RED target Scratch placement: failure
+  ---
+  duration_ms: 48.02513
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:57:3'
+  failureType: 'testCodeFailure'
+  error: 'actual materializer worktree must be beneath TARGET repository Scratch'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:61:14)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: RED cached version-container siblings unchanged: failure
+not ok 9 - RED cached version-container siblings unchanged: failure
+  ---
+  duration_ms: 46.579436
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:64:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    materializer must not create a sibling in simulated installed version container
+    + actual - expected
+    
+      [
+    +   'tmp',
+        'version'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'version'
+  actual:
+    0: 'tmp'
+    1: 'version'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs:65:81)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: green control: invalid signature, exact source binding and no overwrite
+ok 10 - green control: invalid signature, exact source binding and no overwrite
+  ---
+  duration_ms: 31.447312
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 4
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 524.395996
+
+--- stderr ---

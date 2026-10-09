@@ -1,0 +1,79 @@
+command: node --test --test-reporter=tap scratch/alfred-materializer-scratch-fix-r1-20261009/materializer-scratch.test.mjs
+label: coordinator-materializer-readback
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: green control: verify retains signature/byte behavior and cleans actual worktree
+ok 1 - green control: verify retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 58.992707
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: verify
+ok 2 - RED target Scratch placement: verify
+  ---
+  duration_ms: 50.039369
+  type: 'test'
+  ...
+# Subtest: RED cached version-container siblings unchanged: verify
+ok 3 - RED cached version-container siblings unchanged: verify
+  ---
+  duration_ms: 51.93508
+  type: 'test'
+  ...
+# Subtest: green control: apply retains signature/byte behavior and cleans actual worktree
+ok 4 - green control: apply retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 55.595892
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: apply
+ok 5 - RED target Scratch placement: apply
+  ---
+  duration_ms: 56.869454
+  type: 'test'
+  ...
+# Subtest: RED cached version-container siblings unchanged: apply
+ok 6 - RED cached version-container siblings unchanged: apply
+  ---
+  duration_ms: 67.599895
+  type: 'test'
+  ...
+# Subtest: green control: failure retains signature/byte behavior and cleans actual worktree
+ok 7 - green control: failure retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 55.318242
+  type: 'test'
+  ...
+# Subtest: RED target Scratch placement: failure
+ok 8 - RED target Scratch placement: failure
+  ---
+  duration_ms: 51.714485
+  type: 'test'
+  ...
+# Subtest: RED cached version-container siblings unchanged: failure
+ok 9 - RED cached version-container siblings unchanged: failure
+  ---
+  duration_ms: 52.616599
+  type: 'test'
+  ...
+# Subtest: green control: invalid signature, exact source binding and no overwrite
+ok 10 - green control: invalid signature, exact source binding and no overwrite
+  ---
+  duration_ms: 33.018927
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 578.419179
+
+--- stderr ---

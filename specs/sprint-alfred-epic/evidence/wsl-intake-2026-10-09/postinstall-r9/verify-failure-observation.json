@@ -1,0 +1,1402 @@
+{
+  "schema": "alfred.verify-failure-observation.v1",
+  "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "terminal": false,
+  "observedAt": "2026-10-09T17:16:51.669Z",
+  "failures": [
+    {
+      "suite": "advisory-host-bridge-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "d8bed1d4bb980cdc7491816dc3447dc60d43497aad4cd61c19aecd45bb61f664",
+      "sourceLogSha256": "01c756e58116f68efcbc50c6dc84d51eca06eb94dbbd780fba8992ee3db88ca1",
+      "sanitizedLog": {
+        "path": "advisory-host-bridge-tests.log",
+        "sha256": "3c9476c2e15e2cdc5182fc6789aa3187f1f727607991a2673a153864d46c3514"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ workspace observation failure remains typed no-child evidence (26.873225ms)",
+        "✔ missing or drifted on-demand binding prevents workspace observation and child launch (2.24055ms)",
+        "✔ the deepest selected-host entry point also rejects a missing demand before transport (2.511085ms)",
+        "✔ a drifted or omitted evidence bundle fails before the selected transport (5.226996ms)",
+        "✖ only a selected child with matching selection, identity, and durable receipt returns advisory content (25.088036ms)"
+      ]
+    },
+    {
+      "suite": "architecture-entry-readiness-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "66148019a0b1fbc81cea25a297b73e4d3a116b75a65bf687a1954f6740f446e4",
+      "sourceLogSha256": "157ed18633bc920035e72d09cff46e0234f035d62fc66948280d1fa995d69dcf",
+      "sanitizedLog": {
+        "path": "architecture-entry-readiness-tests.log",
+        "sha256": "a2e19367ecd830a317f4deb38dcf4ef6ddb0484631022814b006ade55e33add9"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ missing physical map blocks before any readiness claim and offers only the read-only proposal (2.717016ms)",
+        "✔ missing design block preserves its exact PRD action before scaffold-map validation (0.546883ms)",
+        "✖ a PO-deferred adoption reports complete fitness observations without enforcing them (284.737011ms)",
+        "✔ unreadable checkpoint debt fails closed with a typed repair route (49.364603ms)",
+        "✖ approved greenfield design defers missing physical surfaces without fabricating fitness pass (269.47977ms)"
+      ]
+    },
+    {
+      "suite": "backlog-done-predicate-check",
+      "exitCode": 1,
+      "sourceReceiptSha256": "74186ffbd982db9fda8e31491f56930c8adc723e64a905ca1d504607fa92963d",
+      "sourceLogSha256": "243f4ed138144ec9eccfeb27fd7e99f677fd8a773543d53cb14681d5fff7402a",
+      "sanitizedLog": {
+        "path": "backlog-done-predicate-check.log",
+        "sha256": "243f4ed138144ec9eccfeb27fd7e99f677fd8a773543d53cb14681d5fff7402a"
+      },
+      "caseCompletion": null,
+      "diagnostics": []
+    },
+    {
+      "suite": "backlog-ledger-reconciliation-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "a22a2bda116d0e74bdf20f97448dbfb47fb9d0d67b50cc5e6ed42089dc462028",
+      "sourceLogSha256": "b273048fa993db708fdebc752f1e5fa2b21c3015b9c483548915edef4f5aa95f",
+      "sanitizedLog": {
+        "path": "backlog-ledger-reconciliation-tests.log",
+        "sha256": "b273048fa993db708fdebc752f1e5fa2b21c3015b9c483548915edef4f5aa95f"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS RBL05 a closure whose evidence file is missing is blocked, and nothing is written",
+        "PASS RBL06 a self-closure naming a commit this repository does not have is blocked",
+        "PASS RBL13 a closure whose evidence exists but is untracked is blocked, and nothing is written",
+        "PASS RBL17 (D6) the writer refuses to append an event that would fail the checker's own event validator",
+        "PASS RBL24 event target preflight failure leaves every reconciliation source byte unchanged"
+      ]
+    },
+    {
+      "suite": "backlog-state-check",
+      "exitCode": 2,
+      "sourceReceiptSha256": "792410a5175b76035237eeb602e483790671e2186d9126a1a2d71248215116d1",
+      "sourceLogSha256": "adde39c6143150428b3e88838b1b7d50027a46f5ddefbca1135cdd28c048a3d4",
+      "sanitizedLog": {
+        "path": "backlog-state-check.log",
+        "sha256": "adde39c6143150428b3e88838b1b7d50027a46f5ddefbca1135cdd28c048a3d4"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "FAIL backlog state: backlog/items/2026-10-09-empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary.md: type is not in the canonical item taxonomy",
+        "FAIL backlog state: backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md: item must begin with YAML frontmatter",
+        "FAIL backlog state: backlog/items/2026-10-09-restricted-governance-put-re-hardens-the-root-on-every-write.md: type is not in the canonical item taxonomy",
+        "FAIL backlog state: items: pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses has no transition-ledger entry"
+      ]
+    },
+    {
+      "suite": "bootstrap-source-attestation-acceptance-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "77afe6dc679fde43a00347b942e8744abdb7515d1f2bc646908b8bf3956d00e9",
+      "sourceLogSha256": "ed1e4edbe4e214900e556ec81575e8b5b1aa22fef0ff07770121fac6f06e044d",
+      "sanitizedLog": {
+        "path": "bootstrap-source-attestation-acceptance-tests.log",
+        "sha256": "91ddf1f7b7475a4ca221f7d3e8f1ec86b472f9f1154d2d5bb93dc99e47df1ea9"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ PX0-AC-09: an unavailable Codex registry fails closed to null instead of falling back to another source (0.122166ms)",
+        "✖ PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity (496.076819ms)",
+        "✔ PX0-AC-10: a missing loaded or installed identity yields its own typed status, never an inferred equality (0.346199ms)",
+        "✔ PX0-AC-17 (unknown keys): an adapter field outside the closed contract fails closed without echoing it (0.336359ms)",
+        "✔ PX0-AC-17 (more than one selected plugin): two enabled registrations fail closed on both runners (0.426037ms)"
+      ]
+    },
+    {
+      "suite": "check-backlog-state-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "37ef5a91cc7fd750a6359f68a0bbc0f3e10e90c09dfbd5d2661167517cb2ccc1",
+      "sourceLogSha256": "2e97f23b6656fbd822b29fc213871de81432e1b011eb4ba51894d895147b30ff",
+      "sanitizedLog": {
+        "path": "check-backlog-state-tests.log",
+        "sha256": "2e97f23b6656fbd822b29fc213871de81432e1b011eb4ba51894d895147b30ff"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "16 passed, 1 failed",
+        "FAIL CBS16 the real event 403 format and closure drift are explicitly accepted while all current drift is dispositioned: backlog/items/2026-10-09-empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary.md: type is not in the canonical item taxonomy; backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security."
+      ]
+    },
+    {
+      "suite": "check-runner-manifest-parity",
+      "exitCode": 1,
+      "sourceReceiptSha256": "cb5bc516e53799267fcda9766923e816675c676c66e61b054d175bb9c5276182",
+      "sourceLogSha256": "054527487c6290473724848e36681b87f3996f81ea22d19465c5e82c97f6d0c9",
+      "sanitizedLog": {
+        "path": "check-runner-manifest-parity.log",
+        "sha256": "da17384c44f7dab592b98c7e1177f18a065242e8b8fbaccd211430f144c21bd6"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ checkRunnerManifestParity (0.955761ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ checkRunnerManifestParity (0.955761ms)",
+        "  AssertionError [ERR_ASSERTION]: claude: Runner suffix mismatch"
+      ]
+    },
+    {
+      "suite": "claude-critic-host-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "8a9c366575e739886e5dda751f8298351b41f5113b7bc2294388d5163939a971",
+      "sourceLogSha256": "bc91c81e69eb34d88801e57951249e2a2e82169b9188ff4eb132844d635aa1cd",
+      "sanitizedLog": {
+        "path": "claude-critic-host-tests.log",
+        "sha256": "3cfa175d7b967f4ac8c6489bbeb89366f91b03f4f42d1048193ebb80cc9cb035"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS CLH04 optional Claude selector failure uses only the exact validated V3 route",
+        "function fail(code) { const error = new Error(code); error.code = code; throw error; }",
+        "Error: CDI-DIGEST",
+        "    at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)"
+      ]
+    },
+    {
+      "suite": "codex-design-readiness-bootstrap-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5240d9d7916e96e62ec4656191f3c38b6cbbcbf248741555eb2ea4773d488963",
+      "sourceLogSha256": "2c19b2e2c5a7556c6fd0caceb0da1b0908f79997b69abe06973efa5a0dcaf6a4",
+      "sanitizedLog": {
+        "path": "codex-design-readiness-bootstrap-tests.log",
+        "sha256": "381964130aefafd04a2eb9a6dbc952eb76641e412c747e30fc9121593bc4d609"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ Codex readiness bootstrap dispatches exact committed sources and publishes one exclusive receipt (2.329345ms)",
+        "✖ the bootstrap receipt is consumable by the physical final-package reader without changing its host binding (0.973449ms)",
+        "✖ Codex readiness bootstrap refuses a physical source change before model execution (0.865782ms)",
+        "✖ Codex readiness bootstrap discards output when the candidate changes during review (0.660998ms)",
+        "✖ Codex readiness bootstrap rejects duplicate source roles and flags before resolving a model (0.992598ms)"
+      ]
+    },
+    {
+      "suite": "codex-isolated-critic-contract-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "a576209086aef76b602038288215fd69187856a36c781094e14e0b23bae2ad43",
+      "sourceLogSha256": "8ef0298b3dfae6d0513be3b7a93924e61e87df34f72d3b312ea7975906480501",
+      "sanitizedLog": {
+        "path": "codex-isolated-critic-contract-tests.log",
+        "sha256": "c12a9a1558c420ac30e6cab3428f15ce6068bcaea4beb8c872a303ae8f7281e2"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ journal begins before model start and enforces the lifecycle vocabulary (2.008309ms)",
+        "✖ heartbeat, PID liveness and noisy output are not semantic progress (1.577041ms)",
+        "✖ stream budgets are fixed at one MiB per stream (1.128006ms)",
+        "✖ verdict bytes make retries impossible and success requires validated binding (0.990686ms)",
+        "✖ invalid or misbound verdict can terminate only as verdict-schema-error (1.125635ms)"
+      ]
+    },
+    {
+      "suite": "codex-isolated-critic-protected-preimage-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "3e2b3e9f54595740589ad1333748a06385313032f04f58c49db92b2ac6847a96",
+      "sourceLogSha256": "5ec9e429456787352c55ac80b563b954696d0b72eb494b2f783175f48a8b3fa6",
+      "sanitizedLog": {
+        "path": "codex-isolated-critic-protected-preimage-tests.log",
+        "sha256": "202e842cc748481103f50597a8b2d1353e8f586e6ffa8cb93ef60099d323238a"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+      ]
+    },
+    {
+      "suite": "codex-pretool-guard-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "ee821db93171f2713e125f50c85b4a0cf72710f35d826cdf5ab249685176cabe",
+      "sourceLogSha256": "cde3d336cf1512d1a01b80da4a87e48b63b22fa29a25f8eacdb63c3abc64f05e",
+      "sanitizedLog": {
+        "path": "codex-pretool-guard-tests.log",
+        "sha256": "0a02a8b2c0bf4867c8f340b4f61831954c19594a7314e5f5ccfeb720971a5036"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "not ok 6 - Bash, apply_patch, Edit and Write each reach their intended guard family",
+        "not ok 7 - multiple Bash guard denials are aggregated into one Codex decision",
+        "not ok 8 - F1: codex adapter recognizes every push shape guard-push.mjs itself recognizes, via shared normalization",
+        "not ok 10 - F1 round 2: codex adapter recognizes the directPush and shellWrapperPush shapes guard-push.mjs itself recognizes",
+        "not ok 11 - F1 round 3: codex adapter recognizes the escaped-value and unrecognized-global-option push shapes lib/git-cmd.mjs now classifies"
+      ]
+    },
+    {
+      "suite": "codex-readiness-shared-parent-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "02b16dcabe8747054cff945befbe02b7537d95d9653103e4546ffd3592c6b64c",
+      "sourceLogSha256": "c0e27ff13e838fd6a7a1eda8a48f7af96bd1e705624427d5030e68517e9e7bdc",
+      "sanitizedLog": {
+        "path": "codex-readiness-shared-parent-tests.log",
+        "sha256": "07962c48c8ccd3644c491016b8ef956b2fc3e56848783582b8f9a5ef2899f5ed"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ Readiness shared parent: actual sanctioned GUID mint leaves0755 shared parent and private descendants unchanged (15.938253ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ Readiness shared parent: actual sanctioned GUID mint leaves0755 shared parent and private descendants unchanged (15.938253ms)",
+        "  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:"
+      ]
+    },
+    {
+      "suite": "commit-msg-hook-install-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b5b8507cca82d7fe68add0c64bf5e84084b09e4c5ff6156febe4277f5c29ce20",
+      "sourceLogSha256": "637420ab672fe13d0a85c0ea72b89f0722df883e5392893c23a8d933b2909325",
+      "sanitizedLog": {
+        "path": "commit-msg-hook-install-tests.log",
+        "sha256": "637420ab672fe13d0a85c0ea72b89f0722df883e5392893c23a8d933b2909325"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ CMI018 generated hook fails closed when Git's message file is unreadable (1382.649526ms)",
+        "✔ CMI019 generated hook fails closed when its install-bound policy module is unavailable (1512.180277ms)",
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    },
+    {
+      "suite": "control-placement-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "36b03e7f1b482d889f365c9b0eb0bcde94b0fbaea7bbfc7a304dd866b356ed26",
+      "sourceLogSha256": "994e2b32188454ca7bd08644ec534353bdc274dc23654b8d1c4402132b584b01",
+      "sanitizedLog": {
+        "path": "control-placement-tests.log",
+        "sha256": "c699ddee9c90e0a51ad819af2c99a70d11fefd6a90cbf8e19fd35e122bfebdde"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ fails closed without a usable A1 record and rejects contradicted runner-hook claims (1.104267ms)",
+        "✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (1.640527ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ ships a syntactically complete but deliberately unqualified table until A1 evidence exists (1.640527ms)"
+      ]
+    },
+    {
+      "suite": "critic-diagnostic-evidence-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "07769196d3f2ded2943ee0cf813a8c80bfde29ee29cfb01e34eeb33061248e20",
+      "sourceLogSha256": "24730fdb95b3d71f14b2956a98ce0e5119049ade5cd18ab8a42630b3afc141e9",
+      "sanitizedLog": {
+        "path": "critic-diagnostic-evidence-tests.log",
+        "sha256": "651b9e78d22cb152cea15ff3fc147c8b409e2dcddc799b9ed939197e1f23e063"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ producer captures real failed targeted result while full Verify remains explicitly not-run (72.718512ms)",
+        "✖ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (73.824736ms)",
+        "✖ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (108.295021ms)",
+        "ℹ fail 3",
+        "✖ failing tests:"
+      ]
+    },
+    {
+      "suite": "critic-diagnostic-packet-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "da581fdddad19a2fdfeeed571a53e8537558862c60ad872e7ee58f48e80a4f72",
+      "sourceLogSha256": "7b9dbfa3ffdcce0d325f6b078f2d46e1bcf7cec5fd0b14366625733919c29bb8",
+      "sanitizedLog": {
+        "path": "critic-diagnostic-packet-tests.log",
+        "sha256": "93a8aff9a5f5ad1e3e759b8fd636ed64a415ccba42369262463e0476266d1346"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (73.537735ms)",
+        "✖ packet refuses malformed source/digest before creation and snapshot mutation before claim (73.973271ms)",
+        "ℹ fail 2",
+        "✖ failing tests:",
+        "✖ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (73.537735ms)"
+      ]
+    },
+    {
+      "suite": "critic-dispatch-preflight-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "c16668201a1eab0bb0e7611b39a52d793bd5966a4bef0771b38b235ae225ba44",
+      "sourceLogSha256": "5b06ace9f830ab6b3ae4cae3386d66e89f35ca7e2bcf0d379b47406bdfc8e684",
+      "sanitizedLog": {
+        "path": "critic-dispatch-preflight-tests.log",
+        "sha256": "b4bdc8055e3591af6eaf5ae062db13e1d1600a3fa95ff00611ed6f349016d46b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing (91.546763ms)",
+        "✖ first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail (89.71899ms)",
+        "✔ failed canonical Verify admits review without satisfying final qualification (73.226872ms)",
+        "✔ a base ref that fails commit-peeling and is not the empty tree is still refused (unchanged behavior) (31.629996ms)",
+        "✔ evidence sweep is advisory and non-failing: a task id with no artifacts yields an empty result, never an error (3.639338ms)"
+      ]
+    },
+    {
+      "suite": "critic-skip-coverage-check",
+      "exitCode": 1,
+      "sourceReceiptSha256": "09bf15f5c515c4fe2114ad545c73dfdbab7696f3a2347e2dbbbff069f13e8b26",
+      "sourceLogSha256": "1e6525ad994d3d65a13c3687143e21327e7c7f38c06b8b9fd9c4faa2796f64a5",
+      "sanitizedLog": {
+        "path": "critic-skip-coverage-check.log",
+        "sha256": "1e6525ad994d3d65a13c3687143e21327e7c7f38c06b8b9fd9c4faa2796f64a5"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "CRITIC-SKIP-COVERAGE evidence/dispatch-record-A-S2B-F.json: invalid v4 dispatch record (dispatch record is not closed (unknown=none; missing=effort,candidateCommit))",
+        "CRITIC-SKIP-COVERAGE evidence/dispatch-record-A-S2B-F2.json: invalid v4 dispatch record (dispatch record is not closed (unknown=none; missing=effort,candidateCommit))",
+        "CRITIC-SKIP-COVERAGE evidence/dispatch-record-A-S2B-T.json: invalid v4 dispatch record (dispatch record is not closed (unknown=none; missing=effort,candidateCommit))",
+        "CRITIC-SKIP-COVERAGE evidence/dispatch-record-A-S2B-T2.json: invalid v4 dispatch record (dispatch record is not closed (unknown=none; missing=effort,candidateCommit))",
+        "CRITIC-SKIP-COVERAGE evidence/dispatch-record-AC34-F.json: invalid v4 dispatch record (dispatch record is not closed (unknown=none; missing=effort,candidateCommit))"
+      ]
+    },
+    {
+      "suite": "deferred-backlog-check",
+      "exitCode": 2,
+      "sourceReceiptSha256": "fdc8562fd6acebd4055ef3c0eebf35ce380275dbe7148e6db77b50e2fbcdf788",
+      "sourceLogSha256": "292f26c42fcd17aa0a244f7416a6e1a9323c8f92867316b183df741b8b15c1c7",
+      "sanitizedLog": {
+        "path": "deferred-backlog-check.log",
+        "sha256": "292f26c42fcd17aa0a244f7416a6e1a9323c8f92867316b183df741b8b15c1c7"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "revisit condition missing: 1",
+        "- backlog/items/2026-08-07-approval-mechanisms-require-out-of-session-po-acts.md: age 63d; due 2026-09-06 (overdue); sprint undeclared; revisit MISSING"
+      ]
+    },
+    {
+      "suite": "design-advisory-admission-cli-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "81032b9a01b9383aefaf0d8750a04c6da8f03fab095657a82efd8732d0506bd8",
+      "sourceLogSha256": "67ec5ec40092de6322c14404beb9101aff520f77076f771449a87da5e4e17196",
+      "sanitizedLog": {
+        "path": "design-advisory-admission-cli-tests.log",
+        "sha256": "221c72c0af13ec4b25d2b95a23792d5388f5957dcffa9904a3f3d21dbaf9ec68"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ answered Advisor inspect rechecks its actual private transaction (9.188605ms)",
+        "✖ unavailable Advisor inspect never reuses the write-time final approval claim (4.773006ms)",
+        "ℹ fail 2",
+        "✖ failing tests:",
+        "✖ answered Advisor inspect rechecks its actual private transaction (9.188605ms)"
+      ]
+    },
+    {
+      "suite": "design-advisory-coordinator-v2-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "39193882bbe998f396b649833ee3e37313536f9b6036644d03bbe48c7111265d",
+      "sourceLogSha256": "200c0610269510b330c17e79b06cadf948ba7f4ae8818895737c5188d037b2be",
+      "sanitizedLog": {
+        "path": "design-advisory-coordinator-v2-tests.log",
+        "sha256": "b5af5ab95ed6fb43e094e070a4db5b31179d110d4231028ad105b6ac7ad7b781"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ RC11C003 caller supplied unbranded host object cannot mint a consultation course (1.228281ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ RC11C003 caller supplied unbranded host object cannot mint a consultation course (1.228281ms)",
+        "  AssertionError [ERR_ASSERTION]: Missing expected rejection."
+      ]
+    },
+    {
+      "suite": "design-course-command-admission-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "bd60ac9562839cf1e471c78bb558e6e3c0e82b300098723c00395315c0a40dcd",
+      "sourceLogSha256": "ffdbe888a69be662b65d21d9615fcf10a6e97a6c84914fcf7a703c1dbd9e16eb",
+      "sanitizedLog": {
+        "path": "design-course-command-admission-tests.log",
+        "sha256": "2581ee9bc1af187e606b4293cd278dad078c8891196568b754cf6f57c3a2b563"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic (40.804231ms)",
+        "✖ K3G002 actual course inspect emits advisor execute action admitted by real guard entry point (26.64492ms)",
+        "✖ K3G003 working readiness-stage fixed argv is admitted for every supported runner (28.233147ms)",
+        "✖ K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv (26.490383ms)",
+        "✖ K3G005 inspect rejects extra flags and every agent signing shape including run-v2 (26.811504ms)"
+      ]
+    },
+    {
+      "suite": "design-course-coordinator-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "eaf845295874eb97df0c9ce8ff0e29736750a96aaf51cb4b7a968688e1406083",
+      "sourceLogSha256": "e50e98d0435cf939988df418e850ff325b56875e04165194ee17c647c63c938e",
+      "sanitizedLog": {
+        "path": "design-course-coordinator-tests.log",
+        "sha256": "2c9c2374ccfadbd5a6f1840e7a3cafff03914313ec37adc597a2670714ed3d61"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ K19001 course inspection exposes runner-specific readiness and preserves typed native Advisor unavailability (1.122114ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ K19001 course inspection exposes runner-specific readiness and preserves typed native Advisor unavailability (1.122114ms)",
+        "  TypeError: Cannot read properties of undefined (reading 'status')"
+      ]
+    },
+    {
+      "suite": "design-course-session-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "0e8a1426252d8e7a7e522b9309bd9d8492f0686484ee55d63982b1507a1f0cf1",
+      "sourceLogSha256": "e07caed59ab6273e419af3a25f2cb8c7fcb70c6cc619d6c609ae1e559562dbc5",
+      "sanitizedLog": {
+        "path": "design-course-session-tests.log",
+        "sha256": "10780229cce092ae907e815512a730e1230ce0cfa3d68b8307bd12b5c124d293"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ K3C004 full-course execution requires explicit confirmation (0.94739ms)",
+        "✖ K3C005 submission inspection derives committed five-source refs and agent-owned authoring without inheriting Git context (51.234553ms)",
+        "✖ K3C006 confirmed course reaches one unsigned final package through actual producer-result contracts (1.141644ms)",
+        "✖ K3C007 R7-3b: the inspection's advisor command names a tracked output prefix under specs/<feature-id>/evidence/ (2.123313ms)",
+        "✖ K3C008 R7-3b: the --run-v2 course accepts and writes every digest-bound artifact under the tracked prefix (0.827604ms)"
+      ]
+    },
+    {
+      "suite": "design-workflow-evidence-descendant-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "8b44c09b3ec0ce5aa3f5b3d10cc8a88eb5c3f072ff1007e58359d48e7f7218fd",
+      "sourceLogSha256": "f9f4880ec8f4832089c436afb388c0a41ee42530cc3c4802acc62cf822fd09bc",
+      "sanitizedLog": {
+        "path": "design-workflow-evidence-descendant-tests.log",
+        "sha256": "74e245af8c52b5b3f770379d0f2c648586f25ff074b4beed54af875b6fb3c6e0"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (419.224413ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule (419.224413ms)",
+        "  AssertionError [ERR_ASSERTION]: ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the evidence-only diff says"
+      ]
+    },
+    {
+      "suite": "design-workflow-package-route-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "07ad6f90edebc13c9e26ffbfc5e808d0ef72c142a2234380d8702c64dc7dacde",
+      "sourceLogSha256": "a0aebd9983171ad57713afe871995efc32466709d2ac50c5d8dd511f471310ab",
+      "sanitizedLog": {
+        "path": "design-workflow-package-route-tests.log",
+        "sha256": "be3ef39108ed9cabb224dcaf573bc6cabbad4d4dc530913d145bd24ee95ed642"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (2.652358ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code (2.652358ms)",
+        "  AssertionError [ERR_ASSERTION]: refusal wording must not change"
+      ]
+    },
+    {
+      "suite": "design-workflow-signing-default-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b3a13a7b0dbe47bd4bd1f451ce105f7c1c15bbab205395610ce38b60f8b1120c",
+      "sourceLogSha256": "05a745150116455fa9ec8ec449da04608bd73f22278dbca105acd267335fb357",
+      "sanitizedLog": {
+        "path": "design-workflow-signing-default-tests.log",
+        "sha256": "5e52b87d996a03078b01d13499b3b890da73e9c65e7456d9e932f9efdfe98740"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ RC21C001 synthetic non-Codex authority: complete DWP nested request signs via unchanged default package validator and real OpenSSL (106.946075ms)",
+        "✖ RC21C002 synthetic complete DWP refuses changed intent, extra request keys and physical source drift before confirmation or key use (86.127732ms)",
+        "✖ RC21C003 canonical DWP equality accepts reordering at every object level without changing authority (95.20142ms)",
+        "✖ RC21C004 canonical comparison retains exact shape, intent, package, source and candidate refusals before signing (94.459995ms)",
+        "✖ RC21C005 canonical equality cannot accept changed physical package or current repository candidate (93.814617ms)"
+      ]
+    },
+    {
+      "suite": "dispatch-policy-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b8a348ffc84c4c047bc62771c37e94eaa76ec6c5146c9d374d15fca2b75d194d",
+      "sourceLogSha256": "d0088ae5008045a89df639ce312b10e30397e9bb8c7e28af501c57cd2e09943b",
+      "sanitizedLog": {
+        "path": "dispatch-policy-tests.log",
+        "sha256": "d0088ae5008045a89df639ce312b10e30397e9bb8c7e28af501c57cd2e09943b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ DPT05 DP5 a missing ruleset SHA is a finding on its own (0.421642ms)",
+        "✔ DPT07 DP7 an incomplete Goldfish briefing names what is missing (0.516864ms)",
+        "✔ DPT10 DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps (3.980981ms)",
+        "✔ DPT24 DP18i independent missing candidate inputs and result destination are reported together (7.799094ms)",
+        "✔ DPT29 DP18f malformed explicit destination forms fail closed through the batch runner (0.600662ms)"
+      ]
+    },
+    {
+      "suite": "dispatch-record-strip-for-critic-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "1409a0d5f5df9dc8a2285cb976e54c1c65fd88542a05aa2d5244bea95e5f50bb",
+      "sourceLogSha256": "7b842ef24959f835bff929ff3d5f32d097059c55b9eca328a4c3980b9dbfdcdc",
+      "sanitizedLog": {
+        "path": "dispatch-record-strip-for-critic-tests.log",
+        "sha256": "7b842ef24959f835bff929ff3d5f32d097059c55b9eca328a4c3980b9dbfdcdc"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ DRS06 stripDispatchRecordForCritic fails closed on unsafe object paths while retaining only a safe legacy string path (0.259481ms)",
+        "✔ DRS07 stripDispatchRecordForCritic does not throw on a record missing every optional field (0.186664ms)",
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    },
+    {
+      "suite": "doc-contract-check",
+      "exitCode": 2,
+      "sourceReceiptSha256": "c8d69b645b84e66c2e9e79f9b490c1e4ea7a7aeecffc5b3a148dc3677f35ce0a",
+      "sourceLogSha256": "d38c22bdaa79fe81a85d48a4ba75873fac1ef090712d115224cc1e986658d2f8",
+      "sanitizedLog": {
+        "path": "doc-contract-check.log",
+        "sha256": "d38c22bdaa79fe81a85d48a4ba75873fac1ef090712d115224cc1e986658d2f8"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "Documentation contracts failed: 3 finding(s)."
+      ]
+    },
+    {
+      "suite": "doc-contract-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "f56d2819e0bec35d4924cb8285a24ef7c65f94118821f70d89e176de4c372c80",
+      "sourceLogSha256": "a10abade96c3ee9bbb7430d976918be3de8af33046d945d870e97e16790e7bae",
+      "sanitizedLog": {
+        "path": "doc-contract-tests.log",
+        "sha256": "31e174cc5af43e6089b16ec863c5824b81adc52f4599fc7d32326d9612145382"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ a link into the German half of a bilingual doc fails the anchor check (3.632851ms)",
+        "✔ a genuine broken reference-style link outside any code span is still reported missing-reference (0.151825ms)",
+        "✔ missing file and missing anchor fail (1.358006ms)",
+        "✔ absolute and escaping paths fail closed (1.244759ms)",
+        "✔ a Markdown source under docs/state-archive/ is never scanned, even when its internal links would otherwise fail (175.353279ms)"
+      ]
+    },
+    {
+      "suite": "governance-action-artifact-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "065a7c560f37f5d1fdcb08bb916b71ca0acb93ec9927d97796fe2e80142a78ca",
+      "sourceLogSha256": "e681fe69c7050a8cb2e246acf792a5462ad90c991bb853cefc20aead545e5085",
+      "sanitizedLog": {
+        "path": "governance-action-artifact-tests.log",
+        "sha256": "e681fe69c7050a8cb2e246acf792a5462ad90c991bb853cefc20aead545e5085"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ GAA03 preflight is physical and does not mutate missing parents (0.472955ms)",
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    },
+    {
+      "suite": "guard-apply-patch-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5a22c7e93137bbb9432def94a5391f87e8aeec7be1249422fda00d84ef437e3a",
+      "sourceLogSha256": "3805f7020dd2f748edf0e035d6da3adb240af3a8306d057116f84e9ca887825d",
+      "sanitizedLog": {
+        "path": "guard-apply-patch-tests.log",
+        "sha256": "21e9b848410c2d1227d38839fe56351a8e2ba30f523b5a0abe8a1de0ec9e986a"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "ok 6 - invalid JSON, missing command and ambiguous envelopes block",
+        "ok 17 - EOF02 orphan Add Delete and empty Update EOF markers fail closed",
+        "ok 18 - EOF03 duplicate and nonterminal EOF markers fail closed",
+        "not ok - the lifecycle guard is invoked per patched path with an explicit codex runner even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority, second production caller)",
+        "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:"
+      ]
+    },
+    {
+      "suite": "guard-devplan-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "544f272c3bfe834c0d585b1a5324d3e35e17238f6094a4e4443979950637967f",
+      "sourceLogSha256": "9dc4694a57dc03d40d494c91bb39d036e9661e354bc7795056b9a99079edb22a",
+      "sanitizedLog": {
+        "path": "guard-devplan-tests.log",
+        "sha256": "15147c00e92ecf220fb65053b064ef248d2abd7f3391cfbe24addae4bbf2aa65"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS  DP14 block  backslash path still matches non-exempt (blocked)",
+        "PASS  DP27 block  legacy/v2 approval + present-but-unresolvable decision reference fails closed",
+        "Error: [guard-devplan] implementation requires a valid design approval (DAA-PUBLIC-UNAVAILABLE)."
+      ]
+    },
+    {
+      "suite": "guard-dispatch-budget-checkpoint-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "1d67fc1bd7072250d7f3352b8c8504764b3bea7e5a8813c65101d3841c9dc746",
+      "sourceLogSha256": "c2f651e90c8b9575634976c758442ead345977be4598b03b9b19ded2eaba1300",
+      "sanitizedLog": {
+        "path": "guard-dispatch-budget-checkpoint-tests.log",
+        "sha256": "0cb84dec9c338429a1b9be09efb04e0fffb07ff6695a7a71763ccb3d435e23bf"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (608.931911ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ GDBC10 hook: a Critic notice names critic-notes.md; the closing lane admits only the Critic's own exact notes file (608.931911ms)",
+        "  AssertionError [ERR_ASSERTION]: admitted ABS:scratch/dispatch/review-1/critic-notes.md"
+      ]
+    },
+    {
+      "suite": "guard-dispatch-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "c0bcc92585525271e37ecd467f251dbab77624d7b57a408639e331908f9e41fa",
+      "sourceLogSha256": "065fd15dbabcfe5368637197b5d3bbbbb62b44de6734c173661ef057eb6a71d6",
+      "sanitizedLog": {
+        "path": "guard-dispatch-tests.log",
+        "sha256": "065fd15dbabcfe5368637197b5d3bbbbb62b44de6734c173661ef057eb6a71d6"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ GD17 GD2i an unbound child and an orchestrator are not blanket-blocked (67.589992ms)",
+        "✔ GD18 GD2j an exactly bound prohibited child is content-free audited and blocked (28.583609ms)",
+        "✔ GD19 GD2k audit failure remains blocked before a model call (26.557049ms)",
+        "✔ GD48 GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape) (201.891258ms)",
+        "ℹ fail 0"
+      ]
+    },
+    {
+      "suite": "guard-lifecycle-ready-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "4710cfb355068a657c275f3db4dde7a0f8d191b89fe5e0c0871c4b1481f8e4d2",
+      "sourceLogSha256": "2ccf591a419cba84c3e603ce10f5783991e1e4fdd7426441d3e4edf74987a86c",
+      "sanitizedLog": {
+        "path": "guard-lifecycle-ready-tests.log",
+        "sha256": "1d070ec58a2c2541314df11c59df9f706a008c09d53398a2babeecb8af7be11b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws (0.242363ms)",
+        "✔ evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader (9.668302ms)",
+        "✔ direct State edits remain blocked even when session readiness is exact (28.932136ms)",
+        "✔ a valid architecture deferral does not let a missing physical map mint implementation authority (13.874543ms)",
+        "✔ writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route (27.924217ms)"
+      ]
+    },
+    {
+      "suite": "guard-push-architecture-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "65e50e34aefd036df8f7b2a4161183c232229dcd6e0a305705b8a08315627f25",
+      "sourceLogSha256": "d78c145b8c2cac48e980d9d2405fb586af3ff173ee6f8b854e6fbf7209dbc5f2",
+      "sanitizedLog": {
+        "path": "guard-push-architecture-tests.log",
+        "sha256": "fb06903be6cb84a931f315134a70a87293af3344055ad36f43ec0f888173d1c7"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ GPA001 stale map blocks strict push and explicit checkpoint persists typed debt (497.119365ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ GPA001 stale map blocks strict push and explicit checkpoint persists typed debt (497.119365ms)",
+        "  AssertionError [ERR_ASSERTION]: BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination."
+      ]
+    },
+    {
+      "suite": "guard-testpath-override-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "cd74fda8a822636bd7652fbc76dd35c35608c35e0e4e50df9b3aefbe54ad3257",
+      "sourceLogSha256": "5f860c69d5e97cbce1ad53e2a1db76e4b481aeb326f2ac30a2710c2267b40bb0",
+      "sanitizedLog": {
+        "path": "guard-testpath-override-tests.log",
+        "sha256": "5f860c69d5e97cbce1ad53e2a1db76e4b481aeb326f2ac30a2710c2267b40bb0"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS OT13 an in-session write drifts the repository an armed capability is bound to, which fails closed with HGO-DRIFT",
+        "guard-testpath-override: 21 passed, 2 failed",
+        "FAIL OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane: T84: the restore to committed bytes was refused (lane=git-working-tree-write, rule=TP-3)",
+        "FAIL OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted: T84: the committed-bytes restore of a staged file was refused (lane=git-working-tree-write, rule=TP-3)"
+      ]
+    },
+    {
+      "suite": "guard-testpath-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5b3514db0fed3630cd322e5f50a204471fcc84875592a38353120638107cea8b",
+      "sourceLogSha256": "d36d1940a0645a2ce9e4057324357de2f98b4e3960ad8910d35980414d3184c5",
+      "sanitizedLog": {
+        "path": "guard-testpath-tests.log",
+        "sha256": "d36d1940a0645a2ce9e4057324357de2f98b4e3960ad8910d35980414d3184c5"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS  TP05 block  missing project config still keeps the shipped minimum active",
+        "PASS  TP18 block  briefed test-change authorization blocks when presenting mismatching digest",
+        "✔ TPC005 TP05 block  missing project config still keeps the shipped minimum active (230.485049ms)",
+        "✔ TPC018 TP18 block  briefed test-change authorization blocks when presenting mismatching digest (296.894257ms)",
+        "ℹ fail 0"
+      ]
+    },
+    {
+      "suite": "hook-governance-scope-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "1e9b6bd1d3a603bb9dc059138a938637c45218f56b572a3d0382914d7f06a174",
+      "sourceLogSha256": "9d2039ee0176a02eb66cc5f6a4f11bf420fb8bfbc0942cd25699d200304fec71",
+      "sanitizedLog": {
+        "path": "hook-governance-scope-tests.log",
+        "sha256": "9246f862d970d1a632ba243670a1389a4df4077647c558a319f22ec4af02a762"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.112205ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ RC03C008 all current runner hook commands are automatically enumerated into the source scope inventory (1.112205ms)",
+        "  AssertionError [ERR_ASSERTION]: unadmitted runner wiring: claude-task-output-scope-posttool.mjs"
+      ]
+    },
+    {
+      "suite": "installed-plugin-attestation-host-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "58dc7a77950bcf3ffafe0a00da9b24bfc34129a3cac583b95a0cee55622d0482",
+      "sourceLogSha256": "b4989a8c2c92bb73276e45e127747ec67662423c5ad2193c0e601cc8d2ffe41e",
+      "sanitizedLog": {
+        "path": "installed-plugin-attestation-host-tests.log",
+        "sha256": "1d45a2c99840055f357cf99aa57a407dd7f5acf9be96ddc712d92e8d832719e7"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✔ IPH06 dirty source, stale copy, and embedded credential origin fail before a receipt survives (152.082071ms)",
+        "✔ IPH07 bootstrap fails closed when its bound host locator is missing or stale (110.081189ms)",
+        "✖ IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed (368.310577ms)",
+        "ℹ fail 1",
+        "✖ failing tests:"
+      ]
+    },
+    {
+      "suite": "license-contract-check",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b8ea7343d835bdbd936b35ec8379c54af932e8484f75c12a60d368602b1c4966",
+      "sourceLogSha256": "930b0ae8a5b5f75e2ba0ffb3e8ef28c99dfdec256525e32e1221dd3d5ed4dfed",
+      "sanitizedLog": {
+        "path": "license-contract-check.log",
+        "sha256": "930b0ae8a5b5f75e2ba0ffb3e8ef28c99dfdec256525e32e1221dd3d5ed4dfed"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "FAIL: plugins/pipeline-core/lib/continuity-authority-drift.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+        "FAIL: plugins/pipeline-core/lib/continuity-authority-drift.test.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+        "FAIL: plugins/pipeline-core/lib/critic-lane-fallback.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+        "FAIL: plugins/pipeline-core/lib/critic-lane-fallback.test.mjs lacks an SPDX SUL-1.0 header in its first three lines",
+        "FAIL: plugins/pipeline-core/lib/fs-durability.mjs lacks an SPDX SUL-1.0 header in its first three lines"
+      ]
+    },
+    {
+      "suite": "lifecycle-recovery-contract-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "f62223e8af3940be9d783e01acf68447f3ca782acc3954c4690b055007af2115",
+      "sourceLogSha256": "ad363e625209ef9075417d6bd1a98eabb0f76e614ca3362e18ea476ff98a0b73",
+      "sanitizedLog": {
+        "path": "lifecycle-recovery-contract-tests.log",
+        "sha256": "4633aa4bd252bc0ce5ecbe2cdf3e1f9500d4374a2faa432a78b8bd29acafce16"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ every offered PO-authority-rebind-planner nextAction is admitted by the real guard (1982.354747ms)",
+        "  AssertionError [ERR_ASSERTION]: po_authority_rebind_writer_unavailable"
+      ]
+    },
+    {
+      "suite": "local-worker-supervisor-cli-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "57ac1216be3a7441eb23d37f244c7af402698bd931f1ffcc9808115a751f9da8",
+      "sourceLogSha256": "c5a57f3e294cc538eba57620d5f4b2e935fc1eb9ab18ab8dd95d87372f3e1091",
+      "sanitizedLog": {
+        "path": "local-worker-supervisor-cli-tests.log",
+        "sha256": "d34c861b5823304e7f930a33b6ab2555a3de70d22fe0d6a635610729e28243e6"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ LWSC01 plans and runs two overlapping real child processes in separate no-hardlink Git clones (49.487771ms)",
+        "✖ LWSC02 returns serial-fallback-required before creating a workspace when recovery reserve is exhausted (37.522872ms)",
+        "✖ LWSC03 times out and signals only the exact observed child, then permits exact cleanup (37.508553ms)",
+        "✖ LWSC04 accepts an exact cancellation intent, drains the owned child, and permits cleanup (37.94791ms)",
+        "✖ LWSC05 does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest (43.045881ms)"
+      ]
+    },
+    {
+      "suite": "local-worker-supervisor-core-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b4c06b42d4a150af443f6a4dfa2e093b3cf37666a01d5d4ee929723378045676",
+      "sourceLogSha256": "dda2605065a764b2b2ba992fbeaa406cb11387cb9e56041ee4a4d6348b42ea89",
+      "sanitizedLog": {
+        "path": "local-worker-supervisor-core-tests.log",
+        "sha256": "462c48dd60991494b95519237fb21ba044051f255b8012df0b41a63e0204f313"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ LWS01 accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve (2.034387ms)",
+        "✖ LWS02 rejects unknown fields, path escape, instruction drift, malformed runner, and missing Git identity (0.547332ms)",
+        "✖ LWS03 builds only the fixed fixture launch with shell false and a bounded nonce environment (0.385538ms)",
+        "✖ LWS04 builds a fixed Codex exec adapter without arbitrary argv, web, network, or interactive approval (0.32883ms)",
+        "✖ LWS05 uses the host-boundary sandbox for real Codex worker dispatch, never workspace-write (0.32194ms)"
+      ]
+    },
+    {
+      "suite": "measure-tofu-push-e2e-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5c7db0c0482ad653b7c247a8ddce6e83e2956502418cb44d69c524d31ace1a50",
+      "sourceLogSha256": "d8afcaf1eb926fb2553b9cd8086ae9f1c6186094f42094ca02c2070c809d9316",
+      "sanitizedLog": {
+        "path": "measure-tofu-push-e2e-tests.log",
+        "sha256": "ac8541e1fa8715409a6efdaf2b3af52a1b97e490e4ba380f1d9bb57d4150622f"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ parseJsonStdout: missing stdout field defaults to empty string and returns {ok:false} (0.161085ms)",
+        "✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (8154.673724ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ full TOFU measurement follows Driver-provided design answers through to a recorded signed push (8154.673724ms)"
+      ]
+    },
+    {
+      "suite": "model-family-runtime-host-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "cfabaafc66af65289228a07872b3cdb424dd8cf95441b194b1bef443ec02cf49",
+      "sourceLogSha256": "88f451fe5c74c18da33bce16cf64a5afe5e9354c25e0390bf4aff21ec1caaa25",
+      "sanitizedLog": {
+        "path": "model-family-runtime-host-tests.log",
+        "sha256": "88f451fe5c74c18da33bce16cf64a5afe5e9354c25e0390bf4aff21ec1caaa25"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ MFH001 missing fixed store is physically inactive and observation creates no activation marker (1.349587ms)",
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    },
+    {
+      "suite": "no-autoupdate-key-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "ee6427aef561e46f756852e6bbdfda3b2198663597d8edbfe761c85ad7a564e7",
+      "sourceLogSha256": "b4624445e52c84114b1bb4f8da4bee68ccbf85fa81755f536e0f5680650d6664",
+      "sanitizedLog": {
+        "path": "no-autoupdate-key-tests.log",
+        "sha256": "b4624445e52c84114b1bb4f8da4bee68ccbf85fa81755f536e0f5680650d6664"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "FAIL  SCAN  .claude/settings.json binds pipeline-core@agent-pipeline to the public marketplace -- enabled=false; marketplace=null",
+        "Failures:"
+      ]
+    },
+    {
+      "suite": "notebook-write-coverage-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "51d7963a931bdef17a13694711ffa551e52d3f36c20df8ffa264caf3183bc17b",
+      "sourceLogSha256": "6721849ae66fb7785c5f07055ce60524673b53650fd4dc925170f6f150885287",
+      "sanitizedLog": {
+        "path": "notebook-write-coverage-tests.log",
+        "sha256": "6721849ae66fb7785c5f07055ce60524673b53650fd4dc925170f6f150885287"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS NB05 a NotebookEdit with no usable path fails closed rather than allowing",
+        "notebook-write-coverage: 7 passed, 1 failed",
+        "FAIL NB07 no write guard reads tool_input.file_path directly any more: guard-lifecycle-ready.mjs does not use the shared write-target reader"
+      ]
+    },
+    {
+      "suite": "onboarding-continuity-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5e620b737e220a7f1149d6ed1761bc98a9055c10ba01d77969d0bfe656f597f2",
+      "sourceLogSha256": "c6d6f775e8be78f651340800e43d3e9a7c040e08bbc94d2b62a008f664b4e934",
+      "sanitizedLog": {
+        "path": "onboarding-continuity-tests.log",
+        "sha256": "c6d6f775e8be78f651340800e43d3e9a7c040e08bbc94d2b62a008f664b4e934"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ OBC005 object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable (9.087723ms)",
+        "✔ OBC006 object-shaped configured handover without a usable .path still fails unavailable (7.89702ms)",
+        "✔ OBC019 discard entry missing a required key remains damaged (8.803302ms)",
+        "✔ OBC032 win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed (12.97481ms)",
+        "✔ OBC033 win32: an insecure DACL assessment on the private directory still fails closed (9.880057ms)"
+      ]
+    },
+    {
+      "suite": "phase3-sdlc-coherence-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "6a0f2b88804799b093025a53357501e8383e3c712119382aacb0bf3c168de651",
+      "sourceLogSha256": "cd1543022cfada9c1330717cde6228eab6b809cba615e72d2ad7864d672b3dfd",
+      "sanitizedLog": {
+        "path": "phase3-sdlc-coherence-tests.log",
+        "sha256": "eb7ba7772328822eb095005473db465f889e4bb72af64a46b5fb9c2ee09ade9b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "AssertionError [ERR_ASSERTION]: schema-lite does not execute the published schema's $ref/oneOf nested event contract"
+      ]
+    },
+    {
+      "suite": "pipeline-start-preflight-antigravity-hard-enforcement-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "b899e615cdaa72c4ff9ad42328b3f44b6e4540dc28d5cb83e69f68a2e5311851",
+      "sourceLogSha256": "16131566990ecc2992130d564fa2c72f4f8cc74e7dbd27a59dc704e422689067",
+      "sanitizedLog": {
+        "path": "pipeline-start-preflight-antigravity-hard-enforcement-tests.log",
+        "sha256": "848d9530a2f0bd8e5e38147a2a0948cf2db389d2cb4f65d7111a392bd433fb0d"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ an injected scan failure folds into not-observed rather than throwing (fail-open) (1.468893ms)",
+        "✖ the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready (88.458033ms)",
+        "✔ the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready (9.191309ms)",
+        "✔ the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed (9.21368ms)",
+        "✔ the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed (9.346644ms)"
+      ]
+    },
+    {
+      "suite": "pipeline-start-preflight-pre-push-observation-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "263f66c89f620b6da7b707fd54bd068c43acc461997b3d34d96f727b5da02486",
+      "sourceLogSha256": "c02658d34fbdd84c84dac15a02d3e2f1945595f4a99818627038d7088ba4cc8a",
+      "sanitizedLog": {
+        "path": "pipeline-start-preflight-pre-push-observation-tests.log",
+        "sha256": "b47d3b7514bf8992c82fb2dda88bf32d3f3d777ba375d533dc5864fe439a4556"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ an injected planInstallFn failure folds into repository-unresolved rather than throwing (0.194724ms)",
+        "✖ wired: the ready path is unchanged when the hook is installed-and-current (801.200059ms)",
+        "✖ wired: an absent hook never gates readiness (NVA-PREPUSHVISIBLE-1) -- status/exit code stay ready/0, and the observation still names the install command (292.547032ms)",
+        "✖ wired: a declined repository is ready, and the result still shows the decline with its timestamp (305.315929ms)",
+        "✖ wired: a foreign/modified hook never gates readiness either (NVA-PREPUSHVISIBLE-1) (338.074271ms)"
+      ]
+    },
+    {
+      "suite": "pipeline-state-rebind-runner-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "1055931a6c30fb9a8293938e2475ec5cabbf372aefdfdc0361a1b3f065707e8a",
+      "sourceLogSha256": "5c2ae78e8321de9c2c9c48b3627134e01290948ff6c8ac71e5abd8c07856baed",
+      "sanitizedLog": {
+        "path": "pipeline-state-rebind-runner-tests.log",
+        "sha256": "a4b1ef3ab6b214b17c491d63182a05940ffcc1e0f1da074e5762f66ac9473579"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ submit-plan mini still refuses missing historical acknowledgement without mutation (216.140033ms)",
+        "✖ inspect exposes one typed PO approval action after submit and presentation, independent of runner (238.446391ms)",
+        "✔ rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still fails PO-REBIND-NOT-STALE, not PO-REBIND-APPROVAL (1.377617ms)",
+        "✔ rebind-apply: absent --runner without a recognized runner marker fails closed instead of guessing codex (1.716756ms)",
+        "✔ rebind-apply: invalid explicit --runner fails closed without mutation (1.60038ms)"
+      ]
+    },
+    {
+      "suite": "pipeline-state-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5ede56e9d0546e785d1e5cb2f257548903c78d772179961029a2036f0e0a607c",
+      "sourceLogSha256": "82b0c3421688541a59074f7361d3e79861806b425ae99d0503176a25d3743d4e",
+      "sanitizedLog": {
+        "path": "pipeline-state-tests.log",
+        "sha256": "12ef8ebbc50a77160dfd4a0074eedc7e49d51016990fc5dc6dac968ce7303e13"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "FAIL  PS06a0 submit-plan exit 0 -- got 2",
+        "FAIL  PS06a0-1 present-plan exit 0 -- got 2",
+        "FAIL  PS06a approve-plan exit 0 -- got 2",
+        "FAIL  PS06c planApproved true",
+        "FAIL  PS06d planApproval is exact v7 and binds the submitted Plan, Spec, profile authority, and an empty audit seal"
+      ]
+    },
+    {
+      "suite": "po-gate-authority-fixture-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "391229eba73e2c2a838a270fce2abdc2664d6d574ccfb592e528e7e3c895a158",
+      "sourceLogSha256": "1cfed88210c34709a2db81aeb168f31d69ebea0730ec65abc031f36c3c475ee3",
+      "sanitizedLog": {
+        "path": "po-gate-authority-fixture-tests.log",
+        "sha256": "8678ad2c96e58927d2042f908b5d7747fac15de046643e0006bef459678bd65e"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "ok 4 - profile-only readback rejects missing, stale and non-0600 receipts",
+        "ok 7 - profile-only failures and evidence never expose machine-local paths or raw profile bytes",
+        "ok 10 - a mixed project authority (neutral manifest present without neutral State while legacy State remains) fails the state authority closed instead of silently reading the legacy State",
+        "ok 11 - a missing project authority (no legacy or neutral manifest at the current checkout) fails the state authority closed",
+        "ok 12 - validatePoGateAuthorityForRepository propagates the fail-closed state authority code for a mixed project authority"
+      ]
+    },
+    {
+      "suite": "product-capability-inventory-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "96c4e8a9872b0eab5ccdfd3fa4abde1ce355ef7afd0b0d3e8db6dc00b9e450cd",
+      "sourceLogSha256": "be0b7d0156ee49ce71aeee38d1d9921931ed64d534ba9c44e2bb6069d343b779",
+      "sanitizedLog": {
+        "path": "product-capability-inventory-tests.log",
+        "sha256": "f8104ce60e90ca5b8a75ff2804fbcfca9bbbe0d30ed61710c051b2665ecc1e0c"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ PCI03 HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate (43.311076ms)",
+        "✔ PCI10 HAW-A03 rejects missing Codex disposition (36.833611ms)",
+        "✖ PCI16 HAW-A04c reads a genuinely consumed private Critic receipt across a committed activation successor (69.62339ms)",
+        "✖ PCI18 HAW-A05a CLI discovery is bound to the committed baseline and rejects a later uncommitted assignment (3338.715229ms)",
+        "✖ PCI24 HAW-B01 this repository's own entry points are reachable: never named-but-refused, never admitted-but-unnamed (27.855357ms)"
+      ]
+    },
+    {
+      "suite": "project-onboarding-e2e-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "9ccaa3f9fe3e7b44af5243f1e2b950f65ee100872210088ee720da96a5c94486",
+      "sourceLogSha256": "acf84e476260bb5650838e108f388b9988a89611ce0bae5d94bde93ef30bce54",
+      "sanitizedLog": {
+        "path": "project-onboarding-e2e-tests.log",
+        "sha256": "d871c902e4aa77e56de1c6c47b0aae60bb53a4eca40b57cb80315426765797c3"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs (6453.434935ms)",
+        "✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (13073.649454ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary (13073.649454ms)"
+      ]
+    },
+    {
+      "suite": "project-onboarding-v3-argv-closure-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "4da0d5ad87983265829e074a9f09b67ae7469d06503bc6831a0f50a2460b5782",
+      "sourceLogSha256": "718ddc944d85440c1eccc6556cf46d139495a12c8e2d13c565b58d5bbff52fba",
+      "sanitizedLog": {
+        "path": "project-onboarding-v3-argv-closure-tests.log",
+        "sha256": "8207c46bfe459ecd029872cde370214fa00f1631bee241c741a3c5f7b4860a02"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map (0.520054ms)",
+        "ℹ fail 1",
+        "✖ failing tests:",
+        "✖ R5-9 every flag named by any mutating onboarding shape has an entry in the guard's validator map (0.520054ms)",
+        "  AssertionError [ERR_ASSERTION]: intake-design-questions-apply: --answers-file has no validator entry in the guard map"
+      ]
+    },
+    {
+      "suite": "project-onboarding-v3-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "46934868075fa0ecac32ee1563c5c1114ab25cba5c1ec5cf3c3a36426492cfa0",
+      "sourceLogSha256": "cac8dbf965459cb4d311f76ac2ded9dd068e8ee7eb99d40aa5c42f26a9d9657f",
+      "sanitizedLog": {
+        "path": "project-onboarding-v3-tests.log",
+        "sha256": "2e62987839b756bf6795e4fded351431371f221f05c05313e09544ebe0456d24"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "project-onboarding-v3 controller: malformed coordinates, partition coverage, and child failure outcomes fail closed",
+        "PASS  session capability failure phase is optional, closed, and retained only for its matching failure",
+        "PASS  repository capability failures map exactly and stop before source/runtime inspection",
+        "FAIL  exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable -- B8 producer/guard command drift: partial po-authority-rebind-plan",
+        "+   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-DEVPLAN-SHELL: BLOCKED (guard-devplan, plugin pipeline-core): Feature \"kickoff-8fed00b58c45fed6\" lifecycle is \"invalid\".\\n' +"
+      ]
+    },
+    {
+      "suite": "project-uninstall-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "dcbb41820b00c512b1e214a6ab7bfa260c29a02dbdf6ef6321ba020dae13deec",
+      "sourceLogSha256": "850d7074c6f21b1210d5fe9e2121ad6bc70dc024e1e5d66569843714fee5c3be",
+      "sanitizedLog": {
+        "path": "project-uninstall-tests.log",
+        "sha256": "850d7074c6f21b1210d5fe9e2121ad6bc70dc024e1e5d66569843714fee5c3be"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    },
+    {
+      "suite": "routing-projection-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "53639d440bf5a072acd7e2f8ed7d2423fd8ca2131fab67a9c2ea1ccd8784e913",
+      "sourceLogSha256": "bf5b741b3f1c6aa23824818b7b5189ba1ac73e6b6929bb842a9760843e017501",
+      "sanitizedLog": {
+        "path": "routing-projection-tests.log",
+        "sha256": "bf5b741b3f1c6aa23824818b7b5189ba1ac73e6b6929bb842a9760843e017501"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS RP12 unsupported Codex identity fails closed",
+        "PASS RP12b unsupported effort fails closed",
+        "PASS RP13c unknown host duty fails closed",
+        "PASS RP17 missing manifest route is detected",
+        "PASS RP28 unobserved concrete Codex IDs fail closed"
+      ]
+    },
+    {
+      "suite": "runner-contracts.schema-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "96f2eb6a204d79418e54e632ef80732755dba901be135110713a4c9af436c94c",
+      "sourceLogSha256": "2e63b35bf0ac2920c8616960872eacbeae04f3fd7e276c31c5f6425309846ed4",
+      "sanitizedLog": {
+        "path": "runner-contracts.schema-tests.log",
+        "sha256": "2e63b35bf0ac2920c8616960872eacbeae04f3fd7e276c31c5f6425309846ed4"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "FAIL  committed registry is complete and exact -- mechanic.claude exact tuple",
+        "PASS  missing runner cell is rejected",
+        "PASS  missing common metric is rejected",
+        "PASS  missing capability state is rejected",
+        "Failures:"
+      ]
+    },
+    {
+      "suite": "runner-design-readiness-bootstrap-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "30ce3c6f3cbdc8ea684356eeb2bddef2f584fb32aa1c2be750ddcdab78397e46",
+      "sourceLogSha256": "1a9fc49dad4f7b06260d6d10d0b1b4a26a7a3067014d6213c8961d2ff4ac2523",
+      "sanitizedLog": {
+        "path": "runner-design-readiness-bootstrap-tests.log",
+        "sha256": "2605da14821950e5c9526dcb59da6d119db706b914345da04349953d216d3da7"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ Claude and Antigravity bootstraps publish host-observed receipts bound to committed sources (18.354634ms)",
+        "✖ declined export stops before route, executable resolution, or runner launch (15.537634ms)",
+        "✖ source drift during the child run prevents publishing a readiness receipt (17.824816ms)",
+        "ℹ fail 3",
+        "✖ failing tests:"
+      ]
+    },
+    {
+      "suite": "runner-profile-migration-v3-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "6b278f5c82b122e5f4590cfa72fbd69e1ef5b1352a5e26d33b332290f7ebdf53",
+      "sourceLogSha256": "b9c7adfdab251514918157bd8250585d7cd508b6fda663a468dae356d5d44f40",
+      "sanitizedLog": {
+        "path": "runner-profile-migration-v3-tests.log",
+        "sha256": "b9c7adfdab251514918157bd8250585d7cd508b6fda663a468dae356d5d44f40"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection (17.765869ms)",
+        "✔ RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed (41.071032ms)",
+        "✔ RPM26 current V3 with any missing runtime target remains fail-closed (3.516452ms)",
+        "✔ RPM36 an unsafe existing neutral authority mirror fails planning without a transaction (2.35759ms)",
+        "✔ RPM46 CLI production preview zero-progress and failure seams stop before apply (27.829589ms)"
+      ]
+    },
+    {
+      "suite": "security-scan",
+      "exitCode": 2,
+      "sourceReceiptSha256": "4c54a83fe1d8446db379e58df3f42ebc23953b5ecc4dedb78d19486edf609824",
+      "sourceLogSha256": "ed623f7fff085c9c889882753bdf86b658b168fa75368e00699dfe96c9891787",
+      "sanitizedLog": {
+        "path": "security-scan.log",
+        "sha256": "95e41a7c06afa7883536abb7ec39752e45f89effa2004363eaaa5dbe1ce62273"
+      },
+      "caseCompletion": null,
+      "diagnostics": []
+    },
+    {
+      "suite": "security-scan-snapshot-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "89a4226fba848af7ef0938192d1a9b058a3ca7f0cab245da35a5147358d856b8",
+      "sourceLogSha256": "d8d8e35025a4c1cb5f721eae3c254fe9a999436fe6ac7c96e745f98b9ff43d23",
+      "sanitizedLog": {
+        "path": "security-scan-snapshot-tests.log",
+        "sha256": "980b09004d7bcc9d9c08047dffb38a4f06f3b2e070b2e7982793e9e8bd681360"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (52.978308ms)",
+        "✖ T32 pin 1b (RED): snapshot mode reports the finding HEAD carries even when the dirty tree 'fixes' it (53.133623ms)",
+        "ℹ fail 2",
+        "✖ failing tests:",
+        "✖ T32 pin 1a (RED): snapshot mode scans HEAD's committed bytes on a dirty tree and binds HEAD's commit and tree (52.978308ms)"
+      ]
+    },
+    {
+      "suite": "session-cleanup-binding-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "57c0c6dc55caf6cfffd5e207a17ef88c97773855b58abe2dc46b1222f8e551cd",
+      "sourceLogSha256": "f4ef8b0caab0f7a8cf4013fea0f8766e7f94a6c85e90552ba2773cfd6d289181",
+      "sanitizedLog": {
+        "path": "session-cleanup-binding-tests.log",
+        "sha256": "1bc936a5e5e72e46dc6cfc7e77a13af06d24a03f8f32c9894e22d9f002af2f3b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ start derives the boundary runner from CLAUDECODE when --runner is absent, and fails closed on an invalid explicit value (84.897972ms)",
+        "✔ plan-recovery repairs only the exact historical kickoff-promotion cleanup mismatch (162.925042ms)",
+        "✔ hostile neutral portable cleanup identity fails closed without private rebinding (30.762969ms)",
+        "✔ privatization planning rejects missing, replaced, or multiple active descriptors (174.441338ms)",
+        "✔ double-confirmed privatization recovery clears only a leaked tuple and remains blocked when owner observation is unavailable (203.584751ms)"
+      ]
+    },
+    {
+      "suite": "session-critic-finalizer-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "5c956d851c816b21a878e071f8e8a40f2cfd1fe88e786e6b2e969ceabb2ec924",
+      "sourceLogSha256": "274cf95d383cdb0fba409fa0e6e8bef8c2c157de33bcf668b45822f918f3c6eb",
+      "sanitizedLog": {
+        "path": "session-critic-finalizer-tests.log",
+        "sha256": "4a9aa3f886444a21ca39ee2c91ced53356bb922e6cde71166ad8a982895c4a1a"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ private task snapshot binds uppercase delivered-v3 bytes without exporting record prose (96.604405ms)",
+        "✖ uppercase task ID is safe and wrong or traversal IDs cannot select a different record (99.662568ms)",
+        "✖ empty-tree packet base rejects a non-root authored candidate (97.614794ms)",
+        "✖ prelaunch admission creates one claimed, digest-bound packet before the verdict exists (97.538935ms)",
+        "✖ invalid optional Critic selection retains V3, while valid selection binds before packet creation (98.39185ms)"
+      ]
+    },
+    {
+      "suite": "setup-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "46463036e1fc85f6fced59ab41a4587ab4b98e1896a4932778c4a678ec1dcfcd",
+      "sourceLogSha256": "6dfb9ace876f3a421e17a5683c8d00af614faec7084c6753650e9e799d42f8c7",
+      "sanitizedLog": {
+        "path": "setup-tests.log",
+        "sha256": "6dfb9ace876f3a421e17a5683c8d00af614faec7084c6753650e9e799d42f8c7"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS  PO profile receipt: source/runtime disagreement fails before common-dir mutation",
+        "PASS  PO profile receipt: linked setup fails without copying or rewriting its branch profile",
+        "PASS  setup toolchain report includes versions, blocked claims, executable prerequisite chains, and the no-install boundary",
+        "PASS  setup toolchain report treats execution boundaries as observations rather than missing installations",
+        "PASS  run: a new install is lifecycle-classified and fails closed instead of creating legacy defaults"
+      ]
+    },
+    {
+      "suite": "spec-readiness-host-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "4b0424e9da342148cdcf68e9adda97cd8be084597307de07ad63bf4d8eedac14",
+      "sourceLogSha256": "14df60d89e332302f84ffc25fa5963e871601b36563f7a59c0c6cd4afc8609f0",
+      "sanitizedLog": {
+        "path": "spec-readiness-host-tests.log",
+        "sha256": "1da1d6af297218451c398915787db6f64340ba453376287fe901cd2d16b0fd88"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✖ readiness uses the generic selected duty with only fresh refs and binds the resulting review (1.093544ms)",
+        "✖ readiness returns the selector's typed unavailable result without a child or a prose workaround (0.224623ms)",
+        "✖ readiness refuses to invent a direct Codex route when the host has no physical sandbox runtime (1.006817ms)",
+        "ℹ fail 3",
+        "✖ failing tests:"
+      ]
+    },
+    {
+      "suite": "stop-fanout-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "3519186240108de80d1a8abb2e7cd4505faaf66b8a037af7cc0d1522ed5f3c86",
+      "sourceLogSha256": "c474100fdd977f6d5c6ba9f30eb0f0db3bae189a0d6cc5d2c095d99b5646e93f",
+      "sanitizedLog": {
+        "path": "stop-fanout-tests.log",
+        "sha256": "c474100fdd977f6d5c6ba9f30eb0f0db3bae189a0d6cc5d2c095d99b5646e93f"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ SF10 fail-open: malformed, empty or non-object stdin exits 0 with no stdout (936.135554ms)",
+        "✔ SF11 fail-open: a missing queue file exits 0 with no stdout (151.594597ms)",
+        "✔ SF12 fail-open: a malformed config, a missing session id or an unusable common dir exits 0 with no stdout (483.985616ms)",
+        "✔ SF13 fail-open: an unreadable ledger (the ledger path is a directory) exits 0 with no stdout, even in enforce mode (154.184901ms)",
+        "✔ SF14 fail-open: a governor that throws (PIPELINE_FANOUT_TEST_THROW=1 test seam) exits 0 with no stdout (307.36315ms)"
+      ]
+    },
+    {
+      "suite": "toolchain-preflight-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "6f218d5a02624ea76c99a4ee1f9755949eee6daa2ce932a69d9ab83862746070",
+      "sourceLogSha256": "2d57cdff7d5fb188f17f84ad279e3ff7c6a0f5369a3c13116f8da7b08320c960",
+      "sanitizedLog": {
+        "path": "toolchain-preflight-tests.log",
+        "sha256": "009405960d628484201372ddf10f13aab3eaa9f18e1d8437ba7e630d1773c083"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS TCP03 browser evidence preflight reports unavailable browser separately from a test failure",
+        "PASS TCP06 browser evidence preflight rejects an absent required evidence class fail-closed",
+        "PASS TCP10 warn/off change only failure severity and never skip enabled probing",
+        "PASS TCP12 execution environment outranks missing, timeout, probe and compatibility failures",
+        "PASS TCP13 Git accepts only the documented status-zero EPERM false-positive, while ordinary probes retain EPERM failure"
+      ]
+    },
+    {
+      "suite": "verify-case-completion-registry-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "91fe7dbb59ef87b8f7266e652542b4a1517f9804430762b154e0ed3d435c32ba",
+      "sourceLogSha256": "4e2c6544414e0110fa1e2abffc2fdbc6608976984062b5a655499535465ea57a",
+      "sanitizedLog": {
+        "path": "verify-case-completion-registry-tests.log",
+        "sha256": "6f1f9f7a8519e599dd6cf5895eab2d96aedb1257626f10ac6e41ab949aa93ed0"
+      },
+      "caseCompletion": "complete",
+      "diagnostics": [
+        "✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (1112.300824ms)",
+        "✔ VCR03 missing, new, duplicate, and stale registry entries fail closed (0.97013ms)",
+        "✔ VCR04 unknown fields and missing backlog reasons cannot widen the registry (1.228932ms)",
+        "✔ VCR18 canonical declarative schema and unknown fields fail closed (4.504279ms)",
+        "✔ VCR20 duplicate suite IDs and missing files fail while distinct IDs may share a canonical file (4.171886ms)"
+      ]
+    },
+    {
+      "suite": "verify-suite-registration-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "f1448224b2acef42f54768db6d571fa9ea8166bdcca4f4e6c8e72dfc2431232e",
+      "sourceLogSha256": "1b0f79a6b9b9eb41d7c2c02c4a2283ac5d83995c72e9c42fa4776cfd239ed2fe",
+      "sanitizedLog": {
+        "path": "verify-suite-registration-tests.log",
+        "sha256": "d569ca632133df6e8324d2be79dbfc939eeee0d303c9d24b0658d312e6e76472"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "ok 2 - a registration entry naming a missing file is detected",
+        "ok 16 - QG-06: an exclusion missing \"reason\" is a finding naming the file and that field, and does not suppress",
+        "ok 17 - QG-06: an exclusion missing \"owner\" is a finding naming the file and that field, and does not suppress",
+        "ok 18 - QG-06: an exclusion missing \"expires\" is a finding naming the file and that field, and does not suppress",
+        "ok 19 - QG-06: an empty-string field counts as missing, not as present-but-blank"
+      ]
+    },
+    {
+      "suite": "windows-assurance-verify-registration-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "badf3cac41122226efa88033b76da9a3dd7180354c3a6966b071e536a9f15581",
+      "sourceLogSha256": "513f36c1b2d9f2cfafa22cc997c0e3f523dcfbe114dac6f9175c50c862b77cf9",
+      "sanitizedLog": {
+        "path": "windows-assurance-verify-registration-tests.log",
+        "sha256": "513f36c1b2d9f2cfafa22cc997c0e3f523dcfbe114dac6f9175c50c862b77cf9"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "PASS WAVR02 missing top-level schema fails closed",
+        "PASS WAVR02 missing top-level taskId fails closed",
+        "PASS WAVR02 missing top-level authority fails closed",
+        "PASS WAVR02 missing top-level suites fails closed",
+        "PASS WAVR03 extra top-level keys fail closed"
+      ]
+    },
+    {
+      "suite": "windows-private-state-tests",
+      "exitCode": 1,
+      "sourceReceiptSha256": "4ddbae3a807ed3ade789f79f441f8ff2ad8f6fa2f4a11422d5bb0b8aaa523b55",
+      "sourceLogSha256": "2749918d45e6aa9a28b122f2f69e2b86068220feb25a2706b14fc779d456b57b",
+      "sanitizedLog": {
+        "path": "windows-private-state-tests.log",
+        "sha256": "2749918d45e6aa9a28b122f2f69e2b86068220feb25a2706b14fc779d456b57b"
+      },
+      "caseCompletion": null,
+      "diagnostics": [
+        "✔ WPS006 batched Windows observations fail closed on reordered, missing, and malformed rows (0.299851ms)",
+        "✔ WPS011 assesses raced-in components and fails closed without DACL proof (0.515184ms)",
+        "ℹ fail 0",
+        "[verify-case-completion-error] VERIFY-CASE-COMPLETION-DECLARATION"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,277 @@
+command: node --test --test-reporter=tap scratch/alfred-materializer-scratch-fix-r1-20261009/baseline-cache/pipeline-core/version/lib/signed-quality-package.test.mjs
+label: full-signed-quality-package-library-control-complete-graph
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: quality package requires matching human proof and only applies verified bytes
+ok 1 - quality package requires matching human proof and only applies verified bytes
+  ---
+  duration_ms: 72.270591
+  type: 'test'
+  ...
+# Subtest: isolated readback includes new, mixed, and explicitly ignored added paths without writing to main
+ok 2 - isolated readback includes new, mixed, and explicitly ignored added paths without writing to main
+  ---
+  duration_ms: 220.69944
+  type: 'test'
+  ...
+# Subtest: quality package commit authorization binds the whole staged index and committed trust policy
+ok 3 - quality package commit authorization binds the whole staged index and committed trust policy
+  ---
+  duration_ms: 127.546899
+  type: 'test'
+  ...
+# Subtest: commit authorization accepts .github content and staged files above the child-process default buffer
+ok 4 - commit authorization accepts .github content and staged files above the child-process default buffer
+  ---
+  duration_ms: 109.006197
+  type: 'test'
+  ...
+# Subtest: quality package refuses symlinked package outputs and receipt-directory ancestors
+ok 5 - quality package refuses symlinked package outputs and receipt-directory ancestors
+  ---
+  duration_ms: 86.676015
+  type: 'test'
+  ...
+# Subtest: quality package fails closed on tamper, unsafe paths, proof failure, and base drift
+ok 6 - quality package fails closed on tamper, unsafe paths, proof failure, and base drift
+  ---
+  duration_ms: 30.696388
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT CLI verifies, applies and authorizes with canonical committed trust
+ok 7 - SIGNED-AGENT CLI verifies, applies and authorizes with canonical committed trust
+  ---
+  duration_ms: 255.930542
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects trailing
+ok 8 - SIGNED-AGENT rejects trailing
+  ---
+  duration_ms: 58.04338
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects alternate-policy
+ok 9 - SIGNED-AGENT rejects alternate-policy
+  ---
+  duration_ms: 59.606032
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects intent-symlink
+ok 10 - SIGNED-AGENT rejects intent-symlink
+  ---
+  duration_ms: 59.771917
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects proof-symlink
+ok 11 - SIGNED-AGENT rejects proof-symlink
+  ---
+  duration_ms: 58.782248
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects intent-escape
+ok 12 - SIGNED-AGENT rejects intent-escape
+  ---
+  duration_ms: 59.696699
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects oversized-proof
+ok 13 - SIGNED-AGENT rejects oversized-proof
+  ---
+  duration_ms: 58.213636
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects policy-symlink
+ok 14 - SIGNED-AGENT rejects policy-symlink
+  ---
+  duration_ms: 64.141938
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects policy-hardlink
+ok 15 - SIGNED-AGENT rejects policy-hardlink
+  ---
+  duration_ms: 59.440247
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects worktree-drift
+ok 16 - SIGNED-AGENT rejects worktree-drift
+  ---
+  duration_ms: 73.053406
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects index-drift
+ok 17 - SIGNED-AGENT rejects index-drift
+  ---
+  duration_ms: 74.008596
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects untracked-policy
+ok 18 - SIGNED-AGENT rejects untracked-policy
+  ---
+  duration_ms: 75.168529
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects wrong-key
+ok 19 - SIGNED-AGENT rejects wrong-key
+  ---
+  duration_ms: 70.758889
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects forged-proof
+ok 20 - SIGNED-AGENT rejects forged-proof
+  ---
+  duration_ms: 74.617126
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects dirty-apply
+ok 21 - SIGNED-AGENT rejects dirty-apply
+  ---
+  duration_ms: 78.966949
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT rejects base-drift
+ok 22 - SIGNED-AGENT rejects base-drift
+  ---
+  duration_ms: 78.847163
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT refuses policy self-mutation even with explicit external trust
+ok 23 - SIGNED-AGENT refuses policy self-mutation even with explicit external trust
+  ---
+  duration_ms: 24.496544
+  type: 'test'
+  ...
+# Subtest: SIGNED-AGENT authorize refuses a planted untracked policy
+ok 24 - SIGNED-AGENT authorize refuses a planted untracked policy
+  ---
+  duration_ms: 39.920326
+  type: 'test'
+  ...
+# Subtest: integration precommit and postcommit verifiers bind the signed package to one exact parent and tree
+ok 25 - integration precommit and postcommit verifiers bind the signed package to one exact parent and tree
+  ---
+  duration_ms: 120.25294
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects wrong-intent
+ok 26 - integration verifier rejects wrong-intent
+  ---
+  duration_ms: 76.279844
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects forged-proof
+ok 27 - integration verifier rejects forged-proof
+  ---
+  duration_ms: 80.048724
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects missing-authorization
+ok 28 - integration verifier rejects missing-authorization
+  ---
+  duration_ms: 71.792715
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects extra-staged
+ok 29 - integration verifier rejects extra-staged
+  ---
+  duration_ms: 87.013145
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects dropped-staged
+ok 30 - integration verifier rejects dropped-staged
+  ---
+  duration_ms: 91.436393
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects content-drift
+ok 31 - integration verifier rejects content-drift
+  ---
+  duration_ms: 101.468566
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects mode-drift
+ok 32 - integration verifier rejects mode-drift
+  ---
+  duration_ms: 94.270504
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects symlink-submodule
+ok 33 - integration verifier rejects symlink-submodule
+  ---
+  duration_ms: 86.930406
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects postcommit-extra
+ok 34 - integration verifier rejects postcommit-extra
+  ---
+  duration_ms: 93.001564
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects wrong-parent
+ok 35 - integration verifier rejects wrong-parent
+  ---
+  duration_ms: 96.153023
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects merge-parent
+ok 36 - integration verifier rejects merge-parent
+  ---
+  duration_ms: 89.958772
+  type: 'test'
+  ...
+# Subtest: integration verifier rejects unsafe-authorization
+ok 37 - integration verifier rejects unsafe-authorization
+  ---
+  duration_ms: 71.499176
+  type: 'test'
+  ...
+# Subtest: postcommit distinguishes an absent selected receipt from present invalid authorization
+ok 38 - postcommit distinguishes an absent selected receipt from present invalid authorization
+  ---
+  duration_ms: 84.504162
+  type: 'test'
+  ...
+# Subtest: hotfix 11: receiptModeBitsRefused skips the POSIX mode-bit term on win32 only and fails closed on every platform that has mode bits
+ok 39 - hotfix 11: receiptModeBitsRefused skips the POSIX mode-bit term on win32 only and fails closed on every platform that has mode bits
+  ---
+  duration_ms: 0.195813
+  type: 'test'
+  ...
+# Subtest: hotfix 11: gitReportedPathIsSamePhysicalPath accepts the spellings of one directory (Git's forward slashes on win32) and rejects any other
+ok 40 - hotfix 11: gitReportedPathIsSamePhysicalPath accepts the spellings of one directory (Git's forward slashes on win32) and rejects any other
+  ---
+  duration_ms: 1.931989
+  type: 'test'
+  ...
+# Subtest: hotfix 11: verify, apply, authorize-commit and the commit-time verifiers accept a correctly signed package end to end (native Windows included)
+ok 41 - hotfix 11: verify, apply, authorize-commit and the commit-time verifiers accept a correctly signed package end to end (native Windows included)
+  ---
+  duration_ms: 192.181412
+  type: 'test'
+  ...
+# Subtest: hotfix 11: the path normalisation relaxes nothing (subdirectory root, forged proof, wrong key, dirty tree, tampered policy)
+ok 42 - hotfix 11: the path normalisation relaxes nothing (subdirectory root, forged proof, wrong key, dirty tree, tampered policy)
+  ---
+  duration_ms: 88.128518
+  type: 'test'
+  ...
+# Subtest: hotfix 11: a receipt carrying group/other mode bits is accepted on win32 only (where the platform has no mode bits); a symlinked receipt is refused everywhere
+ok 43 - hotfix 11: a receipt carrying group/other mode bits is accepted on win32 only (where the platform has no mode bits); a symlinked receipt is refused everywhere
+  ---
+  duration_ms: 166.358711
+  type: 'test'
+  ...
+1..43
+# tests 43
+# suites 0
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3717.20163
+
+--- stderr ---

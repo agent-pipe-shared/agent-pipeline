@@ -1,0 +1,182 @@
+{
+  "schema": "alfred.postinstall-checkpoint.v1",
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "installedVersion": "0.7.0+codex.20261009161950.7f37cc91",
+  "installedExactFileComparisons": [
+    {
+      "file": "skills/pipeline-start/SKILL.md",
+      "sourceSha256": "8ca34f87c14655e7a746b0e8070d108fd78d33e7de92b04db0f9301be38dcb6a",
+      "installedSha256": "8ca34f87c14655e7a746b0e8070d108fd78d33e7de92b04db0f9301be38dcb6a"
+    },
+    {
+      "file": "scripts/installed-plugin-attestation-host.mjs",
+      "sourceSha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24",
+      "installedSha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24"
+    }
+  ],
+  "observerRegistration": {
+    "present": true,
+    "scope": "source registry observation; full execution qualification pending",
+    "historicalEvidenceUnchanged": true
+  },
+  "verification": {
+    "fullVerify": "running; nonterminal snapshot",
+    "runId": "verify-1791565248875-9dc2c922b74c4e2f",
+    "materializerIndependentRed": {
+      "pass": 4,
+      "fail": 6
+    },
+    "materializerProposalGreen": {
+      "independent": 10,
+      "library": 43,
+      "coordinatorReadback": 10
+    },
+    "retiredDesignProposal": {
+      "baselinePass": 5,
+      "baselineFail": 12,
+      "green": 17,
+      "coordinatorReadback": 17
+    },
+    "sourceIntegration": false,
+    "independentReview": "pending",
+    "poAcceptance": "open"
+  },
+  "records": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-independent-regression.mjs",
+      "sourcePath": "scratch/alfred-materializer-scratch-red-r1-20261009/materializer-scratch.test.mjs",
+      "sourceSha256": "aaadd6e354788eb141d4d3c25db44f3d9617c8502b5923ad55713317aefc87c6",
+      "archivedSha256": "aaadd6e354788eb141d4d3c25db44f3d9617c8502b5923ad55713317aefc87c6",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-independent-red.txt",
+      "sourcePath": "scratch/alfred-materializer-scratch-red-r1-20261009/behavioral-red.tap.txt",
+      "sourceSha256": "d683f7c8b045eec1bc10923ccc9f93318be55316dbec80a68a26591375f5965f",
+      "archivedSha256": "d683f7c8b045eec1bc10923ccc9f93318be55316dbec80a68a26591375f5965f",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-fix-postimage.mjs",
+      "sourcePath": "scratch/alfred-materializer-scratch-fix-r1-20261009/signed-quality-package.mjs",
+      "sourceSha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+      "archivedSha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-fix-diff.txt",
+      "sourcePath": "scratch/alfred-materializer-scratch-fix-r1-20261009/source-diff.txt",
+      "sourceSha256": "92a13256d6db98947c55502f0269fe6594287b8f245d47299d7f8846cecb962a",
+      "archivedSha256": "92a13256d6db98947c55502f0269fe6594287b8f245d47299d7f8846cecb962a",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-fix-green.txt",
+      "sourcePath": "scratch/alfred-materializer-scratch-fix-r1-20261009/behavioral-green.tap.txt",
+      "sourceSha256": "9db088d98923a1e338ed62843db44dfa6f8a4d5358f0e7bf874be071f436faa9",
+      "archivedSha256": "9db088d98923a1e338ed62843db44dfa6f8a4d5358f0e7bf874be071f436faa9",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-library-green.txt",
+      "sourcePath": "scratch/alfred-materializer-scratch-fix-r1-20261009/library-green-complete.tap.txt",
+      "sourceSha256": "ca959b8330c49e7d8bf8a3627cdc91635ceeb9572ad19ba86014aec6889aad27",
+      "archivedSha256": "ca959b8330c49e7d8bf8a3627cdc91635ceeb9572ad19ba86014aec6889aad27",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/materializer-coordinator-green.txt",
+      "sourcePath": "scratch/alfred-materializer-scratch-fix-r1-20261009/coordinator-behavioral-green.tap.txt",
+      "sourceSha256": "64e90476a4bf6e000b2565e10f26bad5bf51e26cf35e1d92a89020786f54e377",
+      "archivedSha256": "64e90476a4bf6e000b2565e10f26bad5bf51e26cf35e1d92a89020786f54e377",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/design-retired-test-postimage.mjs",
+      "sourcePath": "scratch/alfred-retired-design-fixture-r2-20261009/design-course-command-admission.test.mjs",
+      "sourceSha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "archivedSha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/design-retired-case-map.md",
+      "sourcePath": "scratch/alfred-retired-design-fixture-r2-20261009/case-map.md",
+      "sourceSha256": "0f9b7415851daac44141cb26b957698b447e3bc61aa7c159078fb2c651a2e4bc",
+      "archivedSha256": "0f9b7415851daac44141cb26b957698b447e3bc61aa7c159078fb2c651a2e4bc",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/design-retired-baseline.json",
+      "sourcePath": "scratch/alfred-retired-design-fixture-r2-20261009/baseline-tap.json",
+      "sourceSha256": "3c5fbdde6233ba18a16b088c09ee960598b0ea6aeaad58094b8b485be95e13cc",
+      "archivedSha256": "3c5fbdde6233ba18a16b088c09ee960598b0ea6aeaad58094b8b485be95e13cc",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/design-retired-green.json",
+      "sourcePath": "scratch/alfred-retired-design-fixture-r2-20261009/postimage-tap.json",
+      "sourceSha256": "335d062990364331e5c7294537edfcde729ea2f81cb8ff89df78725b0c00db8b",
+      "archivedSha256": "335d062990364331e5c7294537edfcde729ea2f81cb8ff89df78725b0c00db8b",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/design-retired-coordinator-green.json",
+      "sourcePath": "scratch/alfred-retired-design-fixture-r2-20261009/coordinator-postimage-tap.json",
+      "sourceSha256": "6991d6eeb86ea025d19112689044f72e002ba92be2be92975965afbf832d645c",
+      "archivedSha256": "6991d6eeb86ea025d19112689044f72e002ba92be2be92975965afbf832d645c",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/inline-install-report.md",
+      "sourcePath": "scratch/alfred-inline-install-r1-20261009/report.md",
+      "sourceSha256": "c62e6003e8b7bc49356d1612952fc5331f9d1c0e81c7016685da7668032958d0",
+      "archivedSha256": "c62e6003e8b7bc49356d1612952fc5331f9d1c0e81c7016685da7668032958d0",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/verify-failure-observation.json",
+      "sourcePath": "scratch/alfred-full-verify-failures-r8-20261009/index.json",
+      "sourceSha256": "957b030299e111c0bd5aa1157ed71e425bd24b8d0917195bbf4981cf71815dc3",
+      "archivedSha256": "957b030299e111c0bd5aa1157ed71e425bd24b8d0917195bbf4981cf71815dc3",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/bootstrap-triage.md",
+      "sourcePath": "scratch/alfred-verify-bootstrap-triage-r1-20261009/report.md",
+      "sourceSha256": "60ae7814f857e888d5a4a3e836532787dc51160aa5b64cfa002e7a4352163146",
+      "archivedSha256": "60ae7814f857e888d5a4a3e836532787dc51160aa5b64cfa002e7a4352163146",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/critic-diagnostic-triage.md",
+      "sourcePath": "scratch/alfred-verify-critic-diagnostic-triage-r1-20261009/diagnosis.md",
+      "sourceSha256": "1d2dac4b04038a10f306f35598aab6fce85572be234707a65be6bc2d62a4c493",
+      "archivedSha256": "1d2dac4b04038a10f306f35598aab6fce85572be234707a65be6bc2d62a4c493",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/completion-registry-triage.md",
+      "sourcePath": "scratch/alfred-verify-completion-registry-triage-r1-20261009/report.md",
+      "sourceSha256": "006725bd5e5ba0a435467b5825a9ce67d881d81b6c3ee6bdd6730e1fa0feb7ba",
+      "archivedSha256": "006725bd5e5ba0a435467b5825a9ce67d881d81b6c3ee6bdd6730e1fa0feb7ba",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/onboarding-triage.md",
+      "sourcePath": "scratch/alfred-verify-onboarding-triage-r1-20261009/report.md",
+      "sourceSha256": "2e9448a3a48699b581af43a719c7dbadeef295a06e8f02a88172799097c40924",
+      "archivedSha256": "2e9448a3a48699b581af43a719c7dbadeef295a06e8f02a88172799097c40924",
+      "sourceBytesExact": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/routing-workers-triage.md",
+      "sourcePath": "scratch/alfred-verify-routing-workers-triage-r1-20261009/report.md",
+      "sourceSha256": "acafa8f266d0c3e770264d6d3c5ab2408539ea81bed05a888030c2446608b286",
+      "archivedSha256": "acafa8f266d0c3e770264d6d3c5ab2408539ea81bed05a888030c2446608b286",
+      "sourceBytesExact": true
+    }
+  ]
+}
