@@ -197,3 +197,80 @@ briefed `harness/scripts/check-private-identifiers.mjs` does not exist in this t
 needed.
 
 Independent Critic review: pending.
+
+## TR-G-F3
+
+Dispatch: TR-G-F3-20261009. Guard post-image only (the test post-image is unchanged, sha256
+`2967751fb1c536eda5a8bcbbd2d50923d0293b9c95cd728604771b68a275b019`). Source: Ruling 138 in `plans/0.7-execution-order.md`,
+findings F1 and F2 of the TR-G-F Critic (Opus, partial). Nothing above this section is edited; the Target section's guard
+sha256 `bad0bd5d...` and the TR-G-T3 section's "Guard under test" line describe the guard BEFORE this section and are
+superseded by the value below.
+
+- Guard post-image: `hooks/guard-dispatch-budget.mjs`, new sha256
+  `2ec5a564dc05f47d188bd3486919ee05dc9d232ba232b277ad8f76756012d808` (86028 bytes, LF). Previous value
+  `bad0bd5db55cbc362074f640e77d33dc9c2540a3bc915a0fb4c4fe2142b23d79`. The scratch guard copy built for this run (the two
+  TR-G-F relocations only) has sha256 `650867c74b2f624228442254e3479debea000f1ec790203533e96d53030fb2a0`; scratch test
+  copy sha256 `8fed4a7c0a20b16aff0fe04e6a135b9821328a9b928eb33c99bbc0f1dd07bb7a` (equal to the TR-G-T3 value, since the
+  test post-image is unchanged).
+
+### The two edits
+
+- **F1 (`comparableScriptPath`).** The backslash is mapped to `/` only when `process.platform === "win32"`, the same gate
+  lower-casing already had; trailing slashes are dropped after that conversion on every platform. On a POSIX host
+  `<plugin root>/scripts\goldfish-commit-command-flow.mjs` is now a different path from the producer and is refused after
+  the cap. On win32 both sides (the spelling and `join(pluginRoot, "scripts", ...)`) are still normalised, so the
+  win32 behaviour is unchanged. The doc comments of `comparableScriptPath` and `isCommitFlowProducerCommand` say so.
+- **F2 (git closing act).** New `isSingleGitClosingCommand`: a git closing act is admitted only when the existing verb
+  pattern (`GIT_CLOSING_VERB_PATTERN`, itself unchanged) matches AND the whole trimmed command carries no character of
+  `PRODUCER_ARGS_CONTROL_PATTERN` (`; & | < > `` ` `` $ ( )`, CR, LF), the same refusal the producer lane applies to its
+  arguments. `isClosingAct` calls it in place of the bare verb test. The doc comment on the permitted-after-cap shape set
+  says so. Only a narrowing: plain `git add -- <p>` and `git commit -F <f> -- <p>` are unchanged.
+
+### Pin table (scratch run, WSL, against the edited guard post-image)
+
+| Pin | Shape after the working cap | TR-G-T3 (red.txt) | TR-G-F3 (green.txt) |
+|---|---|---|---|
+| T49 (d) | quoted producer path with a backslash before the script name | RED (admitted) | GREEN |
+| T49 (e) | bare producer path with a backslash before the script name | RED (admitted) | GREEN |
+| T49 (f) | `git add -- <p> && <other>` | RED (admitted) | GREEN |
+| T49 (g) | `git add -- <p>; <other>` | RED (admitted) | GREEN |
+| T49 (h) | `git commit -F <f> -- <p> \| <other>` | RED (admitted) | GREEN |
+| T49 (i) | plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control) | GREEN | GREEN |
+| T49 (j) | forward-slash producer spellings, quoted and bare, stay admitted (control) | GREEN | GREEN |
+
+Every other case is in its `red.txt` state: T49 (a) to (c), T37, T57, T34 and the rest are GREEN; the only reds are the
+three accepted 10 s runner timeouts (orchestrating-session-never-limited, orchestrator-sink-bounded, implementor-cap-40).
+The two load-sensitive cases (a preflight-bound base cap of 20, R7-11a) passed in this run, as in `red.txt`.
+
+### Scope and limits
+
+- Pins (d) and (e) are skipped on a win32 host (TR-G-T3 reason text) and the whole run is WSL only. The win32 branch of
+  `comparableScriptPath` is unverified on native Windows by this evidence, as the Boundaries section above says; macOS is
+  unverified.
+- F2 is pinned for the three shapes named in Ruling 138 (`&&`, `;`, `|`). The other chain shapes (`||`, a redirect, a
+  substitution, a line break) are refused by the same character class but have no case of their own; the refusal is the
+  pattern's, not a per-shape pin. Control character present anywhere in the git command refuses it, including inside
+  quotes: `git commit -m "feat(x): y"` or a parenthesised path is refused after the cap (the safe direction; the
+  obligations route is `git commit -F <file> -- <paths>`).
+- Whether `guard-lifecycle-ready` and the other guards of the union admit the same shapes is not decided here.
+- Installing the post-image at the target path remains a signed-package step for the PO ceremony.
+
+### Command and result
+
+Build (reads the two post-images, writes only the two scratch copies; prints the shas above):
+
+```
+node scratch/dispatch-wip/TR-G-F3/build.mjs
+```
+
+Run (scratch test copy against the scratch copy of the edited guard post-image):
+
+```
+wsl.exe -e bash -lc "cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F3-20261009/green.txt --label TR-G-F3 -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-F3/guard-dispatch-budget.test.mjs"
+```
+
+Wrapped exit code 1. Artifact: `evidence/TR-G-F3-20261009/green.txt` (99 tests, 96 pass, 3 fail: the three accepted
+timeouts listed above). Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0 (9 pass);
+`node plugins/pipeline-core/scripts/check-private-identifiers.mjs --root .` exit 0, `{"ok":true,"findings":[]}`.
+
+Independent Critic review (delta, Opus): pending.

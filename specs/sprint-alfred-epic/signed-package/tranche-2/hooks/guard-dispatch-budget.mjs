@@ -489,8 +489,9 @@ function budgetContractOptions(rootDir, options) {
 /**
  * The exact permitted-after-cap shape set (DoD): a write/update of
  * `evidence/dispatch-record-*.json`, a Bash call whose command begins
- * with `git add` / `git commit`, or the one read-only commit-flow producer call (TR-G-F, toil row T49; see
- * `isCommitFlowProducerCommand`). Ownership of the exact paths inside a
+ * with `git add` / `git commit` AND is one simple git command (TR-G-F3, Ruling 138 F2; see `isSingleGitClosingCommand`:
+ * a chain, a redirect, a pipe or a substitution after the cap is never a closing act), or the one read-only
+ * commit-flow producer call (TR-G-F, toil row T49; see `isCommitFlowProducerCommand`). Ownership of the exact paths inside a
  * `git add`/`git commit` call is not something a PreToolUse payload lets
  * this guard verify; the other guards in the union (guard-git.mjs,
  * guard-testpath.mjs) already own that narrower question.
@@ -586,15 +587,24 @@ const PRODUCER_COMMAND_PATTERN = /^node(?:\.exe)?\s+(?:"([^"]+)"|'([^']+)'|([^\s
 // Any shell control or substitution character in the arguments means the call is not ONE plain `node <script> <args>`.
 const PRODUCER_ARGS_CONTROL_PATTERN = /[;&|<>`$()\r\n]/u;
 
+/**
+ * The form two script paths are compared in. TR-G-F3 (Ruling 138, F1): the backslash is a path separator on win32
+ * ONLY, so it is mapped to "/" there and nowhere else, exactly as lower-casing is win32-only. On a POSIX host a
+ * backslash is an ordinary file-name character: `<plugin root>/scripts\goldfish-commit-command-flow.mjs` is a
+ * different path from `<plugin root>/scripts/goldfish-commit-command-flow.mjs` and must not compare equal. Trailing
+ * slashes (after the win32 conversion) are dropped on every platform.
+ */
 function comparableScriptPath(value) {
-  const slashed = String(value).replaceAll("\\", "/").replace(/\/+$/u, "");
-  return process.platform === "win32" ? slashed.toLowerCase() : slashed;
+  const win32 = process.platform === "win32";
+  const slashed = (win32 ? String(value).replaceAll("\\", "/") : String(value)).replace(/\/+$/u, "");
+  return win32 ? slashed.toLowerCase() : slashed;
 }
 
 /**
  * TR-G-F (toil row T49): is this Bash command exactly one plain call of the read-only commit-flow producer shipped
  * in THIS guard's plugin (the root `resolveAgentPluginRoot` answers, the same one the maxTurns read uses)? The script
- * path must equal `<plugin root>/scripts/goldfish-commit-command-flow.mjs` once separators are normalised (a copy of
+ * path must equal `<plugin root>/scripts/goldfish-commit-command-flow.mjs` once separators are normalised (win32
+ * only, see `comparableScriptPath`; a copy of
  * the script elsewhere is a different program), and the arguments may carry no shell control character, so a chained
  * second command, a redirect or a substitution is never admitted through this lane. Whether the call is admitted at
  * all is still the shared core's decision: it counts the attempt and ends the allowance after five.
@@ -606,6 +616,19 @@ function isCommitFlowProducerCommand(command, pluginRoot) {
   if (PRODUCER_ARGS_CONTROL_PATTERN.test(command.slice(match[0].length))) return false;
   const scriptPath = match[1] ?? match[2] ?? match[3];
   return comparableScriptPath(scriptPath) === comparableScriptPath(join(pluginRoot, "scripts", COMMIT_FLOW_PRODUCER_SCRIPT));
+}
+
+/**
+ * TR-G-F3 (Ruling 138, F2): is this Bash command ONE simple `git add` / `git commit`? The verb pattern tests only the
+ * start of the command, so on its own `git add -- x && <other>` or `git commit -F f -- p | <other>` would be admitted
+ * after the working cap. The same control-character refusal the producer lane applies (`;`, `&`, `|`, `<`, `>`,
+ * backtick, `$`, parentheses, CR, LF) is applied to the WHOLE git command, so a chain, a redirect, a pipe or a
+ * substitution is never a closing act. This only narrows what was admitted: plain `git add -- <p>` and
+ * `git commit -F <f> -- <p>` are unchanged. A path or message that itself contains one of those characters (a
+ * parenthesised directory, `git commit -m "feat(x): y"`) is refused too, the safe direction; use `-F <file>`.
+ */
+function isSingleGitClosingCommand(command) {
+  return typeof command === "string" && GIT_CLOSING_VERB_PATTERN.test(command) && !PRODUCER_ARGS_CONTROL_PATTERN.test(command);
 }
 
 function isClosingAct(input, rootDir, agentType, dependencies = {}) {
@@ -620,7 +643,7 @@ function isClosingAct(input, rootDir, agentType, dependencies = {}) {
     const command = input?.tool_input?.command ?? input?.tool_input?.CommandLine;
     if (typeof command !== "string") return false;
     const trimmed = command.trim();
-    return GIT_CLOSING_VERB_PATTERN.test(trimmed) || isCommitFlowProducerCommand(trimmed, resolveAgentPluginRoot(rootDir, dependencies));
+    return isSingleGitClosingCommand(trimmed) || isCommitFlowProducerCommand(trimmed, resolveAgentPluginRoot(rootDir, dependencies));
   }
   return false;
 }
