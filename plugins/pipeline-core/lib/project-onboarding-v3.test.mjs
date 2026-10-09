@@ -652,7 +652,7 @@ function v0Source() {
       feature: { design_phase: route("opus-4.8", "high"), execution_phase: route("sonnet-5", "high"), advisor: "opus-4.8" },
       mini: { design_phase: route("sonnet-5", "high"), execution_phase: route("sonnet-5", "high"), advisor: "opus-4.8" },
     },
-    models: { implement: route("sonnet-5", "medium"), mechanic: route("sonnet-5", "low"), deep: route("sonnet-5", "xhigh"), review: route("sonnet-5", "max") },
+    models: { implement: route("sonnet-5", "medium"), mechanic: route("haiku", "medium"), deep: route("sonnet-5", "xhigh"), review: route("sonnet-5", "max") },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 200 },
   };

@@ -78,7 +78,7 @@ function publicLegacyIntent() {
       mini: { design_phase: route("sonnet", "high"), execution_phase: route("sonnet", "high"), advisor: "opus" },
     },
     models: {
-      implement: route("sonnet", "medium"), mechanic: route("sonnet", "low"),
+      implement: route("sonnet", "medium"), mechanic: route("haiku", "medium"),
       deep: route("sonnet", "xhigh"), review: route("sonnet", "max"),
     },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },

@@ -73,7 +73,7 @@ const EXPECTED_PROFILES = {
 
 const EXPECTED_DUTIES = {
   implement: ["default|alias:sonnet|medium|defer|dispatch-receipt|-", "default|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],
-  mechanic: ["opt-in|alias:sonnet|low|defer|dispatch-receipt|-", "opt-in|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],
+  mechanic: ["opt-in|alias:haiku|medium|defer|dispatch-receipt|-", "opt-in|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],
   deep: ["opt-in|alias:sonnet|xhigh|defer|dispatch-receipt|-", "opt-in|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],
   test_author: ["opt-in|alias:sonnet|xhigh|defer|dispatch-receipt|-", "opt-in|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],
   critic_normal: ["default|alias:sonnet|max|defer|dispatch-receipt|-", "default|model-id:gpt-5.6-terra|xhigh|defer|dispatch-receipt|-"],

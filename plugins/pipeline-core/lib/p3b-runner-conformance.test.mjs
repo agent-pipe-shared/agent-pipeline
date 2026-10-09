@@ -80,7 +80,7 @@ function v1Source() {
         mini: { design_phase: claude("sonnet", "high"), execution_phase: claude("sonnet", "high"), advisor: claude("opus", "not-applicable") },
       },
       duties: {
-        implement: claude("sonnet", "medium"), mechanic: claude("sonnet", "low"), deep: claude("sonnet", "xhigh"), review: claude("sonnet", "max"),
+        implement: claude("sonnet", "medium"), mechanic: claude("haiku", "medium"), deep: claude("sonnet", "xhigh"), review: claude("sonnet", "max"),
         codex_design: codex("gpt-5.6-sol"), codex_independent_critic: codex(), codex_implementation: codex(), codex_goldfish: codex(), codex_mechanic: codex(), codex_deep: codex(),
       },
     },

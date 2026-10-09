@@ -49,7 +49,7 @@ const max = projectPreset("max", "claude");
 check("RP01 authority is provider-neutral", !JSON.stringify(ROUTING_AUTHORITY).match(/opus|sonnet|gpt-5\.6-sol/));
 check("RP02 Claude design mapping unchanged", max.worktypes.design.design_phase.model === "opus");
 check("RP03 Claude implement mapping unchanged", max.models.implement.model === "sonnet");
-check("RP04 mechanic effort is low", max.models.mechanic.effort === "low");
+check("RP04 mechanic route is Haiku at effort medium", max.models.mechanic.model === "haiku" && max.models.mechanic.effort === "medium");
 check("RP05 implementor effort is medium", max.models.implement.effort === "medium");
 check("RP06 deep effort is xhigh", max.models.deep.effort === "xhigh");
 check("RP07 critic effort is max", max.models.review.effort === "max");
