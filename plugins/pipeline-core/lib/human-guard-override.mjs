@@ -3138,8 +3138,9 @@ export function humanGuardAuditLockRecoveryLine(error, options = {}) {
     if (error === null || typeof error !== "object" || error.code !== AUDIT_LOCK_AMBIGUOUS_CODE) return null;
     const recovery = error.recovery;
     if (recovery === null || typeof recovery !== "object" || Array.isArray(recovery)) return null;
-    const files = recovery.files;
-    if (!Array.isArray(files) || files.length === 0 || files.length > AUDIT_LOCK_RECOVERY_MAX_FILES) return null;
+    if (!Array.isArray(recovery.files)) return null;
+    const files = Array.from(recovery.files);
+    if (files.length === 0 || files.length > AUDIT_LOCK_RECOVERY_MAX_FILES) return null;
     for (const file of files) {
       if (typeof file !== "string" || !AUDIT_LOCK_RECOVERY_FILE.test(file)) return null;
     }
