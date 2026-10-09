@@ -203,7 +203,13 @@ test("ENFORCEMENT: Elephant, one mandatory hook stale next to a current one -> a
   assertElephantMustRefresh(result, [COMMIT_MSG]);
 });
 
-test("ENFORCEMENT: Elephant, a stale hook next to a MISSING one is not a dead end (a typed action, not null)", async () => {
+// HOOKREFRESH-T6-20261009 RE-POINT (Ruling 84 F1): this T0 case used to pin the blocked-branch `staleMissingMix`
+// refresh action (status stayed `hook-provisioning-blocked`, the action was refresh-mandatory-hooks.mjs, and its last
+// assertion required `refreshes` to include PRE_COMMIT). Ruling 84 removes that branch: the mix is now provisioning
+// first, then refresh. The case keeps its precondition and its "not a dead end, one typed command" assertions and is
+// re-pointed to the two-hop expectation; each hop's `expected` is asserted, and the hops are driven through the
+// `checkCloneProvisioningFn` fixture states the real coordinator / helper would leave behind.
+test("ENFORCEMENT [T0 case re-pointed by HOOKREFRESH-T6, Ruling 84 F1]: Elephant, a stale hook next to a MISSING one goes provisioning first, then refresh, then ready", async () => {
   await assertBaseline("elephant");
   const { result } = await run({ role: "elephant", hooks: { preCommit: "refresh", commitMsg: "install" } });
   assert.deepEqual(result.mandatoryHookReadiness.required.map((entry) => entry.status), ["refresh", "install"],
@@ -214,7 +220,69 @@ test("ENFORCEMENT: Elephant, a stale hook next to a MISSING one is not a dead en
     `a stale + missing mix must not collapse to a dead end (blocked, nextAction null); it must offer one typed action, got ${JSON.stringify(action)}`);
   assert.equal(action.kind, "command");
   assert.equal(action.mutation, true);
-  assert.ok((coveredHookIds(action) ?? []).includes(PRE_COMMIT), "the stale hook must be covered by the offered action");
+
+  // Hop 1: the coordinator installs the missing hook (RED today: status is hook-provisioning-blocked and the action is the refresh).
+  assert.equal(result.status, "hook-provisioning-required",
+    "Ruling 84 F1: the stale+missing mix is provisioning-required first (today hook-provisioning-blocked with the removed staleMissingMix refresh action)");
+  assert.equal(result.mandatoryHookReadiness.status, "provisioning-required");
+  assert.equal(basename(action.argv[0]), "clone-hook-readiness.mjs", "hop 1 runs the install coordinator, not the refresh helper");
+  assert.ok(action.argv.includes("--apply"));
+  assert.equal(action.requiresConfirmation, true);
+  assert.deepEqual(action.expected, { schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" });
+
+  // Hop 2: after the coordinator ran, commit-msg is current and pre-commit is still stale -> the existing refresh action.
+  const { result: second } = await run({ role: "elephant", hooks: { preCommit: "refresh", commitMsg: "current" } });
+  assert.equal(second.status, "hook-refresh-required");
+  assertElephantMustRefresh(second, [PRE_COMMIT]);
+  assert.equal(basename(second.nextAction.argv[0]), "refresh-mandatory-hooks.mjs");
+  assert.deepEqual(second.nextAction.expected, { schema: "pipeline.mandatory-hook-refresh.v1", status: "ready" });
+
+  // Hop 3: after the refresh helper ran, everything is current.
+  const { result: third } = await run({ role: "elephant", hooks: {} });
+  assert.equal(third.status, "ready");
+  assert.equal(pipelineStartPipelineExitCodeOf(third), 0);
+});
+
+const pipelineStartPipelineExitCodeOf = (result) => pipelineStartPreflightExitCode(result);
+
+// ---------------------------------------------------------------------------------------------------------------
+// HOOKREFRESH-T6-20261009 additions (Ruling 84 F4 status passthrough, F2 seam argument bag).
+// ---------------------------------------------------------------------------------------------------------------
+
+for (const value of [
+  Object.freeze({ ok: false, code: "MODEL-ROLE-BOOTSTRAP-HUMAN-CONFIRMATION-REQUIRED", status: "confirmation-required" }),
+  Object.freeze({ ok: false, code: "MODEL-ROLE-BOOTSTRAP-NOT-CONFIRMED", status: "confirmation-required" }),
+  Object.freeze({ ok: false, code: "MODEL-ROLE-BOOTSTRAP-ADMISSION-PENDING", status: "admission-pending" }),
+]) {
+  test(`RED F4 (Ruling 84): the field carries \`${value.status}\` / ${value.code} as its own status, not \`unavailable\``, async () => {
+    const { result } = await run({ role: "elephant", hooks: {}, modelRole: value });
+    assert.equal(result.status, "ready", "precondition: ready envelope (the readback is reported, not gating)");
+    assert.ok(result.modelRoleBootstrap, "modelRoleBootstrap must be present");
+    assert.equal(result.modelRoleBootstrap.status, value.status,
+      "Ruling 84 F4: modelRoleBootstrapField folds everything but `ready` into `unavailable`, hiding that a human confirmation or an admission is merely pending");
+    assert.equal(result.modelRoleBootstrap.code, value.code);
+    assert.deepEqual(Object.keys(result.modelRoleBootstrap).sort(), ["code", "status"], "the field stays the closed { status, code } shape");
+  });
+}
+
+test("GREEN control F4: genuinely unavailable results, unknown statuses and a null result still read `unavailable`", async () => {
+  const unavailable = { ok: false, code: "MODEL-ROLE-BOOTSTRAP-GIT-UNAVAILABLE", status: "unavailable", fallbackForbidden: true };
+  const first = (await run({ role: "elephant", hooks: {}, modelRole: unavailable })).result;
+  assert.deepEqual(first.modelRoleBootstrap, { status: "unavailable", code: "MODEL-ROLE-BOOTSTRAP-GIT-UNAVAILABLE" });
+  const unknown = { ok: false, code: "MODEL-ROLE-BOOTSTRAP-SOMETHING-NEW", status: "surprising-new-status" };
+  const second = (await run({ role: "elephant", hooks: {}, modelRole: unknown })).result;
+  assert.deepEqual(second.modelRoleBootstrap, { status: "unavailable", code: "MODEL-ROLE-BOOTSTRAP-SOMETHING-NEW" },
+    "the passthrough is a closed allowlist, not an open echo of any status");
+  const third = (await run({ role: "elephant", hooks: {}, modelRole: null })).result;
+  assert.deepEqual(third.modelRoleBootstrap, { status: "unavailable", code: "MODEL-ROLE-BOOTSTRAP-UNAVAILABLE" });
+});
+
+test("RED F2 (Ruling 84, ASSUMED NAME R5): the preflight's readback call carries readOnly: true in its argument bag (seam spy)", async () => {
+  const { modelRoleCalls } = await run({ role: "elephant", hooks: {}, modelRole: modelRoleReady });
+  assert.equal(modelRoleCalls.length, 1, "precondition: the preflight ran the readback exactly once");
+  assert.equal(typeof modelRoleCalls[0].rootDir, "string", "precondition: the existing argument bag is intact");
+  assert.equal(modelRoleCalls[0].readOnly, true,
+    "Ruling 84 F2: the preflight's model-role readback must be read-only (the process-entry call site is pinned in model-role-bootstrap.readonly.test.mjs)");
 });
 
 test("ENFORCEMENT: an absent role is the Elephant (strict default) -> stale mandatory hook is non-ready", async () => {
