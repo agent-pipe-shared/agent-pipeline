@@ -59,6 +59,7 @@ import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./p
 import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "./governance-scope.mjs";
+import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "dir" }));
@@ -5870,3 +5871,308 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// T90-T (Ruling 111): RED pins for same-host win32 audit-lock owner liveness.
+//
+// Defect. auditLockOwnerState() (lib/human-guard-override.mjs:2336-2348) answers "ambiguous"
+// for every non-Linux owner, and localAuditLockOwner() (:2209-2225) records bootId
+// "unavailable" and processStart "unavailable" on win32. A crashed win32 writer therefore
+// wedges the audit lock for good (HGO-AUDIT-LOCK-AMBIGUOUS), and every override plan and
+// ceremony on that machine is refused.
+//
+// Observable. The owner state is private, so every pin goes through the public handle
+// humanGuardOverrideInternals.acquireAuditLock(paths, secret): a "dead" verdict reclaims the
+// lock and returns { recovered: true } (:2431 -> :2460), a "live" verdict throws
+// HGO-AUDIT-LOCKED, and an "ambiguous" verdict throws HGO-AUDIT-LOCK-AMBIGUOUS.
+//
+// Placement. These cases live in this file, not a new sibling, because Verify discovers test
+// files from the pinned list in harness/scripts/verify.mjs, which names this file
+// ("human-guard-override-tests") and would not run a new one.
+//
+// SEAM: none. auditLockOwnerState(record) and localAuditLockOwner() take no parameters and
+// read process.platform, hostname() and /proc directly; neither is exported, and
+// acquireAuditLock's `dependencies` carries only publish/recovery hook callbacks. So pins
+// (a)-(d) can only run against a real win32 host and are skipped everywhere else. T90-F must
+// add the missing seam: an injectable { platform, hostname, bootId/uptime, pidAlive } on
+// auditLockOwnerState/localAuditLockOwner (threaded through acquireAuditLock's
+// `dependencies`), after which (a)-(d) should be re-pinned to run on every host.
+//
+// Pin matrix, with the state each pin is committed in:
+//   (a)  win32, same host, owner pid gone                     -> reclaimed   RED on win32 today
+//   (a2) the same for an abandoned recovery guard (:2400)     -> cleared     RED on win32 today
+//   (b)  legacy record (bootId "unavailable"), pid gone       -> reclaimed   RED on win32 today
+//   (c)  pid alive, recorded boot time differs from local     -> reclaimed   RED on win32 today
+//   (d1) pid alive, recorded boot time equals local           -> AMBIGUOUS   green (unchanged)
+//   (d2) pid alive, bootId "unavailable"                      -> AMBIGUOUS   green (unchanged)
+//   (e)  foreign host (every host)                            -> AMBIGUOUS   green (unchanged)
+//   (f)  every AMBIGUOUS refusal carries error.recovery       -> typed      RED on every host
+//   (L)  Linux control: dead owner reclaimed, live refused    -> unchanged   green on Linux
+//
+// ASSUMPTIONS the briefing/ruling do not fix (named here so T90-F and the Critic can see them):
+//   1. Refusal shape. HumanGuardOverrideError carries only `code` and `message` today. Pin (f)
+//      therefore fixes a NEW own property named `recovery` with exactly the keys
+//      { files, command }: `files` is a non-empty array of strings that includes the exact
+//      path of the lock file that caused the refusal (paths.auditLock, or
+//      paths.auditLockRecovery for an abandoned recovery guard), and `command` is a non-empty
+//      string for an attended operator. The verb of the command is deliberately not pinned.
+//   2. win32 boot-time encoding. Ruling 111 fixes "a coarse boot time in the bootId field" but
+//      not its textual format or its tolerance. (c) therefore records the literal decimal
+//      string "1" (a boot time no clock can call equal to the real one, valid under SAFE_ID,
+//      and not the legacy marker "unavailable"). (d1) takes the "matching" value from a real
+//      acquisition on the same host instead of computing it, retried up to 3 times so a
+//      minute-boundary crossing between two reads cannot make it flaky. Before T90-F lands,
+//      the local bootId is still "unavailable", so (d1) and (d2) coincide; they diverge once
+//      a real boot time is recorded.
+//   3. (a) keeps the locally recorded bootId and only kills the pid; (b) forces the legacy
+//      marker. They overlap until T90-F records a real boot time, which is intended: (b)
+//      isolates the pid-gone rule from any boot-time comparison.
+//   4. Platform of the planted record is always the host's own (win32 on win32, linux on
+//      linux); a cross-platform record is out of scope for Ruling 111.
+//
+// Fixture. Temp directories only; the real .git/agent-pipeline/human-guard-overrides/ store
+// and any live lock are never touched. A lock record is HMAC'd, so each fixture publishes a
+// REAL lock first (that file carries the owner-private DACL/mode lockIdentity() demands),
+// then rewrites its bytes in place with a patched owner and a fresh MAC. If a temp dir
+// cannot host a lock at all, that first acquire throws (for example HGO-DACL) and the test
+// fails as a precondition failure, not as a pin.
+//
+// The whole section sits in a block so its helper names cannot collide with this file.
+// ---------------------------------------------------------------------------------
+{
+  const { acquireAuditLock, releaseOwnedAuditLock } = humanGuardOverrideInternals;
+  const canonicalJson = humanGuardOverrideInternals.canonical;
+
+  const WIN32_ONLY = process.platform === "win32"
+    ? false
+    : "needs a native win32 host: auditLockOwnerState has no platform/pid/uptime injection seam (T90-F adds it)";
+  const LINUX_ONLY = process.platform === "linux"
+    ? false
+    : "Linux control: needs /proc on a Linux host";
+
+  const SECRET = Buffer.alloc(32, 0x7a);
+  const AMBIGUOUS = "HGO-AUDIT-LOCK-AMBIGUOUS";
+  const FOREIGN_HOST = "other-host-t90";
+
+  // On win32 a bare temp dir inherits a DACL that lockIdentity()/safePrivateFile() rightly
+  // refuse as not owner-private (HGO-DACL). Production hardens its store directory with
+  // hardenWindowsPrivateDirectory before any lock lives there, so the sandbox does the same;
+  // the files created inside then inherit an owner-only DACL. That is a harness precondition,
+  // asserted here so it can never be mistaken for a pin result.
+  function sandbox() {
+    const base = mkdtempSync(join(tmpdir(), "hgo-t90-"));
+    if (process.platform === "win32") {
+      try {
+        const hardened = hardenWindowsPrivateDirectory(base);
+        assert.equal(hardened.status, "secure",
+          `precondition: the win32 sandbox directory must be owner-private (status ${hardened.status})`);
+      } catch (error) {
+        rmSync(base, { recursive: true, force: true });
+        throw error;
+      }
+    }
+    return {
+      base,
+      paths: { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") },
+      cleanup: () => rmSync(base, { recursive: true, force: true }),
+    };
+  }
+
+  // A pid that provably does not exist: spawn and await a short child, then confirm with a
+  // signal-0 probe that its pid is gone (a recycled pid would otherwise fake a red).
+  function deadPid() {
+    for (let tries = 0; tries < 5; tries += 1) {
+      const child = spawnSync(process.execPath, ["-e", "0"], { shell: false, stdio: "ignore" });
+      assert.equal(child.status, 0, "the short-lived child must exit cleanly");
+      try { process.kill(child.pid, 0); }
+      catch (error) {
+        if (error?.code === "ESRCH") return child.pid;
+        throw error;
+      }
+    }
+    return assert.fail("could not obtain a verifiably dead pid");
+  }
+
+  // Publish a real lock, then rewrite it in place with the owner patched and a valid MAC.
+  // target "auditLockRecovery" moves the rewritten record to the recovery-guard path.
+  function plantLock(box, { target = "auditLock", ownerPatch = {} }) {
+    const purpose = target === "auditLockRecovery" ? "recovery" : "existing";
+    const live = acquireAuditLock(box.paths, SECRET, { purpose: "existing" });
+    const owner = { ...live.record.owner, ...ownerPatch };
+    const core = { schema: live.record.schema, purpose, owner };
+    const record = { ...core, mac: createHmac("sha256", SECRET).update(canonicalJson(core)).digest("hex") };
+    writeFileSync(box.paths.auditLock, `${JSON.stringify(record)}\n`);
+    if (target === "auditLockRecovery") renameSync(box.paths.auditLock, box.paths.auditLockRecovery);
+    return { localOwner: live.record.owner };
+  }
+
+  function localBootId() {
+    const box = sandbox();
+    try {
+      const lock = acquireAuditLock(box.paths, SECRET);
+      try { return lock.record.owner.bootId; } finally { releaseOwnedAuditLock(lock); }
+    } finally { box.cleanup(); }
+  }
+
+  function attempt(box) {
+    try {
+      const lock = acquireAuditLock(box.paths, SECRET);
+      return { ok: true, lock, recovered: lock.recovered === true };
+    } catch (error) {
+      return { ok: false, code: error?.code, error };
+    }
+  }
+
+  function outcomeText(result) {
+    return result.ok
+      ? `the lock was acquired (recovered: ${result.recovered})`
+      : `acquireAuditLock threw ${result.code}: ${result.error?.message}`;
+  }
+
+  function releaseIfHeld(result) {
+    if (result.ok) releaseOwnedAuditLock(result.lock);
+  }
+
+  function expectReclaimed(box, label) {
+    const result = attempt(box);
+    try {
+      assert.equal(result.ok && result.recovered, true,
+        `${label}: expected the dead owner's lock to be reclaimed (recovered: true), but ${outcomeText(result)}`);
+      assert.equal(result.lock.record.owner.pid, process.pid, `${label}: the reclaimed lock must belong to the caller`);
+    } finally { releaseIfHeld(result); }
+  }
+
+  function expectAmbiguous(box, label, { keepPath }) {
+    const result = attempt(box);
+    try {
+      assert.equal(result.ok, false, `${label}: expected an ambiguous refusal, but ${outcomeText(result)}`);
+      assert.ok(result.error instanceof HumanGuardOverrideError, `${label}: expected a HumanGuardOverrideError`);
+      assert.equal(result.code, AMBIGUOUS, `${label}: expected ${AMBIGUOUS}, but ${outcomeText(result)}`);
+      assert.equal(existsSync(keepPath), true, `${label}: an ambiguous lock must be left in place`);
+    } finally { releaseIfHeld(result); }
+    return result;
+  }
+
+  test("T90-T (a): win32 same-host owner whose pid is gone is dead, so the stale lock is reclaimed", { skip: WIN32_ONLY }, () => {
+    const box = sandbox();
+    try {
+      plantLock(box, { ownerPatch: { pid: deadPid() } });
+      expectReclaimed(box, "(a) dead pid, locally recorded boot time");
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (a2): win32 abandoned recovery guard whose owner pid is gone is cleared (:2400)", { skip: WIN32_ONLY }, () => {
+    const box = sandbox();
+    try {
+      plantLock(box, { target: "auditLockRecovery", ownerPatch: { pid: deadPid() } });
+      const result = attempt(box);
+      try {
+        assert.equal(result.ok, true,
+          `(a2) expected the dead recovery guard to be cleared and the lock acquired, but ${outcomeText(result)}`);
+        assert.equal(existsSync(box.paths.auditLockRecovery), false, "(a2) the dead recovery guard must be gone");
+        assert.equal(result.lock.record.owner.pid, process.pid, "(a2) the acquired lock must belong to the caller");
+      } finally { releaseIfHeld(result); }
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (b): a legacy win32 record (bootId unavailable) with a dead pid is dead", { skip: WIN32_ONLY }, () => {
+    const box = sandbox();
+    try {
+      plantLock(box, { ownerPatch: { pid: deadPid(), bootId: "unavailable", processStart: "unavailable" } });
+      expectReclaimed(box, "(b) legacy bootId, dead pid");
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (c): win32 owner with a live pid but a different recorded boot time is dead", { skip: WIN32_ONLY }, () => {
+    const box = sandbox();
+    try {
+      plantLock(box, { ownerPatch: { pid: process.pid, bootId: "1" } });
+      expectReclaimed(box, "(c) live pid, different boot time");
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (d1): win32 owner with a live pid and the local boot time stays ambiguous", { skip: WIN32_ONLY }, () => {
+    for (let round = 0; round < 3; round += 1) {
+      const before = localBootId();
+      const box = sandbox();
+      let result;
+      try {
+        plantLock(box, { ownerPatch: { pid: process.pid, bootId: before } });
+        result = attempt(box);
+        releaseIfHeld(result);
+      } finally { box.cleanup(); }
+      // A coarse boot time can tick over between two reads; only judge a round whose premise held.
+      if (localBootId() !== before) continue;
+      assert.equal(result.ok, false, `(d1) expected an ambiguous refusal, but ${outcomeText(result)}`);
+      assert.equal(result.code, AMBIGUOUS, `(d1) expected ${AMBIGUOUS}, but ${outcomeText(result)}`);
+      return;
+    }
+    assert.fail("(d1) the local boot time changed in every one of 3 rounds, so no round could be judged");
+  });
+
+  test("T90-T (d2): win32 owner with a live pid and bootId unavailable stays ambiguous", { skip: WIN32_ONLY }, () => {
+    const box = sandbox();
+    try {
+      plantLock(box, { ownerPatch: { pid: process.pid, bootId: "unavailable", processStart: "unavailable" } });
+      expectAmbiguous(box, "(d2) live pid, legacy bootId", { keepPath: box.paths.auditLock });
+    } finally { box.cleanup(); }
+  });
+
+  test("T90-T (e): a foreign-host owner stays ambiguous even with a dead pid and a different boot time", () => {
+    const variants = [
+      { label: "dead pid, different boot time", ownerPatch: () => ({ hostId: FOREIGN_HOST, pid: deadPid(), bootId: "1" }) },
+      { label: "live pid", ownerPatch: () => ({ hostId: FOREIGN_HOST, pid: process.pid }) },
+    ];
+    for (const variant of variants) {
+      const box = sandbox();
+      try {
+        plantLock(box, { ownerPatch: variant.ownerPatch() });
+        expectAmbiguous(box, `(e) foreign host, ${variant.label}`, { keepPath: box.paths.auditLock });
+      } finally { box.cleanup(); }
+    }
+  });
+
+  test("T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command", () => {
+    const variants = [
+      { label: "ordinary lock", target: "auditLock", expected: (paths) => paths.auditLock },
+      { label: "abandoned recovery guard", target: "auditLockRecovery", expected: (paths) => paths.auditLockRecovery },
+    ];
+    for (const variant of variants) {
+      const box = sandbox();
+      try {
+        plantLock(box, { target: variant.target, ownerPatch: { hostId: FOREIGN_HOST, pid: process.pid } });
+        const result = expectAmbiguous(box, `(f) ${variant.label}`, { keepPath: variant.expected(box.paths) });
+        const { recovery } = result.error;
+        assert.ok(recovery !== null && typeof recovery === "object" && !Array.isArray(recovery),
+          `(f) ${variant.label}: the ${AMBIGUOUS} refusal carries no typed recovery (error.recovery is ${recovery === null ? "null" : typeof recovery})`);
+        assert.deepEqual(Object.keys(recovery).sort(), ["command", "files"],
+          `(f) ${variant.label}: error.recovery must be exactly { files, command }`);
+        assert.ok(Array.isArray(recovery.files) && recovery.files.length > 0
+          && recovery.files.every((file) => typeof file === "string" && file.length > 0),
+        `(f) ${variant.label}: recovery.files must be a non-empty array of path strings`);
+        assert.ok(recovery.files.includes(variant.expected(box.paths)),
+          `(f) ${variant.label}: recovery.files must name the exact lock file ${variant.expected(box.paths)}`);
+        assert.equal(typeof recovery.command, "string", `(f) ${variant.label}: recovery.command must be a string`);
+        assert.notEqual(recovery.command.trim(), "", `(f) ${variant.label}: recovery.command must not be empty`);
+      } finally { box.cleanup(); }
+    }
+  });
+
+  test("T90-T (L): Linux control: a dead same-host owner is reclaimed and a live owner is refused as busy", { skip: LINUX_ONLY }, () => {
+    const dead = sandbox();
+    try {
+      plantLock(dead, { ownerPatch: { pid: deadPid() } });
+      expectReclaimed(dead, "(L) linux dead owner");
+    } finally { dead.cleanup(); }
+
+    const live = sandbox();
+    try {
+      plantLock(live, { ownerPatch: {} });
+      const result = attempt(live);
+      try {
+        assert.equal(result.ok, false, `(L) expected a busy refusal for a live owner, but ${outcomeText(result)}`);
+        assert.equal(result.code, "HGO-AUDIT-LOCKED", `(L) expected HGO-AUDIT-LOCKED, but ${outcomeText(result)}`);
+      } finally { releaseIfHeld(result); }
+    } finally { live.cleanup(); }
+  });
+}
