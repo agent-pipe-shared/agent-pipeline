@@ -25,13 +25,14 @@ USAGE (Elephant)
 2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
    mechanical/deterministic diffs (lockfiles, generated artifacts, pure
    formatting, zero semantic delta) auto-pass — no critic dispatch. Class-mittel
-   diffs dispatch the review-tier model FIRST, escalating to a higher-capability
-   model only on a finding ≥ major, a discovered A/G/S touch, or a contested
-   verdict (never a higher-capability first pass for a non-A/G/S class-mittel
-   diff); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
-   the next package). ARCHITECTURE, GUARDRAIL, or SECURITY diffs = the
-   higher-capability review model at max MANDATORY in the default
-   functional-equivalent session lane: ONE fresh independently
+   diffs dispatch the review-tier model (a finding ≥ major, a discovered A/G/S
+   touch or a contested verdict gets a fresh review-tier re-review, never a
+   per-diff higher-capability escalation); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
+   the next package). ARCHITECTURE, GUARDRAIL, or SECURITY diffs = a Critic
+   MANDATORY on the Critic agent's own review-tier route (Sonnet) in the default
+   functional-equivalent session lane; the higher-capability tier (Opus) ONLY
+   for genuinely critical architecture or security, as ONE batched Critic per
+   larger batch with later reviews as delta-diff re-critics (MP-07): ONE fresh independently
    briefed, contractually read-only Critic subagent, no chat/history or
    implementer reasoning, refs-only bounded input, strict no-write and
    no-subdelegation, fixed candidate commit/diff, and literal assurance
@@ -106,7 +107,8 @@ USAGE (Elephant)
    judgment.
 4. Standard level: dispatch as read-only session subagent (tools:
    Read/Grep/Glob + git diff/log via Bash; no memory, no write tools). T1 uses
-   the same fresh session lane on the higher-capability tier.
+   the same fresh session lane (route per MP-07: review tier; the higher-capability
+   tier only for the one batched critical architecture/security Critic).
    `claude -p --bare` and corresponding runner-native launchers are optional
    explicit escalations, not cross-runner defaults or PO gates.
 5. Phase-2.6 bounded re-review: the initial architecture/security review is
@@ -272,7 +274,7 @@ Dispatch metadata (`roles/goldfish.md` GF-01 field 6, critic variant):
   validate preflight identity but never execute onboarding or default to
   Elephant) — `CRITIC-BOOTSTRAP-ROLE-CLOSED`
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
-- Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max in the standing fresh session functional-equivalent lane" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
+- Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "genuinely critical architecture or security change, ONE batched Critic → higher-capability review model at max in the standing fresh session functional-equivalent lane" or "standard (including a guardrail diff that is not security-critical) → review-tier model at max" or "class-mittel → review-tier model at max (no per-diff escalation)" or "mechanical auto-pass (T0) → no critic dispatched"}}
 - Batch scope (MP-07, PO rule 2026-10-09): {{BATCH_SCOPE: the slice ids and the single candidate range this one Critic covers. A Design-tier (Opus) Critic is dispatched ONLY for genuinely critical architecture or security, ONCE per larger batch, never per slice; every other Critic runs on the review-tier model (Sonnet). A RE-CRITIC names the delta range since the reviewed candidate as its ONLY search surface and reads nothing outside it.}}
 - Requested route: {{MODEL_ID}} at {{EFFORT}} — the CONCRETE model identifier resolved from the tier above (e.g. "claude-opus-5 at max"), not the tier name. The report-header requirement below asks the Critic to open with this exact value; a dispatch that states only the tier and never the identifier gives the Critic nothing to echo (2026-08-06 Critic round, F1).
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
@@ -297,8 +299,8 @@ mutating command and do not delegate.
 
 ## Route pre-check before substantive review (MUST; A/G/S dispatches)
 
-Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
-GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+Where the `Criticality → model (MP-07)` row above declares a genuinely critical ARCHITECTURE
+or SECURITY batch — the case for which MP-07 makes the
 higher-capability route at `max` MANDATORY rather than preferred — run this check
 immediately after the bootstrap line and BEFORE Phase A: state the `Requested
 route` value from the dispatch metadata, then your effective model identity,

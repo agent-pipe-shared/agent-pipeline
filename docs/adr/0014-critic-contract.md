@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks.
+Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks; amended on 2026-10-09 (PO decision, Sprint Alfred Ruling 156) to reserve the higher-capability Critic tier for one batched review of genuinely critical architecture or security changes.
 
 **Governs:** docs/operating-model.md, roles/critic.md, harness/review-protocol.md, harness/checklists/critic-review.md, templates/prompts/critic-review.md, plugins/pipeline-core/agents/critic.md, plugins/pipeline-core/skills/critic-review/SKILL.md, harness/scripts/check-critic-contract-citations.mjs, harness/scripts/check-critic-contract-citations.test.mjs, plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json, plugins/pipeline-core/config/codex-sandbox-compatibility.v2.schema.json, plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs, plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs, plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs, plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs, plugins/pipeline-core/scripts/critic-claude-host.mjs, plugins/pipeline-core/scripts/critic-claude-host.test.mjs, plugins/pipeline-core/scripts/critic-native-bare.mjs, plugins/pipeline-core/scripts/critic-bare.mjs, plugins/pipeline-core/scripts/critic-bare.test.mjs, plugins/pipeline-core/scripts/critic-verdict.schema.json, plugins/pipeline-core/scripts/codex-critic-host.mjs, plugins/pipeline-core/scripts/codex-critic-host.test.mjs, plugins/pipeline-core/scripts/codex-critic-selected-host.mjs, plugins/pipeline-core/scripts/codex-critic-app-server.mjs, plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.test.mjs, plugins/pipeline-core/scripts/codex-critic-receipt.schema.json, plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs, plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs
 
@@ -28,11 +28,13 @@ The Critic must:
 
 The report includes a **Deliberately not flagged** section for plausible concerns rejected due to insufficient evidence, irrelevance, or deterministic enforcement elsewhere. The Critic does not repeat findings already enforced by a deterministic gate unless the gate itself is missing, stale, or not bound to the reviewed content.
 
-Risk policy selects staffing and isolation. High-risk architecture, guardrail,
-and security changes require the configured highest review capability. The
-normal route is the fresh, contractually read-only session Critic:
+Risk policy selects staffing and isolation. Every architecture, guardrail and
+security change requires an independent Critic; the configured highest review
+capability is reserved for genuinely critical architecture or security changes,
+reviewed once per batch (amendment of 2026-10-09 below). The normal route is the
+fresh, contractually read-only session Critic:
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`, on the review-tier model (the Critic agent's own Sonnet route); the higher-capability tier is used only for a genuinely critical architecture or security change, as ONE batched Critic over a larger batch of slices (never one per slice or per diff), and every later review of that batch is a re-critic restricted to the delta diff since the reviewed candidate. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only for a genuinely critical architecture or security change, reviewed once per batch."
 
 The default session Critic has no chat/history or implementer reasoning,
 refs-only bounded input, strict read-only/no-write/no-subdelegation instruction,
@@ -42,6 +44,33 @@ independent review, the coordinator reports a typed runtime failure; it does
 not invent a PO decision point.
 
 Model names and spawn mechanics belong to runner mappings. The kernel contract is provider-neutral; any runner-specific mapping must preserve the required capability and independence.
+
+### Amendment — one batched higher-capability Critic (PO decision 2026-10-09, Sprint Alfred Ruling 156)
+
+The Critic tier trigger above is amended. The independence, read-only, assurance, evidence and
+finding-disposition requirements of this ADR are unchanged. Cause: one night of per-diff
+higher-capability Critic rounds cost about 20 % of a weekly budget.
+
+1. A Critic runs on the higher-capability (Opus) tier only for genuinely critical architecture
+   changes (ADR-required decisions, core contracts, operating-model changes) or security changes
+   (secrets/credentials, auth, network exposure, history rewrites, anything that can control real
+   devices or production systems).
+2. Even then there is ONE higher-capability Critic over a larger batch of slices, never one per
+   slice or per diff; the dispatch states the batch scope and the rationale.
+3. Any later review of that batch is a re-critic restricted to the delta diff since the reviewed
+   candidate; it names the delta range as its only search surface.
+4. Every other Critic, including an architecture, guardrail or security diff that is not critical
+   in this sense, runs on the review-tier model (the Critic agent's own Sonnet route).
+   Guardrail-only changes no longer escalate on their own unless they are security-critical.
+
+The earlier canonical wording (escalation of every architecture, guardrail or security diff, and of
+every rigor-2 diff with a high risk class, to the higher-capability tier) is superseded; the
+canonical wording quoted above replaces it word-identically in `harness/review-protocol.md` §2.1,
+`roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and this ADR.
+Operative detail: `policies/model-policy.md` MP-07 and `harness/review-protocol.md` §2.1. Backlog
+item: `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`. Not part
+of this amendment: the plugin Critic route and budget checks and their test pin, which that item
+tracks.
 
 ## Consequences
 

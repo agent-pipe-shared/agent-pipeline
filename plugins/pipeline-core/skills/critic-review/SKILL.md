@@ -195,7 +195,7 @@ reopen cleared categories, or create a Critic-of-Critic loop otherwise.
 
 ## 1. Stage gate (self-enforcing, before any review work)
 
-Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claude/settings*`, permission/guard config, `guardrails/`, `policies/`, secrets/auth/credentials, or A/G/S-marked `riskZones` from the calibration — it is T1. Dispatch the default fresh functional-equivalent session Critic on the higher-capability tier. Runner-native isolation is optional only when explicitly configured or requested.
+Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claude/settings*`, permission/guard config, `guardrails/`, `policies/`, secrets/auth/credentials, or A/G/S-marked `riskZones` from the calibration — it is T1. Dispatch the default fresh functional-equivalent session Critic on its own review-tier route (the higher-capability tier only for the one batched Critic over genuinely critical architecture or security changes, MP-07). Runner-native isolation is optional only when explicitly configured or requested.
 
 For T1, first require `verdict:yes` and one `assurance:` argument. Missing,
 contradictory, or unrecognized assurance → report `dispatch defect: T1 requires
@@ -205,11 +205,11 @@ selected runner's native lane rather than this generic standard-stage skill.
 `assurance:functional-equivalent-read-only` proceeds here when this is
 ONE fresh independently briefed Critic with no chat/history or implementer
 reasoning, refs-only bounded input, strict read-only/no-write/no-subdelegation,
-fixed candidate commit/diff, and a higher-capability route; otherwise report a
+fixed candidate commit/diff, and the route MP-07 selects; otherwise report a
 typed runtime failure and STOP. Its report MUST carry the literal assurance above and never
 claim OS isolation or effective model identity.
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`, on the review-tier model (the Critic agent's own Sonnet route); the higher-capability tier is used only for a genuinely critical architecture or security change, as ONE batched Critic over a larger batch of slices (never one per slice or per diff), and every later review of that batch is a re-critic restricted to the delta diff since the reviewed candidate. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only for a genuinely critical architecture or security change, reviewed once per batch."
 
 (Canonical English wording, authoritative — word-identical in `harness/review-protocol.md` §2.1, *Trigger decision table*, `roles/critic.md` and ADR-0003/ADR-0014; `docs/operating-model.md` does not carry this wording.)
 

@@ -32,17 +32,25 @@ multi-runner pipeline. The effective T1 policy supersedes only that operational
 mechanism, not its rigor, evidence, independence, staffing, or disposition
 requirements.
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff gets the Critic in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`, on the review-tier model (the Critic agent's own Sonnet route); the higher-capability tier is used only for a genuinely critical architecture or security change, as ONE batched Critic over a larger batch of slices (never one per slice or per diff), and every later review of that batch is a re-critic restricted to the delta diff since the reviewed candidate. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only for a genuinely critical architecture or security change, reviewed once per batch."
 
 For T1, retain the selected runner and use exactly one fresh independently
 briefed Critic subagent with no chat/history or implementer reasoning, refs-only bounded
 input, strict read-only/no-write/no-subdelegation instruction, fixed candidate
-commit and diff, higher-capability route, and a JSON-schema-shaped verdict. The
+commit and diff, the route the amended trigger selects (review tier; higher-capability only for the one batched critical architecture/security Critic), and a JSON-schema-shaped verdict. The
 assurance literal above is mandatory and never asserts OS isolation or effective
 model identity. If that runner cannot provide even this contractual review,
 report a typed runtime failure; do not create a new PO gate or silently
 substitute another runner. Runner-native launchers such as `claude -p --bare`
 remain optional explicit escalations.
+
+### Amendment — Critic tier trigger (PO decision 2026-10-09, Sprint Alfred Ruling 156)
+
+The trigger quoted above carries the amended wording, word-identical to ADR-0014: the
+higher-capability tier is reserved for ONE batched Critic over genuinely critical
+architecture or security changes, later reviews are delta-diff re-critics, and every other
+Critic runs on the Critic agent's own review-tier (Sonnet) route. The decision record is the
+dated amendment in ADR-0014; the operative detail is `policies/model-policy.md` MP-07.
 
 ## Consequences
 

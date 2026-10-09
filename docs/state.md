@@ -5,6 +5,8 @@
 
 **Release state:** version `0.6.3` · tag `v0.6.3` · commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` · tree `6821503f8f4fd72ed31459cb843d97bf8bfaa049` · status `published`
 
+**Register 2026-10-09:** Critic tier per the ADR-0014 amendment (Rulings 156, 158).
+
 **Current 2026-10-08 eve:** START HERE — [handover](../specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md) §0 (signed tranche `da20519dd`, stamp), then [next actions](../specs/sprint-alfred-epic/plans/next-actions-2026-10-08.md) §0. Nothing PO-accepted.
 
 ## Archived history
