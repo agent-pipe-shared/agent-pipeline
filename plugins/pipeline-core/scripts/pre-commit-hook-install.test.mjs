@@ -11,13 +11,13 @@
  *
  * Run: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
  */
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, unlinkSync, symlinkSync, statSync }  from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync, rmSync, unlinkSync, symlinkSync, statSync }  from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -38,11 +38,24 @@ import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 
-const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+// TR-J-T3d (TOILRES T44/T58, Ruling 116): applyInstall inventories the plugin root twice (publishGitHookRuntimeSnapshot)
+// and the signed-window cases hash it, so a parallel writer into the LIVE tree fails these cases (the GHS-SOURCE-DRIFT
+// class). The suite therefore runs against a frozen copy of the plugin root, made once at load and removed in after().
+// PLUGIN_ROOT and every directory derived from it name the copy; the live tree is read only by that one copy.
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "pre-commit-hook-plugin-"));
+cpSync(LIVE_PLUGIN_ROOT, PLUGIN_ROOT, { recursive: true });
+after(() => { rmSync(PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
 const PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
 const PLUGIN_HOOKS_DIR = join(PLUGIN_ROOT, "hooks");
 const PLUGIN_SCRIPTS_DIR = join(PLUGIN_ROOT, "scripts");
 const PLUGIN_DIRS = { pluginLibDir: PLUGIN_LIB_DIR, pluginHooksDir: PLUGIN_HOOKS_DIR, pluginScriptsDir: PLUGIN_SCRIPTS_DIR };
+// Proof that the copy, not the live tree, is what the install, snapshot and spawn cases read.
+assert.notEqual(PLUGIN_ROOT, LIVE_PLUGIN_ROOT, "PLUGIN_ROOT must not be the live plugin root");
+for (const dir of Object.values(PLUGIN_DIRS)) assert.ok(dir.startsWith(PLUGIN_ROOT), "every plugin directory must lie under the frozen plugin copy");
+assert.ok(existsSync(join(PLUGIN_LIB_DIR, "git-hook-runtime-snapshot.mjs")), "the frozen copy must carry the snapshot module");
+assert.ok(existsSync(join(PLUGIN_SCRIPTS_DIR, "pre-commit-hook-install.mjs")), "the frozen copy must carry the installer the CLI case spawns");
+process.stderr.write(`# frozen plugin copy in use: ${basename(PLUGIN_ROOT)}\n`);
 
 // A-S2b (HOOKREFRESH, PO decision M): the --install CLI must report the refusal code the install
 // path actually threw, as one JSON object with exit 1 -- not die with an uncaught exception and no
@@ -69,7 +82,8 @@ test("--install CLI: a typed refusal thrown by the install path is reported as i
     'import { register } from "node:module";',
     `register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(hooksSource)}`)});`,
   ].join("\n"), "utf8");
-  const installer = fileURLToPath(new URL("./pre-commit-hook-install.mjs", import.meta.url));
+  // TR-J-T3d: the installer is the frozen copy's, not the live one; the stub still intercepts its hardened-directory import.
+  const installer = join(PLUGIN_SCRIPTS_DIR, "pre-commit-hook-install.mjs");
   const result = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, installer, "--install"], {
     cwd: repoDir,
     encoding: "utf8",

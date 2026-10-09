@@ -16,23 +16,34 @@
  *
  * Run: node --test plugins/pipeline-core/scripts/pre-commit-hook-install.trust-anchor-bootstrap.test.mjs
  */
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { applyInstall } from "./pre-commit-hook-install.mjs";
 
-const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+// TR-J-T3d (TOILRES T44/T58, Ruling 116): applyInstall inventories the plugin root twice (publishGitHookRuntimeSnapshot),
+// so a parallel writer into the LIVE tree fails these cases (the GHS-SOURCE-DRIFT class). The suite therefore installs from
+// a frozen copy of the plugin root, made once at load and removed in after(); the live tree is read only by that one copy.
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "pre-commit-hook-tofu-plugin-"));
+cpSync(LIVE_PLUGIN_ROOT, PLUGIN_ROOT, { recursive: true });
+after(() => { rmSync(PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
 const PLUGIN_DIRS = {
   pluginLibDir: join(PLUGIN_ROOT, "lib"),
   pluginHooksDir: join(PLUGIN_ROOT, "hooks"),
   pluginScriptsDir: join(PLUGIN_ROOT, "scripts"),
 };
+// Proof that the copy, not the live tree, is what every install below snapshots.
+assert.notEqual(PLUGIN_ROOT, LIVE_PLUGIN_ROOT, "PLUGIN_ROOT must not be the live plugin root");
+for (const dir of Object.values(PLUGIN_DIRS)) assert.ok(dir.startsWith(PLUGIN_ROOT), "every plugin directory must lie under the frozen plugin copy");
+assert.ok(existsSync(join(PLUGIN_DIRS.pluginLibDir, "git-hook-runtime-snapshot.mjs")), "the frozen copy must carry the snapshot module");
+process.stderr.write(`# frozen plugin copy in use: ${basename(PLUGIN_ROOT)}\n`);
 
 const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
 
