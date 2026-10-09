@@ -1,0 +1,25 @@
+command: node scratch/alfred-f14-bootstrap-mode-diagnostic.mjs
+label: ALFRED-F14-policy-selected-bootstrap-acknowledgement
+exitCode: 1
+head: 7f0950d4485e264ff2061f3a91464b6a32c59d3c
+tree: 2c9d1cf2c9314b8e513f103ba6e03d6e7153a2c4
+dirty: true
+--- stdout ---
+{"source":"plugins/pipeline-core/lib/project-onboarding-v3.mjs","sourceSha256":"d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/project-onboarding-v3.mjs","proposalSha256":"e81be1a5e45155a7d152daf2c5e0b7122fbddae548eac4530507945185449c51"}
+{"source":"plugins/pipeline-core/lib/onboarding-continuity.mjs","sourceSha256":"a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/onboarding-continuity.mjs","proposalSha256":"512ee2181025efe326375c780711eb018a49a2e38f9c7a4f787e5145b37a2f0d"}
+{"source":"plugins/pipeline-core/scripts/project-onboarding-v3.mjs","sourceSha256":"b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71","proposal":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/project-onboarding-v3.mjs","proposalSha256":"cbf82f9b8900b048cdc39c147072aaa81ad158b7fe880bfc9ef2de3bc7789250"}
+
+--- stderr ---
+file://<repo-root>/scratch/alfred-f14-bootstrap-mode-diagnostic.mjs:53
+    if (!fs.existsSync(next) || !fs.statSync(next).isFile()) throw Error(`missing import dependency: ${path.relative(graph, file)} -> ${match[1]}`);
+                                                                   ^
+
+Error: missing import dependency: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs -> ./...
+    at staticGraph (file://<repo-root>/scratch/alfred-f14-bootstrap-mode-diagnostic.mjs:53:68)
+    at staticGraph (file://<repo-root>/scratch/alfred-f14-bootstrap-mode-diagnostic.mjs:54:32)
+    at file://<repo-root>/scratch/alfred-f14-bootstrap-mode-diagnostic.mjs:57:29
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0

@@ -1,0 +1,301 @@
+command: node scratch/alfred-backlog-ac-readback.mjs
+label: backlog-ac-current
+exitCode: 0
+head: d3058587297004a9d6dd7b42b39ce432e567d256
+tree: 5b8a9c43b1d59a17ade111d69ffb338e205e12c2
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.backlog-ac-status-readback.v1",
+  "generatedAt": "2026-10-09T11:43:45.506Z",
+  "population": {
+    "files": 872,
+    "statuses": {
+      "closed": 664,
+      "deferred": 11,
+      "open": 193,
+      "rejected": 3,
+      "(none)": 1
+    },
+    "open": 193,
+    "excludedBatmanNightwing": 24,
+    "workingSet": 169,
+    "explicitAlfredOpen": 147,
+    "unassignedOpen": 22
+  },
+  "historicalBoard": {
+    "path": "specs/sprint-alfred-epic/plans/candidate-status-2026-10-09.md",
+    "sha256": "2e3722807527ef540b7f912c5247db2550c84f4960208f16536557368f139fa1",
+    "sourceCandidate": "b20f9123c75f1e17e159f3933e610b2f11d8bcd1",
+    "liveMatchedCategories": {
+      "deferred": 1,
+      "implementation-complete": 10,
+      "landed": 56,
+      "unverified": 10,
+      "in flight": 68,
+      "open": 21,
+      "host-check": 3
+    },
+    "newUnmappedItems": [],
+    "acAndIrCounts": {
+      "landed": 5,
+      "unverified": 15,
+      "in flight": 12,
+      "open": 3,
+      "host-check": 1,
+      "implementation-complete": 1,
+      "not surveyed": 4
+    },
+    "acAndIrRows": [
+      {
+        "id": "AC-1",
+        "criterion": "Enforcement-conformance records; placement rows consistent",
+        "status": "landed (file presence only; per-runner host records and a fresh green run not established)",
+        "slices": "A1, A2"
+      },
+      {
+        "id": "AC-2",
+        "criterion": "No agent route mutates protected, approved or closed bytes",
+        "status": "unverified (partial per RECON-2A; A3/A4/A5 fixtures not confirmed by name; no later slice in the log)",
+        "slices": "A3, A4, A5"
+      },
+      {
+        "id": "AC-3",
+        "criterion": "Every pipeline-state verb passes every readiness observer",
+        "status": "landed (file presence only; green not re-run)",
+        "slices": "A5"
+      },
+      {
+        "id": "AC-4",
+        "criterion": "submit/approve-plan refuse pre-authority staging paths",
+        "status": "unverified (no A4-named fixture found by RECON-2A)",
+        "slices": "A4"
+      },
+      {
+        "id": "AC-5",
+        "criterion": "Closed-evidence drift: detect, fail closed, repair verbs",
+        "status": "unverified (partial; 2026-08-27 replay not found by RECON-2A)",
+        "slices": "A5"
+      },
+      {
+        "id": "AC-6",
+        "criterion": "Interruption baseline and promotion evidence with explicit PO approval",
+        "status": "in flight (evaluator and baseline writer landed; promotion-record reader planned; writer cases host-only; PO approval still owed)",
+        "slices": "AC6-F, AC6-F2, AC6-F3, DESIGN-AC6-PROMO, AC-6 promotion record reader (next-actions section 3, decision BB), host-check H2"
+      },
+      {
+        "id": "AC-7",
+        "criterion": "Rigor floor deterministic; disagreement log before enforcement",
+        "status": "unverified (partial; disagreement log not confirmed)",
+        "slices": "B1"
+      },
+      {
+        "id": "AC-8",
+        "criterion": "Greenfield resolves inherited-agent-first; custom profile honoured",
+        "status": "unverified (partial; custom-profile case unconfirmed)",
+        "slices": "D2, D3"
+      },
+      {
+        "id": "AC-9",
+        "criterion": "Dogfood D4 adoption flow end to end in this repository",
+        "status": "open (PO action: durable adoption decision and evidence set; orientation shows adoption deferred, decision po-0.7.0-release-defer-2026-09-20)",
+        "slices": "D4"
+      },
+      {
+        "id": "AC-10",
+        "criterion": "Model-judged evaluator output can never be pass",
+        "status": "unverified (partial; fixture name unconfirmed)",
+        "slices": "D3"
+      },
+      {
+        "id": "AC-11",
+        "criterion": "Eight B2 routes; refusals name their route",
+        "status": "unverified (partial; R7-6 realignment pins and tranche-1 signed package exist, per-route coverage not re-checked)",
+        "slices": "B2, R7-6"
+      },
+      {
+        "id": "AC-12",
+        "criterion": "Rules-as-code sweep: GG-22 defined, strip tool, push-flow doc",
+        "status": "unverified (partial; strip stale-prose cases unconfirmed)",
+        "slices": "B3"
+      },
+      {
+        "id": "AC-13",
+        "criterion": "Every sprint backlog item closed or PO-visibly re-triaged; ledger reconciled",
+        "status": "open (close-time act; this board is the live survey of the set; live count and GitHub trail at close)",
+        "slices": "backlog sweep (Section B)"
+      },
+      {
+        "id": "AC-14",
+        "criterion": "Every wave passes at least one independent Critic round",
+        "status": "in flight (continuous; rule since Rulings 156/158: one batched Critic per batch, follow-ups on the delta diff only)",
+        "slices": "per-package Critic rounds"
+      },
+      {
+        "id": "AC-15",
+        "criterion": "Per-issue documentation acceptance on the candidate",
+        "status": "open (close-time, candidate-bound)",
+        "slices": "close-out"
+      },
+      {
+        "id": "AC-16",
+        "criterion": "Host-layout onboarding tests assert the success contract",
+        "status": "unverified (post-Nova re-derivation not located by RECON-2A)",
+        "slices": "-"
+      },
+      {
+        "id": "AC-17",
+        "criterion": "No implementation authority with an unresolved architecture disposition",
+        "status": "unverified (partial; planning-boundary run unconfirmed)",
+        "slices": "D4"
+      },
+      {
+        "id": "AC-18",
+        "criterion": "Stale map fails closed; checkpoint push records debt",
+        "status": "unverified (partial; class-7 fixtures unconfirmed)",
+        "slices": "D3"
+      },
+      {
+        "id": "AC-19",
+        "criterion": "Decision parity across runners",
+        "status": "unverified (partial; two-runner replay unconfirmed)",
+        "slices": "D1"
+      },
+      {
+        "id": "AC-20",
+        "criterion": "Critic catches a token ADR that does not match its implementation",
+        "status": "unverified (partial; #99 section 7 fixture unconfirmed)",
+        "slices": "D1"
+      },
+      {
+        "id": "AC-21",
+        "criterion": "Anti-fragmentation: tiny-module shredding is rejected",
+        "status": "unverified (partial; #104 fixture unconfirmed)",
+        "slices": "D3"
+      },
+      {
+        "id": "AC-22",
+        "criterion": "Planning findings carry remedy options",
+        "status": "landed (file presence; comparison generator test present)",
+        "slices": "D2"
+      },
+      {
+        "id": "AC-23",
+        "criterion": "AGENTS.md links the map bundle; re-entry order resolves",
+        "status": "unverified (partial; walkthrough evidence missing)",
+        "slices": "D2"
+      },
+      {
+        "id": "AC-24",
+        "criterion": "Provider-free AGY dispatch seam with typed receipt",
+        "status": "landed (file presence; fake-executable cases not individually checked)",
+        "slices": "E3"
+      },
+      {
+        "id": "AC-25",
+        "criterion": "Native Claude/Codex Goldfish host-commit",
+        "status": "landed (file presence; a fresh clone stays UNVERIFIABLE by design)",
+        "slices": "E4"
+      },
+      {
+        "id": "AC-26",
+        "criterion": "Lifecycle-command admission (R1-1..R1-9)",
+        "status": "in flight (push-classifier and read-admission work landed; R1 catalogue slice is protected and TR-B/TR-C/TR-G post-images await the signed tranche 2; mapping of TR slices to this AC is the Elephant judgment)",
+        "slices": "R1 catalogue (tranche), TR-B, TR-C, TR-G, Q12"
+      },
+      {
+        "id": "AC-27",
+        "criterion": "Read policy (R2-1..R2-5)",
+        "status": "in flight (TR-B read-grammar post-images landed unsigned, rg -g kept refused by Ruling 145; R2 case coverage and WSL UNC files unverified)",
+        "slices": "TR-B"
+      },
+      {
+        "id": "AC-28",
+        "criterion": "Two-decision ceremonies (R3-1..R3-7)",
+        "status": "in flight (tranche 1 signed; TR-S1 encrypted-key gate and key-pointer chain continue, TR-S1-F3b next)",
+        "slices": "TR-S1-F3, TR-S1-F3b, R7-6"
+      },
+      {
+        "id": "AC-29",
+        "criterion": "Runner and platform parity (R4-1..R4-10)",
+        "status": "in flight (role-route preflight module and close-side route evidence landed; R4 S3b/S4/S5, WINMF and AL follow-ups open; AL-2 and R4-12 measurement need host H9)",
+        "slices": "R4-S1..S5, WINMF, AL, AM-W"
+      },
+      {
+        "id": "AC-30",
+        "criterion": "Design-course contract (R5-1..R5-8)",
+        "status": "in flight (answers-file and asked-once landed; R5-F2 guard part is protected and goes to a tranche; status of PO question N14 not re-read)",
+        "slices": "R5-F1..F7, R5-F2"
+      },
+      {
+        "id": "AC-31",
+        "criterion": "Forensics and audit (R6-1..R6-5)",
+        "status": "in flight (R6-2 continuity drift projection landed; State inspect wiring R6-F2b and the audit-index script planned)",
+        "slices": "R6-D, R6-F2b, audit index"
+      },
+      {
+        "id": "AC-32",
+        "criterion": "Three-runner end-to-end happy path on the stamped candidate",
+        "status": "host-check (PO-run host sessions on the matrix; the H-rows of the host checklist)",
+        "slices": "H1-H12"
+      },
+      {
+        "id": "AC-33",
+        "criterion": "Recovery availability (RV-1..RV-11)",
+        "status": "in flight (RV S1-S5 and S7 landed; RV-S6 forward-only recovery implementation and S8-S11 open)",
+        "slices": "RV-S1..S11"
+      },
+      {
+        "id": "AC-34",
+        "criterion": "Uninstall refuses a foreign hook (PU-FOREIGN-HOOK-CONFLICT)",
+        "status": "implementation-complete awaiting review (AC34-F2 self-verified per ruling 29; POSIX run is host row H12)",
+        "slices": "AC34-T/F/Fb/F2, host-check H12"
+      },
+      {
+        "id": "AC-35",
+        "criterion": "Model-family approval and role mechanism (extends AC-29)",
+        "status": "in flight (drive-letter fix landed; R4-12 hook measurement and AL-2 pending, host H9)",
+        "slices": "WINMF, R4"
+      },
+      {
+        "id": "AC-36",
+        "criterion": "PO-decision ceremonies (extends AC-28)",
+        "status": "in flight (signing-window and chat-mode cases ride the TR-S1 / R7-6 chain)",
+        "slices": "TR-S1, R7-6"
+      },
+      {
+        "id": "AC-37",
+        "criterion": "Agent-recoverable operation and device portability (R7-1..R7-11e)",
+        "status": "in flight (R7-1, R7-3 gate and bound-path classification, R7-5 library, R7-6 tranche 1, R7-7, R7-11 landed; R7-3-F1e held, R7-5 verb integration and R7-6 part 3 open; device-switch walk not reached)",
+        "slices": "R7-x slices"
+      },
+      {
+        "id": "IR-1",
+        "criterion": "Post-close write to a bound Result refused/detected (incident class)",
+        "status": "not surveyed (incident-derived criterion, not in the briefed AC list)",
+        "slices": "-"
+      },
+      {
+        "id": "IR-2",
+        "criterion": "discard-feature on active continuity ends in a ready session",
+        "status": "not surveyed (incident-derived criterion)",
+        "slices": "-"
+      },
+      {
+        "id": "IR-3",
+        "criterion": "Four seed interruption classes emit correct receipts",
+        "status": "not surveyed (incident-derived criterion)",
+        "slices": "-"
+      },
+      {
+        "id": "IR-4",
+        "criterion": "Bounded read-only interpreter probe admitted; opaque write denied",
+        "status": "not surveyed (incident-derived criterion)",
+        "slices": "-"
+      }
+    ]
+  },
+  "qualification": "Historical board classifications are not fresh candidate PASS or acceptance. This readback measures frontmatter only; it closes nothing."
+}
+
+--- stderr ---

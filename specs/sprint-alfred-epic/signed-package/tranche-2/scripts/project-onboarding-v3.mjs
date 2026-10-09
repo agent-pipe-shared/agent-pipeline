@@ -36,6 +36,7 @@ import {
   planOnboardingBootstrapBind,
   applyOnboardingBootstrapBind,
   planOnboardingBootstrapAcknowledgement,
+  planOnboardingBootstrapAcknowledgementChat,
   applyOnboardingBootstrapAcknowledgement,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
@@ -985,7 +986,11 @@ export function main(args = process.argv.slice(2), {
     });
     else if (options.command === "bootstrap-acknowledge-plan") {
       if (!options.activate) throw Object.assign(new Error("signature acknowledgement request requires explicit activation"), { code: "BOOTSTRAP-ACK-ACTIVATION-REQUIRED" });
-      output = planOnboardingBootstrapAcknowledgement({
+      const approval = readHumanApprovalMode(options.root, { spawn: deps?.spawnSync ?? deps?.spawn });
+      const planner = approval.mode === "chat"
+        ? planOnboardingBootstrapAcknowledgementChat
+        : planOnboardingBootstrapAcknowledgement;
+      output = planner({
         rootDir: options.root, runner: options.runner, spawn: deps?.spawn ?? hostSpawnSync, deps,
       });
     }

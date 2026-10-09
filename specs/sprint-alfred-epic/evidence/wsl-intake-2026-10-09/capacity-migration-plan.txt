@@ -1,0 +1,545 @@
+command: node scratch/capacity-migration-contract-readback-20261009.mjs
+label: ALFRED-CAPACITY-MIGRATE-PLAN-20261009
+exitCode: 0
+head: d3058587297004a9d6dd7b42b39ce432e567d256
+tree: 5b8a9c43b1d59a17ade111d69ffb338e205e12c2
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.capacity-migration-plan-evidence.v1",
+  "helperSha256": "dd134b8119681ad424ae7976717539c329108c5efa76719994ddb73826d3beaa",
+  "observations": [
+    {
+      "path": "docs/adr/draft-shared-agent-capacity.md",
+      "currentSha256": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450",
+      "candidateSha256": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450",
+      "anchors": []
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "currentSha256": "3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795",
+      "candidateSha256": "3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795",
+      "anchors": [
+        {
+          "line": 821,
+          "text": "export function statePath(dir = projectDir()) {"
+        },
+        {
+          "line": 845,
+          "text": "export function readState(dir = projectDir()) {"
+        },
+        {
+          "line": 874,
+          "text": "function writeState(dir, state, expectedState, options = {}) {"
+        },
+        {
+          "line": 919,
+          "text": "const revisionAdvancedOnce = options.allowContinuityAdvance === true"
+        },
+        {
+          "line": 949,
+          "text": "preserveGateEstimate: options.preserveGateEstimate === true,"
+        },
+        {
+          "line": 951,
+          "text": "if (written.ok && options.requirePhysicalReadback === true) {"
+        },
+        {
+          "line": 952,
+          "text": "const expectedPostimage = options.preserveGateEstimate === true"
+        },
+        {
+          "line": 968,
+          "text": "state: options.preserveGateEstimate === true"
+        },
+        {
+          "line": 1251,
+          "text": "export function acquireContinuityLock(dir, token, deps = {}) {"
+        },
+        {
+          "line": 1306,
+          "text": "export function releaseContinuityLock(lock) {"
+        },
+        {
+          "line": 1331,
+          "text": "export function atomicWriteContinuityState(dir, state, lock, deps = {}) {"
+        },
+        {
+          "line": 1337,
+          "text": "const stateToWrite = deps.preserveGateEstimate === true ? state : clearGateEstimateForMutation(state);"
+        },
+        {
+          "line": 4729,
+          "text": "function readStateRaw(dir) {"
+        },
+        {
+          "line": 9973,
+          "text": "if(sha256Bytes(state.bytes)===entry.sha256&&!planned.replay){const result=writeState(root,undefined,state.state,{reuseLock:lock,requirePhysicalReadback:true,transition:()=>({...planned,state:post}),beforeCommit:()=>({ok:sha256Bytes(retirementReadFile(statePath(root)))===entry.sha256})});if(!stateWriteSucceeded(result))throw Error('ER-STATE-WRITE');}"
+        },
+        {
+          "line": 10461,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10507,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10508,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 10562,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10563,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 10781,
+          "text": "preserveGateEstimate: true,"
+        },
+        {
+          "line": 11552,
+          "text": "requirePhysicalReadback: actionEventRequested,"
+        },
+        {
+          "line": 12044,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 12201,
+          "text": "requirePhysicalReadback: actionEventRequested,"
+        }
+      ]
+    },
+    {
+      "path": "harness/scripts/pipeline-state.test.mjs",
+      "currentSha256": "53b6c667e8709cd7c18e75c6614809c669e7308c83de14e2c3c3224be2bb6760",
+      "candidateSha256": "53b6c667e8709cd7c18e75c6614809c669e7308c83de14e2c3c3224be2bb6760",
+      "anchors": [
+        {
+          "line": 82,
+          "text": "function seedPoAuthorityRebind(prefix = \"po-rebind\") {"
+        },
+        {
+          "line": 709,
+          "text": "function captureConsole(action) {"
+        },
+        {
+          "line": 922,
+          "text": "function continuityIdentity(overrides = {}) {"
+        },
+        {
+          "line": 937,
+          "text": "function continuityQueue(overrides = {}) {"
+        },
+        {
+          "line": 949,
+          "text": "function continuityState(overrides = {}) {"
+        },
+        {
+          "line": 977,
+          "text": "function seedContinuityRoot(dir) {"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "currentSha256": "a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d",
+      "candidateSha256": "a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d",
+      "anchors": [
+        {
+          "line": 1140,
+          "text": "export function classifyOnboardingContinuity(options = {}) {"
+        },
+        {
+          "line": 1462,
+          "text": "export function planOnboardingContinuityRepair({"
+        },
+        {
+          "line": 1563,
+          "text": "export function applyOnboardingContinuityRepair({"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "currentSha256": "76e7b84b05e468a80274b8af671289a19148ca14ac8bd85c17e3f80653804387",
+      "candidateSha256": "76e7b84b05e468a80274b8af671289a19148ca14ac8bd85c17e3f80653804387",
+      "anchors": [
+        {
+          "line": 1913,
+          "text": "function promotionSeed(name, { privatized = false, bumpRevision = privatized, poLanguage = \"en\" } = {}) {"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "currentSha256": "d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3",
+      "candidateSha256": "d97a1b45fddc1e865674a3d21b6e349bcbe99501e0f25ea6974e575a7a6ef2f3",
+      "anchors": [
+        {
+          "line": 2642,
+          "text": "function continuityRepairPlanAction(root, runner, intent) {"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "currentSha256": "8af97f8b6026234575184c8ebfcebc2c1594a6944b3fef37cca98147e86bbd0f",
+      "candidateSha256": "8af97f8b6026234575184c8ebfcebc2c1594a6944b3fef37cca98147e86bbd0f",
+      "anchors": [
+        {
+          "line": 420,
+          "text": "export function root() { return mkdtempSync(join(temporaryBase(), \"project onboarding v3 matrix with spaces-\")); }"
+        },
+        {
+          "line": 422,
+          "text": "export function dispose(path) { rmSync(path, { recursive: true, force: true }); }"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "currentSha256": "b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71",
+      "candidateSha256": "b63fd1af3dc1c20ae9e0054b3114bf1597c6cb48817f062e04326a1067df2a71",
+      "anchors": [
+        {
+          "line": 247,
+          "text": "{ name: \"plan-repair\", flat: true, mutates: false, automatedArgvShape: \"lifecycle\" },"
+        },
+        {
+          "line": 248,
+          "text": "{ name: \"apply-repair\", flat: true, mutates: true, automatedArgvShape: null },"
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "currentSha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77",
+      "candidateSha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77",
+      "anchors": [
+        {
+          "line": 284,
+          "text": "function validResume(value, revision) {"
+        },
+        {
+          "line": 332,
+          "text": "function validCapacity(value) {"
+        }
+      ]
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-1/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "currentSha256": "3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795",
+      "candidateSha256": "3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795",
+      "anchors": [
+        {
+          "line": 821,
+          "text": "export function statePath(dir = projectDir()) {"
+        },
+        {
+          "line": 845,
+          "text": "export function readState(dir = projectDir()) {"
+        },
+        {
+          "line": 874,
+          "text": "function writeState(dir, state, expectedState, options = {}) {"
+        },
+        {
+          "line": 919,
+          "text": "const revisionAdvancedOnce = options.allowContinuityAdvance === true"
+        },
+        {
+          "line": 949,
+          "text": "preserveGateEstimate: options.preserveGateEstimate === true,"
+        },
+        {
+          "line": 951,
+          "text": "if (written.ok && options.requirePhysicalReadback === true) {"
+        },
+        {
+          "line": 952,
+          "text": "const expectedPostimage = options.preserveGateEstimate === true"
+        },
+        {
+          "line": 968,
+          "text": "state: options.preserveGateEstimate === true"
+        },
+        {
+          "line": 1251,
+          "text": "export function acquireContinuityLock(dir, token, deps = {}) {"
+        },
+        {
+          "line": 1306,
+          "text": "export function releaseContinuityLock(lock) {"
+        },
+        {
+          "line": 1331,
+          "text": "export function atomicWriteContinuityState(dir, state, lock, deps = {}) {"
+        },
+        {
+          "line": 1337,
+          "text": "const stateToWrite = deps.preserveGateEstimate === true ? state : clearGateEstimateForMutation(state);"
+        },
+        {
+          "line": 4729,
+          "text": "function readStateRaw(dir) {"
+        },
+        {
+          "line": 9973,
+          "text": "if(sha256Bytes(state.bytes)===entry.sha256&&!planned.replay){const result=writeState(root,undefined,state.state,{reuseLock:lock,requirePhysicalReadback:true,transition:()=>({...planned,state:post}),beforeCommit:()=>({ok:sha256Bytes(retirementReadFile(statePath(root)))===entry.sha256})});if(!stateWriteSucceeded(result))throw Error('ER-STATE-WRITE');}"
+        },
+        {
+          "line": 10461,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10507,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10508,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 10562,
+          "text": "allowContinuityAdvance: true,"
+        },
+        {
+          "line": 10563,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 10781,
+          "text": "preserveGateEstimate: true,"
+        },
+        {
+          "line": 11552,
+          "text": "requirePhysicalReadback: actionEventRequested,"
+        },
+        {
+          "line": 12044,
+          "text": "requirePhysicalReadback: true,"
+        },
+        {
+          "line": 12201,
+          "text": "requirePhysicalReadback: actionEventRequested,"
+        }
+      ]
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/pipeline-state-R6F2b-R75.patch",
+      "currentSha256": "bf54af3122a55daf6918e27c1b018a013bd3acf102c8c17865787c079bf08893",
+      "candidateSha256": "bf54af3122a55daf6918e27c1b018a013bd3acf102c8c17865787c079bf08893",
+      "anchors": [
+        {
+          "line": 9,
+          "text": "+import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';"
+        },
+        {
+          "line": 32,
+          "text": "+      const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);"
+        },
+        {
+          "line": 51,
+          "text": "+    case \"rebind-approval\": {"
+        }
+      ]
+    }
+  ],
+  "contract": {
+    "schema": "pipeline.capacity-migration-implementation-contract.v1",
+    "status": "proposal-only; independent review: pending; no live apply authorized",
+    "sourceCandidate": "d3058587297004a9d6dd7b42b39ce432e567d256",
+    "entry": {
+      "writer": "plugins/pipeline-core/scripts/pipeline-state.mjs (installed plugin absolute path in returned actions)",
+      "planArgv": [
+        "continuity-capacity-migration-plan",
+        "--feature-id",
+        "<featureId>",
+        "--updated-at",
+        "<ISO8601 UTC timestamp>",
+        "--plan-file",
+        "<repository-relative scratch JSON path>",
+        "[--concurrency-limit <explicit integer 2..64>]"
+      ],
+      "applyArgv": [
+        "continuity-capacity-migration-apply",
+        "--feature-id",
+        "<featureId>",
+        "--expected-revision",
+        "<nonnegative safe integer>",
+        "--expected-state-sha256",
+        "<raw preimage digest>",
+        "--expected-post-state-sha256",
+        "<raw postimage digest>",
+        "--expected-state-path",
+        "<canonical repository-relative state path>",
+        "--updated-at",
+        "<same timestamp>",
+        "--plan-sha256",
+        "<canonical payload digest>",
+        "[--concurrency-limit <same explicit integer>]",
+        "--plan-file",
+        "<same scratch JSON path>",
+        "--activate"
+      ],
+      "cwd": "physical consumer root; existing deps.dir/projectDir resolution. No caller-selected State file.",
+      "parser": "Exact flag grammar and ordering above, optional ceiling only in shown position before --activate; reject duplicate/unknown flags, missing values, unsafe revision, invalid timestamp and digest, nondecimal/noninteger ceiling. No new defaults.",
+      "path": "Resolve project authority first using statePath; bind canonical realpath(root), selected neutral project/pipeline-state.json or legacy .claude/pipeline-state.json, physical State realpath and physical parent. Refuse ambiguous authority, aliases/symlinks anywhere below physical root, hardlinked State (nlink != 1), nonregular/missing State and physical escape before acquiring a lock. Do not create State or choose fallback paths after planning. Recheck the identical physical topology under lock and immediately before rename."
+    },
+    "schemas": {
+      "plan": "pipeline.continuity-capacity-migration-plan.v1",
+      "apply": "pipeline.continuity-capacity-migration-apply.v1",
+      "payloadKeys": [
+        "schema",
+        "root",
+        "statePath",
+        "physicalStatePath",
+        "featureId",
+        "preimage",
+        "postimage",
+        "operatorCeiling"
+      ],
+      "preimageKeys": [
+        "stateSha256",
+        "revision",
+        "capacity"
+      ],
+      "postimageKeys": [
+        "stateSha256",
+        "revision",
+        "capacity",
+        "updatedAt"
+      ],
+      "operatorCeiling": "null when flag absent; exact supplied integer when explicit, including an explicit value equal to the old ceiling. This is part of plan digest.",
+      "planReadyKeys": [
+        "payload",
+        "status",
+        "code",
+        "mutated",
+        "planSha256",
+        "applyAction"
+      ],
+      "ready": "status ready, code CAPACITY-MIGRATION-READY, mutated false; planSha256 = SHA256 canonical sorted-key JSON(payload). State hashes use exact bytes, not canonical JSON. applyAction carries executable node, exact installed writer argv, host-authorized-wsl, mutation true, requiresConfirmation true, expected apply schema/statuses applied or replayed.",
+      "noOp": "Canonical capacity with no effective ceiling change: status not-needed, code CAPACITY-MIGRATION-NOT-NEEDED, mutated false, applyAction null; no revision/time update. Canonical capacity with explicit changed ceiling uses same route.",
+      "refusal": "Closed {schema,status,code,mutated}; plan status refused or deferred; apply status refused; mutated false for precommit refusal. No raw paths or data in diagnostic strings. No apply action for refusal/defer.",
+      "applySuccessKeys": [
+        "schema",
+        "status",
+        "code",
+        "featureId",
+        "planSha256",
+        "revision",
+        "stateSha256",
+        "mutated",
+        "committed"
+      ],
+      "applySuccess": "applied / CAPACITY-MIGRATION-APPLIED / mutated true / committed true; replayed / CAPACITY-MIGRATION-REPLAYED / mutated false / committed true. Both bind exact postimage digest and expectedRevision+1.",
+      "uncertain": "Closed {schema,status,code,mutated,committed}; status recovery-required, mutated true, committed true or null as actual writer disposition; exit 2. Never call a failed postrename readback a zero-mutation refusal.",
+      "exits": "ready/not-needed/deferred plan: 0; refused plan: 2; applied/replayed apply: 0; active/stale/invalid/lock/apply-readback failure: 2."
+    },
+    "transformation": {
+      "compatibleLegacy": "Exactly {concurrencyLimit, reservedCriticSlots:1, reservedRecoverySlots:1, fallbackPolicy}; integer limit 2..64; fallback defer or pre-authorized-mapped-fallback. Canonical exactly {concurrencyLimit, allocation:\"shared\", fallbackPolicy}. Reject unknown keys, mixed shapes, wrong reservation values and invalid limits/fallbacks.",
+      "capacity": "Replace continuity.capacity with {concurrencyLimit: explicit flag if present else original declared ceiling, allocation:\"shared\", fallbackPolicy: original}. Legacy 4 remains 4; no inference that 4 was a default. No ten-agent value imposed on any host.",
+      "postimage": "Clone complete parsed State. Change only continuity.capacity, continuity.revision += 1 and root updatedAt = bound timestamp. Require revision < MAX_SAFE_INTEGER. Preserve all other values, including optional and unknown outer fields admitted by existing State validation. Serialize exactly JSON.stringify(post, null, 2)+newline, matching atomicWriteContinuityState.",
+      "preservation": "Whole State raw byte equality cannot survive capacity replacement/revision increment. Require semantic deep equality of every subtree except the three listed fields; require exact byte equality of all external PRD/Spec/Result, authority/profile/approval receipts, history/retry journals and handover artifacts. Preserve embedded authority, planApproved/planApproval/planRevocation, activeFeature, gateEstimate, Result bindings, queueHead counters, retryBudget, history, recovery, acknowledgedFinal, resume and decisionTxn values. No authority reseal/rebind, no archive/history append and no companion writes.",
+      "dispatch": "When queueHead.dispatch is non-null defer plan with CAPACITY-MIGRATION-ACTIVE-DISPATCH; apply refuses with same code without State mutation. Also defer unresolved native continuation/recovery execution identities that still occupy an execution slot. Do not rewrite queueRevision. Pure compatible normalization/readback still succeeds with unchanged serialized State and active dispatch identity.",
+      "host": "Ceiling is operator policy, not certified/observed host capacity. Existing admission bounds remain; no new capacity claim."
+    },
+    "transaction": [
+      "Pure plan: physically validate topology, read exact State bytes, parse/validate compatible continuity and feature, identify defer/no-op, compute preimage/postimage and digest. No lock, directory creation, State/history write or approval action.",
+      "Apply requires --activate. Validate all input bindings and physical paths before lock. Acquire acquireContinuityLock(root, \"capacity-migration-\"+planSha256.slice(0,32)); reuse the ordinary State lock and token/nonce ownership. Respect PS-CONTINUITY-LOCKED and recovery-in-progress; no parallel lock family.",
+      "Under lock read raw bytes and validate feature/revision/topology. First handle replay: raw digest exactly expectedPostStateSha256, feature exact, revision expectedRevision+1, canonical capacity matches requested target and updatedAt exact. Reconstruct preimage by restoring legacy reservations/ceiling (or canonical shape for explicit ceiling change), revision and original timestamp only if proof exists: do not claim this reconstruction alone proves plan provenance. Instead replay must be positively proved by complete immutable plan payload supplied via a bounded scratch plan file (see replay closure below).",
+      "Fresh apply recomputes the exact plan payload from current raw preimage and original operator input/timestamp. Require SHA256(raw) == expectedStateSha256, feature/revision/path exact, recomputed planSha256 exact and expectedPostStateSha256 exact. Stale preimage, including whitespace-only edit, refuses CAPACITY-MIGRATION-STALE with zero mutation.",
+      "Call writeState(root, undefined, observedState, {reuseLock:lock, allowContinuityAdvance:true, preserveGateEstimate:true, requirePhysicalReadback:true, transition:()=>({ok:true,state:plannedPost}), beforeCommit:()=>physicalTopologyAndExactRawDigestRecheck()}). Preserve both raw digest CAS and writer semantic CAS. atomicWriteContinuityState owns exclusive same-directory temporary, file fsync, nonce checks, rename and directory fsync.",
+      "Before releasing lock, independently read exact physical State bytes and require postimage raw digest, exact parsed postimage, canonical capacity and expectedRevision+1. Run sanctioned continuity projection and approval reader with compatible schema; approval must retain prior accepted verdict. On mismatch return recovery-required, never retry writing blindly.",
+      "Release only owned token+nonce in finally. Repeated exact apply after positive readback returns replayed with no rename or increment; changed postimage, feature or revision refuses stale. Postrename fsync/readback uncertainty reports actual committed disposition and requires readback recovery."
+    ],
+    "replayClosure": {
+      "amendmentToArgv": "To make replay fully provable without adding durable migration history, append required --plan-file <repository-relative scratch JSON file> immediately before --activate in applyArgv. The file contains exactly payload (payloadKeys above), not an action or executable. Plan does not write it; operator/coordinator saves returned payload using existing scratch authoring route.",
+      "validation": "Read plan file as bounded <=32768-byte regular nlink=1 file through existing safeRequestFile, plus reject symlink parent aliases. Reject absolute path, traversal, NUL, backslash and physical escape. Require canonical digest equals --plan-sha256 and every flag equals payload binding. Payload binds original preimage capacity, raw digest and postimage digest, so replay checks current exact postimage positively without recomputing plan from migrated State.",
+      "planAction": "Ready applyAction must carry --plan-file <root-relative scratch path supplied as required --plan-file input to plan>, before --activate. Therefore final planArgv additionally requires --plan-file <scratch JSON path> before optional ceiling. Plan validates safe scratch destination and returns payload plus savePayload action as data, never auto-writes file. Final apply order is base applyArgv with --plan-file immediately before --activate. Payload digest excludes plan-file location (path is transport, not authority); apply validates scratch confinement independently.",
+      "status": "These additions are normative final grammar, not an optional implementation choice. No replay journal, no self-authorizing receipt and no lockless success shortcut."
+    },
+    "onboarding": {
+      "inspection": "After plugin update, classify valid legacy capacity as compatible and expose additive capacityMigration diagnostic/action; keep existing continuity.status valid and accepted approval valid. Active dispatch marks persisted migration deferred, not continuity damaged. Never use damaged-continuity repair to synthesize fresh authority for this case.",
+      "repair": "Existing project-onboarding-v3 plan-repair/apply-repair dispatch capacity-only reason migrate-shared-capacity to sanctioned writer above. Add forwarding --concurrency-limit, --updated-at, --plan-file input; returned writer action carries all bindings. Other repair reasons retain their current route, shape and stricter preconditions. No direct State rename from onboarding for this migration.",
+      "priority": "Existing hard authority/damage/security repair takes priority. Offer capacity migration only when the compatible State and accepted authority are independently readable; no plan/update refresh conceals authority drift.",
+      "update": "Update channel selection and source/plugin update never persist consumer State. Dedicated activated migration after update is the only capacity write."
+    },
+    "proposalComposition": {
+      "bases": "Construct future protected writer proposal against hashed current source, incorporate tranche-1 writer postimage and tranche-2 R6F2b/R75 delta through explicit context-aware composition. Never replace live writer wholesale with older tranche-1 postimage.",
+      "retainedDeltas": "Retain tranche-1 enrollment retirement, activation, inspect-retirement, accepted design-workflow/approval lifecycle and physical readback changes. Retain tranche-2 projectContinuityAuthorityDrift/rebindApproval imports, rebind-approval command registration/case and inspect drift/recovery projection. Shared migration cannot rebind approval, erase drift diagnostic, or supersede either tranche.",
+      "prerequisite": "Compatible reader/validator/schema delta must be composed and independently tested before enabling writer migration; current validCapacity rejects canonical allocation. This report proposes implementation and tests, not qualification or promotion of those parked changes."
+    },
+    "futureIndependentRedMatrix": [
+      [
+        "M01",
+        "harness/scripts/pipeline-state.test.mjs: freshDir, seedContinuityRoot, continuityState({queueHead:continuityQueue({dispatch:null})}), continuityDeps, captureConsole",
+        "Plan legacy 3,4,10,64 with each fallback; exact ready schema/payload/digests/action; original State/Result/approval/history bytes unchanged; no lock/temp created. Future test expected RED against absent command."
+      ],
+      [
+        "M02",
+        "same builders; lifecycleContinuity/initializeLifecycleContinuity + submitAndApprove; seedPoAuthorityRebind for accepted PO fixture",
+        "Apply exact plan: applied exit0, raw expected postimage, revision+1 once; deep equality except capacity/revision/updatedAt; external artifacts byte identical; planApproval, gateEstimate, history, retryBudget and queue counters intact; approval reader stays accepted."
+      ],
+      [
+        "M03",
+        "continuityState default continuityQueue/continuityIdentity; continuityDeps",
+        "Active dispatch plan deferred exit0/action null; apply exit2 CAPACITY-MIGRATION-ACTIVE-DISPATCH; byte equality/no rename; compatible pure read valid and identity.queueRevision unchanged. Repeat with unresolved native/recovery execution."
+      ],
+      [
+        "M04",
+        "M02 approved fixture + captureConsole",
+        "Same apply twice: second replayed exit0 mutated false, exact digest/revision and byte equality; no writer rename on retry; stale postimage digest/revision/feature or altered payload refuses exit2."
+      ],
+      [
+        "M05",
+        "freshDir + continuityDeps overrides for beforeCasRecheck/beforeCommit seams to be added",
+        "Change raw State whitespace, capacity, feature, revision or timestamp after plan and again under lock; exit2 CAPACITY-MIGRATION-STALE, no migration overwrite; keep concurrent edit bytes intact."
+      ],
+      [
+        "M06",
+        "freshDir/seedContinuityRoot; symlinkSync/linkSync existing harness imports; onboarding root() spaces fixture",
+        "Neutral and legacy physical paths, root with spaces and absolute deps.dir/cwd. State symlink, parent symlink, hardlink, ambiguous authority, escape or swapped topology => exit2 CAPACITY-MIGRATION-PATH, no outside writes/lock; plan-file absolute/../backslash/symlink escape likewise refuses."
+      ],
+      [
+        "M07",
+        "continuityState capacity overrides + writeRequest + captureConsole/captureConsoleError",
+        "Limits 1,65,0,-1,NaN,string,fraction; mixed/extra keys, wrong reserved counts/fallback: exit2 CAPACITY-MIGRATION-INVALID, raw State unchanged. CLI missing/duplicate flags and revision overflow refuse."
+      ],
+      [
+        "M08",
+        "M01/M02 fixture",
+        "Without flag legacy 4 stays4; explicit7 becomes7; explicit10 only affects this host; canonical same ceiling no-op/no revision; canonical changed ceiling applies once; plan flags/payload mismatches refuse."
+      ],
+      [
+        "M09",
+        "continuityDeps ownerNonce/nowMs + acquireContinuityLock existing fixture pattern",
+        "Busy foreign token/nonce and recovery guard => existing lock refusal zero State write; lock loss before rename refuses; foreign lock retained; owned lock released only on matched ownership."
+      ],
+      [
+        "M10",
+        "continuityDeps injection at renameSync/syncDirectory/physicalReadback; new narrow hooks passed to existing writer",
+        "Postrename directory-sync failure/readback mismatch => recovery-required exit2, committed true/null accurately; no false zero-mutation or duplicate revision. Retry with exact durable postimage/payload can positively read back replay."
+      ],
+      [
+        "M11",
+        "onboarding-continuity.test.mjs promotionSeed(name), promotionWriteSurface; project-onboarding-v3.test.mjs root/dispose/fakeGit/writeProject + existing plan-repair/apply-repair CLI fixture",
+        "Updated installed reader recognizes compatible legacy State and approval; plan-repair returns capacity writer action, explicit ceiling forwarded; apply-repair delegates once. Active dispatch remains compatible read/deferred migration. Channel choice/update inspection bytes unchanged. Existing damaged repair remains routed as before."
+      ],
+      [
+        "M12",
+        "M02 plus tranche-1 and tranche-2 existing writer regression fixtures",
+        "Composed writer keeps retirement/activation/design approval and rebind-approval/inspect drift behavior; full protected pipeline-state suite and independent reader suites green only after separate RED pins. Consumer-safe-paths and signature-package checks remain required."
+      ]
+    ],
+    "verificationMeaning": "This helper validates source availability and emits their exact digests/line anchors plus the closed future implementation/test contract. It does not execute proposed behavioral acceptance or certify capacity migration. All matrix behavior remains future independent RED work."
+  }
+}
+
+--- stderr ---

@@ -1,0 +1,576 @@
+command: node scratch/shared-pool-accounting-readback-20261009.mjs
+label: shared-pool-accounting-plan
+exitCode: 0
+head: d3058587297004a9d6dd7b42b39ce432e567d256
+tree: 5b8a9c43b1d59a17ade111d69ffb338e205e12c2
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.shared-pool-accounting-plan.v1",
+  "sourceReadback": [
+    {
+      "path": "docs/adr/draft-shared-agent-capacity.md",
+      "sha256": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450",
+      "bytes": 4402,
+      "pointers": []
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-pool.mjs",
+      "sha256": "6456e4545d3615629e1a45f180fdd2f8a1ba8fc7c1998331b278f09e79b12493",
+      "bytes": 15634,
+      "pointers": [
+        {
+          "needle": "const ACTIVE_WORKER_STATES",
+          "line": 18
+        },
+        {
+          "needle": "function capacityCode",
+          "line": 46
+        },
+        {
+          "needle": "function poolCode",
+          "line": 52
+        },
+        {
+          "needle": "export function computeEffectiveCapacity",
+          "line": 71
+        },
+        {
+          "needle": "export function createLocalWorkerPool",
+          "line": 80
+        },
+        {
+          "needle": "export function reduceLocalWorkerPool",
+          "line": 100
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "sha256": "46f3d8b1bfb4f64aca8e09af8fae618cbec9c251573a406dd76a188a8a4b3895",
+      "bytes": 6807,
+      "pointers": [
+        {
+          "needle": "const bounds",
+          "line": 10
+        },
+        {
+          "needle": "calculates minimum known capacity",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "sha256": "e74c95581f117d03f06b233bae0a8a83bb822ef7726134ba620a30c46dfba8e8",
+      "bytes": 62885,
+      "pointers": [
+        {
+          "needle": "export function validateLocalWorkerSupervisorRequest",
+          "line": 190
+        },
+        {
+          "needle": "function validatePoolBindings",
+          "line": 480
+        },
+        {
+          "needle": "function overlappingWritePaths",
+          "line": 548
+        },
+        {
+          "needle": "export function planLocalWorkerSupervisor",
+          "line": 563
+        },
+        {
+          "needle": "const available =",
+          "line": 582
+        },
+        {
+          "needle": "export async function runLocalWorkerSupervisor",
+          "line": 1091
+        },
+        {
+          "needle": "export function inspectLocalWorkerSupervisor",
+          "line": 1273
+        },
+        {
+          "needle": "export function cleanupLocalWorkerSupervisor",
+          "line": 1311
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+      "sha256": "0f30c44188cd76c864f785b0fe915089c2ee9b94092886f02a0e4e9dc1bf0393",
+      "bytes": 25106,
+      "pointers": [
+        {
+          "needle": "function capacity()",
+          "line": 38
+        },
+        {
+          "needle": "function pool(",
+          "line": 50
+        },
+        {
+          "needle": "function request(",
+          "line": 100
+        },
+        {
+          "needle": "accepts one closed request",
+          "line": 238
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/local-worker-supervisor.schema.json",
+      "sha256": "29fb57cd09e70c3e428b19995816b63b764bf324fff9e157fc554ac04e986d6c",
+      "bytes": 19132,
+      "pointers": [
+        {
+          "needle": "\"recoveryReserve\"",
+          "line": 231
+        },
+        {
+          "needle": "\"recoveryReserve\"",
+          "line": 239
+        },
+        {
+          "needle": "\"effectiveCapacity\"",
+          "line": 295
+        },
+        {
+          "needle": "\"effectiveCapacity\"",
+          "line": 308
+        },
+        {
+          "needle": "\"effectiveCapacity\"",
+          "line": 524
+        },
+        {
+          "needle": "\"effectiveCapacity\"",
+          "line": 591
+        },
+        {
+          "needle": "\"processIdentity\"",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/workflow-writer-preflight.mjs",
+      "sha256": "9afdd18453dfe073f618209499d7894638f667ee99232338d1ba902b6a12e638",
+      "bytes": 33529,
+      "pointers": [
+        {
+          "needle": "function validFailoverShape",
+          "line": 318
+        },
+        {
+          "needle": "function validateFailover(",
+          "line": 414
+        },
+        {
+          "needle": "capabilities.idempotentDispatchKeys",
+          "line": 247
+        },
+        {
+          "needle": "capabilities.idempotentDispatchKeys",
+          "line": 440
+        },
+        {
+          "needle": "export function validateWorkflowWriterDispatch",
+          "line": 512
+        },
+        {
+          "needle": "export function validateWorkflowWriterDispatch",
+          "line": 548
+        },
+        {
+          "needle": "export function preflightAndInvokeWorkflowWriterDispatch",
+          "line": 585
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs",
+      "sha256": "b490478928fe9ee2e5bcf32c1e0a90b8e499a6d9d3be948e1ba4963ccf15d8ee",
+      "bytes": 27758,
+      "pointers": [
+        {
+          "needle": "reservedCriticSlots",
+          "line": 263
+        },
+        {
+          "needle": "recoverySlot:",
+          "line": 348
+        },
+        {
+          "needle": "one exact Coordinator-created failover",
+          "line": 427
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/execution-plane-launch.mjs",
+      "sha256": "3cc7c7307f49980eb5a143965655840fca068b7e08cfefa661c3b0297eabf526",
+      "bytes": 24182,
+      "pointers": [
+        {
+          "needle": "function capacity()",
+          "line": 179
+        },
+        {
+          "needle": "capacity: capacity()",
+          "line": 275
+        },
+        {
+          "needle": "recoveryReserve:",
+          "line": 297
+        },
+        {
+          "needle": "const plannerInput0",
+          "line": 362
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/local-worker-supervisor.mjs",
+      "sha256": "575b11b0d9050f44f5239906e8e5b280f9d708b9c8586aa31b4371de7ef3f97b",
+      "bytes": 4812,
+      "pointers": []
+    },
+    {
+      "path": "plugins/pipeline-core/lib/workflow-runner-boundary.mjs",
+      "sha256": "4dd385546a96a953ae27c16d5f3462e859cdfdc8c7d7eefa942e008dcbedd150",
+      "bytes": 24621,
+      "pointers": [
+        {
+          "needle": "export function runSyntheticWorkflowDispatch",
+          "line": 196
+        },
+        {
+          "needle": "export function runSyntheticWorkflowDispatch",
+          "line": 231
+        },
+        {
+          "needle": "export function runSyntheticWorkflowDispatchBatch",
+          "line": 231
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs",
+      "sha256": "2820233fded07e2006e308b772fc597d2a69a04024be1ff07a8987c924ea1341",
+      "bytes": 13351,
+      "pointers": [
+        {
+          "needle": "function normalizedInput",
+          "line": 112
+        },
+        {
+          "needle": "const availableSlots",
+          "line": 238
+        },
+        {
+          "needle": "export function planParallelDispatch",
+          "line": 290
+        },
+        {
+          "needle": "export function validateParallelDispatchReceipt",
+          "line": 310
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/scheduling-lifecycle.mjs",
+      "sha256": "436409ab1e55ea932e47e5df16f94e87b2b389f1971fe6fe55c09aa9edbbb847",
+      "bytes": 15183,
+      "pointers": [
+        {
+          "needle": "function plannerInputCode",
+          "line": 94
+        },
+        {
+          "needle": "export function composeSchedulingLifecycle",
+          "line": 174
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "sha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77",
+      "bytes": 75889,
+      "pointers": [
+        {
+          "needle": "const CAPACITY_KEYS",
+          "line": 51
+        },
+        {
+          "needle": "function validCapacity",
+          "line": 332
+        },
+        {
+          "needle": "export function validateContinuityState",
+          "line": 420
+        },
+        {
+          "needle": "export function compareAndSwapContinuity",
+          "line": 558
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d",
+      "bytes": 424003,
+      "pointers": [
+        {
+          "needle": "reservedCriticSlots:",
+          "line": 1201
+        },
+        {
+          "needle": "reservedCriticSlots:",
+          "line": 1303
+        },
+        {
+          "needle": "reservedCriticSlots:",
+          "line": 4554
+        },
+        {
+          "needle": "reservedRecoverySlots:",
+          "line": 1202
+        },
+        {
+          "needle": "reservedRecoverySlots:",
+          "line": 1304
+        },
+        {
+          "needle": "reservedRecoverySlots:",
+          "line": 4555
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795",
+      "bytes": 700252,
+      "pointers": [
+        {
+          "needle": "reservedCriticSlots:",
+          "line": 10160
+        },
+        {
+          "needle": "reservedRecoverySlots:",
+          "line": 10161
+        }
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "sha256": "b3c51a274f3534bb935241924ff78215b555b6daee7341f66bac5ed2fa82f877",
+      "bytes": 16714,
+      "pointers": [
+        {
+          "needle": "\"capacity\"",
+          "line": 7
+        },
+        {
+          "needle": "\"capacity\"",
+          "line": 124
+        },
+        {
+          "needle": "\"capacity\"",
+          "line": 287
+        },
+        {
+          "needle": "\"reservedCriticSlots\"",
+          "line": 290
+        },
+        {
+          "needle": "\"reservedCriticSlots\"",
+          "line": 293
+        }
+      ]
+    }
+  ],
+  "contract": {
+    "status": "PROPOSED; implementable follow-up contract; no behavioral qualification claimed",
+    "currentGaps": [
+      "computeEffectiveCapacity subtracts idle role numbers; poolCode only counts admitted/running/cancel-requested/orphan-suspected, omitting recovered and unresolved timed-out/orphaned/rejected.",
+      "planLocalWorkerSupervisor subtracts recoveryReserve again and compares wave length; it does not project deduplicated control/recovery/existing-worker occupancy.",
+      "validateFailover requires reservedRecoverySlots and scalar availableRecoverySlots; neither proves current host capacity or a claimable recovery execution.",
+      "execution-plane-launch capacity() hardcodes two places to leave one idle recovery place for a single worker; planner input separately sets maxParallel=2/reservedSlots=0."
+    ],
+    "continuityInputs": {
+      "canonical": "{concurrencyLimit: integer 2..64, allocation: \"shared\", fallbackPolicy: \"defer\" | \"pre-authorized-mapped-fallback\"}; exact keys only",
+      "legacy": "{concurrencyLimit: integer 2..64, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: same enum}; exact keys only",
+      "proposedApi": "normalizeContinuityCapacity(value) -> fresh canonical object or typed refusal; deep input immutability; preserve ceiling/fallback; no serialized writes",
+      "refusals": "Reject mixed canonical/legacy, unknown keys, missing keys, wrong types, fractions, unsafe integers, limits 1/65, reservations other than exact 1, unknown fallback."
+    },
+    "proposedVersionedShapes": {
+      "capacityV2": "Exact {configured,operator,certified,observed,pressure,allocation:\"shared\",effective}; each bound remains exact {concurrentTasks:null|nonnegative-safe-integer,required:boolean}; effective remains {status,concurrentTasks,reasonCodes} and is independently recomputed. concurrentTasks means gross spawned-task ceiling, never free places. No reserved key in v2.",
+      "poolV2": "Existing pool keys plus occupancy; schema pipeline.local-worker-pool.v2, capacityV2 above. occupancy is exact {schema:\"pipeline.live-task-occupancy.v1\",hostScopeSha256,snapshotSha256,entries}; entries are canonical-sorted closed records {subjectSha256,role,disposition,evidenceSha256}; role is worker|control|recovery; disposition is occupied|released. Digests are lowercase 64-hex; duplicate identities within one input refuse; merged observations use union semantics below. Bounds/array maxima remain bounded (256 entries).",
+      "hostNormalization": "PROPOSED normalizeHostTaskBound({concurrentTasks,scope,primaryCount,evidenceSha256}) where exact scope=total-threads|spawned-agents, concurrentTasks is null or nonnegative-safe-integer, primaryCount is exactly 1 and evidenceSha256 is 64-hex. total-threads 11 -> spawned bound 10; spawned-agents 10 -> 10. Invalid scope/missing evidence/total below primary refuse. Null stays unknown. Primary control activity is excluded from spawned occupancy; separate spawned control task counts normally. Never infer scope from role or configured ten.",
+      "admissionApi": "PROPOSED computeSharedPoolAdmission({capacity,occupancy,requestedSubjects}) -> {status,ceiling,occupied,additional,remaining,reasonCodes}; requestedSubjects sorted unique 64-hex, nonempty and bounded. PROPOSED mergeLiveTaskOccupancy(observations) requires matching host scope/current host readback binding and derives snapshot digest; it never creates a host receipt or accepts caller digests as provenance.",
+      "supervisorV2": "Version request/plan/record schema together; canonical supervisor removes recoveryReserve (other timing/subject/nonce fields unchanged) and request uses poolV2. Exact v1 recoveryReserve 1..16 remains structurally readable with all old bindings, but supplies zero idle occupancy evidence. No mixed v1/v2 keys. Plans distinguish gross effectiveCapacity from admission receipt remaining; retain MAX_WORKERS=16 and existing source/runner/Git/anchor/lease/package checks.",
+      "workflowV1": "PROPOSED versioned failover/capabilities/trusted-Coordinator context replaces recoverySlot:{reserved,available} with capacityAdmission:{snapshotSha256,subjectSha256}; runtime host boundary reconstructs current shared admission for fallback dispatch identity before invocation. Legacy fields remain readable for historical requests but cannot authorize live recovery without fresh host admission. Recovery availability still requires existing real adapter capability/idempotent key and matching continuity recovery/trust/frozen/narrowing predicates."
+    },
+    "accountingRules": [
+      "Compute C=min(all known normalized configured/operator/certified/observed/pressure bounds). Any required null -> unavailable with sorted UNKNOWN:name; no known bound -> UNKNOWN:all. Optional null is omitted. Preserve 0 and every existing workload/tier/test/resource bound; do not raise minima to make a wave fit.",
+      "Occupancy is the union of validated stable execution subject identities across coordinator dispatch, recovery and supervisor observations within one host pool, including other repositories sharing that host. subjectSha256 must bind repository, dispatch/task, attempt and execution subject; same taskId in another repository or another attempt is distinct. Candidate drift never releases a live old subject.",
+      "Coordinator dispatch/recovery projections must bind to the same execution subject as supervisor pool.workers[].subjectSha256 and record.workers[].subjectSha256. A missing identity bridge/current snapshot/provenance refuses admission rather than counting zero or guessing by role/PID.",
+      "Identical occupied observations for a subject count once across roles/sources. Released and occupied disagreement stays occupied; inconsistent candidate/attempt/host binding refuses. Fresh authoritative terminal/owned-process disposition must explicitly supersede prior evidence to release; arbitrary newer timestamp or caller state string is insufficient.",
+      "admitted is a claimed place and counts once; running, cancel-requested, orphan-suspected, recovered, and unresolved timeout/orphan/stale-candidate/recovery-required remain occupied. created without admission/process is zero; terminal/rejected before launch is zero only with proven no-launch. cancelled/completed/failed release only after bound process is proved exited/disposed. Cleanup-only retained workspace holds ownership but no agent thread once execution is resolved.",
+      "Let O be existing occupied identity set and W requested identities. additional=|W minus O|; admission requires |O union W|<=C and all path/resource/workload checks. remaining=max(0,C-|O union W|). Pre-admitted W already in pool must not be subtracted twice. Over-capacity O refuses new admission; malformed or unresolved unenumerable observations refuse all admission.",
+      "Full supervisor wave admits atomically or yields serial-fallback-required with zero workspaces; no partial spawn. A zero free pool cannot run a serial child. Serial fallback is a separate safe admission of one after a place is available, preserving conflict/authority checks.",
+      "Recovery uses an ordinary place. If original execution is unresolved it stays in O; fallback adds a distinct subject. With C full, defer recovery; no invented reserve or forced termination. Proven exited origin releases one, enabling fallback. SameLaneRetryProhibited, retry/reroute ceilings, frozen input/output/tool/path narrowing and real execution adapter authority remain mandatory.",
+      "Admission readback must occur immediately before launch/adapter invocation and claim identities atomically through existing host owner/lock boundary. A pure snapshot calculation is not a claim or new durable State authority. Competing planners that read one free place cannot both launch; stale snapshot/changed occupancy requires re-read or refusal."
+    ],
+    "wiring": [
+      "local-worker-pool: computeEffectiveCapacity -> capacityCode -> poolCode/createLocalWorkerPool/validateLocalWorkerPool; reduceLocalWorkerPool must retain occupancy on unresolved transitions independently of its state enum. selectLocalWorkerPoolReferenceAdapter must project available admission and cannot manufacture serial capacity.",
+      "local-worker-supervisor: validateLocalWorkerSupervisorRequest and schema structural+semantic parity; validatePoolBindings + planLocalWorkerSupervisor call shared admission with existing pool claims and whole requested wave; runLocalWorkerSupervisor revalidates/claims at real boundary; inspect/cleanup supply verified disposition, never enum-only release.",
+      "scripts/local-worker-supervisor.mjs run: CLI plan/run uses those same versioned validators and canonical projection; no alternate arithmetic.",
+      "workflow-writer-preflight validateFailover -> validateWorkflowWriterDispatch/preflightAndInvokeWorkflowWriterDispatch; workflow-runner-boundary runSyntheticWorkflowDispatch/Batch must supply bound runtime admission, not recover from a scalar reservation or caller-created receipt.",
+      "execution-plane-launch capacity(), pool construction, supervisor recoveryReserve seed and plannerInput0 must derive one normalized host/shared ceiling and occupancy; stop hardcoding two only to reserve one. It remains fixture evidence, not host certification.",
+      "parallel-dispatch-planner planParallelDispatch/validateParallelDispatchReceipt + scheduling-lifecycle plannerInputCode/composeSchedulingLifecycle: retain v1 planner shape and rules; sanctioned caller projects maxParallel=C (within 1..32), reservedSlots=|O| for actual occupied subjects only. Candidate packages exclude already occupied work. At C=0 or |O|>C caller refuses before planner. The legacy name reservedSlots remains an arithmetic operand, not role evidence. A versioned richer receipt may bind occupancy digest; current v1 alone cannot attest host occupancy.",
+      "continuity-state validCapacity/validateContinuityState and continuity-state.schema.json accept closed canonical/legacy branches; onboarding-continuity seeds at current lines 1199/1301/4552 and pipeline-state continuity-init seed at 10158 require shared canonical configured operator ceiling, runner-specific observed bound separately; existing consumers require sanctioned digest/revision/feature/path-bound lock/CAS migration, deferred during active dispatch, no update-channel State write."
+    ],
+    "testPolicy": "Cases below are independent new RED pins for a future test-only dispatch. This readback does not run them, does not report current behavioral GREEN, and does not modify historical tests. Commit new pins first, then authorized implementation, then re-aim older reservation expectations without deleting negative-path coverage."
+  },
+  "acceptanceMatrix": [
+    {
+      "id": "SP01",
+      "api": "computeEffectiveCapacity (current export; changed semantics)",
+      "input": "bounds 8/6/3/4/5, legacy idle reservations 1/1/0",
+      "expected": "C=3, not 1; bounds 8/6/3/4/2 -> C=2, not 0",
+      "qualification": "RED on current arithmetic"
+    },
+    {
+      "id": "SP02",
+      "api": "computeEffectiveCapacity",
+      "input": "required certified null; optional pressure null; all optional null; configured zero; malformed bound/reservation/unknown v2 key",
+      "expected": "unknown certified refuses; optional null omitted; all unknown refuses; zero retained; malformed refuses",
+      "qualification": "mixed acceptance/refusal pins"
+    },
+    {
+      "id": "SP03",
+      "api": "normalizeHostTaskBound (PROPOSED)",
+      "input": "11 total threads vs 10 spawned agents, evidence-bound; scope omitted or total zero",
+      "expected": "both C=10; no second primary subtraction; invalid scope/underflow refuses",
+      "qualification": "new RED API"
+    },
+    {
+      "id": "SP04",
+      "api": "normalizeContinuityCapacity (PROPOSED) + validateContinuityState (current)",
+      "input": "canonical/legacy ceiling 2 and 64, both fallbacks; mixed keys/limit 1/65/fraction/reservation zero; deep-frozen input",
+      "expected": "identical fresh canonical return, ceiling/fallback preserved, input unchanged; invalid refuses",
+      "qualification": "new RED API/schema parity"
+    },
+    {
+      "id": "SP05",
+      "api": "mergeLiveTaskOccupancy + computeSharedPoolAdmission (PROPOSED)",
+      "input": "C=10, 8 worker subjects plus same spawned control in Coordinator+supervisor and same recovery in both",
+      "expected": "O=10, not 12; one new subject refuses; same task label from different attempt/repository counts separately",
+      "qualification": "new RED union pins"
+    },
+    {
+      "id": "SP06",
+      "api": "computeSharedPoolAdmission (PROPOSED)",
+      "input": "C=10, O=2, W=8 distinct vs W=9; then eight pre-admitted subjects already in O",
+      "expected": "eight admits exactly, nine refuses atomically; pre-admitted wave adds zero and is not counted twice",
+      "qualification": "new RED full-wave pins"
+    },
+    {
+      "id": "SP07",
+      "api": "reduceLocalWorkerPool (current) + occupancy projection (PROPOSED)",
+      "input": "running -> timeout/orphan-suspected -> orphaned; recovered; stale-candidate rejected; cancel-requested; null/unavailable process readback",
+      "expected": "all unresolved remain occupied; result-import still refuses; only bound exit disposition releases; late stale evidence cannot reopen/release",
+      "qualification": "RED omission pins"
+    },
+    {
+      "id": "SP08",
+      "api": "computeSharedPoolAdmission (PROPOSED)",
+      "input": "released+occupied duplicate; missing subject mapping; hostScope mismatch; changed current snapshot; malformed digest/duplicate same-source identity",
+      "expected": "remain occupied on disposition disagreement; invalid binding refuses; no scalar reservation used as evidence",
+      "qualification": "new RED fail-closed pins"
+    },
+    {
+      "id": "SP09",
+      "api": "validateLocalWorkerPool/createLocalWorkerPool (current, v2 proposed)",
+      "input": "C=2 with three occupied workers, C unavailable with occupied workers, serial flag with two, malformed lease/owner/candidate",
+      "expected": "capacity/unavailable/serial/ownership refusals retained; no idle reservation causes extra refusal",
+      "qualification": "preserve current negative pins"
+    },
+    {
+      "id": "SP10",
+      "api": "planLocalWorkerSupervisor (current) via owner fixtures; pure admission extraction PROPOSED",
+      "input": "C=2, two pre-admitted disjoint workers, idle recovery; then occupied spawned recovery plus wave",
+      "expected": "first plan ready two workspaces without reserve subtraction; second refuses/falls back whole wave; zero free cannot launch serial",
+      "qualification": "RED integration pin; future fixture only, not executed here"
+    },
+    {
+      "id": "SP11",
+      "api": "planLocalWorkerSupervisor/current validators/schema",
+      "input": "same path or prefix-conflicting write ownership, source candidate drift, stale lease/anchor, instruction/package digest drift, unknown request key; absolute source/executable/workspace paths",
+      "expected": "refuse as existing contract; ancestor/descendant conflicts must be retained from planner through caller, supervisor equality-only gap requires explicit coverage; no partial workspace creation",
+      "qualification": "independent real-shape negative pins"
+    },
+    {
+      "id": "SP12",
+      "api": "validateWorkflowWriterDispatch/preflightAndInvokeWorkflowWriterDispatch (current; v1 proposed)",
+      "input": "matching trusted recovery with C=2 and unresolved origin+other worker; then proven exited origin; then no real idempotent recovery adapter",
+      "expected": "full pool refuses with zero boundary invocations; released origin admits exactly one mapped fallback; missing adapter refuses even when free",
+      "qualification": "new RED runtime boundary pins"
+    },
+    {
+      "id": "SP13",
+      "api": "validateWorkflowWriterDispatch (current)",
+      "input": "fresh free pool but tampered fallback id, frozen digest, path/tool/budget broadening, retry/reroute drift, same-lane retry, untrusted coordinator context",
+      "expected": "all remain refused; canonical capacity replaces reservedRecoverySlots predicate only",
+      "qualification": "preserve existing security/recovery pins"
+    },
+    {
+      "id": "SP14",
+      "api": "planParallelDispatch/validateParallelDispatchReceipt + composeSchedulingLifecycle (current)",
+      "input": "C=4,O=1 projection maxParallel=4/reservedSlots=1, 4 ready disjoint packages; idle roles with O=0; path/resource/dependency conflicts",
+      "expected": "3 selected then 4 with idle roles; unused/blocked receipts exact; forged receipt rejected; conflicts preserved",
+      "qualification": "independent caller projection pins"
+    },
+    {
+      "id": "SP15",
+      "api": "execution-plane-launch seed builder (PROPOSED export), CLI + supervisor integration",
+      "input": "host-bound C=1 with one worker and idle recovery; C=10 spawned scope; malformed/unknown host bound",
+      "expected": "first admits one, ten remains ten; no hardcoded two/no supervisor double deduction; unknown refuses; do not execute exported CLI main to inspect seed",
+      "qualification": "new RED wiring pins"
+    },
+    {
+      "id": "SP16",
+      "api": "runLocalWorkerSupervisor / workflow boundary claim seam (PROPOSED fixture-only admission hooks)",
+      "input": "two claimants observe one free place; occupancy changes between plan and launch",
+      "expected": "only one launch succeeds; other stale admission refuses; exact stable identity replay idempotent, different attempt adds a place",
+      "qualification": "future concurrency pin; no live execution here"
+    },
+    {
+      "id": "SP17",
+      "api": "continuity canonical/legacy readers + onboarding/pipeline-state seeds (proposed integration)",
+      "input": "existing legacy State, explicit ceiling unchanged, active dispatch, sanctioned migration stale revision/raw digest",
+      "expected": "read normalizes without mutation; active migration defers; stale plan refuses; successful migration changes capacity only and increments once",
+      "qualification": "separate governed migration tests required"
+    }
+  ],
+  "historicalRetarget": [
+    "local-worker-pool.test.mjs bounds() and calculates minimum known capacity after Elephant, Verify, and Critic reservation: replace -2 expectation only after SP01/SP06/SP07 RED pins exist; preserve UNKNOWN, shape, binding, transition and serial checks.",
+    "local-worker-supervisor.test.mjs capacity() gross eight currently serialized as effective five and request recoveryReserve seed: canonical fixture becomes eight with explicit live occupancy; keep package/runner/absolute path/timing/digest/schema parity negatives.",
+    "workflow-writer-preflight.test.mjs legacy capacity at 262 and recoverySlot at 348: retain exact legacy reading fixture; add independent shared failover fixture backed by proposed admission; preserve existing one exact Coordinator-created failover and trust/narrowing negatives.",
+    "Planner historical reservedSlots tests retain meaning as actual occupancy projection tests; no deletion of slot, path, resource or receipt-validator checks. Canonical continuity tests already present in worktree are not edited or treated as live occupancy evidence."
+  ],
+  "pending": [
+    "Independent Critic review",
+    "New independent behavioral RED pins and authorized implementation",
+    "Production/native host capacity and occupancy qualification",
+    "Final package adoption/signature and consumer migration qualification"
+  ]
+}
+
+--- stderr ---
