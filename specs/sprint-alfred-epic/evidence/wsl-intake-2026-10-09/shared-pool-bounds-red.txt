@@ -1,0 +1,83 @@
+command: node --test plugins/pipeline-core/lib/shared-pool-bounds.test.mjs
+label: shared-pool-bounds-red
+exitCode: 1
+head: f2d2d5bfda170398ef6797aa42bbc546db413cc6
+tree: 25650bbaea3f35ad50c918a09a7d84bb4b603e19
+dirty: true
+--- stdout ---
+✖ SP-BND01 SP01 idle legacy role holds preserve the minimum known gross ceiling of three (1.787387ms)
+✖ SP-BND02 SP01 pressure bounds the shared ceiling at two without subtracting idle holds (0.323578ms)
+✔ SP-BND03 SP02 required unknown bounds refuse with sorted reasons (0.227085ms)
+✔ SP-BND04 SP02 optional unknown pressure is omitted from the minimum (0.165139ms)
+✔ SP-BND05 SP02 all optional unknown bounds refuse rather than claiming capacity (0.769167ms)
+✔ SP-BND06 SP02 each known zero remains a zero ceiling (0.256082ms)
+✔ SP-BND07 SP02 malformed bounds refuse through the current exported API (0.944625ms)
+✔ SP-BND08 SP02 malformed legacy reservation declarations remain refused (0.605209ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 6
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57.997624
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SP-BND01 SP01 idle legacy role holds preserve the minimum known gross ceiling of three (1.787387ms)
+  AssertionError [ERR_ASSERTION]: 8/6/3/4/5 with idle 1/1/0 must yield C=3
+  + actual - expected
+  
+    {
+  +   concurrentTasks: 1,
+  -   concurrentTasks: 3,
+      reasonCodes: [],
+      status: 'available'
+    }
+  
+      at expectCapacity (file://<repo-root>/plugins/pipeline-core/lib/shared-pool-bounds.test.mjs:40:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/shared-pool-bounds.test.mjs:52:7)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'available', concurrentTasks: 1, reasonCodes: [] },
+    expected: { status: 'available', concurrentTasks: 3, reasonCodes: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SP-BND02 SP01 pressure bounds the shared ceiling at two without subtracting idle holds (0.323578ms)
+  AssertionError [ERR_ASSERTION]: 8/6/3/4/2 with idle 1/1/0 must yield C=2
+  + actual - expected
+  
+    {
+  +   concurrentTasks: 0,
+  -   concurrentTasks: 2,
+      reasonCodes: [],
+      status: 'available'
+    }
+  
+      at expectCapacity (file://<repo-root>/plugins/pipeline-core/lib/shared-pool-bounds.test.mjs:40:12)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/shared-pool-bounds.test.mjs:61:7)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'available', concurrentTasks: 0, reasonCodes: [] },
+    expected: { status: 'available', concurrentTasks: 2, reasonCodes: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
