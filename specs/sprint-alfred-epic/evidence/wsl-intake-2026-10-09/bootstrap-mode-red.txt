@@ -1,0 +1,46 @@
+command: node --test plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs
+label: bootstrap-mode-red
+exitCode: 1
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+✔ BAM001 finished chat fixture reaches the real chat planner without a trust anchor (36.981489ms)
+✖ BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture (45.863134ms)
+✔ BAM003 signature configuration with no anchor refuses instead of downgrading to chat (42.245229ms)
+✔ BAM004 both configured modes preserve explicit activation (49.003664ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 335.664473
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ BAM002 CLI chat configuration returns exactly the chat plan on the same finished fixture (45.863134ms)
+  AssertionError [ERR_ASSERTION]: BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE: signature acknowledgement requires a valid configured PO signing-key directory
+  
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs:89:14)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

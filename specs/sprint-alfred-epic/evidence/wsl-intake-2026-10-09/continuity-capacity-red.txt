@@ -1,0 +1,163 @@
+command: node --test plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs
+label: ALFRED-CAPACITY-COMPAT-T-20261009-red
+exitCode: 1
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+✔ legacy full continuity state remains readable (5.987668ms)
+✖ canonical full continuity state validates with the runtime validator (0.650247ms)
+✖ formal capacity schema accepts the exact canonical and legacy objects (0.292683ms)
+✖ formal capacity schema rejects mixed and unknown capacity keys (0.173952ms)
+✖ canonical and legacy pure reads normalize to the same shared shape (0.262883ms)
+✖ normalization preserves operator ceilings for legacy and canonical values (0.184372ms)
+✖ normalization refuses malformed numeric values from a valid canonical control (0.211982ms)
+✖ normalization refuses bad fallback, mixed legacy fields and unknown keys (0.177892ms)
+✖ normalization leaves deeply frozen caller state and its authority, approval, history and revision byte-identical (0.297913ms)
+✔ runtime validator rejects bad integer limits while schema-lite documents its integer adaptation (0.457725ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 2
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51.47826
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:108:1
+✖ canonical full continuity state validates with the runtime validator (0.650247ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:110:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:113:1
+✖ formal capacity schema accepts the exact canonical and legacy objects (0.292683ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:118:1
+✖ formal capacity schema rejects mixed and unknown capacity keys (0.173952ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:122:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:127:1
+✖ canonical and legacy pure reads normalize to the same shared shape (0.262883ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export normalizeContinuityCapacity in ./continuity-state.mjs
+      at loadNormalizer (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:25:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:128:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:134:1
+✖ normalization preserves operator ceilings for legacy and canonical values (0.184372ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export normalizeContinuityCapacity in ./continuity-state.mjs
+      at loadNormalizer (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:25:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:135:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:142:1
+✖ normalization refuses malformed numeric values from a valid canonical control (0.211982ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export normalizeContinuityCapacity in ./continuity-state.mjs
+      at loadNormalizer (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:25:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:143:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:151:1
+✖ normalization refuses bad fallback, mixed legacy fields and unknown keys (0.177892ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export normalizeContinuityCapacity in ./continuity-state.mjs
+      at loadNormalizer (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:25:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:152:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:164:1
+✖ normalization leaves deeply frozen caller state and its authority, approval, history and revision byte-identical (0.297913ms)
+  AssertionError [ERR_ASSERTION]: RED: missing export normalizeContinuityCapacity in ./continuity-state.mjs
+      at loadNormalizer (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:25:12)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs:165:21)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+--- stderr ---
