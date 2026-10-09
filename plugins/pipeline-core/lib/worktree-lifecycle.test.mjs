@@ -37,7 +37,10 @@ import {
   finalizeTemporaryResource,
   inspectTemporaryResource,
   inspectSessionClosure,
+  inspectExternallyArchivedSession,
+  inspectOrphanArchiveEligibility,
   inspectSessionOwnerRuntime,
+  inspectSessionRetirement,
   migrateBranchWorktree,
   parseWorktreePorcelain,
   rawSha256,
@@ -50,7 +53,7 @@ import {
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 import { main as worktreeCreateMain } from "../scripts/worktree-create.mjs";
-import { observeConcurrentSessionWarning } from "../scripts/pipeline-start-preflight.mjs";
+import { CONCURRENT_SESSION_WARNING_SCHEMA, observeConcurrentSessionWarning } from "../scripts/pipeline-start-preflight.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -885,6 +888,245 @@ check("CSW-T control: a second session whose owner pid does not exist never fire
     ownerPid: 2_147_483_647,
   });
   assert.equal(observeConcurrentSessionWarning({ startPath: primary, currentSessionId: mine.sessionId }), null);
+});
+
+// CSW-T2 (Ruling 162, CSW-F bullet; the landed fix is b0d1ff11d). The win32 branch of the probable-liveness check is
+// driven on EVERY host through the injected seams (`platform`, `nowMs`, `uptimeSeconds`), so a Linux or macOS run exercises
+// the same code a native Windows run does. `nowMs` is a multiple of 60 000 and `uptimeSeconds` a multiple of 60, so the
+// boot minute is exact (floor((nowMs - uptimeSeconds * 1000) / 60 000) = 29 999 880) and a shift of whole minutes moves
+// it by exactly that many. Registration, inspection and the warning all take the same seams.
+const CSW_NOW_MS = 1_800_000_000_000;
+const CSW_UPTIME_SECONDS = 7_200;
+const CSW_BOOT_MINUTE = "29999880";
+const CSW_SEAMS = { platform: "win32", nowMs: CSW_NOW_MS, uptimeSeconds: CSW_UPTIME_SECONDS };
+const CSW_ABSENT_PID = 2_147_483_647;
+
+function cswSession(primary, tag, seams = CSW_SEAMS, extra = {}) {
+  return startSessionDescriptor(primary, {
+    sessionId: `session-csw2-${tag}`,
+    ownerNonce: `owner-nonce-csw2-${tag}-0000000001`,
+    ownerPid: process.pid,
+    ...seams,
+    ...extra,
+  });
+}
+
+function cswRecordedRuntime(session) {
+  return JSON.parse(readFileSync(session.path, "utf8")).ownerRuntime;
+}
+
+function cswOwnerRead(primary, session, extra = {}) {
+  return inspectSessionOwnerRuntime(primary, session.sessionId, { ...CSW_SEAMS, ...extra });
+}
+
+function cswVanishOwner(session) {
+  const descriptor = JSON.parse(readFileSync(session.path, "utf8"));
+  descriptor.ownerRuntime.pid = CSW_ABSENT_PID;
+  writeFileSync(session.path, `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 });
+}
+
+check("CSW-T2 a win32 registration records the owner pid and the host boot minute in the existing processStartId slot", () => {
+  const { primary } = repoFixture();
+  const runtime = cswRecordedRuntime(cswSession(primary, "register"));
+  assert.equal(runtime.pid, process.pid);
+  assert.equal(runtime.processStartId, CSW_BOOT_MINUTE);
+  // The boot minute is floored: 59.999 s later is the same minute, one whole minute later is the next one.
+  assert.equal(cswRecordedRuntime(cswSession(primary, "register-subminute", { ...CSW_SEAMS, nowMs: CSW_NOW_MS + 59_999 })).processStartId, CSW_BOOT_MINUTE);
+  assert.equal(
+    cswRecordedRuntime(cswSession(primary, "register-nextminute", { ...CSW_SEAMS, nowMs: CSW_NOW_MS + 60_000 })).processStartId,
+    String(Number(CSW_BOOT_MINUTE) + 1),
+  );
+  // No owner runtime is recorded for an owner pid that does not exist, for any non-win32 platform, or for unusable clock inputs.
+  assert.equal(cswRecordedRuntime(cswSession(primary, "register-absent", CSW_SEAMS, { ownerPid: CSW_ABSENT_PID })), null);
+  assert.equal(cswRecordedRuntime(cswSession(primary, "register-darwin", { ...CSW_SEAMS, platform: "darwin" })), null);
+  const unusable = [{ uptimeSeconds: -1 }, { uptimeSeconds: Number.NaN }, { nowMs: Number.NaN }, { nowMs: 1_000, uptimeSeconds: 0 }];
+  unusable.forEach((inputs, index) => {
+    assert.equal(
+      cswRecordedRuntime(cswSession(primary, `register-unusable-${index}`, { ...CSW_SEAMS, ...inputs })),
+      null,
+      `unusable clock inputs ${JSON.stringify(inputs)} must record no owner runtime`,
+    );
+  });
+});
+
+check("CSW-T2 opt-in reads a win32 owner as probably live; the default read keeps the typed unavailable; other platforms stay unavailable", () => {
+  const { primary } = repoFixture();
+  const session = cswSession(primary, "optin");
+  const byDefault = cswOwnerRead(primary, session);
+  assert.equal(byDefault.status, "unavailable");
+  assert.equal("probable" in byDefault, false);
+  const optedIn = cswOwnerRead(primary, session, { probableLiveness: true, expectedDescriptorSha256: session.descriptorSha256 });
+  assert.equal(optedIn.status, "live");
+  assert.equal(optedIn.probable, true);
+  assert.deepEqual(Object.keys(optedIn).sort(), ["descriptorSha256", "probable", "schema", "sessionId", "status"]);
+  assert.equal(JSON.stringify(optedIn).includes(session.ownerNonce), false);
+  // Only the literal boolean true opts in.
+  for (const loose of [1, "true", {}, undefined, null, false]) {
+    assert.equal(cswOwnerRead(primary, session, { probableLiveness: loose }).status, "unavailable", `probableLiveness ${JSON.stringify(loose)} must not opt in`);
+  }
+  // A platform that is neither Linux nor win32 stays unavailable, opted in or not, registered there or read there.
+  const mac = cswSession(primary, "optin-darwin", { ...CSW_SEAMS, platform: "darwin" });
+  const macRead = cswOwnerRead(primary, mac, { platform: "darwin", probableLiveness: true });
+  assert.equal(macRead.status, "unavailable");
+  assert.equal("probable" in macRead, false);
+  assert.equal(cswOwnerRead(primary, session, { platform: "darwin", probableLiveness: true }).status, "unavailable");
+});
+
+check("CSW-T2 the boot-minute comparison tolerates exactly one minute either way and reads a larger gap as reused", () => {
+  const { primary } = repoFixture();
+  const session = cswSession(primary, "boundary");
+  const read = (deltaMs) => cswOwnerRead(primary, session, { nowMs: CSW_NOW_MS + deltaMs, probableLiveness: true });
+  // floor((delta) / 60 000) is the boot-minute offset: -1 minute and +1 minute are inside the tolerance, +-2 are outside.
+  for (const deltaMs of [0, -1, -60_000, 59_999, 60_000, 119_999]) {
+    const result = read(deltaMs);
+    assert.equal(result.status, "live", `delta ${deltaMs} ms must still read as the same boot`);
+    assert.equal(result.probable, true);
+  }
+  for (const deltaMs of [-60_001, -120_000, 120_000]) {
+    const result = read(deltaMs);
+    assert.equal(result.status, "reused", `delta ${deltaMs} ms is a different boot`);
+    assert.equal("probable" in result, false);
+  }
+});
+
+check("CSW-T2 a rebooted host reads a recorded win32 owner as reused and a vanished owner process as not-live, never as probably live", () => {
+  const { primary } = repoFixture();
+  const rebootedSession = cswSession(primary, "rebooted");
+  // An hour later the host reports ten minutes of uptime: it booted again, 170 minutes after the recorded boot.
+  const rebootedSeams = { nowMs: CSW_NOW_MS + 3_600_000, uptimeSeconds: 600 };
+  const rebooted = cswOwnerRead(primary, rebootedSession, { ...rebootedSeams, probableLiveness: true });
+  assert.equal(rebooted.status, "reused");
+  assert.equal("probable" in rebooted, false);
+  assert.equal(cswOwnerRead(primary, rebootedSession, rebootedSeams).status, "unavailable");
+  // The same fixture with the owner process gone: not-live whether or not the caller opted in, with no probable marker.
+  const goneSession = cswSession(primary, "gone");
+  cswVanishOwner(goneSession);
+  for (const probableLiveness of [true, false]) {
+    const gone = cswOwnerRead(primary, goneSession, { probableLiveness });
+    assert.equal(gone.status, "not-live");
+    assert.equal("probable" in gone, false);
+  }
+});
+
+check("CSW-T2 on this host the default read and the opted-in read follow the platform table", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-csw2-hostreal",
+    ownerNonce: "owner-nonce-csw2-hostreal-0000001",
+  });
+  const byDefault = inspectSessionOwnerRuntime(primary, session.sessionId);
+  const optedIn = inspectSessionOwnerRuntime(primary, session.sessionId, { probableLiveness: true });
+  if (process.platform === "linux") {
+    // Real process start ticks are authoritative: the opt-in changes nothing and nothing is marked probable.
+    assert.equal(byDefault.status, "live");
+    assert.equal(optedIn.status, "live");
+    assert.equal("probable" in byDefault, false);
+    assert.equal("probable" in optedIn, false);
+  } else if (process.platform === "win32") {
+    assert.equal(byDefault.status, "unavailable");
+    assert.equal(optedIn.status, "live");
+    assert.equal(optedIn.probable, true);
+  } else {
+    assert.equal(byDefault.status, "unavailable");
+    assert.equal(optedIn.status, "unavailable");
+  }
+});
+
+check("CSW-T2 the concurrent-session warning for a probably live win32 owner is marked probable and says probably live", () => {
+  const { primary } = repoFixture();
+  const mine = cswSession(primary, "warn-mine");
+  const other = cswSession(primary, "warn-other");
+  const seen = [];
+  const inspectOwner = (startPath, sessionId, options) => {
+    seen.push(options);
+    return inspectSessionOwnerRuntime(startPath, sessionId, { ...options, ...CSW_SEAMS });
+  };
+  const warning = observeConcurrentSessionWarning({ startPath: primary, currentSessionId: mine.sessionId, inspectOwner });
+  assert.notEqual(warning, null);
+  assert.deepEqual(Object.keys(warning).sort(), ["descriptorSha256", "message", "probable", "schema", "sessionId", "status"]);
+  assert.equal(warning.schema, CONCURRENT_SESSION_WARNING_SCHEMA);
+  assert.equal(warning.sessionId, other.sessionId);
+  assert.equal(warning.descriptorSha256, other.descriptorSha256);
+  assert.equal(warning.status, "live");
+  assert.equal(warning.probable, true);
+  assert.match(warning.message, /probably live/u);
+  const text = JSON.stringify(warning);
+  assert.equal(text.includes(other.ownerNonce), false);
+  assert.equal(text.includes("processStartId"), false);
+  assert.equal(text.includes(CSW_BOOT_MINUTE), false);
+  // The warning is the caller that opts in, and it pins the exact descriptor it inspects.
+  assert.ok(seen.length >= 1);
+  for (const options of seen) {
+    assert.equal(options.probableLiveness, true);
+    assert.match(options.expectedDescriptorSha256, /^[0-9a-f]{64}$/u);
+  }
+  // On a real Linux host the warning keeps its original four-key shape.
+  if (process.platform === "linux") {
+    const real = startSessionDescriptor(primary, { sessionId: "session-csw2-warn-real", ownerNonce: "owner-nonce-csw2-warn-real-000001" });
+    const linuxWarning = observeConcurrentSessionWarning({
+      startPath: primary,
+      currentSessionId: mine.sessionId,
+      listDescriptors: (startPath) => listActiveSessionDescriptors(startPath).filter((entry) => entry.sessionId === real.sessionId),
+    });
+    assert.deepEqual(Object.keys(linuxWarning).sort(), ["descriptorSha256", "schema", "sessionId", "status"]);
+  }
+});
+
+check("CSW-T2 the warning fires one minute either side of the recorded boot minute and stays silent beyond it, after a reboot, and for a vanished owner", () => {
+  const { primary } = repoFixture();
+  const mine = cswSession(primary, "silent-mine");
+  const other = cswSession(primary, "silent-other");
+  const warnWith = (seams) => observeConcurrentSessionWarning({
+    startPath: primary,
+    currentSessionId: mine.sessionId,
+    inspectOwner: (startPath, sessionId, options) => inspectSessionOwnerRuntime(startPath, sessionId, { ...options, ...CSW_SEAMS, ...seams }),
+  });
+  for (const deltaMs of [-60_000, -1, 0, 59_999, 60_000, 119_999]) {
+    const warning = warnWith({ nowMs: CSW_NOW_MS + deltaMs });
+    assert.notEqual(warning, null, `delta ${deltaMs} ms is inside the tolerance and must warn`);
+    assert.equal(warning.sessionId, other.sessionId);
+    assert.equal(warning.probable, true);
+  }
+  for (const deltaMs of [-120_000, -60_001, 120_000]) {
+    assert.equal(warnWith({ nowMs: CSW_NOW_MS + deltaMs }), null, `delta ${deltaMs} ms is a different boot and must not warn`);
+  }
+  assert.equal(warnWith({ nowMs: CSW_NOW_MS + 3_600_000, uptimeSeconds: 600 }), null);
+  cswVanishOwner(other);
+  assert.equal(warnWith({}), null);
+});
+
+check("CSW-T2 retirement, external-archive and orphan-archive reads never act on a probably live owner and expose no probable marker", () => {
+  const { primary } = repoFixture();
+  const session = cswSession(primary, "retire");
+  // These readers are called without the opt-in, exactly as every production caller does.
+  const retirement = inspectSessionRetirement(primary, session.sessionId, CSW_SEAMS);
+  assert.equal(retirement.ownerStatus, "unavailable");
+  assert.equal(retirement.status, "owner-unavailable");
+  const archived = inspectExternallyArchivedSession(primary, session.sessionId, CSW_SEAMS);
+  assert.equal(archived.ownerStatus, "unavailable");
+  assert.equal(archived.status, "owner-active");
+  const orphan = inspectOrphanArchiveEligibility(primary, session.sessionId, { ...CSW_SEAMS, requesterSessionId: "session-csw2-requester" });
+  assert.equal(orphan.ownerStatus, "unavailable");
+  for (const result of [retirement, archived, orphan]) {
+    assert.equal(JSON.stringify(result).includes("probable"), false, "no retirement-family result may carry the probable marker");
+  }
+});
+
+check("CSW-T2 only the concurrent-session warning opts into probable liveness: no other production module passes probableLiveness", () => {
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const holders = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== "node_modules") walk(full);
+      } else if (entry.name.endsWith(".mjs") && !entry.name.endsWith(".test.mjs") && readFileSync(full, "utf8").includes("probableLiveness")) {
+        holders.push(full.slice(pluginRoot.length + 1).replaceAll("\\", "/"));
+      }
+    }
+  };
+  for (const sub of ["lib", "scripts", "hooks"]) walk(join(pluginRoot, sub));
+  assert.deepEqual(holders.sort(), ["lib/worktree-lifecycle.mjs", "scripts/pipeline-start-preflight.mjs"]);
 });
 
 check("D0 session-cleanup CLI accepts descriptor ownership without receiving the nonce", () => {
