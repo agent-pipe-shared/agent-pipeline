@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.runner-mappings.v0",
+  "runners": {
+    "claude": {
+      "capabilities": {
+        "design": "opus",
+        "implement": "sonnet",
+        "mechanic": "haiku",
+        "deep": "sonnet",
+        "review": "sonnet"
+      },
+      "manifestAliases": {
+        "sonnet": "sonnet-5"
+      },
+      "directSelectors": {
+        "design": { "kind": "alias", "value": "opus", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "implement": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "mechanic": { "kind": "alias", "value": "haiku", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "deep": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "review": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null }
+      },
+      "effortMode": "identity"
+    },
+    "codex": {
+      "capabilities": {
+        "design": "gpt-6-astra",
+        "implement": "gpt-5.6-luna",
+        "mechanic": "gpt-5.6-luna",
+        "deep": "gpt-5.6-terra",
+        "review": "gpt-5.6-terra"
+      },
+      "aliases": {
+        "fable": "gpt-5.6-sol"
+      },
+      "directSelectors": {
+        "design": { "kind": "model-id", "value": "gpt-6-astra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "review": { "kind": "model-id", "value": "gpt-5.6-terra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "implement": { "kind": "model-id", "value": "gpt-5.6-luna", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "mechanic": { "kind": "model-id", "value": "gpt-5.6-luna", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" },
+        "deep": { "kind": "model-id", "value": "gpt-5.6-terra", "resolutionStatus": "observed-model-id", "resolutionEvidence": "official-model-docs" }
+      },
+      "effortMode": "identity"
+    },
+    "antigravity": {
+      "capabilities": {
+        "design": "gemini-3.1-pro-high",
+        "implement": "gemini-3.8-flash-high",
+        "mechanic": "gemini-3.8-flash-low",
+        "deep": "gemini-3.8-flash-high",
+        "review": "gemini-3.1-pro-high"
+      },
+      "aliases": {
+        "flash-high": "gemini-3.8-flash-high",
+        "flash-medium": "gemini-3.8-flash-medium",
+        "flash-low": "gemini-3.8-flash-low",
+        "pro-high": "gemini-3.1-pro-high",
+        "pro-low": "gemini-3.1-pro-low"
+      },
+      "directSelectors": {
+        "design": { "kind": "model-id", "value": "gemini-3.1-pro-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "review": { "kind": "model-id", "value": "gemini-3.1-pro-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "implement": { "kind": "model-id", "value": "gemini-3.8-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "mechanic": { "kind": "model-id", "value": "gemini-3.8-flash-low", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" },
+        "deep": { "kind": "model-id", "value": "gemini-3.8-flash-high", "resolutionStatus": "observed-model-id", "resolutionEvidence": "agy-models" }
+      },
+      "effortMode": "identity"
+    }
+  }
+}
