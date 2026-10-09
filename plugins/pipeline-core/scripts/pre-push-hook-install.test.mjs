@@ -9,13 +9,13 @@
  * Run: node plugins/pipeline-core/scripts/pre-push-hook-install.test.mjs
  * Exit: 0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, appendFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, appendFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
@@ -32,10 +32,26 @@ import {
   applyDecline,
   DECLINE_MARKER_SCHEMA,
 } from "./pre-push-hook-install.mjs";
-import { buildPrePushHookOfferAction } from "./project-onboarding-v3.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
-const PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta.url));
+// TR-J-T3c (TOILRES T44/T58, the shape committed for the commit-msg install test in 0ad7ab3df): applyInstall
+// inventories the plugin root twice (publishGitHookRuntimeSnapshot), so a parallel writer into the LIVE tree fails
+// these cases with GHS-SOURCE-DRIFT. The suite therefore snapshots a frozen copy of the plugin root, made once at
+// load and removed in after(); the lib dir, the snapshot inspections and the spawned installers all point at it.
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const FROZEN_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "pre-push-hook-plugin-"));
+cpSync(LIVE_PLUGIN_ROOT, FROZEN_PLUGIN_ROOT, { recursive: true });
+after(() => { rmSync(FROZEN_PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
+const PLUGIN_LIB_DIR = join(FROZEN_PLUGIN_ROOT, "lib");
+// Proof that the copy, not the live tree, is what the install cases snapshot and spawn.
+assert.ok(PLUGIN_LIB_DIR.startsWith(FROZEN_PLUGIN_ROOT), "PLUGIN_LIB_DIR must lie under the frozen plugin copy");
+assert.notEqual(PLUGIN_LIB_DIR, join(LIVE_PLUGIN_ROOT, "lib"), "PLUGIN_LIB_DIR must not be the live lib dir");
+assert.ok(existsSync(join(PLUGIN_LIB_DIR, "git-hook-runtime-snapshot.mjs")), "the frozen copy must carry the snapshot module");
+assert.ok(existsSync(join(FROZEN_PLUGIN_ROOT, "scripts", "pre-push-hook-install.mjs")), "the frozen copy must carry the installer");
+process.stderr.write(`# frozen plugin copy in use: ${basename(FROZEN_PLUGIN_ROOT)}\n`);
+// The onboarding offer names the installer next to its own module (argv[0]), so the builder is taken from the copy:
+// the offered installer is then the frozen one, and the case still asserts the same shape of the same code.
+const { buildPrePushHookOfferAction } = await import(pathToFileURL(join(FROZEN_PLUGIN_ROOT, "scripts", "project-onboarding-v3.mjs")).href);
 const ZERO40 = "0".repeat(40);
 
 test("onboarding pre-push offer executes from a consumer repository with an absolute installer path", () => {
@@ -838,7 +854,9 @@ test("--install CLI: a typed refusal thrown by the install path is reported as i
       'import { register } from "node:module";',
       `register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(hooksSource)}`)});`,
     ].join("\n"), "utf8");
-    const installer = fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url));
+    // TR-J-T3c: the frozen installer. The injected stub resolves by the `/lib/hardened-private-directory.mjs` suffix, which
+    // the copy's lib shares, and the typed refusal is thrown before any snapshot, so the assertions below are unchanged.
+    const installer = join(FROZEN_PLUGIN_ROOT, "scripts", "pre-push-hook-install.mjs");
     const result = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, installer, "--install"], {
       cwd: repoDir,
       encoding: "utf8",
