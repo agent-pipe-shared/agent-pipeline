@@ -707,16 +707,15 @@ const symlinkRefusedWithEperm = () => {
     }
   });
 
-// DP25-DP27 -- the shipped Critic budget contract, pinned to the values of Ruling 98(c)
-// (specs/sprint-alfred-epic/plans/0.7-execution-order.md). The working cap is
-// maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN) = maxTurns - 15, so a Critic base cap of 30 needs
-// a Critic maxTurns of at least 45; the ruling raises it to 50, which gives a working cap of 35.
-// Before that change the Critic shipped base cap 24 under maxTurns 40: working cap 25, a closing
-// end of 29 and 11 turns in reserve. Nothing else in the suites states these numbers: the other
-// maxTurns 40 / 24-tool-use hits are parser fixtures, role-agnostic arithmetic or briefed caps
-// that stay valid under both working caps. The cases are RED until CRITIC-BUDGET-F changes
-// agents/critic.md and DEFAULT_DISPATCH_BASE_CALL_CAP.critic. They read the plugin that ships
-// this file explicitly, so no harness-side definition can stand in for the one F changes.
+// DP25-DP27 -- the shipped Critic budget contract. DP25 keeps the default base cap 30 of Ruling 98(c)
+// (specs/sprint-alfred-epic/plans/0.7-execution-order.md); DP26/DP27 follow Ruling 161 (CRITIC-CKPT-T4,
+// Ruling 163): the Critic maxTurns is 65. The working cap is maxTurns - (CLOSING_ALLOWANCE +
+// SAFETY_MARGIN) = maxTurns - 15, so maxTurns 65 gives a working cap of 50. The default base cap stays
+// 30 (effectiveCap 30, closing end 35), which leaves 30 turns in reserve (65 - 35). History: the
+// Critic shipped base cap 24 under maxTurns 40 (working cap 25, closing end 29, 11 in reserve), then
+// maxTurns 50 under Ruling 98(c) (working cap 35, 15 in reserve). DP26/DP27 are RED until
+// CRITIC-CKPT-F2 changes agents/critic.md to maxTurns 65. They read the plugin that ships this file
+// explicitly, so no harness-side definition can stand in for the one F2 changes.
 const CRITIC_BUDGET_PLUGIN_ROOT = join(repoRoot, "plugins", "pipeline-core");
 
 check("DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24)", () => {
@@ -725,12 +724,12 @@ check("DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 
     `Ruling 98(c): the Critic default base cap is 30, got ${JSON.stringify(line)}`);
 });
 
-check("DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40)", () => {
-  assert.equal(readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT), 50,
-    "Ruling 98(c): plugins/pipeline-core/agents/critic.md raises maxTurns to 50");
+check("DP26 the shipped Critic definition carries maxTurns 65 (Ruling 161, was 50)", () => {
+  assert.equal(readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT), 65,
+    "Ruling 161: plugins/pipeline-core/agents/critic.md raises maxTurns to 65");
 });
 
-check("DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11)", () => {
+check("DP27 the default Critic budget binds base 30 under working cap 50 with 30 turns in reserve (Ruling 161, was 30/50/35/15)", () => {
   const binding = dispatchBudgetBinding({
     subagentType: "pipeline-core:critic",
     prompt: dispatchBudgetLineForRole("critic"),
@@ -738,13 +737,13 @@ check("DP27 the default Critic budget binds base 30 under working cap 35 with 15
   });
   assert.equal(binding.code, "DBB-PREPARED", JSON.stringify(binding));
   assert.equal(binding.baseCalls, 30, "default base cap");
-  assert.equal(binding.maxTurns, 50, "maxTurns read from the shipped definition");
-  assert.equal(binding.workingCap, 35, "maxTurns - 15");
+  assert.equal(binding.maxTurns, 65, "maxTurns read from the shipped definition");
+  assert.equal(binding.workingCap, 50, "maxTurns - 15");
   assert.equal(binding.effectiveCap, 30, "the tier no longer limits the default base cap");
   assert.equal(binding.tierLimited, false);
   const closingEnd = binding.baseCalls + CLOSING_ALLOWANCE;
   assert.equal(closingEnd, 35, "base cap + closing allowance (was 24 + 5 = 29)");
-  assert.equal(binding.maxTurns - closingEnd, 15, "turns left in reserve below maxTurns (was 40 - 29 = 11)");
+  assert.equal(binding.maxTurns - closingEnd, 30, "turns left in reserve below maxTurns (65 - 35; was 50 - 35 = 15)");
 });
 
 assert.equal(cases.length, 41, "the complete dispatch-policy corpus must be registered before execution begins");
