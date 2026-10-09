@@ -4418,6 +4418,22 @@ test("the rendered reason is bounded to typed tokens against any outcome shape",
         `(v) command ${JSON.stringify(command)}: the rendered text must not depend on recovery.command at all`);
     }
   });
+
+  // T90-T3 (Ruling 136): the relative paths name a file below the directory that holds the
+  // common dir's `.git`, which in a linked worktree is the MAIN checkout, not the worktree and
+  // not "the repository root" (ambiguous there). The wording is the briefing's plain spelling.
+  test("T90-T3 (w): the recovery line says to run from the main checkout root (the directory that holds .git), not from the repository root", () => {
+    const wording = "run from the main checkout root (the directory that holds .git)";
+    for (const files of [[LOCK], [RECOVER], [LOCK, RECOVER]]) {
+      for (const options of [undefined, { platform: "linux" }, { platform: "win32" }]) {
+        const where = `(w) ${files.join("+")}${options ? ` (platform ${options.platform})` : " (host default)"}`;
+        const line = assertOneRecoveryLine(render({ files, command: "ignored" }, options), files, where);
+        assert.ok(line.includes(wording), `${where}: the line must say "${wording}": ${JSON.stringify(line)}`);
+        assert.ok(!line.includes("run from the repository root"),
+          `${where}: the old wording "run from the repository root" must be gone: ${JSON.stringify(line)}`);
+      }
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------------
@@ -6194,6 +6210,57 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
     };
   }
 
+  // T90-T3 (Ruling 136): a box laid out like the real store, <git-common-dir>/agent-pipeline/
+  // human-guard-overrides, so the recovery path has a common dir to be relative to. sandbox()
+  // above stays a bare temp dir for every case that does not care about the layout.
+  //   commonDir  the git common dir below the temp root, "/"-separated (".git" by default)
+  //   linked     also lay out a linked worktree beside it: <root>/linked-wt holding a `.git`
+  //              FILE that points into <commonDir>/worktrees/linked-wt, as `git worktree add` does
+  // paths.base mirrors storage()'s output (lib :710) so the fix may derive the common dir from
+  // either the base or the lock path; nothing in these pins reads it.
+  const RECOVERY_STORE = ".git/agent-pipeline/human-guard-overrides";
+  const MAIN_CHECKOUT_WORDING = "run from the main checkout root (the directory that holds .git)";
+  const recoveryRelative = (target) => `${RECOVERY_STORE}/${target === "auditLock" ? "audit.lock" : "audit.lock.recover"}`;
+
+  function gitSandbox({ commonDir = ".git", linked = false } = {}) {
+    const root = mkdtempSync(join(tmpdir(), "hgo-t90t3-"));
+    const common = join(root, ...commonDir.split("/"));
+    const store = join(common, "agent-pipeline", "human-guard-overrides");
+    let linkedRoot = null;
+    try {
+      mkdirSync(store, { recursive: true });
+      // The lock files inherit the DACL of the directory they live in, so the INNERMOST store
+      // directory is the one to harden (see sandbox()); without it a native win32 run refuses
+      // with HGO-DACL instead of HGO-AUDIT-LOCK-AMBIGUOUS and every pin below would be red for
+      // the wrong reason.
+      if (process.platform === "win32") {
+        const hardened = hardenWindowsPrivateDirectory(store);
+        assert.equal(hardened.status, "secure",
+          `precondition: the win32 store directory must be owner-private (status ${hardened.status})`);
+      }
+      if (linked) {
+        linkedRoot = join(root, "linked-wt");
+        const worktreeGitDir = join(common, "worktrees", "linked-wt");
+        mkdirSync(linkedRoot);
+        mkdirSync(worktreeGitDir, { recursive: true });
+        writeFileSync(join(linkedRoot, ".git"), `gitdir: ${worktreeGitDir.replaceAll("\\", "/")}\n`);
+      }
+    } catch (error) {
+      rmSync(root, { recursive: true, force: true });
+      throw error;
+    }
+    return {
+      root,
+      linkedRoot,
+      paths: {
+        base: store,
+        auditLock: join(store, "audit.lock"),
+        auditLockRecovery: join(store, "audit.lock.recover"),
+      },
+      cleanup: () => rmSync(root, { recursive: true, force: true }),
+    };
+  }
+
   // A pid that provably does not exist: spawn and await a short child, then confirm with a
   // signal-0 probe that its pid is gone (a recycled pid would otherwise fake a red).
   function deadPid() {
@@ -6464,11 +6531,14 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 
   test("T90-T (f): an ambiguous audit-lock refusal carries a typed recovery naming the lock file and an attended command", () => {
     const variants = [
-      { label: "ordinary lock", target: "auditLock", expected: (paths) => paths.auditLock },
-      { label: "abandoned recovery guard", target: "auditLockRecovery", expected: (paths) => paths.auditLockRecovery },
+      // T90-T3 (Ruling 136): `expected` stays the ABSOLUTE path (it is what existsSync keeps
+      // watching); `relative` is the POSIX form recovery.files must now carry, relative to the
+      // directory that holds the common dir's `.git`.
+      { label: "ordinary lock", target: "auditLock", expected: (paths) => paths.auditLock, relative: ".git/agent-pipeline/human-guard-overrides/audit.lock" },
+      { label: "abandoned recovery guard", target: "auditLockRecovery", expected: (paths) => paths.auditLockRecovery, relative: ".git/agent-pipeline/human-guard-overrides/audit.lock.recover" },
     ];
     for (const variant of variants) {
-      const box = sandbox();
+      const box = gitSandbox();
       try {
         plantLock(box, { target: variant.target, ownerPatch: { hostId: FOREIGN_HOST, pid: process.pid } });
         const result = expectAmbiguous(box, `(f) ${variant.label}`, { keepPath: variant.expected(box.paths) });
@@ -6480,10 +6550,107 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
         assert.ok(Array.isArray(recovery.files) && recovery.files.length > 0
           && recovery.files.every((file) => typeof file === "string" && file.length > 0),
         `(f) ${variant.label}: recovery.files must be a non-empty array of path strings`);
-        assert.ok(recovery.files.includes(variant.expected(box.paths)),
-          `(f) ${variant.label}: recovery.files must name the exact lock file ${variant.expected(box.paths)}`);
+        assert.deepEqual(recovery.files, [variant.relative],
+          `(f) ${variant.label}: recovery.files must be exactly the main-checkout-relative POSIX form ${variant.relative}, not an absolute path (got ${JSON.stringify(recovery.files)})`);
         assert.equal(typeof recovery.command, "string", `(f) ${variant.label}: recovery.command must be a string`);
         assert.notEqual(recovery.command.trim(), "", `(f) ${variant.label}: recovery.command must not be empty`);
+      } finally { box.cleanup(); }
+    }
+  });
+
+  // T90-T3 (Ruling 136, fail-closed): the recovery path is relative to the directory that holds
+  // the common dir's `.git`, so a common dir with any other basename has nothing it can be
+  // relative to. The refusal then carries NO `recovery` own property (absence, not null or
+  // undefined) and the route text keeps today's two lines.
+  test("T90-T3 (g): a common dir whose basename is not .git yields no recovery property and no recovery line", () => {
+    const layouts = [
+      ["a separate git dir", "separate-gitdir"],
+      ["a bare-repository name", "repo.git"],
+      ["a submodule git dir (.git/modules/<name>)", "super/.git/modules/sub"],
+    ];
+    const targets = [["ordinary lock", "auditLock"], ["abandoned recovery guard", "auditLockRecovery"]];
+    for (const [layout, commonDir] of layouts) {
+      for (const [targetLabel, target] of targets) {
+        const label = `(g) ${layout}, ${targetLabel}`;
+        const box = gitSandbox({ commonDir });
+        try {
+          plantLock(box, { target, ownerPatch: { hostId: FOREIGN_HOST, pid: process.pid } });
+          const result = expectAmbiguous(box, label, { keepPath: box.paths[target] });
+          assert.equal(Object.hasOwn(result.error, "recovery"), false,
+            `${label}: a common dir not named .git must yield NO recovery property, but error.recovery is ${JSON.stringify(result.error.recovery)}`);
+          assert.match(result.error.message, /ambiguous/u, `${label}: the refusal keeps its plain ambiguous text`);
+          for (const options of [undefined, { platform: "linux" }, { platform: "win32" }]) {
+            const rendered = options === undefined
+              ? humanGuardRouteUnavailableReason("command", { error: result.error })
+              : humanGuardRouteUnavailableReason("command", { error: result.error }, options);
+            const where = `${label}${options ? ` (platform ${options.platform})` : " (host default)"}`;
+            assert.equal(rendered.split("\n").length, 2, `${where}: the route text must stay exactly two lines, but it is ${JSON.stringify(rendered)}`);
+            assert.doesNotMatch(rendered, /Recovery|rm --|Remove-Item/u, `${where}: the route text must carry no recovery line: ${JSON.stringify(rendered)}`);
+          }
+        } finally { box.cleanup(); }
+      }
+    }
+  });
+
+  // T90-T3 (Ruling 136, linked worktree): the store lives under the MAIN checkout's common dir
+  // (<root>/main/.git), so from a linked worktree (<root>/linked-wt) the relative form is still
+  // `.git/...`, relative to <root>/main, never to the worktree and never `../main/.git/...`.
+  // The attempt runs with the process cwd INSIDE the linked worktree, so a fix that derived the
+  // path from the invocation directory would be red here; the cwd is restored before cleanup.
+  test("T90-T3 (h): from a linked worktree the recovery is relative to the main checkout root, the directory that holds .git", () => {
+    for (const [targetLabel, target] of [["ordinary lock", "auditLock"], ["abandoned recovery guard", "auditLockRecovery"]]) {
+      const label = `(h) linked worktree, ${targetLabel}`;
+      const box = gitSandbox({ commonDir: "main/.git", linked: true });
+      const invokedFrom = process.cwd();
+      try {
+        plantLock(box, { target, ownerPatch: { hostId: FOREIGN_HOST, pid: process.pid } });
+        let result;
+        process.chdir(box.linkedRoot);
+        try {
+          assert.equal(realpathSync(process.cwd()), realpathSync(box.linkedRoot),
+            `${label}: precondition: the attempt must run from inside the linked worktree`);
+          result = expectAmbiguous(box, label, { keepPath: box.paths[target] });
+        } finally { process.chdir(invokedFrom); }
+        assert.equal(Object.hasOwn(result.error, "recovery"), true,
+          `${label}: a common dir named .git (here <root>/main/.git) must carry a typed recovery`);
+        assert.deepEqual(Object.keys(result.error.recovery).sort(), ["command", "files"],
+          `${label}: error.recovery must stay exactly { files, command }`);
+        assert.deepEqual(result.error.recovery.files, [recoveryRelative(target)],
+          `${label}: recovery.files must be relative to the main checkout root (${recoveryRelative(target)}), got ${JSON.stringify(result.error.recovery.files)}`);
+      } finally {
+        if (process.cwd() !== invokedFrom) process.chdir(invokedFrom);
+        box.cleanup();
+      }
+    }
+  });
+
+  // T90-T3 (Ruling 136, end to end): a real ambiguous lock, thrown by the real acquireAuditLock,
+  // through the one public renderer. This is the case that proves the cure is live: the
+  // refusal's own recovery must survive the renderer's re-validation (which rejects absolute
+  // paths by design) and surface as the third line.
+  test("T90-T3 (j): end-to-end, a real ambiguous lock reaches the route text as a third line with the main-checkout-relative path", () => {
+    for (const [targetLabel, target] of [["ordinary lock", "auditLock"], ["abandoned recovery guard", "auditLockRecovery"]]) {
+      const box = gitSandbox();
+      try {
+        plantLock(box, { target, ownerPatch: { hostId: FOREIGN_HOST, pid: process.pid } });
+        const result = expectAmbiguous(box, `(j) ${targetLabel}`, { keepPath: box.paths[target] });
+        const relative = recoveryRelative(target);
+        for (const options of [undefined, { platform: "linux" }, { platform: "win32" }]) {
+          const where = `(j) ${targetLabel}${options ? ` (platform ${options.platform})` : " (host default)"}`;
+          const rendered = options === undefined
+            ? humanGuardRouteUnavailableReason("command", { error: result.error })
+            : humanGuardRouteUnavailableReason("command", { error: result.error }, options);
+          const lines = rendered.split("\n");
+          assert.equal(lines.length, 3,
+            `${where}: a real ${AMBIGUOUS} refusal must render the recovery as a third line, but the route text is ${JSON.stringify(rendered)}`);
+          assert.ok(lines[1].includes(`code=${AMBIGUOUS}`), `${where}: the first two lines stay today's text: ${JSON.stringify(lines.slice(0, 2))}`);
+          assert.ok(lines[2].includes(`'${relative}'`),
+            `${where}: the third line must name the lock as '${relative}' (single-quoted), but it is ${JSON.stringify(lines[2])}`);
+          assert.ok(lines[2].includes(MAIN_CHECKOUT_WORDING),
+            `${where}: the third line must say ${MAIN_CHECKOUT_WORDING}, but it is ${JSON.stringify(lines[2])}`);
+          assert.ok(!lines[2].includes(box.root) && !lines[2].includes(box.root.replaceAll("\\", "/")),
+            `${where}: the third line must carry no absolute host path: ${JSON.stringify(lines[2])}`);
+        }
       } finally { box.cleanup(); }
     }
   });
