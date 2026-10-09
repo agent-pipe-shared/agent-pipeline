@@ -1,0 +1,1 @@
+{"taskId":"TR-S2-F-20261009","model":"claude-sonnet-5-5","rulesetSha":"0.7.0+claude.20261008194106.da20519d","dispatcher":"elephant","outcome":"superseded","supersededBy":"evidence/dispatch-record-TR-S2-F-20261009.json","note":"opening stub written before the CONT15 record-path rule was read; safe to delete","log":[{"phase":"opening","toolUses":4}]}

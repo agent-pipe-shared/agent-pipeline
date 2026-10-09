@@ -1,0 +1,12 @@
+{
+  "taskId": "TRANCHE2-PSc-20261009",
+  "model": "claude-sonnet-5-5",
+  "effort": "xhigh",
+  "agent": "goldfish-deep",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [
+    { "phase": "opening: record created, route pre-check passed (requested claude-sonnet-5-5 == observed claude-sonnet-5-5 from runtime prompt); bootstrap preflight run after GUARD-BOOTSTRAP-RECEIPT-MISSING refusal, status ready", "toolUses": 3 }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema": "pipeline.dispatch-record.v4",
+  "taskId": "TR-K2-20261009",
+  "model": "claude-sonnet-5-5",
+  "agentType": "goldfish-implementor",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "stopped-without-commit",
+  "outcomeClassification": {"schema": "pipeline.dispatch-outcome-classification.v1", "kind": "stopped-without-commit"},
+  "commits": [],
+  "log": [
+    {"phase": "opening (preflight first, per guard)", "toolUses": 3},
+    {"phase": "edits applied to both template copies", "toolUses": 22},
+    {"phase": "verify: sync check 0, consumer-safe-paths 0, sync test 0, dispatch-policy test 1 (DPT37 EPERM symlink, win32 env; DP12 template pin green)", "toolUses": 27},
+    {"phase": "git add refused twice, .git/index.lock exists (retried once after other work); stop condition", "toolUses": 31}
+  ],
+  "rowLineMap": {
+    "T36": "templates/prompts/goldfish-task.md:397 (field 3)",
+    "T40": ":117-:121 (usage note 13, starts :115)",
+    "T47": ":117-:121 (usage note 13)",
+    "T48": ":122 (usage note 13)",
+    "T52": ":125 (usage note 13)",
+    "T54": "already covered at :460 (min(stated, maxTurns-15) clamp)",
+    "T56": "orchestrator-grant already covered at :460; SendMessage non-grant clause added at :460",
+    "T57": ":117-:121 (usage note 13)",
+    "T63": ":415 (field 4)",
+    "T68": ":127 (usage note 13)",
+    "T69": ":416 (field 4)",
+    "T86": "closing allowance already covered at :461; foreground suites :375; index.lock retry :445 (field 5)"
+  },
+  "report": {
+    "text": "Edits made identically to templates/prompts/goldfish-task.md and plugins/pipeline-core/templates/prompts/goldfish-task.md, UNCOMMITTED. Commit blocked: .git/index.lock persists after one retry. Message file ready at scratch/commit-msg/TR-K2-20261009.txt. Next: git add -- <both template paths>, then git commit -F <msg> -- <both paths>, then rebind this record's commits. Verify: check-vendored-template-sync.mjs exit 0; check-consumer-safe-paths.test.mjs exit 0 (9/9); check-vendored-template-sync.test.mjs exit 0; dispatch-policy.test.mjs 37/38, DPT37 fails EPERM symlink creation (win32 privilege, unrelated to template); DP12 goldfish-task template pin passes. independent review: pending.",
+    "changedFiles": ["templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md"]
+  },
+  "resultSha256": null
+}

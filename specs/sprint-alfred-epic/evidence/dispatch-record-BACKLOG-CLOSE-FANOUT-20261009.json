@@ -1,0 +1,13 @@
+{
+  "taskId": "BACKLOG-CLOSE-FANOUT-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "goldfish-implementor",
+  "outcome": "interim-budget-exhausted-uncommitted",
+  "log": [
+    {"phase": "opening", "toolUses": 5},
+    {"phase": "item edited (status closed, closed_at, closure_* fields, re-scoped title, closure section, triage)", "toolUses": 19},
+    {"phase": "reconcile-backlog-ledger --activate ran; wrote 11 transitions across 10 items (9 other items pre-existing drift)", "toolUses": 23}
+  ],
+  "report": "INTERIM. Done: item closed/re-scoped, numbers copied, Ruling 87 + SF22b (7d2837f8d, tranche-2 README tracked at HEAD) cited. closure_commit=7d2837f8d9dd077e2079fbbb766c573bf01978b3, closure_evidence=tranche-2 README (must be tracked). Ledger reconciled via --activate: it ALSO recorded transitions for 9 other items (pre-existing drift), so backlog/transitions.ndjson, index.json, STATUS.md contain out-of-scope entries; dispatcher must decide whether to accept or revert those. NOT done: check-backlog-state.mjs, node --test check-consumer-safe-paths.test.mjs, the docs(backlog) commit. Nothing committed. Next: run those checks, review git diff of backlog/, commit with exact pathspecs."
+}

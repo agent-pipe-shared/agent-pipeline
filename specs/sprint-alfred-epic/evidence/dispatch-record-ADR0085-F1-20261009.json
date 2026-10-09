@@ -1,0 +1,5 @@
+{
+  "taskId": "ADR0085-F1-20261009",
+  "outcome": "superseded",
+  "note": "Written here in error before the repo-root evidence/ rule was read. The canonical record is evidence/dispatch-record-ADR0085-F1-20261009.json. Safe to delete."
+}

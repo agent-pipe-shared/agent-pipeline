@@ -1,0 +1,12 @@
+{
+  "taskId": "ADR0085-D3b-20261009",
+  "model": "claude-sonnet-5-5",
+  "rulesetSha": "0.7.0+claude.20261008194106.da20519d",
+  "dispatcher": "elephant",
+  "outcome": "committed",
+  "commits": ["710b8d255"],
+  "report": {
+    "dod": "four edits made (S17-R iii, signature-only paragraph, grep for equals/both directions found no remaining both-directions wording, section 7); commit succeeded first try",
+    "changedFiles": ["specs/sprint-alfred-epic/design/adr-0085-removal-2026-10-08.md"]
+  }
+}
