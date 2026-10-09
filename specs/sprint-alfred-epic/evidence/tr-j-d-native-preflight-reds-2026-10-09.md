@@ -1,7 +1,7 @@
 # TR-J-D: the five native preflight reds (partial diagnosis, 2026-10-09)
 
-Status: PARTIAL. The dispatch hit its 80 % budget checkpoint after tracing the three onboarding-gate cases. The two
-owner-runtime cases (`:1852`, `:1905`) are **not reached**. Read-only; no code or test was edited.
+Status: COMPLETE for all five cases. Section A (three onboarding-gate cases) came from TR-J-D; section B (two owner-runtime
+cases) was added by TR-J-D2-20261009. Read-only; no code or test was edited.
 
 ## A. The shared cause of `:1544`, `:1572`, `:1720` (traced, observed natively)
 
@@ -50,12 +50,61 @@ status: "ready", intent: "bootstrap" })`), still overridable by `...options`. Th
 that cases at `:567-672`, which pass their own `requireProjectOnboardingReadyFn`, still override it (they spread after).
 Open question for the next dispatch: whether a small number of cases in the file rely on the real gate by omission.
 
-## B. `:1852` (`concurrentSessionWarning` null at about :1877) and `:1905` (`ownerRuntime` null at about :1933)
+## B. The two owner-runtime cases (diagnosed by TR-J-D2-20261009, read-only)
 
-NOT REACHED. Entry points for the next dispatch: `pipeline-start-preflight.mjs:1415`
-(`observeConcurrentSessionWarning({ startPath: cwd, currentSessionId })`), the same `cwd = process.cwd()` default, and the
-`ownerRuntime` computation. Likely the same fixture-leak pattern (live `.git/agent-pipeline/run` state) or a win32 path /
-process-liveness divergence; this is a guess, not a finding. Classification: undetermined. Proposed slice: undetermined.
+Line-number note: the native capture (`evidence/TR-J-T-20261009/preflight-native-after.txt`) reports the cases at
+`pipeline-start-preflight.test.mjs:1852` and `:1905`; in the current working tree the same two tests start at `:1873` and
+`:1926` (assertion at `:1898`, TypeError site at `:1954`). The file shifted by 21 lines after the capture; names are
+unchanged. Cited lines below are the current ones.
+
+Observed natively (win32), single case, re-run in this dispatch:
+`node --test --test-name-pattern "another session's LIVE descriptor surfaces" plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`
+exits 1: `afterOther.concurrentSessionWarning` is `null`, expected the `live` warning (assertion at test `:1898`).
+
+### B1. Shared cause for both cases: the win32/Linux divergence is one line
+
+`plugins/pipeline-core/lib/worktree-lifecycle.mjs:559`:
+`if (!Number.isSafeInteger(pid) || pid < 1 || process.platform !== "linux") return null;` in `localProcessStartIdentity`.
+Process start identity is read only from `/proc/<pid>/stat` (`:561`), so on any non-Linux platform it is `null`.
+
+Chain (all `file:line` read):
+
+1. `worktree-lifecycle.mjs:567-574` `localProcessOwnerRuntime` returns `null` when the start identity is `null`.
+2. `worktree-lifecycle.mjs:642` `startSessionDescriptor` stores `ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid)`.
+   On win32 every freshly registered descriptor therefore carries `ownerRuntime: null`.
+3. `worktree-lifecycle.mjs:715` `inspectSessionOwnerRuntime`: `if (loaded.ownerRuntime === null) return { ...base, status: "unavailable" }`.
+4. `pipeline-start-preflight.mjs:846-878` `observeConcurrentSessionWarning` (called at `:1415`) warns only on
+   `owner.status === "live"` (`:868`); `unavailable` falls through to `return null`.
+   - Case 1 (`:1873`): "another session's LIVE descriptor surfaces a warning" gets `null` at `:1898`. Observed.
+   - Case 2 (`:1926`): the test builds `notLive`/`reused` by mutating the descriptor JSON. At `:1954` it does
+     `reusedDescriptor.ownerRuntime.processStartId = ...` on the `null` `ownerRuntime`, hence
+     `TypeError: Cannot read properties of null (reading 'processStartId')` (the capture shows the same site as `:1933:92`).
+
+On Linux (WSL) `/proc/<pid>/stat` exists, `ownerRuntime` is non-null, both cases are green (Ruling 113).
+
+Design intent is explicit, not accidental: the fail-closed `unavailable` status on non-Linux is already asserted by the sibling
+suite, `plugins/pipeline-core/lib/worktree-lifecycle.test.mjs:818`
+(`assert.equal(live.status, process.platform === "linux" ? "live" : "unavailable")`, platform-branched at `:821`). The
+preflight test file has no `process.platform` branch and no `skip:` anywhere (grep: 0 matches), so it silently assumes Linux.
+
+### Classification (both): host limitation, surfacing as a test defect (no product defect)
+
+- Product: not a defect. A concurrent-session warning that cannot prove liveness degrades to no warning by design
+  (`worktree-lifecycle.mjs:559`, the module's "unobserved rather than guessed" contract at `:703`).
+- Test: the two cases require a platform capability (Linux `/proc` start identity) and do not declare it. That is the defect.
+  This is not a live-repo leak: the fixture is a fresh `mkdtemp` git repo (`buildConcurrencyRepoFixture`, `:1857`).
+- Out of scope here and not claimed: whether Windows should get a real start-identity source (for example via a Win32 process
+  creation time). That would be a product feature slice and needs a PO ruling; it is not required to make the suite honest.
+
+### Proposed slice (test-only, target `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`)
+
+Add `{ skip: process.platform !== "linux" ? "owner-runtime start identity is Linux-only (worktree-lifecycle.mjs:559)" : false }`
+as the options argument to the two `test(...)` calls at `:1873` and `:1926`, mirroring the platform branch already in
+`worktree-lifecycle.test.mjs:818-821`. Optional, preferred: add one positive non-Linux case asserting that
+`observeConcurrentSessionWarning` returns `null` when the other descriptor's `ownerRuntime` is `null`, so win32 still
+covers the fail-closed behaviour instead of only skipping. Both are test-only; a skip must not be applied to the
+two descriptor-free cases that follow, which are green natively (capture lines 76-77). QG-04: the test edit is its own dispatch, separate from any fix.
+Note this pattern changes skipped-count on win32 (+2), which any native baseline comparison must expect.
 
 ## Not changed / not verified
 
