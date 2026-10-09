@@ -235,7 +235,7 @@ export async function assertRestrictedRoot(repositoryRoot, storeRoot, { create =
     const harden = io.harden ?? hardenWindowsPrivateDirectory;
     const assess = io.assess ?? assessWindowsPrivatePath;
     const state = create ? harden(target) : assess(target);
-    if (state.status !== "secure") fail("GES-RESTRICTED-WINDOWS-ASSURANCE", `Restricted storage Windows DACL assurance is ${state.status}.`);
+    if (state.status !== "secure") fail("GES-RESTRICTED-WINDOWS-ASSURANCE", `Restricted storage Windows DACL assurance is ${state.status}${state.reason ? `: ${state.reason}` : ""}.`);
   }
   return target;
 }
@@ -903,12 +903,19 @@ export async function readExistingLocalRepositoryFingerprint({ repositoryRoot } 
     const target = path.join(repository.commonDir, ...LOCAL_REPOSITORY_BINDING_SEGMENTS);
     await assertNoSymlinkAncestry(target);
     const before = await lstat(target, { bigint: true });
+    // Where the host reports no POSIX mode bits (win32 reports a writable file as 0o666), `(mode & 0o022n)` cannot hold
+    // whatever the DACL says: there the owner/DACL assessment below replaces only that clause, and every other predicate
+    // (type, link count, size, uid where it exists) and every `same(...)` stability comparison applies unchanged.
+    const win32 = process.platform === "win32";
     const validFile = value => value.isFile() && !value.isSymbolicLink() && value.nlink === 1n
-      && value.size <= 65536n && (value.mode & 0o022n) === 0n
+      && value.size <= 65536n && (win32 || (value.mode & 0o022n) === 0n)
       && (typeof process.getuid !== "function" || value.uid === BigInt(process.getuid()));
     const same = (left, right) => ["dev", "ino", "mode", "uid", "nlink", "size", "mtimeNs", "ctimeNs"]
       .every(key => left[key] === right[key]);
     if (!validFile(before) || await realpath(target) !== target) unavailable();
+    // One DACL assessment of the binding file, after the cheap checks and before the descriptor is opened. It adds no
+    // window: the descriptor/`lstat` snapshots below are still compared to `before` (ctime moves when a DACL changes).
+    if (win32 && assessWindowsPrivatePath(target).status !== "secure") unavailable();
     descriptor = await open(target, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
     const opened = await descriptor.stat({ bigint: true });
     if (!validFile(opened) || !same(before, opened)) unavailable();
