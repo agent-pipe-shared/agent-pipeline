@@ -1021,6 +1021,12 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
         signerPrivateKey, signerKeyReference: "fixture-po-key",
       });
       bindFixtureReadiness(cwd, runner, designFixture);
+      // R7-3-T2e: the bound-path gate (R7-3a) refuses present-plan for a package that is not tracked and clean at HEAD. Commit EXACTLY the
+      // package's bound set (package, Advisor receipt, readiness) only after bindFixtureReadiness has rewritten the readiness and the package;
+      // the package keeps its design-candidate binding and the v1 reader admits this evidence-only descendant of that candidate (F1e).
+      const boundPackage = JSON.parse(readFileSync(join(cwd, designFixture.packagePath), "utf8"));
+      commitFixturePaths(cwd, [designFixture.packagePath, boundPackage.advisor.receipt.path, boundPackage.readiness.path],
+        "test: commit the design workflow package", "stage-0");
       Object.assign(designWorkflowDeps, designFixture.deps);
       designWorkflowDeps.gitCandidate = () => ({ ok: true, ...candidateAtHead(cwd) });
       designWorkflowDeps.verifyDesignReadinessHostExecution = verifyDesignReadinessHostExecution;
