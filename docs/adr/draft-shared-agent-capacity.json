@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-shared-agent-capacity",
+  "title": "Shared agent capacity and existing-consumer migration",
+  "status": "proposed",
+  "digest": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450",
+  "scope": "global",
+  "date": "2026-10-09"
+}
