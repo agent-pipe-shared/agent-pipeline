@@ -1,0 +1,31 @@
+{
+  "schema": "alfred.coordinator-delivery-checkpoint.v1",
+  "commit": "10e146f033c9455bc6d6eb86d008f2743eb9c6b5",
+  "commitAct": "orchestrator",
+  "returned": {
+    "schema": "pipeline.native-goldfish-host-return.v1",
+    "dispatchId": "ALFRED-M1B-DURABILITY-20261009",
+    "candidateCommit": "e02641365f31286b9d98afd5a73b3080062bdb47",
+    "outcome": "succeeded",
+    "report": "M1 passed. The narrow Git ignore rules expose only the four approval-bound files, and exact-path -text attributes protect their checkout bytes. The files retain their contracted SHA-256 values. Verification: node scratch/alfred-m1-check.mjs, exit 0; machine-written evidence: specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/m1-durability.txt. The check covered four visible paths and ten ignored controls; the report contains no prohibited host paths. Installed pipeline preflight was ready. All seven changed paths are uncommitted for the native host. Host commit and fresh-checkout byte verification remain pending; independent review: pending; PO acceptance: open.",
+    "changedPaths": [
+      ".gitattributes",
+      ".gitignore",
+      "evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json",
+      "evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json",
+      "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+      "evidence/design-course/sprint-alfred-epic/r5d.readiness.json",
+      "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/m1-durability.txt"
+    ]
+  },
+  "nativeHostAuthorship": "unavailable",
+  "canonicalAuthorshipRecord": null,
+  "limitation": "The native hook produced neither a commit nor a host-observed record. This is a preserved return and coordinator recovery checkpoint, not a substitute authority receipt or a v4 authorship record.",
+  "independentReview": "pending",
+  "freshCheckoutVerification": {
+    "status": "verified",
+    "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/m1-fresh-checkout.txt",
+    "exitCode": 0
+  },
+  "poAcceptance": "open"
+}

@@ -1,0 +1,85 @@
+command: node --test --test-reporter=tap --test-name-pattern "^S[0-9]+ stored verifier" plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: ADR0085-F2b-current-e02641365
+exitCode: 0
+head: e02641365f31286b9d98afd5a73b3080062bdb47
+tree: e568d1171ae3091a0bc5a96fe8059cba8faf1a6a
+dirty: false
+--- stdout ---
+TAP version 13
+# Subtest: S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 1 - S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 32.071217
+  type: 'test'
+  ...
+# Subtest: S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 2 - S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 1.92041
+  type: 'test'
+  ...
+# Subtest: S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 3 - S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 2.408091
+  type: 'test'
+  ...
+# Subtest: S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 4 - S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 6.410832
+  type: 'test'
+  ...
+# Subtest: S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 5 - S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 4.975044
+  type: 'test'
+  ...
+# Subtest: S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 6 - S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 1.96862
+  type: 'test'
+  ...
+# Subtest: S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 7 - S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 2.308411
+  type: 'test'
+  ...
+# Subtest: S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 8 - S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 3.99912
+  type: 'test'
+  ...
+# Subtest: S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 9 - S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 1.323566
+  type: 'test'
+  ...
+# Subtest: S10 stored verifier: a signature made with another key over the same intent is refused
+ok 10 - S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 3.002845
+  type: 'test'
+  ...
+# Subtest: S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 11 - S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 4.071161
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 112.183559
+
+--- stderr ---

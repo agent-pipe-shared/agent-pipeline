@@ -32,7 +32,8 @@ late-return corrections supersede earlier completion claims.
 The PO requires important evidence to survive Git transfer. The existing M1
 migration in [the ADR-0085 removal note](../design/adr-0085-removal-2026-10-08.md)
 already addresses this for the approved package. Its four bound files are
-restored byte-identically at their original paths but remain untracked there:
+restored byte-identically at their original paths and tracked there by M1 commit
+`10e146f033c9455bc6d6eb86d008f2743eb9c6b5`:
 
 | Original path below `evidence/design-course/sprint-alfred-epic/` | SHA-256 |
 | --- | --- |
@@ -41,9 +42,19 @@ restored byte-identically at their original paths but remain untracked there:
 | `claude-r5d.failure.json` | `85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324` |
 | `claude-r5d.initial.json` | `1502f9982f9c6ac9961f7cc2783c4071b3373dfafc4ee0b8bbed49e7014fc718` |
 
-Tracked copies exist under `../evidence/design-course-rev5/`. They preserve the
-bytes but do not satisfy a consumer that reads the original bound path. Do not
-relocate or rewrite approved bytes. Complete M1 before candidate qualification.
+Tracked copies also exist under `../evidence/design-course-rev5/`. M1 preserves
+the recorded original paths, with exact-path `-text` attributes. The
+[14-case check](../evidence/wsl-intake-2026-10-09/m1-durability.txt) passed, and a
+[fresh checkout](../evidence/wsl-intake-2026-10-09/m1-fresh-checkout.txt) with
+`core.autocrlf=true` retains all four hashes and verifies the original signature
+without a private course store. Do not relocate or rewrite approved bytes.
+
+The Goldfish returned a successful, uncommitted result. The native host hook
+produced no commit or host-observed authorship record; the Coordinator performed
+the ordinary exact-path commit with `Commit-Act: orchestrator`. The
+[delivery checkpoint](../evidence/wsl-intake-2026-10-09/m1-delivery-checkpoint.json)
+preserves this limitation and the returned report. It is not a substitute v4
+authorship receipt. Independent review and qualified provenance remain pending.
 
 The root `/evidence/` ignore rule hides durable dispatch provenance as well as
 regenerated status. Global `*.log` and `*.jsonl` rules also affect new files in
@@ -109,3 +120,11 @@ open. Use the existing living PO list; no push, tag or release is authorized by
 this handover. The three linked captures above are promoted byte-identically;
 they preserve their original candidate binding. Any further working capture
 must likewise be published before it is cited as durable gate evidence.
+
+The stored-signature verifier already uses the portable re-read in current
+source. Its eleven existing S1–S11 pins pass on clean `e02641365`
+([capture](../evidence/wsl-intake-2026-10-09/stored-signature-current.txt)), including
+forged signature, changed source and stale exception denials. The historical
+ADR-0085 design inventory and the read-only worker's signature-path statement
+are stale on this point. Do not duplicate F2b; the remaining final-reader defect
+is the `architecture-design.mjs` repository reader call.

@@ -1,0 +1,47 @@
+command: node scratch/check-m1-fresh-checkout.mjs
+label: M1-fresh-checkout-10e146f03
+exitCode: 0
+head: 10e146f033c9455bc6d6eb86d008f2743eb9c6b5
+tree: c11a6464137fb4a78a4871a435db11130f15ee18
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.m1-fresh-checkout.v1",
+  "candidateCommit": "10e146f033c9455bc6d6eb86d008f2743eb9c6b5",
+  "checkoutAutocrlf": true,
+  "noPrivateCourseStore": true,
+  "results": [
+    {
+      "path": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+      "sha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
+      "byteIdentical": true,
+      "text": "unset"
+    },
+    {
+      "path": "evidence/design-course/sprint-alfred-epic/r5d.readiness.json",
+      "sha256": "2d93d4871098bc255e2d5851c5a76bdd71a11cdad194abb07952c611da87a853",
+      "byteIdentical": true,
+      "text": "unset"
+    },
+    {
+      "path": "evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json",
+      "sha256": "85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324",
+      "byteIdentical": true,
+      "text": "unset"
+    },
+    {
+      "path": "evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json",
+      "sha256": "1502f9982f9c6ac9961f7cc2783c4071b3373dfafc4ee0b8bbed49e7014fc718",
+      "byteIdentical": true,
+      "text": "unset"
+    }
+  ],
+  "storedSignature": {
+    "ok": true,
+    "code": "DWP-APPROVAL-STORED-SIGNATURE-VERIFIED"
+  },
+  "stateUnchanged": true,
+  "fixtureRemoved": true
+}
+
+--- stderr ---
