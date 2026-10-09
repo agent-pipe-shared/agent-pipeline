@@ -38,3 +38,19 @@ verbatim.
 ## Deviations
 
 Budget ended before items 3, 5, 6; no command was run for items 1 and 1b (static reading only).
+
+## ADOPT-P0b (dispatch ADOPT-P0b-20261009, candidate `00e62f8b4`): partial, closing-allowance handover
+
+Read-only. Independent review: pending. PO acceptance: pending. The 35-call budget ended after argv reading and one run.
+
+| # | Answer | Command / source | Exit | Verdict |
+|---|--------|------------------|------|---------|
+| 3a | Map module contracts valid | `node plugins/pipeline-core/scripts/module-inventory.mjs --check --root .` (read-only; flags `--root`, `--check`, `--json`, `--check-reentry-pointer`) | 0 | PASSED: 5 governed modules validated. This proves contract shape, NOT currency against HEAD. |
+| 3b | Map currency vs HEAD | NOT run. `architecture-fitness.mjs` flags: `--root`, `--mode candidate\|push`, `--check`, `--json`, `--checkpoint`, `--diff <paths...>`. Staleness is `evaluateNavigationCurrency` (`:600`, uses `mapStale`/touched contracts); no write is visible in the CLI path, but `saveBaseline` (`:95`) exists in the same file, so it was not run. Next argv: `node plugins/pipeline-core/scripts/architecture-fitness.mjs --check --json --mode candidate --root .` | n/a | not measured |
+| 5 | `fitness-model.json` / `baseline.json` validity | NOT run. `architecture-baseline.mjs` is a significance assessor (`--diff/--from/--through/--format/--compile-summary/--validate <adr>`), NOT a baseline.json validator; `--compile-summary` WRITES `project/architecture-decisions.compiled.json` and must not be run. The validator is `inspectArchitectureEntryReadiness({rootDir})` in `plugins/pipeline-core/lib/architecture-entry-readiness.mjs:264` (fitness-model needs `profileId`, `revision>0`, `modules[]`, `allowedBoundaryCrossings[]`, `antiFragmentationPolicy{}`; baseline needs `baselineRevision>0`, `acceptedViolations[]`, `ratchetMetrics` with three non-negative integers); it has no CLI, so it needs a Node helper under `scratch/`. | n/a | not measured |
+| 6 | Phase transition / push currency before the interim stamp | PARTIAL. `hooks/guard-push.mjs:146` only imports `inspectArchitecturePushCurrency` (call site not traced; trace with `rg -n inspectArchitecturePushCurrency plugins/pipeline-core/hooks/guard-push.mjs`, then read `lib/architecture-push-currency.mjs`). `project/pipeline-state.json` (head read only) has `planApproved: true`, `updatedAt` 2026-10-07; the `phase` field was not reached. | n/a | not measured |
+
+### Slices needed (updated)
+
+- P1 map refresh: UNDECIDED (3b not measured); contracts valid (3a), so only a currency finding would justify it.
+- Remaining P0c edits (no orientation needed): run 3b command above; write a `scratch/` Node helper that imports `inspectArchitectureEntryReadiness` and prints JSON (item 5); trace the push-currency call site and `rg -n '"phase"' project/pipeline-state.json` (item 6). Slices ADOPT-SIGN-CLI and ADOPT-REQ-FILE above are unchanged.
