@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -34,6 +34,20 @@ import {
   ProjectOnboardingReadyError,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
+
+// TR-J (T45): platform-native fixture roots. The production code requires `resolve(root) === root`
+// and compares roots by their resolved form, so a hard-coded POSIX root such as "/projects/current"
+// is refused on win32 (it resolves to a drive-qualified path). `resolve` is the identity on a POSIX
+// host and adds the drive on win32, so each constant is byte-identical to the former literal on
+// POSIX and a valid native root on win32. Fixtures and the assertions that echo them use the SAME
+// constant; no expectation is weakened.
+const ROOT_CURRENT = resolve("/projects/current");
+const ROOT_WSL = resolve("/projects/wsl");
+const ROOT_MINE = resolve("/projects/mine");
+const ROOT_OTHER = resolve("/projects/other");
+const ROOT_THIRD = resolve("/projects/third");
+const ROOT_NOT_A_REPOSITORY = resolve("/projects/does-not-exist-as-a-repository");
+const ROOT_REPO = resolve("/repo");
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
 const pluginList = (
@@ -73,11 +87,11 @@ const claudePluginList = (
   installPath: "/cache/claude/plugins/cache/agent-pipeline-local/pipeline-core",
   installedAt: "2026-08-05T21:06:31.445Z",
   lastUpdated: "2026-08-05T21:06:31.445Z",
-  projectPath: "/projects/current",
+  projectPath: ROOT_CURRENT,
 }]);
 const claudeKnownMarketplaces = (
   marketplaceName = "agent-pipeline-local",
-  path = "/repo",
+  path = ROOT_REPO,
 ) => () => JSON.stringify({
   [marketplaceName]: {
     source: { source: "directory", path },
@@ -92,7 +106,7 @@ const claudeKnownMarketplaces = (
 // The scope declaration is what makes the two statements reconcilable by construction
 // (setup-check.mjs's `reconcileSetupObservation` refuses an undeclared scope outright).
 test("preflight declares what its status ranges over, in every status", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   // Routed through preflight() (hermetic observe default), not raw
   // observePipelineStartPreflight: this test is about status/statusScope
   // logic, not about the origin/content attestation, so it must not depend
@@ -118,7 +132,7 @@ test("preflight declares what its status ranges over, in every status", () => {
 });
 
 test("preflight gates mandatory local hooks and keeps pre-push advisory", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const provisioning = (preCommit, commitMsg, prePush = "decline") => ({
     schema: "pipeline.clone-provisioning-report.v1", status: "provisioning-required", checks: [
       { id: "pre-commit-hook", status: preCommit },
@@ -223,7 +237,7 @@ function assertRefreshAdvisory(result) {
 test("all three runner bootstraps expose the same nonblocking decision digest", () => {
   const expected = "b".repeat(64);
   const inspect = ({ rootDir, area }) => {
-    assert.equal(rootDir, "/projects/current");
+    assert.equal(rootDir, ROOT_CURRENT);
     assert.equal(area, "project");
     return {
       schema: "pipeline.architecture-effective-decisions.v1", area,
@@ -236,7 +250,7 @@ test("all three runner bootstraps expose the same nonblocking decision digest", 
   };
   for (const env of [{ CLAUDECODE: "1" }, { CODEX_SESSION_ID: "codex-session" }, { ANTIGRAVITY_AGENT: "1" }]) {
     const result = preflight({ env, pluginList: pluginList(), read: () => manifest,
-      cwd: "/projects/current", inspectEffectiveArchitectureDecisionsFn: inspect });
+      cwd: ROOT_CURRENT, inspectEffectiveArchitectureDecisionsFn: inspect });
     assert.equal(result.effectiveDecisions.projectionSha256, expected);
     assert.equal(result.effectiveDecisions.decisionCount, 1);
     assert.equal(result.effectiveDecisions.taskScopeResolved, false);
@@ -244,7 +258,7 @@ test("all three runner bootstraps expose the same nonblocking decision digest", 
       "a legacy warning cannot turn bootstrap into an implementation gate");
   }
   const malformed = preflight({ env: { CODEX_SESSION_ID: "codex-session" },
-    pluginList: pluginList(), read: () => manifest, cwd: "/projects/current",
+    pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
     inspectEffectiveArchitectureDecisionsFn: () => ({ status: "ready", projectionSha256: expected }) });
   assert.equal(malformed.effectiveDecisions.status, "unavailable");
   assert.equal(malformed.effectiveDecisions.projectionSha256, null);
@@ -286,7 +300,7 @@ test("AC19 source parity uses the same physical decision projection for fresh ru
 });
 
 test("preflight reports exact identity and no-handoff without secret fields", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -346,7 +360,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
 });
 
 test("normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {}, pluginList: pluginList(), read: () => manifest, cwd,
     requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
@@ -375,7 +389,7 @@ test("normal bootstrap surfaces brownfield architecture adoption as a read-only 
 });
 
 test("a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {}, pluginList: pluginList(), read: () => manifest, cwd,
     requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
@@ -403,12 +417,12 @@ test("a durable deferral with a missing physical map retains its decision and of
 
 test("a durable decision with a present physical map does not repeatedly propose adoption", () => {
   const result = preflight({
-    env: {}, pluginList: pluginList(), read: () => manifest, cwd: "/projects/current",
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd: ROOT_CURRENT,
     requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
     observeArchitectureAdoptionOrientationFn: () => ({
       schema: "pipeline.architecture-adoption-orientation.v1",
       status: "decision-recorded",
-      root: "/projects/current",
+      root: ROOT_CURRENT,
       adoption: { state: "deferred-valid-until-review", scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "excepted", confidence: "measured" },
       physicalMap: { greenfieldScaffold: false, status: "present-unvalidated" },
       guidance: "verify at implementation boundary",
@@ -419,7 +433,7 @@ test("a durable decision with a present physical map does not repeatedly propose
 });
 
 test("normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {}, pluginList: pluginList(), read: () => manifest, cwd,
     observeArchitectureAdoptionOrientationFn: () => ({
@@ -443,7 +457,7 @@ test("normal bootstrap reports a real greenfield scaffold as design-pending rath
 // later resume: preflight has no event-specific escape hatch, so either pass
 // becoming different would strand one entry route without the proposal.
 test("Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const orientation = {
     schema: "pipeline.architecture-adoption-orientation.v1",
     status: "adoption-required",
@@ -502,7 +516,7 @@ test("Brownfield architecture orientation is identical and actionable on fresh e
 });
 
 test("all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const orientation = {
     schema: "pipeline.architecture-adoption-orientation.v1",
     status: "decision-recorded",
@@ -559,7 +573,7 @@ function commandFromNextAction(action) {
 }
 
 test("NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided driver, in its exact admitted shape", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -596,7 +610,7 @@ test("NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided drive
 test("a soft plugin refresh still exposes the not-ready project's onboarding action", () => {
   const result = preflight({
     env: {}, pluginList: pluginList("0.4.5+new"), read: () => manifest,
-    cwd: "/projects/current",
+    cwd: ROOT_CURRENT,
     requireProjectOnboardingReadyFn() {
       throw new ProjectOnboardingReadyError("PORG-NOT-READY", "onboarding pending", {
         intent: "bootstrap", lifecycleStatus: "intake-required",
@@ -609,7 +623,7 @@ test("a soft plugin refresh still exposes the not-ready project's onboarding act
   assert.equal(result.nextAction.expected.schema, "pipeline.onboarding-init.v1");
 });
 test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: {},
     pluginList: pluginList(),
@@ -649,7 +663,7 @@ test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-exi
 // 2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md).
 test("NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction names, the readiness guard admits it -- the property, not a string", () => {
   for (const lifecycleStatus of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
-    const cwd = "/projects/current";
+    const cwd = ROOT_CURRENT;
     const result = preflight({
       env: {},
       pluginList: pluginList(),
@@ -671,7 +685,7 @@ test("NVA-K-DRIVERREACH: whatever command a not-ready bootstrap's nextAction nam
 });
 
 test("preflight declares the Claude runner when CLAUDECODE marks the session", () => {
-  const cwd = "/projects/current";
+  const cwd = ROOT_CURRENT;
   const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: pluginList(),
@@ -687,7 +701,7 @@ test("preflight keeps the Codex runner default for any non-Claude-Code session",
       env,
       pluginList: pluginList(),
       read: () => manifest,
-      cwd: "/projects/current",
+      cwd: ROOT_CURRENT,
     });
     assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "codex"], JSON.stringify(env));
   }
@@ -703,13 +717,13 @@ const CODEX_DEFAULT_SOURCE = 'schema: "pipeline.user.v3"\nrunners:\n  default: "
 test("resolveActiveRunner: a genuine Codex session resolves codex even in a claude-default repository", () => {
   const runner = resolveActiveRunner({
     env: { CODEX_SESSION_ID: "codex-session-1" },
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => CLAUDE_DEFAULT_SOURCE,
   });
   assert.equal(runner, "codex");
   const viaThread = resolveActiveRunner({
     env: { CODEX_THREAD_ID: "codex-thread-1" },
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => CLAUDE_DEFAULT_SOURCE,
   });
   assert.equal(viaThread, "codex");
@@ -718,7 +732,7 @@ test("resolveActiveRunner: a genuine Codex session resolves codex even in a clau
 test("resolveActiveRunner: a signal-less shell in a claude-default repository resolves claude", () => {
   const runner = resolveActiveRunner({
     env: {},
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => CLAUDE_DEFAULT_SOURCE,
   });
   assert.equal(runner, "claude");
@@ -729,13 +743,13 @@ test("resolveActiveRunner: a signal-less shell in a repository declaring nothing
   assert.equal(noRootDir, "codex");
   const unreadableSource = resolveActiveRunner({
     env: {},
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => { throw new Error("ENOENT: pipeline.user.yaml"); },
   });
   assert.equal(unreadableSource, "codex");
   const noDeclaredDefault = resolveActiveRunner({
     env: {},
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => 'schema: "pipeline.user.v3"\n',
   });
   assert.equal(noDeclaredDefault, "codex");
@@ -744,12 +758,12 @@ test("resolveActiveRunner: a signal-less shell in a repository declaring nothing
 test("resolveActiveRunner: an actual CLAUDECODE/Antigravity signal is never overridden by a declared default", () => {
   assert.equal(resolveActiveRunner({
     env: { CLAUDECODE: "1" },
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => CODEX_DEFAULT_SOURCE,
   }), "claude");
   assert.equal(resolveActiveRunner({
     env: { ANTIGRAVITY_AGENT: "1" },
-    rootDir: "/repo",
+    rootDir: ROOT_REPO,
     read: () => CODEX_DEFAULT_SOURCE,
   }), "antigravity");
 });
@@ -759,13 +773,13 @@ test("a rendered PO-facing re-run command always carries --runner explicitly", (
   // out --runner (it was resolved implicitly via resolveOnboardingCliRunner), so
   // the byte-faithful echo of argv would otherwise hand a human an ambiguous
   // command to type into their own, possibly signal-less, attended terminal.
-  const argsWithoutRunner = ["kickoff-plan", "--root", "/repo", "--goal", "ship it", "--language", "en"];
+  const argsWithoutRunner = ["kickoff-plan", "--root", ROOT_REPO, "--goal", "ship it", "--language", "en"];
   const rendered = formatOnboardingRerunCommand(argsWithoutRunner, "claude");
   assert.match(rendered, /--runner"\s*"claude"$/u);
   assert.ok(!argsWithoutRunner.includes("--runner"), "the original argv is never mutated");
 
   // Already-explicit --runner is preserved verbatim, never duplicated.
-  const argsWithRunner = ["kickoff-plan", "--root", "/repo", "--runner", "codex", "--goal", "g", "--language", "en"];
+  const argsWithRunner = ["kickoff-plan", "--root", ROOT_REPO, "--runner", "codex", "--goal", "g", "--language", "en"];
   const renderedExplicit = formatOnboardingRerunCommand(argsWithRunner, "codex");
   assert.equal((renderedExplicit.match(/--runner/gu) ?? []).length, 1);
 });
@@ -790,11 +804,11 @@ test("preflight selects one host-authorized capability boundary for WSL under Co
       env,
       pluginList: pluginList(),
       read: () => manifest,
-      cwd: "/projects/wsl",
+      cwd: ROOT_WSL,
     });
     assert.equal(result.executionBoundary, "host-authorized-wsl", JSON.stringify(env));
     assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl", JSON.stringify(env));
-    assert.equal(result.nextAction.argv[3], "/projects/wsl");
+    assert.equal(result.nextAction.argv[3], ROOT_WSL);
   }
 });
 
@@ -816,7 +830,7 @@ test("PX0-AC-13: a Claude Code session under WSL never receives the Codex-only h
       env,
       pluginList: pluginList(),
       read: () => manifest,
-      cwd: "/projects/wsl",
+      cwd: ROOT_WSL,
     });
     assert.equal(result.executionBoundary, "default", JSON.stringify(env));
     assert.equal(result.nextAction.executionBoundary, "default", JSON.stringify(env));
@@ -982,7 +996,7 @@ test("a Claude session reads the Claude source manifest, never the Codex one", (
       if (String(path).endsWith(".claude-plugin/plugin.json")) return claudeManifest;
       throw new Error(`unexpected manifest path for the Claude runner: ${path}`);
     },
-    cwd: "/projects/current",
+    cwd: ROOT_CURRENT,
   });
   assert.equal(result.version, "0.5.2+claude.test");
 });
@@ -995,7 +1009,7 @@ test("a non-Claude-Code session still reads the Codex source manifest, never the
       if (String(path).endsWith(".codex-plugin/plugin.json")) return manifest;
       throw new Error(`unexpected manifest path for the Codex runner: ${path}`);
     },
-    cwd: "/projects/current",
+    cwd: ROOT_CURRENT,
   });
   assert.equal(result.version, "0.4.5+test");
 });
@@ -1017,7 +1031,7 @@ test("a Claude bare-array registry resolves an attested local-development instal
     pluginList: claudePluginList(),
     knownMarketplaces: claudeKnownMarketplaces(),
     read: () => claudeManifest,
-    cwd: "/projects/current",
+    cwd: ROOT_CURRENT,
   });
   assert.equal(result.status, "ready");
   assert.equal(result.installedVersion, "0.5.2+claude.test");
@@ -1092,18 +1106,18 @@ const threeEntriesFixture = () => JSON.stringify([
   { id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "user", enabled: true },
   {
     id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
-    projectPath: "/projects/mine",
+    projectPath: ROOT_MINE,
   },
   {
     id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
-    projectPath: "/projects/other",
+    projectPath: ROOT_OTHER,
   },
 ]);
 
 test("a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity", () => {
   // cwd matches NEITHER project-scope entry's projectPath: both drop out of eligibility,
   // leaving the scope:"user" entry as the single match -- resolves cleanly, not ambiguous.
-  const cwd = "/projects/third";
+  const cwd = ROOT_THIRD;
   const identity = installedPipelineIdentity(threeEntriesFixture, "claude", claudeKnownMarketplaces(), cwd);
   assert.deepEqual(identity, { version: "0.5.4", source: "unknown" });
   // Routed through preflight() (hermetic observe default): this test is
@@ -1127,7 +1141,7 @@ test("a Claude project-scope entry for an unrelated project never counts toward 
 // with it as ambiguous. This supersedes the prior "explicitly forbidden" precedence-rule
 // stance: the PO has now explicitly authorized this precedence.
 test("a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry", () => {
-  const cwd = "/projects/mine";
+  const cwd = ROOT_MINE;
   const identity = installedPipelineIdentity(threeEntriesFixture, "claude", claudeKnownMarketplaces(), cwd);
   assert.deepEqual(identity, { version: "0.5.4", source: "unknown" });
   // Routed through preflight() (hermetic observe default): this test is
@@ -1151,14 +1165,14 @@ test("two eligible Claude project-scope entries for the same id and cwd still co
   const duplicateProjectFixture = () => JSON.stringify([
     {
       id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
-      projectPath: "/projects/mine",
+      projectPath: ROOT_MINE,
     },
     {
       id: "pipeline-core@agent-pipeline", version: "0.5.5", scope: "project", enabled: true,
-      projectPath: "/projects/mine",
+      projectPath: ROOT_MINE,
     },
   ]);
-  const cwd = "/projects/mine";
+  const cwd = ROOT_MINE;
   const identity = installedPipelineIdentity(duplicateProjectFixture, "claude", claudeKnownMarketplaces(), cwd);
   assert.deepEqual(identity, { version: null, source: "unknown", ambiguous: true });
   const result = preflight({
@@ -1210,7 +1224,7 @@ test("a Claude version mismatch between loaded and installed identity requires r
 test("the Claude local-development id is accepted only from an attested directory-source marketplace", () => {
   for (const knownMarketplaces of [
     claudeKnownMarketplaces("agent-pipeline-local", "relative/path"),
-    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "github", path: "/repo" } } }),
+    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "github", path: ROOT_REPO } } }),
     () => JSON.stringify({}),
     () => JSON.stringify({ "agent-pipeline-local": { source: { source: "directory", path: "/repo/./x/.." } } }),
     () => { throw new Error("registry unavailable"); },
@@ -1322,7 +1336,7 @@ test("Codex direct local registry binding supplies its verified content identity
   const contentSha256 = snapshotPhysicalPluginRoot(installedPluginRoot).contentSha256;
   const result = preflight({
     env: { CODEX_SESSION_ID: "controlled-test" },
-    cwd: "/projects/current",
+    cwd: ROOT_CURRENT,
     scriptUrl,
     read: () => JSON.stringify({ version }),
     pluginList: () => JSON.stringify({ installed: [{
@@ -1972,7 +1986,7 @@ test("PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degr
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
-    cwd: "/projects/does-not-exist-as-a-repository",
+    cwd: ROOT_NOT_A_REPOSITORY,
   });
   assert.equal(result.concurrentSessionWarning, null);
   assert.equal(result.status, "ready");
