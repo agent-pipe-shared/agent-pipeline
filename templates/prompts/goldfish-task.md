@@ -112,6 +112,20 @@ USAGE (Elephant)
     briefing's field 2 (Context files) itself — `inspect`'s output is a tool
     result for the Elephant's own pre-dispatch orientation, never something to
     paste into PO-facing chat text as a message-budget shortcut.
+13. **Briefing-scoping checks (TOILRES TR-K, Ruling 98d) — measured toil, each a
+    dispatcher duty before the briefing is sent:**
+    - Orientation spend (T40, T47, T57): one briefing per file; name the exact
+      files AND line ranges (fixture ranges included) in field 2; reserve the
+      closing calls (field 6). A denied call still counts against the budget.
+      When a counter is shared, say "one tool call at a time" — a parallel batch
+      collides on it.
+    - Test-only briefing (T48): first run one case of the target test file on
+      THIS host and read its verify-suite registration (read only, TP-13); a file
+      never baseline-run here is not briefed.
+    - Backlog close-out (T52): map item to test up front in field 2; otherwise a
+      close-out costs about 25 calls per item.
+    - Resume (T68): after a host crash, a lost dispatch resumes via SendMessage —
+      a crashed, unfinished dispatch only, never one that already handed back.
 ═══════════════════════════════════════════════════════════════════════════
 The dispatcher selects the binding version from the actual caller. Claude uses
 `pipeline.native-goldfish-host-briefing.v1` with `agentType` set to the
@@ -358,8 +372,9 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
   disk, and refuses to write anything at all (fail-closed) if a known host-path
   shape survives redaction. This matters most for RED evidence: a failing
   `node --test` run embeds the absolute path in its own `file://` stack traces.
-- Long-running suites/scans (>~60s) SHOULD run via background execution,
-  checking results before writing the final report — keeps turns responsive.
+- Long-running suites/scans (>~60s) run in the FOREGROUND, in-turn — a backgrounded
+  job has no guaranteed resumption inside a dispatch (field 6), and the budget is
+  sized for the closing ceremony, not for polling (T86).
 - Test fixtures MUST mirror the real harness contract: hook-input fixtures
   include ABSOLUTE paths alongside relative ones — testing only the convenient
   relative form is the fixture-blindness failure class.
@@ -379,6 +394,8 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
   not only when a path feels risky (twice, `NVA-A1214-SUCCESS-1` and
   `NVA-RETRYECON-1`, a dispatch's own DoD checks missed exactly this and it was
   only caught by a later, separate Full Verify run).
+- Test-only RED briefing (T36): the DoD includes sweeping assertions in older
+  tests that pin the replaced behaviour — the RED commit lists or updates each one.
 - {{ADDITIONAL_CHECKS or delete this line}}
 
 ### 4. Forbidden
@@ -395,6 +412,8 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - **Restore-before-yield:** if your task runs state-changing tests (fault injection, live-state mutation, temporary breakage to prove a check catches it), restore the touched state BEFORE every yield/turn end — never end a turn with a live fault injection left lying in the checkout.
 - {{SANITIZATION_DOD: if this dispatch's report/commits/artifacts could carry local paths, spell the check out as a concrete grep-pattern list instead of principle-prose — e.g. repo-root absolute-path pattern, scratchpad-path pattern, user-directory pattern (`C:\Users\<name>` / `/home/<name>`), known secret/token formats — else delete this line (a principle-prose sanitization DoD has let a repo-root path through).}}
 - {{ACCOUNTING_ATTRIBUTION: if this briefing touches booking/accounting/financial data, require an explicit attribution/source line for every evidence entry the goldfish produces — the source of each figure/label, never a goldfish-invented label (e.g. an ad hoc session name not present in the source data); keep booking facts and delivery evidence in visibly separate fields, never merged into one prose line — else delete this line (an inline accounting briefing has let a goldfish invent an ad-hoc session label inside an evidence line).}}
+- **Calibration file (T63):** read it with Read only; any shell command naming it is refused by the gate-strength lane (`GUARD-GATE-STRENGTH-SHELL`).
+- **Guard files (T69):** never unstage a guard file or restore a TP-13 copy — both are refused; take post-images from `scratch/` or the tranche package.
 - {{TASK_SPECIFIC_PROHIBITIONS or delete}}
 
 ### 5. Stop conditions
@@ -423,6 +442,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
   state before you stop (restore-before-yield, see field 4) — a stop report
   with a live fault injection still in place is itself the failure to avoid,
   not an acceptable stop.
+- `.git/index.lock` exists at commit time: retry once after other work; if it persists, stop and report (T86).
 - {{TASK_SPECIFIC_STOPS or delete}}
 
 ### 6. Dispatch metadata
@@ -437,7 +457,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
 - **Fan-out slice declaration (only when a slice queue exists for the feature):** declare the slice as two literal lines of this field, each on a line of its own — `Slice: <queue slice id>` and `Write scope: <comma-separated repo-relative paths or globs, or none for read-only>` (exactly these spellings: capital first letter, a colon directly after the label; `parseDispatchSlice` in `plugins/pipeline-core/lib/dispatch-policy.mjs` reads them and `guard-dispatch` judges the declared scope against the queue entry). When no slice queue exists, omit both lines — never write placeholders or empty values.
 - Profile: {{standard | light}} — `light` ONLY for stage-0 mechanical or bounded implementation tasks (operating-model §3.3; `roles/goldfish.md` §6): condensed 3-field report (see below), mechanic `low` or implementor `medium`, skip the pre-edit baseline verify. Never `light` for deep, class-high, architecture, guardrail, or security work.
-- **Tool budget (TB-09, hard cap, first-class field):** {{TOOL_BUDGET default: "≤35 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. The stated number is the **base cap for doing the work**; the closing allowance below sits on top of it, so scope the package against the base number and plan the total as base + 5. Approaching or reaching the base cap is a stop condition (field 5): stop working there and close out through the allowance — never "push through" past it on the task itself. The dispatch-budget guard enforces the briefed cap as a hard limit, and caps above about 35 are not honoured; brief 30 or fewer and leave the closing allowance for the record and report. **A second, harder limit exists above this one, and it is enforced.** Every Goldfish agent definition (`plugins/pipeline-core/agents/goldfish-*.md`) carries a `maxTurns` frontmatter value — check the exact number for the `agentType` this dispatch invokes — and the harness cuts the run off there, mid-sentence, with no report and no closing handover. **The Claude hook enforces `min(stated base cap, maxTurns - 15)` for the dispatched `agentType`** (5 closing allowance + 10 safety margin are reserved out of `maxTurns`); it silently clamps a higher stated cap, and only an orchestrator-written grant can raise the working cap, up to `maxTurns - 6`; the 15-call reserve describes the clamp without a grant. Treat the effective cap, not the stated number, as the base cap everywhere in this briefing. The default base cap above (35) plus the 15 reserved = 50 fits exactly under the shipped `maxTurns: 50` for `goldfish-implementor`/`goldfish-mechanic`, so a stated 40 would silently be clamped to 35; `goldfish-deep` ships a higher `maxTurns: 80` (deep-tier tasks run longer by design), so its effective cap is at most 65 — if a dispatch's `agentType` carries yet another `maxTurns` value, state a base cap at or below `maxTurns - 15` — do not reuse 35 unchecked. The 80 % checkpoint is computed on that effective cap (e.g. call 28 of 35 on the implementor), and the call that reaches it carries the notice. **Runner support:** Claude Code's installed hook counts authenticated subagent calls and restricts an over-cap dispatch to closing acts. The runner-neutral policy core is also shipped for other adapters, but Codex and Antigravity do not yet provide authenticated live-call adapters, so on those runners the base cap remains a briefing duty rather than an enforced count. Do not claim cross-runner enforcement from the shared core alone (the G1 lesson, `policies/tooling-policy.md` AP-T2). `maxTurns` itself is a real harness cliff wherever the runner exposes it — treat reaching it as data loss, not merely a missed target (`backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`).
+- **Tool budget (TB-09, hard cap, first-class field):** {{TOOL_BUDGET default: "≤35 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. The stated number is the **base cap for doing the work**; the closing allowance below sits on top of it, so scope the package against the base number and plan the total as base + 5. Approaching or reaching the base cap is a stop condition (field 5): stop working there and close out through the allowance — never "push through" past it on the task itself. The dispatch-budget guard enforces the briefed cap as a hard limit, and caps above about 35 are not honoured; brief 30 or fewer and leave the closing allowance for the record and report. **A second, harder limit exists above this one, and it is enforced.** Every Goldfish agent definition (`plugins/pipeline-core/agents/goldfish-*.md`) carries a `maxTurns` frontmatter value — check the exact number for the `agentType` this dispatch invokes — and the harness cuts the run off there, mid-sentence, with no report and no closing handover. **The Claude hook enforces `min(stated base cap, maxTurns - 15)` for the dispatched `agentType`** (5 closing allowance + 10 safety margin are reserved out of `maxTurns`); it silently clamps a higher stated cap, and only an orchestrator-written grant can raise the working cap, up to `maxTurns - 6` (a SendMessage asking for more budget is not a grant and raises nothing, T56); the 15-call reserve describes the clamp without a grant. Treat the effective cap, not the stated number, as the base cap everywhere in this briefing. The default base cap above (35) plus the 15 reserved = 50 fits exactly under the shipped `maxTurns: 50` for `goldfish-implementor`/`goldfish-mechanic`, so a stated 40 would silently be clamped to 35; `goldfish-deep` ships a higher `maxTurns: 80` (deep-tier tasks run longer by design), so its effective cap is at most 65 — if a dispatch's `agentType` carries yet another `maxTurns` value, state a base cap at or below `maxTurns - 15` — do not reuse 35 unchecked. The 80 % checkpoint is computed on that effective cap (e.g. call 28 of 35 on the implementor), and the call that reaches it carries the notice. **Runner support:** Claude Code's installed hook counts authenticated subagent calls and restricts an over-cap dispatch to closing acts. The runner-neutral policy core is also shipped for other adapters, but Codex and Antigravity do not yet provide authenticated live-call adapters, so on those runners the base cap remains a briefing duty rather than an enforced count. Do not claim cross-runner enforcement from the shared core alone (the G1 lesson, `policies/tooling-policy.md` AP-T2). `maxTurns` itself is a real harness cliff wherever the runner exposes it — treat reaching it as data loss, not merely a missed target (`backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`).
 - **Closing allowance (+5 tool uses beyond the base cap) — the budget is a handover, not a cliff.** Reaching the (effective) base cap ends the WORK, not the dispatch. You then have five further tool uses, spendable on closing ONLY, in this priority order:
   1. **Restore before you yield** — if a state-changing test (fault injection, live-state mutation, temporary breakage) is still live in the checkout, restore it FIRST. A handover that leaves one lying there is the failure this allowance exists to prevent, not an acceptable close (field 5).
   2. **Commit what is already green** — the pieces whose checks actually passed, and nothing else.
