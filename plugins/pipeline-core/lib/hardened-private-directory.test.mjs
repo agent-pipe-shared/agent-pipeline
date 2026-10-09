@@ -762,6 +762,10 @@ describe("ensureAgentPipelineRoot (Ruling 141 D0 root entry point)", () => {
   });
 
   test("F1: without an emitWarning seam the repair surfaces as a typed process warning, so every caller sees it (seam-driven win32)", async () => {
+    // Earlier cases repair through the default seam too, and `process.emitWarning` delivers on the next tick. The runner
+    // can reach this case without returning to the event loop, so those deferred deliveries drain here, before the
+    // listener exists, and only this case's own repair can reach it.
+    await new Promise((resolve) => setImmediate(resolve));
     const seen = [];
     const listener = (warning) => { seen.push(warning); };
     process.on("warning", listener);
@@ -776,7 +780,7 @@ describe("ensureAgentPipelineRoot (Ruling 141 D0 root entry point)", () => {
       process.off("warning", listener);
     }
     const typed = seen.filter((warning) => warning?.code === REPAIRED_ADVISORY);
-    assert.equal(typed.length, 1, `expected one process warning with code ${REPAIRED_ADVISORY}, saw ${seen.length} warning(s)`);
+    assert.equal(typed.length, 1, `expected one process warning with code ${REPAIRED_ADVISORY}, saw ${seen.length} warning(s) with codes [${seen.map((warning) => warning?.code).join(", ")}]`);
   });
 
   test("F2: a PRIVATE root owned by someone else is refused with PB-ROOT-INSECURE under either posture, untouched and never chmodded (seam-driven POSIX over a real directory)", { skip: POSIX_MODE_HOST_SKIP }, () => {
