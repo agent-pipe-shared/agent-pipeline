@@ -8,6 +8,7 @@
  * the single final approval over the returned physical package digest and then
  * re-read that approval at the implementation boundary.
  */
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readDesignWorkflowPackageV2FromRepository } from "./design-workflow-package-v2.mjs";
 import { canonicalizeJson } from "./governance-event.mjs";
@@ -76,6 +77,39 @@ function sameJsonBytes(value, raw) {
 function validCandidate(value) {
   return exact(value, ["commit", "tree"])
     && GIT_OBJECT.test(value.commit ?? "") && GIT_OBJECT.test(value.tree ?? "");
+}
+const COMMIT_ID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+function gitText(repoRoot, args) {
+  return execFileSync("git", ["-C", repoRoot, ...args], { timeout: 10000, maxBuffer: 1048577, stdio: ["ignore", "pipe", "pipe"] }).toString();
+}
+// The v1 package's own bound set (Ruling 92a): the package file, the readiness reference and the Advisor receipt.
+// Derived from the package object, never from a directory glob; the digest-bound sources are excluded.
+function boundEvidencePaths(workflowPackage, packagePath) {
+  const sourcePaths = new Set(SOURCE_NAMES.map((name) => workflowPackage.sources?.[name]?.path));
+  return new Set([packagePath, workflowPackage.readiness?.path, workflowPackage.advisor?.receipt?.path]
+    .filter((path) => typeof path === "string" && path.length > 0 && !sourcePaths.has(path)));
+}
+// "Candidate or an evidence-only descendant" (Rulings 65 and 92a), the v2 rule applied to the v1 package: the live HEAD
+// commit differs from the candidate commit, the candidate is an ancestor of HEAD, and every path that differs between the two
+// commits was added or modified and belongs to the bound set. Only an affirmative proof admits; any git failure, deletion,
+// rename, type change or other path refuses. A HEAD on the candidate commit itself is never decided here, so a recorded tree
+// that disagrees with the live one keeps the strict-equality refusal.
+function isEvidenceOnlyDescendant(repoRoot, head, workflowPackage, packagePath) {
+  try {
+    const candidate = workflowPackage.candidate?.commit;
+    if (typeof candidate !== "string" || !COMMIT_ID.test(candidate) || typeof head?.commit !== "string"
+      || !COMMIT_ID.test(head.commit) || head.commit === candidate) return false;
+    try { gitText(repoRoot, ["merge-base", "--is-ancestor", candidate, head.commit]); }
+    catch (error) { if (error?.status === 1) return false; throw error; }
+    const bound = boundEvidencePaths(workflowPackage, packagePath);
+    const tokens = gitText(repoRoot, ["diff-tree", "-r", "--name-status", "-z", "--no-renames", candidate, head.commit]).split("\0");
+    if (tokens[tokens.length - 1] === "") tokens.pop();
+    if (tokens.length % 2 !== 0) return false;
+    for (let i = 0; i < tokens.length; i += 2) {
+      if ((tokens[i] !== "A" && tokens[i] !== "M") || !bound.has(tokens[i + 1])) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 function validSource(value) {
   return exact(value, ["path", "sha256"])
@@ -567,6 +601,12 @@ export function readDesignWorkflowPackageFromRepository({
     attemptTrail = attemptFile.value;
     attemptTrailBytes = attemptFile.bytes;
   }
+  // "Candidate or an evidence-only descendant" (Rulings 65 and 92a), decided once here for this read, as the v2 reader does:
+  // when HEAD is not the candidate but descends from it through bound-set evidence paths only, the strict equality below is
+  // not demanded. The package is committed after its candidate, which the bound-path gate requires before present-plan.
+  const evidenceOnlyDescendant = requireCurrentCandidate
+    && JSON.stringify(beforeCandidate) !== JSON.stringify(workflowPackage.candidate)
+    && isEvidenceOnlyDescendant(repoRoot, beforeCandidate, workflowPackage, packagePath);
   const result = validateDesignWorkflowPackage({
     workflowPackage,
     packageBytes: packageFile.bytes,
@@ -582,13 +622,15 @@ export function readDesignWorkflowPackageFromRepository({
     requireReadinessExecution,
     roleRoutePreflight,
     evidenceBindings,
-    // At package creation/presentation the exact Git candidate must match.
+    // At package creation/presentation the exact Git candidate must match, or
+    // HEAD must be an evidence-only descendant of it (decided above); any other
+    // difference keeps DWP-CANDIDATE-DRIFT from the validator.
     // After an approval, consumers may re-read the same immutable package
     // following unrelated commits; the observed HEAD is still sampled twice
     // below to reject a moving read, but it is no longer required to equal the
     // package's provenance candidate. Such consumers must separately compare
     // packageSha256 with the digest recorded by the approved authority.
-    ...(requireCurrentCandidate ? { candidate: beforeCandidate } : {}),
+    ...(requireCurrentCandidate && !evidenceOnlyDescendant ? { candidate: beforeCandidate } : {}),
   });
   if (!result.ok) return result;
 
