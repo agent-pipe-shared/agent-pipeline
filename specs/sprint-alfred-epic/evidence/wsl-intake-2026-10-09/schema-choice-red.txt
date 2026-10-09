@@ -1,0 +1,136 @@
+command: node --test plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs
+label: schema-choice-red
+exitCode: 1
+head: b0d919b3f364d902b1ba927496542674bea3290a
+tree: b945ed38e488f260d97cf18c5f4d53e2f8fe017d
+dirty: true
+--- stdout ---
+✔ SC-ALTERNATIVES-ACCEPT each exact closed alternative accepts (0.594767ms)
+✖ SC-ALTERNATIVES-AMBIGUOUS a value matching more than one branch refuses under oneOf (0.504375ms)
+✖ SC-ALTERNATIVES-CLOSED unmatched, mixed, and unknown-key objects refuse (0.207733ms)
+✖ SC-ALTERNATIVES-MALFORMED malformed oneOf declarations refuse (0.163451ms)
+✖ SC-ALTERNATIVES-NESTED-ARRAY oneOf is enforced in nested properties and array items (0.237382ms)
+✔ SC-ALTERNATIVES-Z-REGRESSION schemas without oneOf retain type required and additionalProperties behavior (0.108822ms)
+✖ SC-ALTERNATIVES-ZZ-MATCH a value matching no alternative refuses (0.290573ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 2
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.561535
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SC-ALTERNATIVES-AMBIGUOUS a value matching more than one branch refuses under oneOf (0.504375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs:52:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SC-ALTERNATIVES-CLOSED unmatched, mixed, and unknown-key objects refuse (0.207733ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs:60:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SC-ALTERNATIVES-MALFORMED malformed oneOf declarations refuse (0.163451ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs:71:18)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SC-ALTERNATIVES-NESTED-ARRAY oneOf is enforced in nested properties and array items (0.237382ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs:92:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ SC-ALTERNATIVES-ZZ-MATCH a value matching no alternative refuses (0.290573ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs:123:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
