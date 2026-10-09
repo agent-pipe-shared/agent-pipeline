@@ -17,7 +17,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { hostname } from "node:os";
+import { hostname, uptime } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -2206,17 +2206,80 @@ function procStart(pid) {
   return fields[19];
 }
 
-function localAuditLockOwner() {
-  const hostId = hostname().toLowerCase();
-  const linux = process.platform === "linux";
-  const bootId = linux
-    ? readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase()
-    : "unavailable";
+// The audit-lock host seam (T90-F, Ruling 111). An audit-lock owner is judged against "the
+// host": its platform, hostname, boot identity and a pid probe. Everything the verdict reads
+// from the machine goes through this one object, so a caller can stand in for another
+// machine by passing `dependencies.auditLockHost` to acquireAuditLock. With nothing injected
+// every member is the real host. All members are optional:
+//   platform       string               default process.platform
+//   hostname       string               default os.hostname()
+//   bootId         string               a ready boot identity; wins over uptime and /proc
+//   uptimeSeconds  number               win32 only; with nowMs it derives the boot minute
+//   nowMs          number               default Date.now()
+//   pidAlive       (pid) => boolean     default process.kill(pid, 0); false only for ESRCH
+// The Linux branch still reads /proc/<pid>/stat for the process start time, so injecting
+// platform "linux" on a host without /proc is unsupported.
+const WIN32_BOOT_MINUTE = /^[0-9]{1,15}$/u;
+// A win32 boot time is `now - uptime` floored to the minute, and that estimate wobbles by up
+// to about a second between two reads, so a boot time near a minute edge can floor to
+// adjacent minutes in the owner's write and the reader's check. Judging such a live owner
+// dead would steal a live lock, so adjacent minutes count as the same boot. A reboot moves
+// the boot time by at least the previous uptime, far beyond this.
+const WIN32_BOOT_MINUTE_TOLERANCE = 1;
+
+function defaultPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    if (error?.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+function win32BootMinute(nowMs, uptimeSeconds) {
+  if (!Number.isFinite(nowMs) || !Number.isFinite(uptimeSeconds) || uptimeSeconds < 0) return "unavailable";
+  const minute = Math.floor((nowMs - uptimeSeconds * 1000) / 60000);
+  return Number.isSafeInteger(minute) && minute > 0 ? String(minute) : "unavailable";
+}
+
+function resolveAuditLockHost(injected) {
+  if (injected !== undefined && !object(injected)) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock host seam is invalid");
+  }
+  const seam = injected ?? {};
+  if ((seam.platform !== undefined && typeof seam.platform !== "string")
+    || (seam.hostname !== undefined && typeof seam.hostname !== "string")
+    || (seam.bootId !== undefined && typeof seam.bootId !== "string")
+    || (seam.uptimeSeconds !== undefined && typeof seam.uptimeSeconds !== "number")
+    || (seam.nowMs !== undefined && typeof seam.nowMs !== "number")
+    || (seam.pidAlive !== undefined && typeof seam.pidAlive !== "function")) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock host seam is invalid");
+  }
+  const platform = seam.platform ?? process.platform;
+  return {
+    platform,
+    hostId: () => (seam.hostname ?? hostname()).toLowerCase(),
+    bootId: () => {
+      if (seam.bootId !== undefined) return seam.bootId.trim().toLowerCase();
+      if (platform === "linux") return readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+      if (platform === "win32") return win32BootMinute(seam.nowMs ?? Date.now(), seam.uptimeSeconds ?? uptime());
+      return "unavailable";
+    },
+    pidAlive: seam.pidAlive ?? defaultPidAlive,
+  };
+}
+
+function localAuditLockOwner(host = resolveAuditLockHost()) {
+  const hostId = host.hostId();
+  const linux = host.platform === "linux";
+  const bootId = host.bootId();
   if (!SAFE_ID.test(hostId) || !SAFE_ID.test(bootId)) {
     fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock host identity is unavailable");
   }
   return {
-    platform: process.platform,
+    platform: host.platform,
     hostId,
     bootId,
     pid: process.pid,
@@ -2333,22 +2396,63 @@ function readAuditLock(path, secret) {
   return { record: value, identity: finalizeInterruptedAuditLockPublication(path, identity) };
 }
 
-function auditLockOwnerState(record) {
-  if (process.platform !== "linux" || record.owner.platform !== "linux") return "ambiguous";
+function linuxAuditLockOwnerState(owner, host) {
   let localHost;
   let localBoot;
   try {
-    localHost = hostname().toLowerCase();
-    localBoot = readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+    localHost = host.hostId();
+    localBoot = host.bootId();
   } catch { return "ambiguous"; }
-  if (record.owner.hostId !== localHost) return "ambiguous";
-  if (record.owner.bootId !== localBoot) return "dead";
-  try { return procStart(record.owner.pid) === record.owner.processStart ? "live" : "dead"; }
+  if (owner.hostId !== localHost) return "ambiguous";
+  if (owner.bootId !== localBoot) return "dead";
+  try { return procStart(owner.pid) === owner.processStart ? "live" : "dead"; }
   catch (error) { return error?.code === "ENOENT" ? "dead" : "ambiguous"; }
 }
 
+// win32 keeps no per-process start identity, so a present pid is never proof of a live owner
+// (it may be reused) and this branch never answers "live": a missing pid is dead, a present
+// pid from another boot is dead, and everything else is ambiguous. Only a pid probe that
+// proves the pid gone, or two usable boot minutes that differ, may declare an owner dead.
+function win32AuditLockOwnerState(owner, host) {
+  let localHost;
+  try { localHost = host.hostId(); } catch { return "ambiguous"; }
+  if (owner.hostId !== localHost) return "ambiguous";
+  let present;
+  try { present = host.pidAlive(owner.pid); } catch { return "ambiguous"; }
+  if (present === false) return "dead";
+  if (present !== true) return "ambiguous";
+  let localBoot;
+  try { localBoot = host.bootId(); } catch { return "ambiguous"; }
+  // A legacy "unavailable" record, or an unusable local boot time, cannot prove another boot.
+  if (!WIN32_BOOT_MINUTE.test(owner.bootId) || !WIN32_BOOT_MINUTE.test(localBoot)) return "ambiguous";
+  return Math.abs(Number(owner.bootId) - Number(localBoot)) > WIN32_BOOT_MINUTE_TOLERANCE ? "dead" : "ambiguous";
+}
+
+function auditLockOwnerState(record, host = resolveAuditLockHost()) {
+  if (record.owner.platform !== host.platform) return "ambiguous";
+  if (host.platform === "linux") return linuxAuditLockOwnerState(record.owner, host);
+  if (host.platform === "win32") return win32AuditLockOwnerState(record.owner, host);
+  return "ambiguous";
+}
+
+// An ambiguous owner is a refusal only an attended human can resolve, so the refusal types
+// the way out: the exact lock file and the command that removes it. The message is kept
+// as before; the recovery is a separate own property.
+function ambiguousAuditLockRefusal(message, lockPath) {
+  const win32 = process.platform === "win32";
+  const quoted = win32
+    ? `'${lockPath.replaceAll("'", "''")}'`
+    : `'${lockPath.replaceAll("'", "'\\''")}'`;
+  const error = new HumanGuardOverrideError("HGO-AUDIT-LOCK-AMBIGUOUS", message);
+  error.recovery = {
+    files: [lockPath],
+    command: win32 ? `Remove-Item -LiteralPath ${quoted}` : `rm -- ${quoted}`,
+  };
+  return error;
+}
+
 function publishAuditLock(path, secret, purpose, dependencies = {}) {
-  const record = auditLockRecord(secret, localAuditLockOwner(), purpose);
+  const record = auditLockRecord(secret, localAuditLockOwner(resolveAuditLockHost(dependencies.auditLockHost)), purpose);
   const bytes = auditLockBytes(record);
   const temporary = `${path}.publish.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
   let fd;
@@ -2394,12 +2498,14 @@ function releaseOwnedAuditLock(lock) {
   return true;
 }
 
-function clearAbandonedAuditRecovery(paths, secret) {
+function clearAbandonedAuditRecovery(paths, secret, host) {
   if (!existsSync(paths.auditLockRecovery)) return;
   const observed = readAuditLock(paths.auditLockRecovery, secret);
-  const state = auditLockOwnerState(observed.record);
+  const state = auditLockOwnerState(observed.record, host);
   if (state === "live") fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery is already active");
-  if (state !== "dead") fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock recovery owner state is ambiguous");
+  if (state !== "dead") {
+    throw ambiguousAuditLockRefusal("audit lock recovery owner state is ambiguous", paths.auditLockRecovery);
+  }
   const quarantine = `${paths.auditLockRecovery}.dead.${process.pid}.${randomBytes(8).toString("hex")}`;
   try { renameSync(paths.auditLockRecovery, quarantine); }
   catch { fail("HGO-AUDIT-LOCK-CHANGED", "audit lock recovery guard changed during reclamation"); }
@@ -2415,7 +2521,8 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
   if (!["genesis", "existing"].includes(purpose)) {
     fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock purpose is invalid");
   }
-  clearAbandonedAuditRecovery(paths, secret);
+  const host = resolveAuditLockHost(dependencies.auditLockHost);
+  clearAbandonedAuditRecovery(paths, secret, host);
   try {
     const lock = publishAuditLock(paths.auditLock, secret, purpose, dependencies);
     if (existsSync(paths.auditLockRecovery)) {
@@ -2428,9 +2535,9 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
   }
 
   const observed = readAuditLock(paths.auditLock, secret);
-  const ownerState = auditLockOwnerState(observed.record);
+  const ownerState = auditLockOwnerState(observed.record, host);
   if (ownerState === "live") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
-  if (ownerState !== "dead") fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock owner state is ambiguous");
+  if (ownerState !== "dead") throw ambiguousAuditLockRefusal("audit lock owner state is ambiguous", paths.auditLock);
   if (observed.record.purpose !== purpose) {
     fail("HGO-AUDIT-LOCK-STATE", "audit lock purpose does not match the requested ledger state");
   }
@@ -2448,7 +2555,7 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
     const current = readAuditLock(paths.auditLock, secret);
     if (!sameLockIdentity(paths.auditLock, observed.identity)
       || canonical(current.record) !== canonical(observed.record)
-      || auditLockOwnerState(current.record) !== "dead") {
+      || auditLockOwnerState(current.record, host) !== "dead") {
       fail("HGO-AUDIT-LOCK-CHANGED", "audit lock changed during recovery");
     }
     renameSync(paths.auditLock, quarantine);
