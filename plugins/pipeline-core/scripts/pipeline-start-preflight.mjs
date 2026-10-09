@@ -859,8 +859,11 @@ export function observeConcurrentSessionWarning({
     if (descriptor.sessionId === currentSessionId) continue;
     let owner;
     try {
+      // `probableLiveness` opts this ADVISORY caller into the spawn-free native-Windows check (pid exists +
+      // same host boot minute); no other caller of inspectSessionOwnerRuntime opts in.
       owner = inspectOwner(startPath, descriptor.sessionId, {
         expectedDescriptorSha256: descriptor.descriptorSha256,
+        probableLiveness: true,
       });
     } catch {
       continue;
@@ -871,6 +874,11 @@ export function observeConcurrentSessionWarning({
         sessionId: owner.sessionId,
         descriptorSha256: owner.descriptorSha256,
         status: owner.status,
+        // Only the probable (no process start identity) case carries these two keys, so the Linux
+        // warning keeps its exact four-key shape. A reused pid within one boot cannot be ruled out.
+        ...(owner.probable === true
+          ? { probable: true, message: "another session in this repository is probably live: its owner process exists and the host has not rebooted since it registered (advisory; a reused process id within one boot cannot be ruled out)" }
+          : {}),
       };
     }
   }

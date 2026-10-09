@@ -25,7 +25,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, uptime } from "node:os";
 import {
   basename,
   dirname,
@@ -555,8 +555,8 @@ function linuxProcessStartTicks(stat) {
   return fields.length >= 20 && /^\d+$/u.test(fields[19] ?? "") ? fields[19] : null;
 }
 
-function localProcessStartIdentity(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1 || process.platform !== "linux") return null;
+function localProcessStartIdentity(pid, platform = process.platform) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || platform !== "linux") return null;
   try {
     return linuxProcessStartTicks(readFileSync(`/proc/${pid}/stat`, "utf8"));
   } catch {
@@ -564,8 +564,56 @@ function localProcessStartIdentity(pid) {
   }
 }
 
-function localProcessOwnerRuntime(pid = process.pid) {
-  const processStartId = localProcessStartIdentity(pid);
+// CSW-F (Ruling 117/157): spawn-free "probably live" evidence on native Windows, where there is no /proc.
+// A win32 owner is recorded as its pid plus the host BOOT MINUTE (`now - os.uptime()`, floored to the
+// minute: the Ruling 111 encoding the audit-lock owner already uses), stored in the same `processStartId`
+// slot as the Linux start ticks so the closed descriptor shape (and every validator and fixture) is
+// unchanged. A boot minute is not a process start time: a pid REUSED within one boot is
+// indistinguishable, so the result is advisory ("probable"), never proof. The estimate wobbles by about a
+// second between two reads, so a value near a minute edge can floor to adjacent minutes; adjacent minutes
+// therefore count as the same boot. A reboot moves the boot time by at least the previous uptime.
+// Seams (all optional): `options.platform` (default process.platform), `options.nowMs` (default
+// Date.now()) and `options.uptimeSeconds` (default os.uptime()).
+const WIN32_BOOT_MINUTE_TOLERANCE = 1;
+
+function win32BootMinute(options = {}) {
+  const nowMs = options.nowMs ?? Date.now();
+  const uptimeSeconds = options.uptimeSeconds ?? uptime();
+  if (!Number.isFinite(nowMs) || !Number.isFinite(uptimeSeconds) || uptimeSeconds < 0) return null;
+  const minute = Math.floor((nowMs - uptimeSeconds * 1000) / 60000);
+  return Number.isSafeInteger(minute) && minute > 0 ? String(minute) : null;
+}
+
+function processExists(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The advisory leg of `inspectSessionOwnerRuntime`, reached only when no process start identity is
+ * available (every non-Linux host). It answers "live" (with `probable: true`) or "reused" ONLY for a
+ * caller that opted in with `options.probableLiveness === true` on win32; every other caller keeps the
+ * typed "unavailable" it always had, so retirement and orphan-archive decisions are never driven by a
+ * probable status.
+ */
+function probableOwnerStatus(base, ownerRuntime, platform, options) {
+  if (options?.probableLiveness !== true || platform !== "win32") return { ...base, status: "unavailable" };
+  const current = win32BootMinute(options);
+  if (current === null) return { ...base, status: "unavailable" };
+  const sameBoot = Math.abs(Number(ownerRuntime.processStartId) - Number(current)) <= WIN32_BOOT_MINUTE_TOLERANCE;
+  return sameBoot ? { ...base, status: "live", probable: true } : { ...base, status: "reused" };
+}
+
+function localProcessOwnerRuntime(pid = process.pid, options = {}) {
+  const platform = options.platform ?? process.platform;
+  let processStartId = localProcessStartIdentity(pid, platform);
+  if (processStartId === null && platform === "win32" && Number.isSafeInteger(pid) && pid >= 1 && processExists(pid)) {
+    processStartId = win32BootMinute(options);
+  }
   return processStartId === null ? null : {
     schema: SESSION_OWNER_RUNTIME_SCHEMA,
     pid,
@@ -639,7 +687,7 @@ export function startSessionDescriptor(startPath, options = {}) {
     createdAt: nowIso(options.now),
     ownerNonce,
     ownerNonceSha256: ownerDigest(ownerNonce),
-    ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid),
+    ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid, options),
   };
   writeAtomic(path, canonicalJson(descriptor));
   return {
@@ -719,8 +767,9 @@ export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
     else return { ...base, status: "unavailable" };
   }
   if (!alive) return { ...base, status: "not-live" };
-  const observedStartId = localProcessStartIdentity(loaded.ownerRuntime.pid);
-  if (observedStartId === null) return { ...base, status: "unavailable" };
+  const platform = options.platform ?? process.platform;
+  const observedStartId = localProcessStartIdentity(loaded.ownerRuntime.pid, platform);
+  if (observedStartId === null) return probableOwnerStatus(base, loaded.ownerRuntime, platform, options);
   return {
     ...base,
     status: observedStartId === loaded.ownerRuntime.processStartId ? "live" : "reused",
