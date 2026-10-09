@@ -1940,6 +1940,91 @@ test("TR-G T49 (j): after the working cap, the forward-slash producer spellings,
   trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
 });
 
+// ---------------------------------------------------------------------------
+// TR-G-T4 (tranche-2 post-image, 2026-10-09): pins for the three guard corrections of Ruling 150 (TR-G delta Critic
+// FAIL, findings 1 to 3). Appended after T49 (j); every earlier line is unchanged. The guard fix that turns the red
+// pins green is TR-G-F4, a separate dispatch (QG-04).
+//   Finding 1. The producer is admitted only in its absolute plugin-root spelling, but the refusal text names only the
+//       script. Pin (l): the refusal of a relative spelling names the exact admitted absolute path, compared after
+//       mapping "\" to "/" (and lower-casing on win32) on both sides so the fix may choose either separator. Pin (k)
+//       is its control: the relative spelling is refused, today and after the fix. A relative spelling is NOT
+//       admitted because in a source checkout it is the source copy, a different program from the installed plugin.
+//   Finding 3. The verb pattern `^git\s+(add|commit)\b` lets a hyphenated lookalike through as a closing act, because
+//       `\b` matches between "t" and "-". Pins (m) `git commit-graph write` and (n) `git commit-tree HEAD`: refused.
+//       Neither carries a shell control character, so today they are admitted for the verb pattern alone. The fix
+//       pattern is `^git\s+(add|commit)(\s|$)`.
+//   Finding 2. On win32 only a QUOTED token gets the backslash mapping; a bare (unquoted) token that contains "\" is
+//       refused, because a shell eats an unquoted backslash. Pins (p) all separators backslashes and (q) a backslash
+//       only before the script name: refused, win32-native only. The guard reads process.platform directly and this
+//       runner has no platform seam, so (p) and (q) carry a typed probe-based skip on every other host, and no
+//       injected-win32 variant is invented.
+//   Controls: (o) the exact path the refusal text names is admitted (quoted, and bare with forward slashes only), and
+//       `git commit -F <f> -- <p>` stays admitted. Each test spends at most three post-cap calls (allowance: five).
+// ---------------------------------------------------------------------------
+const TRG4_TAIL = "--task TR-G-T4-20261009 -- evidence/x.json";
+const TRG4_PLUGIN_ROOT = `${FAKE_ROOT}/plugins/pipeline-core`;
+// The one admitted producer path, spelled with the same join the guard uses for its comparison.
+const TRG4_ADMITTED = join(TRG4_PLUGIN_ROOT, "scripts", TRG_PRODUCER);
+const trg4Comparable = (text) => {
+  const slashed = String(text).replaceAll("\\", "/");
+  return process.platform === "win32" ? slashed.toLowerCase() : slashed;
+};
+const trg4RelativeCommand = () => `node plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG4_TAIL}`;
+const TRG4_WIN32_ONLY_SKIP = process.platform === "win32" ? false : "TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)";
+
+test("TR-G T49 (k): after the working cap, a relative spelling of the producer script stays refused (control, green today)", () => {
+  const command = trg4RelativeCommand();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path", () => {
+  const command = trg4RelativeCommand();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+  assert.ok(
+    trg4Comparable(verdict.stderr).includes(trg4Comparable(TRG4_ADMITTED)),
+    `the refusal must name the admitted absolute path ${TRG4_ADMITTED} -- got: ${verdict.stderr.trim().slice(0, 700)}`,
+  );
+});
+
+test("TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb", () => {
+  const command = "git commit-graph write";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike", () => {
+  const command = "git commit-tree HEAD";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (o): after the working cap, the exact admitted producer command (quoted, and bare with forward slashes) and `git commit -F <f> -- <p>` stay admitted (control, green today)", () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const commands = [
+    `node "${TRG4_ADMITTED}" ${TRG4_TAIL}`,
+    `node ${TRG4_ADMITTED.replaceAll("\\", "/")} ${TRG4_TAIL}`,
+    "git commit -F scratch/commit-msg/TR-G-T4.txt -- evidence/x.json",
+  ];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
+test("TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused", { skip: TRG4_WIN32_ONLY_SKIP }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = `node ${TRG4_ADMITTED.replaceAll("/", "\\")} ${TRG4_TAIL}`;
+  assert.ok(command.slice(5, command.indexOf(" ", 5)).includes("\\"), "the bare script token must contain a backslash");
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused", { skip: TRG4_WIN32_ONLY_SKIP }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = `node ${TRG4_PLUGIN_ROOT.replaceAll("\\", "/")}/scripts\\${TRG_PRODUCER} ${TRG4_TAIL}`;
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
 function trgTwoChildrenOneParentFiles() {
   const files = boundImplementorFiles(20, 20);
   files[trgChildMetaPath("def456")] = trgChildMeta("parent-tool-1");
