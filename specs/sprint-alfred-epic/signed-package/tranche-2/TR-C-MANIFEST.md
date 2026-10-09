@@ -1,7 +1,7 @@
 # TR-C manifest: push and git classifier scoping pins (dispatch TR-C-T-20261009)
 
 Two tranche-2 post-images that REPLACE committed contract tests (TP-5 and TP-1). Each is the committed live file plus ONE
-inserted block of new cases (nothing existing is edited or removed). The ceremony copies each post-image over its target
+inserted block of new cases (nothing existing is edited or removed, except the two declared fixture-literal substitutions in the guard-push post-image, see "Declared substitution"). The ceremony copies each post-image over its target
 unchanged. Everything below is repo-relative. Digests are over the committed LF bytes.
 
 Contract: `specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md` section 2 rows T38, T42, T51, T80, T82, T85
@@ -16,7 +16,7 @@ rule is KEPT, relief is procedural) and Ruling 80 (contract tests land as tranch
 - Target path: `plugins/pipeline-core/hooks/guard-push.test.mjs`
 - Post-image: `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs`
 - Base blob: `17d4313347a0f869031a450a70db0aba279b2abe` (live file at the dispatch; 2385 lines). Post-image: 2456 lines (71 inserted: the 70-line block plus one blank separator).
-- sha256: `842c74ad3d29a5191abd66d657a4db610d7420bf69e7056d86db42be9fa5777d`
+- sha256: `6c6b153faba1da5032536a7f4b3241cd229c0fefa4a699b8b5b7a6c7127023a1` (123784 bytes; after the declared substitution of TR-C-T3, TR-C-T4 amendment)
 - Insertion: one block (18 cases, ids `PGC-*`) directly before the `// ---- Cleanup` comment. No import changes.
 - WSL command (run on the scratch copy, see Evidence): `wsl.exe -e bash -lc "cd /mnt/d/Dev/agent-pipeline-share; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-T-20261009/red.txt --label red -- node --test scratch/dispatch-wip/TR-C-T/guard-push.test.mjs scratch/dispatch-wip/TR-C-T/guard-git.test.mjs"`
 - Ceremony command after placement: `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/guard-push.test.mjs"`
@@ -94,6 +94,15 @@ guard-push totals: 18 new pins, 13 GREEN and 5 RED (T38c, T80b, T42c, T82c, T85a
 | GG22-T51f the same command reports `GG-17` | T51 (I3) | RED | exit 2 matches but stderr has no `GG-17`: another rule answers first. Hypothesis, not measured: GG-22's full-index block fires before the bypass rule; it should turn green once T51a/b land |
 
 guard-git totals: 6 new pins, 3 GREEN and 3 RED.
+
+## Declared substitution (TR-C-T3, recorded by TR-C-T4)
+
+- Where: `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs`, lines 123 and 130, inside `configureAnonymousPublicPush`. The same two lines were substituted in the scratch copy.
+- Scan category: `email`.
+- New literal: `pipeline-fixture@example.invalid` (replacing the configured commit e-mail, which is deliberately not written here).
+- Reason: the pre-commit private-identifier scan refuses the configured commit e-mail on a newly added path (toil T104). Nothing in the file compares that value with the repository's identity (checked in TR-C-T3).
+- Verification capture: `evidence/TR-C-T3-20261009/guard-push.txt`, `190/197 cases passed`, with the same 7 failing case names as the reference `evidence/TR-C-T-20261009/red.txt` (PG-CHECKPOINT, PG-CHECKPOINT-WORKTREE, PGC-T38c, PGC-T80b, PGC-T42c, PGC-T82c, PGC-T85a).
+- Consequence: the post-image's prefix is no longer byte-identical to the live file at exactly those two lines. The ceremony still copies the post-image over its target unchanged; the live target takes the neutral literal at those two lines.
 
 ## Readings and gaps the F slice and the PO should see
 

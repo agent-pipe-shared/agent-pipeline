@@ -1,0 +1,2456 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * guard-push.test.mjs — test suite for the Push-Gate PreToolUse guard.
+ *
+ * AP1-P3 "DURIN". Run: node plugins/pipeline-core/hooks/guard-push.test.mjs
+ * Exit: 0 = all cases pass · 1 = at least one case failed (failure list on stdout).
+ *
+ * Hermetics: every spawn sets CLAUDE_PROJECT_DIR (and cwd) to a fresh temp dir with its
+ * own `git init` + commit, so this machine's real .claude/pipeline.yaml / pipeline-
+ * state.json / evidence files can never leak into these cases, and HEAD-dependent
+ * cases have a real, deterministic commit sha to compare against.
+ */
+import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
+
+import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+
+function enrollFixtureGovernance(root) {
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
+  const inactive = controller.observe({ rootDir: root });
+  if (inactive.state !== "inactive" || inactive.requiresEnforcement) throw new Error("fixture governance was not initially inactive");
+  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
+  const active = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+  if (active.state !== "active" || !active.requiresEnforcement) throw new Error("fixture enrollment did not activate enforcement");
+}
+
+const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
+
+const ALL_DIRS = [];
+
+/** Fresh temp dir with a real git repo (one commit) so `git rev-parse HEAD` resolves. */
+function freshRepo(prefix) {
+  const dir = mkdtempSync(join(tmpdir(), `guard-push-${prefix}-`));
+  ALL_DIRS.push(dir);
+  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+  const initialized = git("init", "-q", "-b", "main");
+  if (initialized.status !== 0) throw new Error(`fixture Git initialization failed: ${initialized.stderr}`);
+  // The no-manifest observer remains an ordinary unenrolled optional project.
+  if (prefix !== "no-manifest") enrollFixtureGovernance(dir);
+  git("config", "user.email", "goldfish@example.invalid");
+  git("config", "user.name", "Goldfish");
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "init");
+  const head = git("rev-parse", "HEAD").stdout.trim();
+  return { dir, head };
+}
+
+function gitAt(dir, ...args) {
+  return spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+}
+
+function writeManifest(dir, yamlText) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline.yaml"), yamlText);
+}
+function writeState(dir, obj) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
+}
+function writePublicationMode(dir) {
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    publication: {
+      schema: "pipeline.publication-projection.v1",
+      channels: { private: null, "neutral-public": null },
+      authorizedPushes: [],
+    },
+  });
+}
+function writeEvidence(dir, relPath, obj) {
+  if (relPath === "evidence/verify-latest.json" && obj && typeof obj === "object" && obj.exitCode === 0 && !obj.selection) obj = verifyEvidenceFixture(obj.commit);
+  const full = join(dir, relPath);
+  mkdirSync(join(full, ".."), { recursive: true });
+  writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function exactSecurityEvidence({ head, tree }) {
+  const payload = {
+    schema: "pipeline.security-evidence.v1",
+    exitCode: 0,
+    commit: head,
+    candidate: {
+      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256: "b".repeat(64),
+      inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
+      snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
+    },
+    policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) },
+  };
+  return { ...payload, payloadSha256: createHash("sha256").update(canonicalJson(payload)).digest("hex") };
+}
+
+function configureAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline.json"),
+    JSON.stringify({
+      publicPushIdentity: {
+        schema: "pipeline.public-push-identity.v1",
+        mode: "required",
+        repositoryOwner: "agent-pipe-shared",
+        repositoryName: "agent-pipeline",
+        remoteName: "origin",
+        approvedFeatureBranch: branch,
+        sshHostAlias: "github-share",
+        sshAccount: "agent-pipe-shared",
+        authorName: "The Agent-Pipeline Contributors",
+        authorEmail: "pipeline-fixture@example.invalid",
+      },
+    }),
+  );
+  gitAt(dir, "config", "--local", "user.useConfigOnly", "true");
+  gitAt(dir, "config", "--local", "commit.gpgSign", "false");
+  gitAt(dir, "config", "--local", "user.name", "The Agent-Pipeline Contributors");
+  gitAt(dir, "config", "--local", "user.email", "pipeline-fixture@example.invalid");
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github-share:agent-pipe-shared/agent-pipeline.git");
+  const base = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  gitAt(dir, "update-ref", `refs/remotes/origin/${branch}`, base);
+}
+
+function anonymousCommit(dir, name = "anonymous.txt", message = "anonymous feature") {
+  writeFileSync(join(dir, name), `${message}\n`);
+  gitAt(dir, "add", name);
+  gitAt(dir, "commit", "-q", "-m", message);
+  return gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+}
+
+function prepareAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  configureAnonymousPublicPush(dir, branch);
+  const head = anonymousCommit(dir);
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const bin = join(dir, "fake-ssh-bin");
+  mkdirSync(bin, { recursive: true });
+  const fakeSsh = join(bin, "ssh");
+  writeFileSync(fakeSsh, "#!/bin/sh\necho \"Hi ${FAKE_SSH_ACCOUNT:-agent-pipe-shared}! You've successfully authenticated, but GitHub does not provide shell access.\"\nexit 1\n");
+  chmodSync(fakeSsh, 0o755);
+  // Windows does not execute POSIX shebang fixtures.  Keep the POSIX helper and
+  // add a native command shim so the account probe never falls through to real SSH.
+  writeFileSync(join(bin, "ssh.cmd"), "@echo off\r\nif \"%FAKE_SSH_ACCOUNT%\"==\"\" set \"FAKE_SSH_ACCOUNT=agent-pipe-shared\"\r\necho Hi %FAKE_SSH_ACCOUNT%! You've successfully authenticated, but GitHub does not provide shell access.\r\nexit /b 1\r\n");
+  return { head, command: `git push origin HEAD:refs/heads/${branch}`, env: { PATH: `${bin}${delimiter}${process.env.PATH}` } };
+}
+
+function runGuard(command, dir, { cwd = dir, projectDir = dir, env = {} } = {}) {
+  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+    encoding: "utf8",
+    cwd,
+    env: { ...process.env, ...env, CLAUDE_PROJECT_DIR: projectDir },
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 10000,
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+
+let pass = 0;
+const failures = [];
+function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes, stderrEmpty, cwd, projectDir, env } = {}) {
+  const { code, stderr } = runGuard(command, dir, { cwd: cwd ?? dir, projectDir: projectDir ?? dir, env });
+  const problems = [];
+  if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- stderr: ${stderr.trim().slice(0, 300)}`);
+  for (const needle of [].concat(stderrIncludes ?? [])) {
+    if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}" -- got: ${stderr.trim().slice(0, 300)}`);
+  }
+  for (const needle of [].concat(stderrNotIncludes ?? [])) {
+    if (stderr.includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
+  }
+  if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 200)}`);
+  if (problems.length === 0) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problems.join("; ")}`);
+    console.log(`FAIL  ${id} -- ${problems.join("; ")}`);
+  }
+}
+const BLOCK = 2,
+  ALLOW = 0,
+  WARN = 1;
+
+const PUSH_CMD = "git push origin main:refs/heads/feature-test";
+
+function manifestPush({ mode = "blocking", approval = "required", security = null }) {
+  let y = `schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: ${mode}\n    type: human\n    approval: ${approval}\n`;
+  if (security) y += `  security:\n    mode: ${security}\n    type: automated\n`;
+  return y;
+}
+
+// ---- PG01 no manifest -> allow --------------------------------------------------------
+{
+  const { dir } = freshRepo("no-manifest");
+  check("PG01 allow  no manifest at all", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+
+// ---- PG02 non-push command -> allow fast (even with a strict manifest present) --------
+{
+  const { dir } = freshRepo("non-push");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  check("PG02 allow  non-push command -> fast path", "git status", dir, ALLOW, { stderrEmpty: true });
+}
+
+// ---- PG03 gate mode off -> allow -------------------------------------------------------
+{
+  const { dir } = freshRepo("mode-off");
+  writeManifest(dir, manifestPush({ mode: "off" }));
+  check("PG03 allow  push gate mode off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+{
+  const { dir, head } = freshRepo("inline-override-prefix");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check(
+    "PG03a block  documented inline override cannot authorize main publication",
+    `PIPELINE_GUARD_OVERRIDE="GG-03|20260726-test|PO-approved fixture" git push origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "GG-03"] },
+  );
+  check(
+    "PG03a block  dynamic inline override prefix stays inside the strict shell grammar",
+    `PIPELINE_GUARD_OVERRIDE="$(id)" git push origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["not unambiguous"] },
+  );
+  check(
+    "PG03a block  unquoted override pipeline delimiter stays inside the strict shell grammar",
+    `PIPELINE_GUARD_OVERRIDE=GG-03|git push origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["not unambiguous"] },
+  );
+}
+{
+  const { dir } = freshRepo("opt-in-ambiguous");
+  check("PG03b allow  structural policy remains opt-in without a manifest", "git add README.md && git push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+  writeManifest(dir, manifestPush({ mode: "off" }));
+  check("PG03c allow  structural policy remains off when push gate is off", "git add README.md && git push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+{
+  const { dir, head } = freshRepo("publication-executor-only");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writePublicationMode(dir);
+  check(
+    "PG03d block  raw publication push cannot consume typed authority",
+    `git push --porcelain origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "publication executor"] },
+  );
+  check(
+    "PG03e block  GG-03 cannot widen the executor-only publication boundary",
+    `PIPELINE_GUARD_OVERRIDE="GG-03|20260731-publication|PO-approved fixture" git push --porcelain origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "GG-03"] },
+  );
+}
+
+// ---- PG04 blocking + missing verify evidence -> exit 2 ---------------------------------
+{
+  const { dir } = freshRepo("missing-evidence");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  check("PG04 block  blocking + missing verify evidence", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["evidence/verify-latest.json missing"],
+  });
+}
+
+// ---- PG05 blocking + stale commit -> exit 2 --------------------------------------------
+{
+  const { dir, head } = freshRepo("stale-commit");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: "0000000000000000000000000000000000000000" });
+  check("PG05 block  blocking + stale commit in verify evidence", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is stale"],
+  });
+  void head;
+}
+
+// ---- PG06 blocking + red exitCode -> exit 2 --------------------------------------------
+{
+  const { dir, head } = freshRepo("red-exit");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 1, commit: head });
+  check("PG06 block  blocking + red exitCode in verify evidence", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["exitCode=1"],
+  });
+}
+
+// ---- PG06a impacted evidence must name a strict ancestor of the pushed source ----------
+{
+  const { dir, head } = freshRepo("verify-unrelated-base");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  const unrelated = gitAt(dir, "commit-tree", tree, "-m", "unrelated root").stdout.trim();
+  const selection = planVerifySelection({
+    mode: "push", baseCommit: unrelated, candidateCommit: head, changedPaths: ["README.md"],
+    registeredSuiteIds: ["fixture-suite"],
+    policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "fixture", paths: ["**"], suites: ["fixture-suite"] }] },
+  });
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head, selection });
+  check("PG06a block  impacted Verify base is unrelated to pushed source", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["impacted Verify base is not a strict ancestor"],
+  });
+}
+
+// ---- PG07 warn + missing evidence -> exit 1 --------------------------------------------
+{
+  const { dir } = freshRepo("warn-missing");
+  writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved" }));
+  check("PG07 warn  warn mode + missing verify evidence -> exit 1", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["evidence/verify-latest.json missing"],
+  });
+}
+
+// ---- PG08 security check enforced when security mode blocking -------------------------
+{
+  const { dir, head } = freshRepo("security-enforced");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  // security-latest.json intentionally absent -> must be reported as a failure.
+  check("PG08 block  security evidence enforced when gates.security mode=blocking", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["evidence/security-latest.json missing"],
+  });
+}
+
+// ---- PG09 security check skipped when security mode off -------------------------------
+{
+  const { dir, head } = freshRepo("security-skipped");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "off" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  // security-latest.json absent, but security gate is off -> must NOT be reported, all-green.
+  check("PG09 allow  security evidence skipped when gates.security mode=off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+
+// ---- PG08b security mode=warn never hard-blocks, even though push.mode=blocking ------
+// PUSHWARN-1 (backlog: a warn security gate hard-blocks every push). Each gate's findings
+// must respect that gate's OWN configured mode -- security.mode=warn is a promise that a
+// security finding is advisory, and push.mode=blocking must not silently override it.
+{
+  const { dir, head } = freshRepo("security-warn-only-failure");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "warn" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  // security-latest.json intentionally absent -> a security-only failure.
+  check("PG08b warn  security mode=warn never hard-blocks even though push.mode=blocking", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["evidence/security-latest.json missing"],
+  });
+}
+
+// ---- PG08c security mode=blocking still hard-blocks, even though push.mode=warn --------
+// The reverse of PG08b: a security gate configured "blocking" must not be downgraded to
+// advisory just because the push gate itself is lenient -- each bucket's mode is its own.
+{
+  const { dir, head } = freshRepo("security-blocking-push-warn");
+  writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG08c block  security mode=blocking still hard-blocks even though push.mode=warn", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["evidence/security-latest.json missing"],
+  });
+}
+
+// ---- PG10 standing-approved passes without any state file ------------------------------
+{
+  const { dir, head } = freshRepo("standing-approved");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG10 allow  standing-approved passes without any state file", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+
+// ---- PG11a required + absent approval (no state file at all) -> exit 2 -----------------
+{
+  const { dir, head } = freshRepo("required-absent");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG11a block  required approval, no state file at all", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing"],
+  });
+}
+
+// ---- PG11b required + stale approval (state present, wrong commit) -> exit 2 -----------
+{
+  const { dir, head } = freshRepo("required-stale");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2020-01-01T00:00:00.000Z", forCommit: "deadbeef" } },
+  });
+  check("PG11b block  required approval, state present but stale forCommit", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale"],
+  });
+}
+
+// ---- PG11c required + state lacks lastApproved -> typed block, never throw ------------
+{
+  const { dir, head } = freshRepo("required-missing-last-approved");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, { schema: "pipeline.state.v0", pushApproval: {} });
+  check("PG11c block required approval, state lacks lastApproved", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale", "is not externally attested for this exact action"],
+  });
+}
+
+// ---- PG11d required + malformed approval state fails closed ----------------------------
+{
+  const { dir, head } = freshRepo("required-malformed-state");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, "{not valid JSON");
+  check("PG11d block required approval with malformed state", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["pipeline State is malformed", "publication authority cannot be excluded"],
+  });
+}
+
+// ---- PG11e required + state has no pushApproval key at all -- pins equality with PG11c --
+// PUSHBOUND-1 (backlog: missing fixture named separately from PG11c). state?.pushApproval
+// ?.lastApproved walks the SAME optional chain whether pushApproval is absent entirely or
+// present-but-empty, so this MUST produce byte-identical stderr to PG11c -- pinned directly
+// here rather than assumed.
+{
+  const { dir, head } = freshRepo("required-no-pushapproval-key");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, { schema: "pipeline.state.v0" });
+  const withoutKey = runGuard(PUSH_CMD, dir, { projectDir: dir });
+
+  const { dir: dirC, head: headC } = freshRepo("required-missing-last-approved-compare");
+  writeManifest(dirC, manifestPush({ approval: "required" }));
+  writeEvidence(dirC, "evidence/verify-latest.json", { exitCode: 0, commit: headC });
+  writeState(dirC, { schema: "pipeline.state.v0", pushApproval: {} });
+  const withEmptyObject = runGuard(PUSH_CMD, dirC, { projectDir: dirC });
+
+  const problems = [];
+  if (withoutKey.code !== BLOCK) problems.push(`exit ${withoutKey.code} (expected ${BLOCK})`);
+  if (withoutKey.code !== withEmptyObject.code) {
+    problems.push(`exit code diverges from PG11c: ${withoutKey.code} vs ${withEmptyObject.code}`);
+  }
+  // PG11e-FLAKE (backlog: a verify-gate suite fails on where a second boundary falls): the
+  // two fixture repos are identical except for their commit hash, which differs only when
+  // the two `git commit` calls straddle a second boundary. The property under test is that
+  // the two STATES produce the same message, not that two independently created
+  // repositories share a hash -- so each fixture's own commit is normalized out of both
+  // strings before comparing; every other byte still must match exactly.
+  const withoutCommit = (text, commit) => text.replaceAll(commit, "<source-commit>");
+  if (withoutCommit(withoutKey.stderr, head) !== withoutCommit(withEmptyObject.stderr, headC)) {
+    problems.push(
+      `stderr diverges from PG11c -- no-key: ${withoutKey.stderr.trim().slice(0, 300)} | empty-object: ${withEmptyObject.stderr.trim().slice(0, 300)}`,
+    );
+  }
+  if (problems.length === 0) {
+    pass++;
+    console.log("PASS  PG11e block  required approval, state has no pushApproval key at all (== PG11c)");
+  } else {
+    failures.push(`PG11e: ${problems.join("; ")}`);
+    console.log(`FAIL  PG11e -- ${problems.join("; ")}`);
+  }
+}
+
+// ---- PG-HD heredoc bodies are DATA; a command AFTER one is still a command ----------
+// A first version of this stripping shipped FAIL-OPEN: the opener was never removed so
+// the scan re-matched it, the terminator was gone the second time, and the whole
+// remainder was truncated -- a real push after a heredoc passed the gate entirely.
+// PG-HD1/2 (allow) alone could not see that. The BLOCK cases below are the ones that
+// matter: every one places a real push AFTER the heredoc.
+{
+  const { dir, head } = freshRepo("heredoc-body");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const push = ["git", "push"].join(" ");
+  const real = `${push} origin main`;
+  check("PG-HD1 allow a commit whose heredoc body mentions the phrase",
+    `git commit -q -F - <<EOF\nfix: a raw ${push} cannot consume it\nEOF`, dir, ALLOW);
+  check("PG-HD2 allow a commit whose quoted message mentions the phrase",
+    `git commit -m "docs: explain why ${push} is refused"`, dir, ALLOW);
+  check("PG-HD3 block a --git-dir override push", "git --git-dir=/tmp/x push origin main", dir, BLOCK);
+  check("PG-HD4 block an env-prefixed push", "FOO=bar git push origin main", dir, BLOCK);
+  check("PG-HD5 block a real push AFTER a heredoc terminator",
+    `git commit -q -F - <<EOF\nmsg\nEOF\n${real}`, dir, BLOCK);
+  check("PG-HD6 block a real push chained after a heredoc",
+    `git commit -q -F - <<EOF\nmsg\nEOF\n && ${real}`, dir, BLOCK);
+  check("PG-HD7 block a real push after a tab-indented <<- heredoc",
+    `git commit -F - <<-EOF\n\tmsg\n\tEOF\n${real}`, dir, BLOCK);
+  check("PG-HD8 block a real push after two heredocs",
+    `cat <<A\nx\nA\ncat <<B\ny\nB\n${real}`, dir, BLOCK);
+  check("PG-HD9 block a real push separated from the terminator by a blank line",
+    `git commit -F - <<EOF\nm\nEOF\n\n${real}`, dir, BLOCK);
+  check("PG-HD10 block a real push after a quoted-tag heredoc",
+    `git commit -F - <<'EOF'\nm\nEOF\n${real}`, dir, BLOCK);
+  check("PG-HD11 block a push that itself carries an unterminated heredoc",
+    `${real} <<EOF\nnote\n`, dir, BLOCK);
+  // A `<<` that is NOT a redirection. An earlier version stripped to end-of-string
+  // whenever no terminator was found, so an arithmetic left shift deleted every
+  // following command from the detection region and the gate went open. The header
+  // named the whitespace-prefix rule as the mitigation; a spaced shift has exactly
+  // that shape. Every PG-HD case above uses a well-formed heredoc and none could see
+  // it.
+  check("PG-HD12 block a push after an arithmetic left shift",
+    `echo $(( 1 << shift ))\n${real}`, dir, BLOCK);
+  check("PG-HD13 block a push after a shift in an assignment",
+    `x=$(( 8 << bits ))\n${real}`, dir, BLOCK);
+  check("PG-HD14 block a push after a shift inside a command substitution",
+    `v=$(echo $(( 2 << n )))\n${real}`, dir, BLOCK);
+}
+
+// ---- PG12 required + fresh approval without a critical proof -> block ------------------
+{
+  const { dir, head } = freshRepo("required-fresh");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z", forCommit: head } },
+  });
+  check("PG12 block required approval without critical proof", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact action"],
+  });
+}
+
+// ---- PG12w ADR-0055: an explicit, reasoned waiver stands the PROOF down --------------
+// The human gate itself is untouched: the approval must still be recorded and bound to
+// this exact commit. Only the detached private-key proof is no longer demanded, and the
+// recorded approval has to say so on its face.
+function writeProofPolicy(dir, policy) {
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), `${JSON.stringify(policy, null, 2)}\n`);
+}
+const PUSH_WAIVER = {
+  schema: "pipeline.critical-human-proof-policy.v2",
+  requiredKinds: ["push", "deploy", "publication"],
+  waivedKinds: [{ kind: "push", reason: "operator decision recorded for this fixture" }],
+};
+{
+  const { dir, head } = freshRepo("required-waived");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12w allow required approval when the proof is explicitly waived", PUSH_CMD, dir, ALLOW);
+}
+{
+  // A waiver does NOT relax the approval binding itself.
+  const { dir, head } = freshRepo("required-waived-stale");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z",
+      forCommit: "0000000000000000000000000000000000000000",
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12w2 block a waived push whose approval is bound to another commit", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale"],
+  });
+}
+{
+  // An approval recorded before the waiver existed must be re-recorded, so the state
+  // never silently claims proof-backed authority it does not have.
+  const { dir, head } = freshRepo("required-waived-unlabelled");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+    } },
+  });
+  check("PG12w3 block a waived push whose recorded approval does not name the waiver", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval predates the current critical-proof waiver"],
+  });
+}
+{
+  // The waiver must be written down. A missing policy file is not a waiver.
+  const { dir, head } = freshRepo("required-no-policy");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed without a policy backing it" },
+    } },
+  });
+  check("PG12w4 block a claimed waiver that no policy file backs", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact action"],
+  });
+}
+
+// ---- PHX-WP-GUARDPUSH-REFSPEC-RESOLVE: a bare branch name resolves its own implicit
+// destination (refs/heads/<branch>) before authorizeRecordedPush runs, so it is treated
+// identically to the fully-qualified equivalent -- instead of failing with the
+// misleading PUSH-PROOF-INPUT-INVALID a colon-less refspec produced before this fix.
+{
+  // Same fixture shape as PG12w (fully-qualified `main:refs/heads/feature-test` -> ALLOW),
+  // except the push command is the bare branch name and the local branch it names really
+  // exists at the approved commit -- the regression test the DoD asks for: identical
+  // authorizeRecordedPush outcome to the fully-qualified form.
+  const { dir, head } = freshRepo("bare-refspec-resolve");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12x allow a bare branch-name push resolved to refs/heads/<branch>",
+    "git push origin feature-test", dir, ALLOW);
+}
+{
+  // A colon-less refspec whose source is already a full ref resolves as identity
+  // (refs/heads/feature-test -> refs/heads/feature-test), not double-prefixed into
+  // refs/heads/refs/heads/feature-test.
+  const { dir, head } = freshRepo("bare-refspec-resolve-full-ref");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12x2 allow a colon-less full-ref source resolved as identity",
+    "git push origin refs/heads/feature-test", dir, ALLOW);
+}
+{
+  // The escape valve: a remote with a configured (non-default) push refspec must not be
+  // guessed at -- destination stays null, same PUSH-PROOF-INPUT-INVALID as before this fix.
+  const { dir, head } = freshRepo("bare-refspec-configured-push");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  gitAt(dir, "config", "--add", "remote.origin.push", "refs/heads/feature-test:refs/heads/elsewhere");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head } },
+  });
+  check("PG12y block a bare branch push when remote.<name>.push is configured -- unresolved as before",
+    "git push origin feature-test", dir, BLOCK, { stderrIncludes: ["PUSH-PROOF-INPUT-INVALID"] });
+}
+{
+  // HEAD is a symbolic ref, not a bare branch name -- its target depends on the checkout,
+  // so it must stay unresolved rather than being wrapped as the literal `refs/heads/HEAD`.
+  const { dir, head } = freshRepo("bare-refspec-head-unresolved");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head } },
+  });
+  check("PG12z block a bare `HEAD` push -- not resolved as refs/heads/HEAD",
+    "git push origin HEAD", dir, BLOCK, { stderrIncludes: ["PUSH-PROOF-INPUT-INVALID"] });
+}
+
+{
+  // ADR-0056: the operator-facing control is gates.push_approval in the project's own
+  // source of truth. `chat` stands the external signature down; the commit binding and
+  // the labelled record stay exactly as strict.
+  const { dir } = freshRepo("required-chat-mode");
+  // Committed, not merely written. Since the C1 fix a working-tree copy that differs from
+  // HEAD is untrusted and resolves to `signature`, so a written-only fixture would assert
+  // that an UNCOMMITTED chat setting authorizes a push -- precisely the hole C1 closed.
+  // HEAD is re-read afterwards so the evidence below still binds to the tip.
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c allow a chat-mode push configured in pipeline.user.yaml", PUSH_CMD, dir, ALLOW);
+}
+{
+  // The T2 Critic's C1, at the gate that matters most. The shell lane refuses the literal
+  // filename but not a name assembled at runtime, so an in-session write to this file must
+  // be assumed reachable -- the fixture simply performs it. What must hold is that writing
+  // `chat` buys no push. Identical to PG12c in every respect except the missing commit.
+  const { dir, head } = freshRepo("required-chat-mode-uncommitted");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c3 block a chat mode that exists only in the working tree", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact action"],
+  });
+}
+{
+  // The same source saying `signature` keeps the proof demanded — the setting is a
+  // real switch in both directions, not a one-way relaxation.
+  const { dir, head } = freshRepo("required-signature-mode");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "signature"\n  security: "blocking"\n');
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed while the source demands a signature", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c2 block a claimed chat waiver while the source demands a signature", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact action"],
+  });
+}
+{
+  // PG12c-main -- F4, 2026-08-06 Critic round. ADR-0056 §7: "every session must be able to
+  // push, on every branch and on main, when the human clears it -- by signature or by chat,
+  // depending on the config." Before this fix, `attestedMainPublication` consulted only the
+  // Ed25519 signature lane and never the chat waiver at all, so `chat` mode opened every
+  // branch except the one that matters most. Same fixture shape as PG12c; destination is
+  // main instead of feature-test.
+  const { dir } = freshRepo("required-chat-mode-main");
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/main",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c-main allow a chat-mode push to main -- the boundary that used to refuse it regardless",
+    "git push origin main:refs/heads/main", dir, ALLOW);
+}
+{
+  // PG12c-main-mismatch -- the destination binding inside the new chat lane. A chat-mode
+  // approval recorded for a DIFFERENT destination (the ordinary branch from PG12c) must not
+  // authorize main just because the commit matches -- proves the new lane binds to the exact
+  // action, not only to the commit.
+  const { dir } = freshRepo("required-chat-mode-main-mismatch");
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c-main-mismatch block a chat-mode approval for another destination does not cover main",
+    "git push origin main:refs/heads/main", dir, BLOCK, {
+      stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
+    });
+}
+// ---- PG12s* signature mode: a raw push the key holder actually attested ---------------
+//
+// Until ADR-0056 §6 this whole family was unreachable: `signature` mode refused every
+// agent-issued push and pointed at the publication executor, which is a release path a
+// feature branch has no business entering. These fixtures build the real thing — an
+// Ed25519 keypair, the subject digest over the exact push, a real signature — because a
+// fixture that faked the crypto would assert nothing about the property being claimed.
+
+function pushKeypair() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  return { publicPem, privateKey, publicKeySha256: createHash("sha256").update(publicPem).digest("hex") };
+}
+
+const THREAT_MODEL_REL = "specs/fixture/threat-model.md";
+const SIGNED_PLAN_SHA = "c".repeat(64);
+const SIGNED_SPEC_SHA = "d".repeat(64);
+
+/**
+ * A repository whose committed policy carries the trust anchor, plus a state file whose
+ * recorded approval is backed by a signature over the ACTUAL push this suite issues.
+ * Every knob a negative case needs to move is an override, so each fixture differs from
+ * the allow case in exactly one respect.
+ */
+function signedPushRepo(prefix, {
+  key = pushKeypair(), remote = "origin", destination = "refs/heads/feature-test",
+  expiresAt = "2099-01-01T00:00:00.000Z", keyReference = "po-key-1", anchorKey = null,
+  planSha256 = SIGNED_PLAN_SHA, specSha256 = SIGNED_SPEC_SHA, featureId = "fixture-feature",
+  recordProof = true, consume = true, commitOverride = null, mutateApproval = null,
+} = {}) {
+  const { dir } = freshRepo(prefix);
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  const threatModelBody = "# fixture threat model\n";
+  writeEvidence(dir, THREAT_MODEL_REL, threatModelBody);
+  gitAt(dir, "add", "-A");
+  gitAt(dir, "commit", "-m", "fixture: threat model");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+
+  const anchor = anchorKey ?? key;
+  writeProofPolicy(dir, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: anchor.publicKeySha256 },
+  });
+
+  const candidate = { commit: commitOverride ?? head, tree };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({
+      kind: "push", candidate,
+      subject: { sourceCommit: candidate.commit, remote, destination, threatModel },
+    }),
+    expiresAt,
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId, planSha256, specSha256, candidate,
+    policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference,
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+
+  const approval = {
+    approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: candidate.commit,
+    criticalProof: { proofSha256, intentSha256: intent.sha256, action, ...(recordProof ? { proof } : {}) },
+    remote, destination, threatModel,
+  };
+  if (mutateApproval) mutateApproval(approval);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: featureId },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    pushApproval: { lastApproved: approval },
+    criticalProofConsumption: consume ? [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }] : [],
+  });
+  return { dir, head, key, tree };
+}
+
+{
+  // PG12s1 -- the point of the whole block: an ordinary branch push, in signature mode,
+  // attested by the key holder for exactly this commit/remote/ref, is allowed.
+  const { dir } = signedPushRepo("signed-allow");
+  check("PG12s1 allow a signature-mode push the key holder attested for this exact action", PUSH_CMD, dir, ALLOW);
+}
+{
+  // PG12s2 -- `main` is not special-cased. The PO's requirement was every branch, main
+  // included, when the human has cleared it; the destination is simply part of what is
+  // signed, so main gets no extra permission and no extra refusal.
+  const { dir } = signedPushRepo("signed-allow-main", { destination: "refs/heads/main" });
+  check("PG12s2 allow an attested push to main -- the ref is signed, not special-cased",
+    "git push origin main:refs/heads/main", dir, ALLOW);
+}
+{
+  // PG12s3 -- the attestation names a remote. Redirecting the same commit elsewhere is a
+  // different action and is not covered.
+  const { dir } = signedPushRepo("signed-other-remote", { remote: "upstream" });
+  check("PG12s3 block an attested push redirected to another remote", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-BINDING-MISMATCH"],
+  });
+}
+{
+  // PG12s4 -- likewise the destination ref.
+  const { dir } = signedPushRepo("signed-other-ref", { destination: "refs/heads/somewhere-else" });
+  check("PG12s4 block an attested push redirected to another ref", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-BINDING-MISMATCH"],
+  });
+}
+{
+  // PG12s5 -- an approval for another commit. The pre-existing staleness check fires
+  // first, which is the correct message for a human to read.
+  const { dir } = signedPushRepo("signed-other-commit", { commitOverride: "9".repeat(40) });
+  check("PG12s5 block an approval bound to another commit", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale"],
+  });
+}
+{
+  // PG12s6 -- THE case this design exists for. The record is complete and internally
+  // consistent; the signature is valid; it is simply not the operator's key. A guard that
+  // believed the state file would allow this, and `signature` mode would be theatre.
+  const { dir } = signedPushRepo("signed-foreign-key", { anchorKey: pushKeypair() });
+  check("PG12s6 block a state record signed by a key the project never anchored", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-TRUST-MISMATCH"],
+  });
+}
+{
+  // PG12s7 -- no committed anchor, no verifiable key. The route is simply unavailable
+  // rather than falling back to believing the record.
+  const { dir, head } = freshRepo("signed-no-anchor");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+    } },
+  });
+  check("PG12s7 block a signature-mode push when no trust anchor is committed", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-TRUST-ANCHOR-MISSING"],
+  });
+}
+{
+  // PG12s8 -- an approval recorded before the proof travelled into State. It carries a
+  // digest but no proof object, so nothing can be verified from it.
+  const { dir } = signedPushRepo("signed-legacy-record", { recordProof: false });
+  check("PG12s8 block a legacy approval that records no proof object", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-RECORD-INCOMPLETE"],
+  });
+}
+{
+  // PG12s9 -- expiry is real, and measured against the push rather than the approval.
+  const { dir } = signedPushRepo("signed-expired", { expiresAt: "2026-01-01T00:00:00.000Z" });
+  check("PG12s9 block an attested push whose proof has expired", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-EXPIRED"],
+  });
+}
+{
+  // PG12s10 -- the threat model is inside the signed subject, so changing its bytes after
+  // approval withdraws the authorization instead of silently carrying it forward.
+  const { dir } = signedPushRepo("signed-threat-model-drift");
+  writeEvidence(dir, THREAT_MODEL_REL, "# rewritten after the signature\n");
+  check("PG12s10 block when the bound threat model changed after approval", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-THREAT-MODEL"],
+  });
+}
+{
+  // PG12s11 -- the record's own fields rewritten to agree with the push while the signed
+  // subject still says otherwise. The binding fields alone cannot catch this; the
+  // recomputed subject digest is what does.
+  const { dir } = signedPushRepo("signed-rewritten-fields", {
+    destination: "refs/heads/somewhere-else",
+    mutateApproval: (approval) => { approval.destination = "refs/heads/feature-test"; },
+  });
+  check("PG12s11 block a record whose stated binding contradicts the signed subject", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-SUBJECT-MISMATCH"],
+  });
+}
+{
+  // PG12s12 -- approve-push writes the approval and its consumption entry together, so a
+  // record with no ledger entry did not come from that writer.
+  const { dir } = signedPushRepo("signed-unconsumed", { consume: false });
+  check("PG12s12 block an approval whose proof was never consumed", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PUSH-PROOF-NOT-CONSUMED"],
+  });
+}
+{
+  // PG12u1 -- the methodological uncommitted-work block. An otherwise fully attested
+  // push is refused while specs/, docs/ or backlog/ carry uncommitted work: a push that
+  // leaves its own spec, decision record or evidence behind publishes a commit whose
+  // reasoning nobody can reconstruct. `git status --porcelain` counts untracked files,
+  // which is exactly the case `git commit -a` silently misses.
+  // Neighbour non-fire case: PG12s1 above is this same fixture with a clean tree, allowed.
+  for (const scoped of ["specs", "docs", "backlog"]) {
+    const { dir } = signedPushRepo(`signed-uncommitted-${scoped}`);
+    mkdirSync(join(dir, scoped), { recursive: true });
+    writeFileSync(join(dir, scoped, "stray-note.md"), "uncommitted work\n");
+    check(`PG12u1 block an attested push while ${scoped}/ carries uncommitted work`, PUSH_CMD, dir, BLOCK, {
+      stderrIncludes: ["Uncommitted changes detected in specs/, docs/, or backlog/"],
+    });
+  }
+}
+{
+  // PG12u2 -- the block is scoped to those three directories, and stays scoped. An
+  // uncommitted file anywhere else is not this guard's business and must not become a
+  // push refusal. guard-push.mjs:1659 is the only working-tree status check in the file.
+  const { dir } = signedPushRepo("signed-uncommitted-elsewhere");
+  writeFileSync(join(dir, "stray-note.md"), "uncommitted work\n");
+  check("PG12u2 allow an attested push while an unrelated path carries uncommitted work", PUSH_CMD, dir, ALLOW);
+}
+// ---- PG12s13/s14 the anchor must belong to the GOVERNED session, not to the push target --
+//
+// T6 Critic, F1 (major). The attestation reads its trust anchor and its state from
+// `binding.projectDir` -- the repository the push COMMAND names. ADR-0056 §7 justifies
+// trusting that anchor because `project/critical-human-proof.json` is GS-2 protected, but
+// `gateStrengthRuleFor` matches an exact repository-relative path against the SESSION root
+// (guard-gate-strength.mjs), so `<root>/sub/project/critical-human-proof.json` is not a
+// gate-strength path at all. An agent that can create a nested repository can therefore
+// mint its own anchor, sign with its own key, and have the guard verify it happily.
+//
+// Before this diff the main boundary refused unconditionally, whatever repository the
+// command named; the exception is what made the anchor's provenance load-bearing.
+
+/**
+ * An outer repository that is the governed session root, and a nested one carrying a
+ * complete, internally valid attestation under a keypair the session never anchored.
+ */
+function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManifest = false } = {}) {
+  const { dir: outer } = freshRepo(prefix);
+  const inner = join(outer, "sub");
+  mkdirSync(inner, { recursive: true });
+  const git = (...args) => spawnSync("git", args, { cwd: inner, encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "goldfish@example.invalid");
+  git("config", "user.name", "Goldfish");
+  writeFileSync(join(inner, "README.md"), "nested\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "init");
+  const head = git("rev-parse", "HEAD").stdout.trim();
+  const tree = git("rev-parse", `${head}^{tree}`).stdout.trim();
+
+  const key = pushKeypair();
+  const threatModelBody = "# nested threat model\n";
+  writeEvidence(inner, THREAT_MODEL_REL, threatModelBody);
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+  writeProofPolicy(inner, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+
+  const candidate = { commit: head, tree };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({
+      kind: "push", candidate,
+      subject: { sourceCommit: head, remote: "origin", destination, threatModel },
+    }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA,
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "po-key-1",
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+  if (withManifest) {
+    writeManifest(inner, manifestPush({ approval: "required" }));
+    writeEvidence(inner, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  }
+  writeState(inner, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+      remote: "origin", destination, threatModel,
+    } },
+    criticalProofConsumption: [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }],
+  });
+  return { outer, inner };
+}
+
+{
+  // PG12s13 -- the main boundary. The nested attestation is complete and verifies against
+  // the nested anchor; it must still buy nothing, because that anchor is not the governed
+  // project's. This is the invariant the exception must not have cost.
+  const { outer } = nestedAttestedRepo("nested-anchor-main");
+  check("PG12s13 block a main push attested only by an anchor inside the pushed repository",
+    "git -C sub push origin HEAD:refs/heads/main", outer, BLOCK, {
+      stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
+      projectDir: outer,
+    });
+}
+{
+  // PG12s14 -- the same flaw on the ordinary branch route, which the T6 finding reached
+  // through main but which is not specific to it.
+  const { outer } = nestedAttestedRepo("nested-anchor-branch", {
+    destination: "refs/heads/feature-test", withManifest: true,
+  });
+  check("PG12s14 block a branch push attested only by an anchor inside the pushed repository",
+    "git -C sub push origin HEAD:refs/heads/feature-test", outer, BLOCK, {
+      stderrIncludes: ["PUSH-PROOF-TRUST-ANCHOR-MISSING"],
+      projectDir: outer,
+    });
+}
+{
+  // PG12s15 -- T6 Critic F2. The refusal below is the only new message in this hook that
+  // interpolates operand text, and `remote` is any positional, including a URL. PG17i
+  // proves the file's redaction convention but cannot cover this line: its fixture has no
+  // colon in the refspec, so it lands on the static publication-boundary message instead.
+  const { dir, head } = freshRepo("signature-remote-redaction");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+    } },
+  });
+  check("PG12s15 the attestation refusal never echoes a credential-bearing remote",
+    "git push https://t0ken@example.invalid/repo HEAD:refs/heads/feature-test", dir, BLOCK, {
+      stderrNotIncludes: ["t0ken"],
+    });
+}
+{
+  // PG12s16-s20 -- Phoenix F3. `git push origin main` carries no refspec, so before the
+  // guard can ask whether anything attests the push it has to resolve the bare source
+  // itself. It resolves only where git's own resolution is unambiguous, and hands the
+  // resolved ref to the same binding check the fully-qualified form gets.
+  //
+  // Only s16 discriminates that resolution: without it the bare form never reaches an
+  // attestation at all. The four refusals below would each also pass against a guard that
+  // resolved nothing, and that is the property being pinned -- ambiguity, or a resolved
+  // ref nothing attests, may cost a refusal but must never become permission.
+  const { dir } = signedPushRepo("bare-resolved", { destination: "refs/heads/main" });
+  check("PG12s16 allow a bare `git push origin main` attested for the ref it resolves to",
+    "git push origin main", dir, ALLOW);
+}
+{
+  // PG12s17 -- git's own DWIM prefers a tag of the same name, so a local `main` tag makes
+  // the source genuinely ambiguous. The guard must not pick one of the two readings.
+  const { dir } = signedPushRepo("bare-ambiguous-tag", { destination: "refs/heads/main" });
+  gitAt(dir, "tag", "main");
+  check("PG12s17 block a bare push whose source is ambiguous with a same-named tag",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s18 -- nothing local named `main` as a branch, so there is no branch push to
+  // resolve and the attestation for refs/heads/main covers none of what git would send.
+  const { dir } = signedPushRepo("bare-no-branch", { destination: "refs/heads/main" });
+  gitAt(dir, "branch", "-m", "main", "trunk");
+  check("PG12s18 block a bare push when no local branch by that name exists",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s19 -- a configured push refspec means git's resolution is no longer the default
+  // one, so what the command will actually send is not the guard's to assume.
+  const { dir } = signedPushRepo("bare-configured", { destination: "refs/heads/main" });
+  gitAt(dir, "config", "remote.origin.push", "refs/heads/*:refs/heads/*");
+  check("PG12s19 block a bare push under a configured remote.origin.push refspec",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // PG12s20 -- the control for s16: resolution feeds the binding check, it does not stand
+  // in for it. This attestation names another ref, so the resolved refs/heads/main is
+  // unattested and the publication boundary holds.
+  const { dir } = signedPushRepo("bare-unattested-ref", { destination: "refs/heads/feature-test" });
+  check("PG12s20 block a bare push whose resolved ref no attestation covers",
+    "git push origin main", dir, BLOCK, { stderrIncludes: ["publication boundary"] });
+}
+{
+  // An unreadable policy answers "required", never "waived".
+  const { dir, head } = freshRepo("required-broken-policy");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), "{ not json\n");
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed against an unreadable policy" },
+    } },
+  });
+  check("PG12w5 block when the proof policy cannot be read", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["CRITICAL-PROOF-POLICY-UNREADABLE"],
+  });
+}
+
+// ---- PG12b a proof-SHAPED record is not a proof -----------------------------------------
+//
+// This case used to pin "a raw push can never consume a critical proof at all", which
+// ADR-0056 §6 deliberately reverses. What it pins now is the half that must survive that
+// reversal, and it is the more important half: a record that merely LOOKS like an
+// attestation -- the right key, the right shape, no signature behind it -- buys nothing.
+// The permission the reversal grants is verification, not recognition.
+{
+  const { dir, head } = freshRepo("required-critical-proof");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: { action: { kind: "push" } },
+    } },
+  });
+  check("PG12b block a raw push carrying a proof-shaped record with nothing behind it", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact action"],
+  });
+}
+
+// ---- PG13 all-green (standing-approved + verify + security both fresh) -> allow --------
+{
+  const { dir, head } = freshRepo("all-green");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
+  writeEvidence(dir, "evidence/security-latest.v2.json", {
+    schema: "pipeline.security-evidence.v2",
+    policy: { configurationSha256: "e".repeat(64) },
+    input: { commit: head, tree, inputSha256: "f".repeat(64) },
+    environment: { platform: process.platform, nodeVersion: process.version },
+    capabilities: [
+      {
+        capabilityId: "cap.secrets",
+        tool: { name: "gitleaks", version: null },
+        rulePack: { ref: "gitleaks-default", digest: null },
+        status: "PASS",
+        classification: "clean",
+        findings: [],
+        coverage: {
+          subject: "candidate-tree",
+          exclusions: [],
+          ignored: [],
+          unsupportedScope: [],
+          truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+          dataAge: { ageSeconds: 0, snapshotAt: null },
+        },
+        reason: null,
+      },
+    ],
+  });
+  writeEvidence(dir, "evidence/security-latest.v2.verdict.json", {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: "pipeline.security-evidence.v2",
+    exitAuthority: "v1-blocking-logic",
+    note: "fixture",
+    v1ExitCode: 0,
+    plan: { required: ["cap.secrets"], optional: [], planDigest: "g".repeat(64), source: "fixture", resolvedPolicyDigest: "h".repeat(64) },
+    capabilityOutcomes: { "cap.secrets": "pass" },
+    verdict: { blocking: false, offendingCapabilities: [] },
+    controls: [],
+  });
+  check("PG13 allow  all-green (verify + security fresh, standing-approved)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+
+{
+  const { dir, head } = freshRepo("security-payload-tamper");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  const evidence = exactSecurityEvidence({ head, tree });
+  evidence.candidate.snapshot.verifiedBeforeAfter = false;
+  writeEvidence(dir, "evidence/security-latest.json", evidence);
+  check("PG13a block  unverified immutable snapshot and stale payload digest are rejected", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["immutable snapshot was not verified", "payload digest is invalid"],
+  });
+}
+
+// ---- PG14 malformed manifest -> exit 1 warn --------------------------------------------
+{
+  const { dir } = freshRepo("malformed-manifest");
+  writeManifest(dir, "schema: pipeline.manifest.v0\ngates:\n  push: &anchor\n    mode: blocking\n");
+  check("PG14 warn  malformed manifest YAML -> exit 1 warn, not block", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["WARN"],
+  });
+}
+
+// ---- PG15 push inside second segment -> detected ---------------------------------------
+{
+  const { dir } = freshRepo("second-segment");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  check("PG15 block  push detected inside second segment (git add . && git push)", "git add . && git push", dir, BLOCK, {
+    stderrIncludes: ["standalone command"],
+  });
+}
+
+// ---- PG17 actual repository and explicit source OID bind every artifact ----------------
+{
+  const decoy = freshRepo("binding-decoy");
+  const target = freshRepo("binding-target");
+  writeManifest(decoy.dir, manifestPush({ approval: "standing-approved" }));
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 0, commit: decoy.head });
+  check("PG17a block  git -C target never borrows green evidence from session repo", `git -C ${target.dir} push origin main:refs/heads/feature-test`, decoy.dir, BLOCK, {
+    cwd: decoy.dir,
+    projectDir: decoy.dir,
+    stderrIncludes: ["evidence/verify-latest.json missing"],
+    stderrNotIncludes: [target.dir, decoy.dir],
+  });
+  writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
+  writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 1, commit: decoy.head });
+  check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main:refs/heads/feature-test`, decoy.dir, ALLOW, {
+    cwd: decoy.dir,
+    projectDir: decoy.dir,
+    stderrEmpty: true,
+  });
+}
+{
+  const primary = freshRepo("source-worktree-evidence");
+  const targetDir = join(primary.dir, "target-worktree");
+  gitAt(primary.dir, "worktree", "add", "-q", "-b", "target", targetDir);
+  writeFileSync(join(targetDir, "target.txt"), "target\n");
+  gitAt(targetDir, "add", "target.txt");
+  gitAt(targetDir, "commit", "-q", "-m", "target evidence");
+  const targetHead = gitAt(targetDir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(primary.dir, manifestPush({ approval: "standing-approved" }));
+  writeManifest(targetDir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(primary.dir, "evidence/verify-latest.json", { exitCode: 0, commit: primary.head });
+  writeEvidence(targetDir, "evidence/verify-latest.json", { exitCode: 0, commit: targetHead });
+  check(
+    "PG17bb allow  explicit attached source branch resolves evidence from its target worktree",
+    "git push origin refs/heads/target:refs/heads/target",
+    primary.dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+{
+  const { dir, head: verifiedOid } = freshRepo("source-oid");
+  gitAt(dir, "branch", "verified", verifiedOid);
+  const verifiedDir = join(dir, "verified-worktree");
+  gitAt(dir, "worktree", "add", "-q", verifiedDir, "verified");
+  writeFileSync(join(dir, "later.txt"), "later\n");
+  gitAt(dir, "add", "later.txt");
+  gitAt(dir, "commit", "-q", "-m", "later");
+  const laterOid = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeManifest(verifiedDir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
+  check("PG17c allow  attached short source binds its worktree evidence, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
+  writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
+  check("PG17d block  checkout-HEAD evidence cannot authorize another source", "git push origin verified", dir, BLOCK, {
+    stderrIncludes: [verifiedOid, "pushed source commit"],
+  });
+  check("PG17e block  unresolvable source fails closed", "git push origin does-not-exist:refs/heads/x", dir, BLOCK, {
+    stderrIncludes: ["does not resolve"],
+  });
+}
+{
+  const { dir } = freshRepo("detection-privacy");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  check("PG17f block  quoted git executable is gated", '"git" push origin main:refs/heads/feature-test', dir, BLOCK, {
+    stderrIncludes: ["evidence/verify-latest.json missing"],
+  });
+  check("PG17g block  git.exe cannot bypass detection", "git.exe push origin main", dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h block  shell wrapper cannot bypass detection", 'bash -c "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h2 block  cmd wrapper cannot bypass detection", 'cmd.exe /c "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h3 block  ssh wrapper cannot bypass detection", 'ssh host "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17i diagnostics redact raw credential-shaped remote and absolute path", "git push https://token@example.invalid/repo main", dir, BLOCK, {
+    stderrNotIncludes: ["token@example.invalid", dir],
+  });
+  check("PG17i2 unsupported option diagnostics redact credential-shaped values", "git push --repo=https://secret@example.invalid/x origin main", dir, BLOCK, {
+    stderrNotIncludes: ["secret@example.invalid", dir],
+  });
+}
+{
+  const { dir } = freshRepo("strict-shapes");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  const blockedShapes = [
+    ["PG17j multiple refspecs", "git push origin main other"],
+    ["PG17k bulk all", "git push --all origin main"],
+    ["PG17l pipe", "git push origin main | tee result"],
+    ["PG17m redirect", "git push origin main >result"],
+    ["PG17n substitution", "git push origin $(git branch --show-current)"],
+    ["PG17o option operand", "git push --repo other origin main"],
+    ["PG17o2 git-dir override", "git --git-dir=/tmp/other.git push origin main"],
+    ["PG17o3 multiple git-C overrides", "git -C one -C two push origin main"],
+    ["PG17p incomplete quoting", "git push origin 'main"],
+    ["PG17r variable source expansion", "git push origin $BRANCH"],
+    ["PG17s double-quoted source expansion", 'git push origin "$BRANCH"'],
+  ];
+  for (const [id, command] of blockedShapes) {
+    check(`${id} is structurally blocked`, command, dir, BLOCK, { stderrIncludes: ["not unambiguous"] });
+  }
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim() });
+  check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main:refs/heads/feature-test", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+{
+  const decoy = freshRepo("ambiguous-cross-decoy");
+  const target = freshRepo("ambiguous-cross-target");
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  check(
+    "PG17t block  bundled git -C push loads the target gate, not an ungated session repo",
+    `git -C ${target.dir} push origin main && echo done`,
+    decoy.dir,
+    BLOCK,
+    { cwd: decoy.dir, projectDir: decoy.dir, stderrIncludes: ["standalone command"], stderrNotIncludes: [target.dir, decoy.dir] },
+  );
+  check(
+    "PG17u block  unresolved variable git -C target fails closed",
+    'git -C "$TARGET_DIR" push origin main',
+    decoy.dir,
+    BLOCK,
+    { cwd: decoy.dir, projectDir: decoy.dir, stderrIncludes: ["dynamic cross-repository"], stderrNotIncludes: [decoy.dir] },
+  );
+  const literalDynamicDir = join(decoy.dir, "$TARGET_DIR");
+  mkdirSync(literalDynamicDir);
+  gitAt(literalDynamicDir, "init", "-q", "-b", "main");
+  check(
+    "PG17v block  literal dynamic-path decoy cannot hide the expanded gated target",
+    'git -C "$TARGET_DIR" push origin main',
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      env: { TARGET_DIR: target.dir },
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
+  check(
+    "PG17w block  inline environment assignment cannot hide dynamic cross-repo expansion",
+    `TARGET_DIR=${target.dir} git -C "$TARGET_DIR" push origin main`,
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
+  check(
+    "PG17x block  env wrapper options cannot hide dynamic cross-repo expansion",
+    `env -i TARGET_DIR=${target.dir} git -C "$TARGET_DIR" push origin main`,
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
+}
+
+// ---- PG16 quoted prose mentioning push -> NOT detected ---------------------------------
+{
+  const { dir } = freshRepo("quoted-prose");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  check(
+    "PG16 allow  quoted prose mentioning push is NOT detected as a push command",
+    'git commit -m "remember to git push later"',
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+  check("PG16b allow  an unquoted commit-message token named push is not a push subcommand", "git commit -m push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// =============================================================================================
+// DEPLOY BRANCH -- new fixtures/cases, additive. Base manifest: two envs
+// (`test` = automated/non-gated, `prod` = human-gate) + two adapters (`vercel-preview`
+// no trigger, `vercel-prod` tag-triggered); `triggerRefs` customizes vercel-prod's own
+// trigger.refs (varies per ref-extraction-form case); `testEnvAdapterRef: "ghost-adapter"`
+// deliberately breaks release integrity (an undeclared-adapter semantic error) WITHOUT
+// touching vercel-prod's own trigger patterns -- used for the A/B fail-matrix cases so
+// the manifest is semantic-`status:"invalid"` while trigger classification stays clean.
+// =============================================================================================
+function releaseManifest({ triggerRefs = ["refs/tags/v*"], extraTop = "", testEnvAdapterRef = "vercel-preview", includeCanary = false } = {}) {
+  const lines = ["schema: pipeline.manifest.v0"];
+  if (extraTop) lines.push(...extraTop.split("\n").filter((l) => l.length > 0));
+  lines.push(
+    "release:",
+    "  environments:",
+    "    test:",
+    `      adapter: ${testEnvAdapterRef}`,
+    "      healthcheck: check.sh",
+    "      rollback: rollback-test.sh",
+    "    prod:",
+    "      adapter: vercel-prod",
+    "      healthcheck: check.sh",
+    "      rollback: rollback-prod.sh",
+    "      promotion: human-gate",
+  );
+  if (includeCanary) {
+    lines.push("    canary:", "      adapter: vercel-canary", "      healthcheck: check.sh", "      rollback: rollback-canary.sh");
+  }
+  lines.push("  adapters:", "    vercel-preview:", "      executor: ci", "      credentials: oidc", "    vercel-prod:", "      executor: ci");
+  if (triggerRefs.length > 0) {
+    lines.push("      trigger:", "        refs:");
+    for (const r of triggerRefs) lines.push(`          - ${r}`);
+  }
+  lines.push("      credentials: oidc");
+  if (includeCanary) {
+    lines.push(
+      "    vercel-canary:",
+      "      executor: ci",
+      "      trigger:",
+      "        refs:",
+      "          - refs/tags/canary-*",
+      "      credentials: oidc",
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+function writeGovernancePolicy(dir, relDir, content) {
+  mkdirSync(join(dir, relDir), { recursive: true });
+  writeFileSync(join(dir, relDir, "deploy-policy.yaml"), content);
+}
+function writePolicyLock(dir, { mode = "mandate", status = "resolved" } = {}) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "policy-lock.yaml"),
+    [
+      "schema: pipeline.policy-lock.v0",
+      "pack_id: policy-pack-001",
+      "version: 1.0.0",
+      "digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      `mode: ${mode}`,
+      "update: pinned",
+      "verifier:",
+      `  status: ${status}`,
+      "",
+    ].join("\n"),
+  );
+}
+function deployApprovalState(forArtifact, forEnvironment) {
+  return {
+    schema: "pipeline.state.v0",
+    deployApprovals: [{ forArtifact, forEnvironment, approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z" }],
+  };
+}
+
+// ---- PGD22/23 the release route's attestation (ADR-0056 §6, deploy half) -----------------
+//
+// PGD01..PGD21 all run without a project/critical-human-proof.json, so `deploy` is not a
+// required kind there and the tuple match remains the whole check -- which is why those
+// fixtures kept passing unchanged. These two exercise the case the tuple match never
+// could: a project that DOES demand a detached proof for `deploy`.
+{
+  // PGD22 -- exactly the record PGD02 allows, in a project that demands proof for deploy.
+  // Before this, the release path accepted it: it matched artifact and environment, and
+  // nothing ever asked whether a human had signed anything.
+  const { dir } = freshRepo("deploy-proof-unattested");
+  gitAt(dir, "tag", "v1.0.0");
+  writeManifest(dir, releaseManifest());
+  writeProofPolicy(dir, { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["deploy"] });
+  writeState(dir, deployApprovalState("v1.0.0", "prod"));
+  check("PGD22 block  a tuple-matching deployApproval with no attestation behind it", "git push origin v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["is not externally attested for this exact candidate", "DEPLOY-PROOF-TRUST-ANCHOR-MISSING"],
+  });
+}
+{
+  // PGD23 -- and the same push with a real signature over {artifact, environment} and this
+  // candidate goes through, so the hardening gates rather than blocks the route.
+  const { dir, head } = freshRepo("deploy-proof-attested");
+  gitAt(dir, "tag", "v1.0.0");
+  writeManifest(dir, releaseManifest());
+  const key = pushKeypair();
+  writeProofPolicy(dir, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["deploy"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+  const candidate = { commit: head, tree: gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim() };
+  const action = {
+    kind: "deploy",
+    subjectSha256: criticalActionSubjectSha256({ kind: "deploy", candidate, subject: { artifact: "v1.0.0", environment: "prod" } }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA,
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "po-key-1",
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    deployApprovals: [{
+      forArtifact: "v1.0.0", forEnvironment: "prod", approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z",
+      criticalProof: {
+        proofSha256: createHash("sha256").update(canonicalJson(proof)).digest("hex"),
+        intentSha256: intent.sha256, action, proof,
+      },
+    }],
+  });
+  check("PGD23 allow  a deployApproval the key holder attested for this exact candidate", "git push origin v1.0.0", dir, ALLOW);
+}
+
+// ---- PGD01/02 bare-name candidate: block (no approval) / allow (matching approval) --------
+{
+  const { dir } = freshRepo("deploy-bare-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD01 block  bare-name deploy-trigger to human-gate env without a deployApproval", "git push origin v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["no unused deployApproval", "v1.0.0"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-bare-allow");
+  gitAt(dir, "tag", "v1.0.0");
+  writeManifest(dir, releaseManifest());
+  writeState(dir, deployApprovalState("v1.0.0", "prod"));
+  check("PGD02 allow  bare-name deploy-trigger with a matching unconsumed deployApproval", "git push origin v1.0.0", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD03/04 src:dst candidate (destination-keyed): block / allow ------------------------
+{
+  const { dir } = freshRepo("deploy-srcdst-block");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD03 block  src:dst deploy-trigger (destination-keyed) without a deployApproval",
+    "git push origin HEAD:refs/tags/v2.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["no unused deployApproval", "v2.0.0"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-srcdst-allow");
+  writeManifest(dir, releaseManifest());
+  writeState(dir, deployApprovalState("v2.0.0", "prod"));
+  check(
+    "PGD04 allow  src:dst deploy-trigger with a matching unconsumed deployApproval (bare dest artifact identity)",
+    "git push origin HEAD:refs/tags/v2.0.0",
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+
+// ---- PGD05/06 bulk tag pushes are structurally ambiguous regardless trigger shape --------
+{
+  const { dir } = freshRepo("deploy-tags-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD05 block  --tags cannot bind evidence to one source commit", "git push origin --tags", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-tags-allow");
+  writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] })); // branch-pattern only, no tag pattern
+  check("PGD06 block  --tags remains ambiguous without a tag trigger", "git push origin --tags", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
+  });
+}
+
+// ---- PGD07 deletion has no source commit and is therefore structurally blocked ------------
+{
+  const { dir } = freshRepo("deploy-delete-allow");
+  writeManifest(dir, releaseManifest());
+  check("PGD07 block  --delete cannot bind evidence to a source commit", "git push origin --delete v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
+  });
+}
+
+// ---- PGD08/09 unparseable -> conservative block --------------------------------------------
+{
+  const { dir } = freshRepo("deploy-unparseable-chain");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD08 block  a multi-push chain in one command is unparseable in a release-declaring repo -- conservative block",
+    "git push origin v1.0.0 && git push origin v2.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["standalone command"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-unparseable-refspec");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD09 block  an unparseable refspec form (empty destination after the colon) -- conservative block",
+    "git push origin v1.0.0:",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["source-ambiguous"] },
+  );
+}
+
+// ---- PGD10/11 implicit bare pushes are structurally ambiguous -------------------------------
+{
+  const { dir } = freshRepo("deploy-barepush-tagonly-allow");
+  writeManifest(dir, releaseManifest()); // default trigger is a tag pattern only
+  check("PGD10 block  bare git push cannot identify one source", "git push", dir, BLOCK, {
+    stderrIncludes: ["exactly one remote and one explicit source"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-barepush-branchpattern-block");
+  writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] }));
+  check(
+    "PGD11 block  bare git push remains ambiguous with a branch trigger",
+    "git push",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["exactly one remote and one explicit source"] },
+  );
+}
+
+// ---- PGD12: a deploy-trigger resolving to a NON-human-gated env never demands approval -----
+{
+  const { dir } = freshRepo("deploy-nongated-allow");
+  gitAt(dir, "branch", "canary-1");
+  const canaryDir = join(dir, "canary-worktree");
+  gitAt(dir, "worktree", "add", "-q", canaryDir, "canary-1");
+  const manifest = releaseManifest({ includeCanary: true });
+  writeManifest(dir, manifest);
+  writeManifest(canaryDir, manifest);
+  check("PGD12 allow  deploy-trigger to a non-human-gated env (automated) never demands a deployApproval", "git push origin canary-1", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD13 standing-approval carve-out: the deploy branch is evaluated EVEN under standing-approved --
+{
+  const { dir } = freshRepo("deploy-standing-approval-carveout");
+  writeManifest(dir, releaseManifest({ extraTop: "gates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n" }));
+  check(
+    "PGD13 block  standing push approval does NOT satisfy a deployApproval -- the composition bypass closed",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["no unused deployApproval"] },
+  );
+}
+
+// ---- PGD14/15/16/17 the fail-matrix: A block / B fall-through-block / C warn / D warn ------
+{
+  // Case A: semantic-invalid manifest (undeclared adapter ref on the `test` env), release present,
+  // push IS deploy-triggering (matches vercel-prod's own -- untouched, still valid -- trigger.refs).
+  const { dir } = freshRepo("deploy-caseA-block");
+  writeManifest(dir, releaseManifest({ testEnvAdapterRef: "ghost-adapter" }));
+  check(
+    "PGD14 block  case A: semantic-invalid manifest + release present + deploy-triggering push -- unconditional block",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["is semantically invalid", "deploy-triggering", "unconditional block, no mode exception"] },
+  );
+}
+{
+  // Case B: same semantic-invalid manifest, push NOT deploy-triggering (main matches neither
+  // refs/tags/v* nor refs/heads/v* trigger form) -- falls through to the normal push-gate
+  // checks (WARN prepended); a configured blocking push gate + no verify evidence -> exit 2.
+  const { dir } = freshRepo("deploy-caseB-fallthrough-block");
+  writeManifest(
+    dir,
+    releaseManifest({
+      testEnvAdapterRef: "ghost-adapter",
+      extraTop: "gates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n",
+    }),
+  );
+  check(
+    "PGD15 block  case B: semantic-invalid manifest + release present + NON-deploy-triggering push -- falls through, blocked by the normal evidence-freshness gate (WARN prepended, not fail-open)",
+    "git push origin main:refs/heads/nondeploy",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["release section present, the push-gate check still runs normally", "evidence/verify-latest.json missing"] },
+  );
+}
+{
+  // Case C: semantic-invalid manifest, NO release section at all -- unchanged WARN behavior.
+  const { dir } = freshRepo("deploy-caseC-warn");
+  writeManifest(dir, "schema: pipeline.manifest.v0\nprofiles:\n  active: bogus-profile\n");
+  check("PGD16 warn  case C: semantic-invalid manifest, no release section -- unchanged WARN", "git push origin main:refs/heads/nondeploy", dir, WARN, {
+    stderrIncludes: ["WARN"],
+  });
+}
+{
+  // Case D: parse-level invalid (malformed YAML), no release section reachable at all --
+  // unchanged WARN behavior (same fixture class as PG14 above).
+  const { dir } = freshRepo("deploy-caseD-warn");
+  writeManifest(dir, "schema: pipeline.manifest.v0\ngates:\n  push: &anchor\n    mode: blocking\n");
+  check("PGD17 warn  case D: parse-level invalid manifest (malformed YAML) -- unchanged WARN", "git push origin main:refs/heads/nondeploy", dir, WARN, {
+    stderrIncludes: ["WARN"],
+  });
+}
+
+// ---- PGD18: a declared-but-malformed central deploy policy fail-closes a deploy-triggering push --
+{
+  const { dir } = freshRepo("deploy-malformed-central-policy");
+  writeManifest(dir, releaseManifest({ extraTop: "governance:\n  policies_path: governance-policies\n" }));
+  writeGovernancePolicy(dir, "governance-policies", "schema: &anchor pipeline.deploy-policy.v0\nmode: strict\n");
+  check(
+    "PGD18 block  a declared-but-malformed central deploy-policy fail-closes a deploy-triggering push, unconditional",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["central deploy policy is declared but unreadable/invalid", "fail-closed blocked, unconditional"] },
+  );
+}
+
+// ---- PGD18a/b: fixed managed policy lock is independent of governance.policies_path ----
+{
+  const { dir } = freshRepo("deploy-policylock-mandate");
+  writeManifest(dir, releaseManifest());
+  writePolicyLock(dir, { mode: "mandate", status: "source-unverified" });
+  check(
+    "PGD18a block  a fixed mandate lock with unverified source blocks a deploy trigger without governance discovery",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["managed policy lock status: source-unverified", "deploy-triggering"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-policylock-advisory");
+  gitAt(dir, "tag", "v1.0.0");
+  writeManifest(dir, releaseManifest());
+  writePolicyLock(dir, { mode: "advisory", status: "source-unverified" });
+  writeState(dir, deployApprovalState("v1.0.0", "prod"));
+  check(
+    "PGD18b allow  an advisory unverified lock warns at validation but does not close an otherwise approved deploy trigger",
+    "git push origin v1.0.0",
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+
+// ---- PGD19/20 force refspecs are rejected before evidence binding ----------------------
+{
+  const { dir } = freshRepo("deploy-plus-bare-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD19 block  leading-plus force refspec is source-ambiguous", "git push origin +v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["source-ambiguous"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-plus-fq-block");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD20 block  fully-qualified leading-plus force refspec is source-ambiguous",
+    "git push origin +refs/tags/v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["source-ambiguous"] },
+  );
+}
+
+// ---- PGD21 fall-matrix case B, NO active push gate: the semantic-invalidity WARN is still
+// surfaced instead of exiting silently -------------------------------------------------------
+{
+  // Same semantic-invalid manifest as PGD15 (case B), but no `gates.push` section at all
+  // (absent, not "off") -- exercises the `!pushGate || pushGate.mode === "off"` branch.
+  const { dir } = freshRepo("deploy-caseB-nogate-warn");
+  writeManifest(dir, releaseManifest({ testEnvAdapterRef: "ghost-adapter" }));
+  check(
+    "PGD21 warn  case B: semantic-invalid manifest + release present + NON-deploy-triggering push + NO active push gate -- invalidity WARN still surfaces, does not silently exit 0",
+    "git push origin main:refs/heads/nondeploy",
+    dir,
+    WARN,
+    { stderrIncludes: ["is semantically invalid", "release section present"] },
+  );
+}
+
+// ---- PG26 anonymous-public self-application range -----------------------------------------------
+{
+  const { dir } = freshRepo("anonymous-public-green");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true, env });
+}
+{
+  const { dir } = freshRepo("anonymous-public-malformed-host-alias");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const calibrationPath = join(dir, ".claude", "pipeline.json");
+  const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+  calibration.publicPushIdentity.sshHostAlias = "github-share & untrusted-command";
+  writeFileSync(calibrationPath, JSON.stringify(calibration));
+  check("PG26aa block malformed SSH host alias before shell fixture resolution", command, dir, BLOCK, {
+    stderrIncludes: ["SSH host alias is malformed"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-personal-author");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "user.name", "Personal Name");
+  gitAt(dir, "config", "--local", "user.email", "personal@example.invalid");
+  anonymousCommit(dir, "personal.txt", "personal author");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26b block  personal Author or Committer in the newly reachable range", command, dir, BLOCK, {
+    stderrIncludes: ["non-neutral Author identity", "non-neutral Committer identity"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-trailer");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "trailer.txt", "privacy\n\nCo-authored-by: Personal <personal@example.invalid>");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26c block  personal/provider trailers and mail in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer", "email address"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-private-coordinate");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "private.txt", "privacy\n\nPrivate-Account: account-123");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26d block  private-account trailer in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-wrong-ssh");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github.com:agent-pipe-shared/agent-pipeline.git");
+  check("PG26e block  a generic or wrong SSH identity path", command, dir, BLOCK, {
+    stderrIncludes: ["calibrated SSH host alias"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-signing");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "commit.gpgSign", "true");
+  check("PG26f block  signing-enabled local configuration", command, dir, BLOCK, {
+    stderrIncludes: ["commit.gpgSign"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-unfetched-destination");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "update-ref", "-d", "refs/remotes/origin/feat/v0.3-phase2.6-multi-cli");
+  check("PG26g block  missing fetched destination range evidence", command, dir, BLOCK, {
+    stderrIncludes: ["fetched destination tracking ref"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-wrong-account");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26h block  SSH account evidence from a different account", command, dir, BLOCK, {
+    stderrIncludes: ["SSH account evidence"],
+    env: { ...env, FAKE_SSH_ACCOUNT: "wrong-account" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-pushurl");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "remote.origin.pushurl", "git@wrong-host:wrong-owner/wrong-repo.git");
+  check("PG26i block  pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-main");
+  const { env } = prepareAnonymousPublicPush(dir);
+  check("PG26j block  main is never an anonymous-public delivery destination", "git push origin HEAD:refs/heads/main", dir, BLOCK, {
+    stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-metadata");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "metadata.txt", "privacy\n\nProvider: neutral\nModel: generic\nSession: opaque");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26k block  provider/model/session correlation metadata", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-private-url-path");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "url.txt", "privacy\n\nSee https://private.example.invalid/session/opaque from /home/operator/worktree");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26l block  private URLs and machine paths in the complete range", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-secret-shape");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "secret.txt", "privacy ghp_0123456789abcdef");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26m block  credential-shaped metadata in the complete range", command, dir, BLOCK, {
+    stderrIncludes: ["credential-shaped value"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-global-pushurl");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[remote \"origin\"]\n\tpushurl = git@wrong-host:wrong-owner/wrong-repo.git\n");
+  check("PG26n block  global pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-push-instead-of");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[url \"git@wrong-host:wrong-owner/\"]\n\tpushInsteadOf = git@github-share:agent-pipe-shared/\n");
+  check("PG26o block  pushInsteadOf cannot rewrite the calibrated public endpoint", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-free-text-correlation");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "correlation.txt", "privacy session opaque-123 for account operator42");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26p block  free-text session and account correlation", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-non-http-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "coordinates.txt", "privacy ssh://private.example.invalid/repo \\\\host\\share /root/worktree");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26q block  SSH URLs, UNC paths and root paths", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-field-separator");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "separator.txt", "privacy\x1fSession: opaque");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26r block  field-separator metadata cannot escape range privacy", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-env");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26s block  GIT_SSH_COMMAND cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_SSH_COMMAND: "ssh -i wrong-key" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-config");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[core]\n\tsshCommand = ssh -i wrong-key\n");
+  check("PG26t block  core.sshCommand cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-embedded-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "embedded.txt", "privacy file:/etc/passwd cwd=/root/private alice@10.0.0.1:/srv/repo");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26u block  embedded file URI, root path and general SCP coordinate", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
+
+{
+  const { dir } = freshRepo("portable-cleanup-binding");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeState(dir, {
+    schema: "pipeline.state.v2",
+    continuity: {
+      schema: "pipeline.continuity.v0",
+      runtime: {
+        humanFacingLanguage: "en",
+        activeDuty: "Coordinator",
+        sessionCleanup: {
+          sessionId: "session-machine-local",
+          descriptorSha256: "a".repeat(64),
+        },
+      },
+    },
+  });
+  gitAt(dir, "add", ".claude/pipeline-state.json", ".claude/pipeline.yaml");
+  gitAt(dir, "commit", "-q", "-m", "fixture: bind machine-local cleanup");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check(
+    "PG27 block  a published commit cannot retain a machine-local cleanup binding",
+    "git push origin HEAD:refs/heads/feature-test",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["machine-local sessionCleanup handle"] },
+  );
+}
+
+
+// ---- PG28 terminal fault boundary: an escaped exception inside the blocking evaluation
+// fails CLOSED (issue #100 AC3 / PUSHBOUND-1). Uses the guard's own test-only
+// fault-injection sentinel (PIPELINE_GUARD_PUSH_TEST_FAULT) to make the evaluation
+// genuinely throw -- this is NOT a test that a `catch` merely exists; it exercises it
+// end to end and asserts the exit code a "blocking" push gate demands even on a fault
+// it never anticipated.
+{
+  const { dir, head } = freshRepo("fault-blocking");
+  writeManifest(dir, manifestPush({ mode: "blocking", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG28 block  an injected fault inside the blocking evaluation fails closed", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["BLOCKED", "faulted unexpectedly", "fails closed"],
+    stderrNotIncludes: ["PUSHBOUND-1 injected test fault", "at file://", ".mjs:"],
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "PUSHBOUND-1-inject" },
+  });
+}
+
+// ---- PG29 the SAME injected fault under mode "warn" keeps its documented non-blocking
+// semantics unchanged (acceptance criterion 4) -- a fault must never be MORE permissive
+// than a genuine finding would have been, but it must also never become MORE blocking
+// than the gate's own configured mode.
+{
+  const { dir, head } = freshRepo("fault-warn");
+  writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG29 warn  an injected fault under mode warn stays non-blocking (AC4 unchanged)", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["WARN", "faulted unexpectedly"],
+    stderrNotIncludes: ["PUSHBOUND-1 injected test fault", "at file://", ".mjs:"],
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "PUSHBOUND-1-inject" },
+  });
+}
+
+// ---- PG30 the fault sentinel is inert without the exact env var + value: an ordinary
+// all-green push is unaffected -- confirms the injection seam cannot accidentally fire.
+{
+  const { dir, head } = freshRepo("fault-inert");
+  writeManifest(dir, manifestPush({ mode: "blocking", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG30 allow  the fault sentinel env var alone (wrong value) never fires", PUSH_CMD, dir, ALLOW, {
+    stderrEmpty: true,
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "not-the-sentinel" },
+  });
+}
+
+// ---- D4: declaredCwd / resolveShellCwd() direct coverage, plus the D1 regression (delta
+// Critic review D1/D4) -- resolveShellCwd() and the declaredCwd input it reads had zero
+// direct test before this. runGuard()/check() don't carry a declaredCwd option, so this
+// block adds its own minimal, self-contained spawn helper rather than widening the shared
+// one; it feeds the same module-level `pass`/`failures` the rest of the suite uses. ----
+function runGuardWithDeclaredCwd(command, spawnCwd, declaredCwd, projectDir) {
+  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_name: "Bash", tool_input: { command, cwd: declaredCwd } }),
+    encoding: "utf8",
+    cwd: spawnCwd,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    timeout: 10000,
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+function checkDeclared(id, ok, detail) {
+  if (ok) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${detail}`);
+    console.log(`FAIL  ${id} -- ${detail}`);
+  }
+}
+function freshRepoIn(parentDir, name) {
+  const dir = join(parentDir, name);
+  mkdirSync(dir);
+  const initialized = gitAt(dir, "init", "-q", "-b", "main");
+  if (initialized.status !== 0) throw new Error(`fixture Git initialization failed: ${initialized.stderr}`);
+  enrollFixtureGovernance(dir);
+  gitAt(dir, "config", "user.email", "goldfish@example.invalid");
+  gitAt(dir, "config", "user.name", "Goldfish");
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  gitAt(dir, "add", "README.md");
+  gitAt(dir, "commit", "-q", "-m", "init");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  return { dir, head };
+}
+{
+  // D4a: absolute declaredCwd is used as-is (bare-candidate resolution branch).
+  const target = freshRepo("d4a-target");
+  const decoy = freshRepo("d4a-decoy"); // actual spawn cwd; manifest present, no evidence -> BLOCK if ever used
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
+  writeManifest(decoy.dir, manifestPush({ approval: "required" }));
+  {
+    const r = runGuardWithDeclaredCwd("git push origin main:refs/heads/feature-test", decoy.dir, target.dir, target.dir);
+    checkDeclared("D4a allow  absolute declaredCwd is used as-is (bare candidate)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 300)}`);
+  }
+
+  // D4b: relative declaredCwd resolves against process.cwd() (bare-candidate branch).
+  const parent = mkdtempSync(join(tmpdir(), "d4b-parent-"));
+  ALL_DIRS.push(parent);
+  const { dir: relTarget, head: relHead } = freshRepoIn(parent, "target-repo");
+  writeManifest(relTarget, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(relTarget, "evidence/verify-latest.json", { exitCode: 0, commit: relHead });
+  {
+    const r = runGuardWithDeclaredCwd("git push origin main:refs/heads/feature-test", parent, "./target-repo", relTarget);
+    checkDeclared("D4b allow  relative declaredCwd resolves against process.cwd() (bare candidate)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 300)}`);
+  }
+
+  // D4c (D1 regression): the `-C <relative-path>` branch now honors declaredCwd, not raw
+  // process.cwd() -- proven by spawning in an unrelated decoy while declaring the relative
+  // token's true base explicitly, mirroring D4b's own controlled-parent construction. Fails
+  // red on the pre-D1-fix code (raw process.cwd() = cDecoy.dir, which has no target-repo
+  // subdirectory, so `git -C` fails, evidence never binds to the target, and the decoy's own
+  // required-but-missing evidence blocks) and green after (line ~452 uses resolveShellCwd()).
+  const cParent = mkdtempSync(join(tmpdir(), "d4c-parent-"));
+  ALL_DIRS.push(cParent);
+  const { dir: cTarget, head: cHead } = freshRepoIn(cParent, "target-repo");
+  writeManifest(cTarget, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(cTarget, "evidence/verify-latest.json", { exitCode: 0, commit: cHead });
+  const cDecoy = freshRepo("d4c-decoy"); // spawn cwd; unrelated to cParent
+  writeManifest(cDecoy.dir, manifestPush({ approval: "required" }));
+  {
+    const r = runGuardWithDeclaredCwd("git -C ./target-repo push origin main:refs/heads/feature-test", cDecoy.dir, cParent, cTarget);
+    checkDeclared("D4c allow  -C <relative> branch honors declaredCwd, not raw process.cwd() (D1 regression)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 400)}`);
+  }
+}
+
+// ---- PG-CHECKPOINT: exact feature lane only; all other targets stay strict ---------
+{
+  const { dir } = freshRepo("checkpoint-policy");
+  gitAt(dir, "checkout", "-q", "-b", "feat/checkpoint");
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+  check("PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, ALLOW, { stderrEmpty: true });
+  check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+  check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+  check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+  check("PG-CHECKPOINT block force refspec before any checkpoint classification", "git push origin +feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["push target is not unambiguous"] });
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v2\n  checkpointNamespace: refs/heads/feat/\n`);
+  check("PG-CHECKPOINT block malformed policy cannot select the relaxed lane", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["destination policy"] });
+}
+
+// ---- PG-CHECKPOINT-WORKTREE: explicit -C worktree is the evidence source -----------
+{
+  const { dir } = freshRepo("checkpoint-bound-worktree");
+  const branch = "feat/checkpoint-bound";
+  gitAt(dir, "checkout", "-q", "-b", branch);
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+
+  const source = join(dir, "clean-bound-source");
+  gitAt(dir, "worktree", "add", "--force", "-q", source, branch);
+  writeFileSync(join(dir, "primary-is-dirty.txt"), "dirty primary\n");
+  const refspec = `refs/heads/${branch}:refs/heads/${branch}`;
+  check(
+    "PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary",
+    `git -C ${source} push origin ${refspec}`,
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+
+  const detached = join(dir, "detached-source");
+  gitAt(dir, "worktree", "add", "-q", "--detach", detached, "HEAD");
+  check(
+    "PG-CHECKPOINT-WORKTREE block detached -C source falls back to dirty attached branch worktree",
+    `git -C ${detached} push origin ${refspec}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["checkpoint working tree is not clean"] },
+  );
+
+  const mismatched = join(dir, "mismatched-source");
+  gitAt(dir, "branch", "feat/checkpoint-other");
+  gitAt(dir, "worktree", "add", "-q", mismatched, "feat/checkpoint-other");
+  check(
+    "PG-CHECKPOINT-WORKTREE block attached -C worktree on a different branch falls back",
+    `git -C ${mismatched} push origin ${refspec}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["checkpoint working tree is not clean"] },
+  );
+
+  gitAt(dir, "branch", "feat/checkpoint-unattached");
+  const unattached = "refs/heads/feat/checkpoint-unattached";
+  check(
+    "PG-CHECKPOINT-WORKTREE block source branch with no attached worktree",
+    `git -C ${source} push origin ${unattached}:${unattached}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["explicit source branch has no matching attached worktree"] },
+  );
+}
+
+// ---- TR-C: push classifier scoping (toil-resolution rows T38, T42, T80, T82, T85) -----------------
+// Added by the tranche-2 post-image of dispatch TR-C-T-20261009. Contract: toil-resolution design section 2
+// rows T38, T42, T80, T82 and T85, read together with Ruling 81 (GREP-PUSH, a PO decision): option B of the
+// fail-closed marker rule is KEPT. A command that names git and holds one of the markers ( ) { $ backtick or a
+// nested shell -c is a push CANDIDATE and the gate refuses it, because command substitution can hide a push. That
+// refusal is an accepted false positive, so those cases pin "keeps refusing" (GREEN today and after the F slice).
+// The relief is procedural: commit with git commit -F <file>, search with rg. The F slice owes the refusal text
+// naming both shapes, which the PGC-*c / *b text cases pin RED. The text needles are deliberate literals, not
+// prose: "git commit -F" and "use rg" (the bare letters rg also occur in the word target, which today's text
+// holds, so a looser needle would pass vacuously). Rows with no marker involved pin the row's own contract:
+// T85a (git --version is not a push) is the one RED contract pin of this block.
+// Fixture: an ACTIVE gate (manifest plus verify evidence), otherwise allowExit() fires before the refusal and a
+// BLOCK expectation would be vacuous.
+{
+  const { dir, head } = freshRepo("trc-classifier");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const REFUSAL = "push target is not unambiguous";
+  const RELIEF_NEEDLES = ["git commit -F", "use rg"];
+
+  // T38 -- a read-only git grep.
+  check("PGC-T38a allow  a plain git grep (no marker) never reaches the push gate",
+    "git grep -n needle -- README.md", dir, ALLOW, { stderrEmpty: true });
+  const GREP_PAREN = 'git grep -n "(alpha|beta)" -- README.md';
+  check("PGC-T38b block  a git grep whose pattern holds a parenthesis stays refused (Ruling 81 option B, accepted false positive)",
+    GREP_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T38c text   the refusal of a marker git grep names the relief shapes (git commit -F, use rg)",
+    GREP_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+
+  // T80 -- a git grep with a quoted BRE alternation.
+  const GREP_BRE = 'git grep -n -e "\\(alpha\\|beta\\)" -- README.md';
+  check("PGC-T80a block  a git grep with a quoted BRE alternation stays refused (Ruling 81 option B)",
+    GREP_BRE, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T80b text   the refusal of a BRE-alternation git grep names the relief shapes (git commit -F, use rg)",
+    GREP_BRE, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+
+  // T42 -- a heredoc commit message; PG-HD1 above stays an allow (PO decision 1, default: keep).
+  check("PGC-T42a allow  a heredoc commit message with no marker stays allowed (PG-HD1 keeps its allow)",
+    "git commit -q -F - <<EOF\nfix: pin the classifier\n\nDispatch: TR-C-T-20261009 goldfish\nEOF", dir, ALLOW, { stderrEmpty: true });
+  const HEREDOC_PAREN = "git commit -q -F - <<EOF\nfix: pin the classifier\n\nDispatch: TR-C-T-20261009 (goldfish)\nEOF";
+  check("PGC-T42b block  a heredoc commit message holding a parenthesis stays refused (Ruling 81 option B)",
+    HEREDOC_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T42c text   the refusal of a parenthesised heredoc commit names the relief shapes (git commit -F, use rg)",
+    HEREDOC_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+  check("PGC-T42d allow  the relief shape git commit -F <file> -- <paths> carries no marker and passes",
+    "git commit -F scratch/commit-msg/slice.txt -- docs/a.md", dir, ALLOW, { stderrEmpty: true });
+
+  // T82 -- the commit form the producer prints (-m ... --trailer ...).
+  check("PGC-T82a allow  the printed commit form is admitted when its trailer values hold no marker",
+    'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 goldfish" -- docs/a.md', dir, ALLOW, { stderrEmpty: true });
+  const TRAILER_PAREN = 'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 (goldfish)" -- docs/a.md';
+  check("PGC-T82b block  the printed form whose Dispatch trailer holds a parenthesis stays refused (Ruling 81 option B)",
+    TRAILER_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T82c text   the refusal of the parenthesised trailer form names the relief shapes (git commit -F, use rg)",
+    TRAILER_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+
+  // T85 -- git --version and nested shell text that merely mentions git.
+  check("PGC-T85a allow  git --version is not a push and never reaches the push gate",
+    "git --version", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85b allow  git version is not a push and never reaches the push gate",
+    "git version", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85c allow  a recognised global option before a non-push verb never reaches the push gate",
+    "git -C . status --short", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85d block  WSL command text holding git inside a nested bash -lc stays refused (option B accepted false positive)",
+    'wsl.exe -e bash -lc "cd /mnt/d/repo; git status"', dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T85e block  a real push inside the same nested shell stays refused (I5: a real push stays fail-closed)",
+    'wsl.exe -e bash -lc "git push origin main"', dir, BLOCK);
+  check("PGC-T85f block  a real push after a recognised global option stays refused (I5)",
+    "git --no-pager push origin main:refs/heads/feature-test", dir, BLOCK);
+}
+
+// ---- Cleanup ----------------------------------------------------------------------------
+for (const dir of ALL_DIRS) {
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* temp cleanup is best-effort */
+  }
+}
+
+// ---- Summary ------------------------------------------------------------------------------
+const total = pass + failures.length;
+console.log(`\n${pass}/${total} cases passed.`);
+if (failures.length > 0) {
+  console.log("Failures:");
+  for (const f of failures) console.log(`  - ${f}`);
+  process.exit(1);
+}
+process.exit(0);
