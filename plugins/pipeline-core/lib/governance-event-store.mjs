@@ -264,21 +264,39 @@ function restrictedRecordPath(storeRoot, recordId) {
   return path.join(storeRoot, "records", `${recordId}.json`);
 }
 
+/**
+ * Judge one directory below the restricted store root (`records`, `receipts`,
+ * `key-destruction-journal`).  POSIX: the owner-only mode check, unchanged.  On
+ * win32 `stat().mode` is not DACL data (a directory reports 0o777), so the same
+ * refusal is decided by the module family's DACL assessment instead, with the
+ * create -> harden, existing -> assess split `assertRestrictedRoot` applies to
+ * the store root: `created` is true only when THIS call made the directory (the
+ * `mkdir({ recursive })` return value), so a pre-existing or raced-in directory
+ * is only assessed, never silently claimed.  The refusal keeps its typed code.
+ */
+async function assertRestrictedChildPrivate(target, { created, label }) {
+  if (process.platform === "win32") {
+    const state = created ? hardenWindowsPrivateDirectory(target) : assessWindowsPrivatePath(target);
+    if (state.status !== "secure") fail("GES-RESTRICTED-PERMISSIONS", `${label} must not grant group or other access (Windows DACL assurance is ${state.status}${state.reason ? `: ${state.reason}` : ""}).`);
+    return;
+  }
+  const metadata = await stat(target);
+  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", `${label} must not grant group or other access.`);
+}
+
 async function restrictedRecordsRoot(storeRoot, { create = true } = {}) {
   const recordsRoot = path.join(storeRoot, "records");
-  if (create) await mkdir(recordsRoot, { recursive: true, mode: 0o700 });
+  const created = create && (await mkdir(recordsRoot, { recursive: true, mode: 0o700 })) !== undefined;
   await assertNoSymlink(recordsRoot, { directory: true });
-  const metadata = await stat(recordsRoot);
-  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted records must not grant group or other access.");
+  await assertRestrictedChildPrivate(recordsRoot, { created, label: "Restricted records" });
   return recordsRoot;
 }
 
 async function restrictedAuxiliaryRoot(storeRoot, name) {
   const target = path.join(storeRoot, name);
-  await mkdir(target, { recursive: true, mode: 0o700 });
+  const created = (await mkdir(target, { recursive: true, mode: 0o700 })) !== undefined;
   await assertNoSymlink(target, { directory: true });
-  const metadata = await stat(target);
-  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted auxiliary storage must not grant group or other access.");
+  await assertRestrictedChildPrivate(target, { created, label: "Restricted auxiliary storage" });
   return target;
 }
 
