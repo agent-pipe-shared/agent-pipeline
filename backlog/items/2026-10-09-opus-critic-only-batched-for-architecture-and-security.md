@@ -12,6 +12,10 @@
 3. Any later re-review is a re-critic restricted to the delta diff since the reviewed candidate.
 4. Every other Critic runs on Sonnet (the Critic agent's own route).
 
+**PO clarification (2026-10-09, later the same morning, Ruling 158):** rules 2 and 3 apply to EVERY Critic, not only
+Opus: one overall Critic over a batch, and every follow-up Critic only on the delta diff. Same day: `goldfish-mechanic`
+moves to Haiku at effort medium.
+
 ## Work
 
 - `policies/model-policy.md` MP-07: replace the per-diff A/G/S escalation with the batched rule above; guardrail-only
