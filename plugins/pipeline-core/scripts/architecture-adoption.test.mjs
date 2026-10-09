@@ -487,3 +487,138 @@ describe("ADOPT-SIGN-T: adoption request file for the signing ceremony", () => {
     }
   });
 });
+
+// ADOPT-SIGN-T2: the hardening ADOPT-SIGN-F shipped around `prepare --out` without a negative pin.
+// Every refusal below must exit 1, print no request on stdout and leave the filesystem as it was
+// (for a refused existing target "nothing written" means its bytes and kind are unchanged). A
+// relative --out resolves against --root, so the discriminating cases run from a different cwd.
+// Link-based cases skip with an explicit reason on a host that cannot create the link.
+describe("ADOPT-SIGN-T2: the scratch-bound --out of `prepare`", () => {
+  const script = path.resolve("plugins/pipeline-core/scripts/architecture-adoption.mjs");
+  let root, scratch, side, foreignCwd, stray;
+  const prepareArgs = () => ["--root", root, "--decision", "approved-scoped", "--scope", "src/", "--rationale", "Request file fixture", "--decision-ref", "ADOPT-SIGN-FIXTURE-1", "--decided-at", "2026-01-01T00:00:00.000Z", "--json"];
+  const run = (command, args, options = {}) => spawnSync(process.execPath, [script, command, ...args], { encoding: "utf8", ...options });
+  const prepare = (out, options) => run("prepare", [...prepareArgs(), "--out", out], options);
+  const entries = (dir) => fs.readdirSync(dir).sort();
+  const assertRefused = (refused, label) => {
+    assert.equal(refused.status, 1, `${label} must be refused with exit 1: ${refused.stderr}`);
+    assert.doesNotMatch(refused.stderr, /Unknown or incomplete option/u, `${label}: the refusal must be about the path, not an unrecognised --out flag`);
+    assert.match(refused.stderr, /scratch\//u, `${label}: the refusal must name the scratch/ boundary`);
+    assert.equal(refused.stdout, "", `${label}: a refused --out prints no request`);
+  };
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-request-t2-"));
+    scratch = path.join(root, "scratch");
+    side = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-request-t2-side-"));
+    foreignCwd = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-request-t2-cwd-"));
+    stray = path.join(os.tmpdir(), `adoption-request-t2-up-${process.pid}.json`);
+    setupAdoptionFixture(root);
+    fs.mkdirSync(scratch, { recursive: true });
+  });
+  afterEach(() => {
+    for (const entry of [root, side, foreignCwd, stray]) fs.rmSync(entry, { recursive: true, force: true });
+  });
+
+  it("ADOPT-SIGN-T2-1: --out on a command other than prepare is refused with exit 1, names prepare and writes nothing", () => {
+    const before = entries(root);
+    for (const [command, args] of [["status", ["--root", root, "--json"]], ["propose", ["--root", root, "--json"]], ["apply", prepareArgs()]]) {
+      const refused = run(command, [...args, "--out", "scratch/request.json"]);
+      assert.equal(refused.status, 1, `${command} --out must be refused with exit 1: ${refused.stderr}`);
+      assert.match(refused.stderr, /--out is only valid with the 'prepare' command/u, `${command}: the refusal must say --out belongs to prepare`);
+      assert.equal(refused.stdout, "", `${command}: a refused --out prints nothing`);
+      assert.deepEqual(entries(scratch), [], `${command}: a refused --out must write nothing into scratch/`);
+    }
+    assert.deepEqual(entries(root), before, "a refused --out must leave the root untouched");
+  });
+
+  it("ADOPT-SIGN-T2-2: --out naming scratch/ itself is refused, names the boundary and leaves scratch/ an empty directory", () => {
+    const before = entries(root);
+    for (const out of ["scratch", "scratch/", "./scratch", scratch]) {
+      assertRefused(prepare(out), out);
+      assert.ok(fs.lstatSync(scratch).isDirectory(), `${out}: scratch/ must still be a real directory`);
+      assert.deepEqual(entries(scratch), [], `${out}: scratch/ must stay empty`);
+    }
+    assert.deepEqual(entries(root), before);
+  });
+
+  it("ADOPT-SIGN-T2-3: a relative --out resolves against --root, so a path outside scratch/ is refused from any working directory", () => {
+    const before = entries(root);
+    for (const out of ["adoption-request.json", `../${path.basename(stray)}`, "scratch/../adoption-request-dotdot.json", "scratch-sibling/adoption-request.json"]) {
+      // cwd = scratch/: were the value resolved against the working directory, the first form would land inside scratch/.
+      assertRefused(prepare(out, { cwd: scratch }), out);
+      assert.deepEqual(entries(scratch), [], `${out}: nothing may be written into scratch/`);
+    }
+    assert.deepEqual(entries(root), before, "no refused --out may create a file or directory beside scratch/");
+    assert.equal(fs.existsSync(stray), false, "no refused --out may write above the root");
+  });
+
+  it("ADOPT-SIGN-T2-4: a relative --out resolves against --root (not the working directory) and the file equals stdout byte for byte", () => {
+    const printed = run("prepare", prepareArgs(), { cwd: foreignCwd });
+    assert.equal(printed.status, 0, printed.stderr);
+    const written = prepare("scratch/request-relative.json", { cwd: foreignCwd });
+    assert.equal(written.status, 0, written.stderr);
+    const target = path.join(scratch, "request-relative.json");
+    assert.ok(fs.readFileSync(target).equals(Buffer.from(written.stdout, "utf8")), "the file must equal the stdout of the same call byte for byte");
+    assert.equal(written.stdout, printed.stdout, "the stdout form must not change when --out is given");
+    assert.deepEqual(entries(foreignCwd), [], "a relative --out must not be resolved against the working directory");
+    assert.match(written.stderr, /adoption request written: scratch\/request-relative\.json/u);
+  });
+
+  it("ADOPT-SIGN-T2-5: a symlinked scratch/ is refused, names the boundary and nothing is written through the link", (t) => {
+    fs.rmSync(scratch, { recursive: true, force: true });
+    try { fs.symlinkSync(side, scratch, "dir"); } catch (error) {
+      t.skip(`this host cannot create a directory symlink (${error.code}); the symlinked scratch/ refusal is not exercised here`);
+      return;
+    }
+    assertRefused(prepare("scratch/request-through-link.json"), "scratch/request-through-link.json");
+    assert.deepEqual(entries(side), [], "nothing may be written through the symlinked scratch/");
+  });
+
+  it("ADOPT-SIGN-T2-6: a symlinked directory under scratch/ and a symlinked existing target are refused and nothing is written through them", (t) => {
+    const victim = path.join(side, "victim.json");
+    fs.writeFileSync(victim, "victim-sentinel\n");
+    try {
+      fs.symlinkSync(side, path.join(scratch, "link"), "dir");
+      fs.symlinkSync(victim, path.join(scratch, "request-link.json"), "file");
+    } catch (error) {
+      t.skip(`this host cannot create a symlink (${error.code}); the symlinked parent and target refusals are not exercised here`);
+      return;
+    }
+    assertRefused(prepare("scratch/link/request.json"), "scratch/link/request.json");
+    assert.deepEqual(entries(side), ["victim.json"], "nothing may be written through a symlinked parent directory");
+    assertRefused(prepare("scratch/request-link.json"), "scratch/request-link.json");
+    assert.equal(fs.readFileSync(victim, "utf8"), "victim-sentinel\n", "a symlinked target must not be written through");
+  });
+
+  it("ADOPT-SIGN-T2-7: control: an existing unlinked regular target is replaced, so the refusals below are about links and kind", () => {
+    const plain = path.join(scratch, "request-plain.json");
+    fs.writeFileSync(plain, "old-sentinel\n");
+    const replaced = prepare("scratch/request-plain.json");
+    assert.equal(replaced.status, 0, replaced.stderr);
+    assert.equal(fs.readFileSync(plain, "utf8"), replaced.stdout);
+  });
+
+  it("ADOPT-SIGN-T2-8: a hardlinked existing target is refused, names the boundary and neither name changes", (t) => {
+    const primary = path.join(scratch, "request-linked.json");
+    const alias = path.join(scratch, "request-alias.json");
+    fs.writeFileSync(primary, "linked-sentinel\n");
+    try { fs.linkSync(primary, alias); } catch (error) {
+      t.skip(`this host cannot create a hardlink (${error.code}); the hardlinked target refusal is not exercised here`);
+      return;
+    }
+    for (const out of ["scratch/request-linked.json", "scratch/request-alias.json"]) {
+      assertRefused(prepare(out), out);
+      assert.equal(fs.readFileSync(primary, "utf8"), "linked-sentinel\n", `${out}: the hardlinked file must keep its bytes`);
+      assert.equal(fs.readFileSync(alias, "utf8"), "linked-sentinel\n", `${out}: the second name of the hardlinked file must keep its bytes`);
+    }
+  });
+
+  it("ADOPT-SIGN-T2-9: an existing non-regular target (a directory) is refused, names the boundary and is left as it was", () => {
+    const dir = path.join(scratch, "request-dir.json");
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, "keep.txt"), "keep\n");
+    assertRefused(prepare("scratch/request-dir.json"), "scratch/request-dir.json");
+    assert.ok(fs.lstatSync(dir).isDirectory(), "the directory must still be a directory");
+    assert.deepEqual(entries(dir), ["keep.txt"]);
+  });
+});

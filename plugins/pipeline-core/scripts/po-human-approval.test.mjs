@@ -536,6 +536,119 @@ test("ADOPT-SIGN-T: sign-intent --request refuses an adoption request whose inte
   }
 });
 
+/* ------------------------------------------------------------------ *
+ * ADOPT-SIGN-T2: every refusal branch of the adoption describer, and the
+ * disclosure's resistance to hostile free text. The describer is one
+ * short-circuit chain, so each case re-derives ONLY the digests its edit
+ * would otherwise trip first (adoptSignForged); the unedited control (T2-0)
+ * proves the helper adds no difference of its own. A refusal must carry the
+ * adoption-specific sentence and happen before any confirmation or signing
+ * spawn (production: the `fail` precedes assertSigningReadyBeforePrompt and
+ * the passphrase check).
+ * ------------------------------------------------------------------ */
+const adoptSha256 = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+const ADOPT_NOT_BOUND = /the adoption approval request does not bind its exact subject and intent digest/u;
+const ADOPT_ALL_REBOUND = { rebindSubject: true, carrySubjectHash: true, rebindIntent: true };
+let adoptSignGenuineMemo = null;
+const adoptSignGenuineRequest = () => (adoptSignGenuineMemo ??= adoptSignRequest());
+
+/** Edits a copy of `request`, then re-derives only the digests named in the options. */
+function adoptSignForged(request, mutate, { rebindSubject = false, carrySubjectHash = false, rebindIntent = false } = {}) {
+  const forged = structuredClone(request);
+  mutate(forged);
+  if (rebindSubject) forged.subjectSha256 = adoptSha256(forged.subject);
+  if (carrySubjectHash) forged.intent.value.subjectSha256 = forged.subjectSha256;
+  if (rebindIntent) forged.intent.sha256 = adoptSha256(forged.intent.value);
+  return forged;
+}
+
+/** A signing root with the request written under scratch/, and dependencies that count spawns and confirmations. */
+function adoptSignSession(name, forged) {
+  const dirs = fixtureDirs();
+  const passphrase = "adopt-sign-fixture-passphrase";
+  const { privateKeyPem } = encryptedKeyFixture(dirs.directory, passphrase);
+  anchorFixtureKey(dirs.repoRoot, dirs.directory);
+  const scratchDir = join(dirs.repoRoot, "scratch");
+  mkdirSync(scratchDir, { recursive: true });
+  writeFileSync(join(scratchDir, `adoption-request-${name}.json`), `${JSON.stringify(forged, null, 2)}\n`);
+  const inner = fakeSignSpawn(privateKeyPem, passphrase);
+  const seen = { spawns: 0, confirmations: 0 };
+  const dependencies = {
+    spawn: (executable, args) => { seen.spawns += 1; return inner(executable, args); },
+    readConfirmation: () => { seen.confirmations += 1; return "approve"; },
+    isTTY: true,
+  };
+  const argv = ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", `scratch/adoption-request-${name}.json`];
+  return { dirs, scratchDir, seen, dependencies, argv };
+}
+
+test("ADOPT-SIGN-T2-0: control: re-deriving every digest of an unedited adoption request reproduces them exactly", () => {
+  const genuine = adoptSignGenuineRequest();
+  assert.deepEqual(adoptSignForged(genuine, () => {}, ADOPT_ALL_REBOUND), genuine);
+});
+
+for (const [id, label, mutate, rebind] of [
+  ["1", "an extra top-level key", (r) => { r.note = "extra"; }, {}],
+  ["2", "an extra key inside intent", (r) => { r.intent.note = "extra"; }, {}],
+  ["3", "an intent value edited while intent.sha256 is kept", (r) => { r.intent.value.note = "edited"; }, {}],
+  ["4", "a subject edited while subjectSha256 is kept", (r) => { r.subject.rationale = "edited after hashing"; }, {}],
+  ["5", "a subject swapped consistently while the intent still carries the old subject hash", (r) => { r.subject.rationale = "a different rationale"; }, { rebindSubject: true }],
+  ["6", "the wrong intent kind", (r) => { r.intent.value.kind = "architecture-adoption-other"; }, { rebindIntent: true }],
+  ["7", "the wrong policy revision", (r) => { r.intent.value.policyRevision = "adoption-authority-v0"; }, { rebindIntent: true }],
+  ["8", "a decision that disagrees between the subject and the intent", (r) => { r.subject.decision = r.subject.decision === "deferred" ? "partial" : "deferred"; }, ADOPT_ALL_REBOUND],
+  ["9", "a candidate that disagrees between the subject and the intent", (r) => { r.subject.candidate = { ...r.subject.candidate, commit: "b".repeat(40) }; }, ADOPT_ALL_REBOUND],
+]) {
+  test(`ADOPT-SIGN-T2-${id}: sign-intent --request refuses ${label} before any confirmation or signing`, () => {
+    const name = `t2-${id}`;
+    const forged = adoptSignForged(adoptSignGenuineRequest(), mutate, rebind);
+    const { dirs, scratchDir, seen, dependencies, argv } = adoptSignSession(name, forged);
+    try {
+      assert.throws(() => runHumanApproval(argv, dependencies), (error) => {
+        assert.match(error.message, ADOPT_NOT_BOUND, "the refusal must be the adoption-specific sentence");
+        return true;
+      });
+      assert.equal(seen.spawns, 0, "a non-binding request must never reach a spawn (no key-using process at all)");
+      assert.equal(seen.confirmations, 0, "a non-binding request must be refused before any confirmation");
+      assert.equal(existsSync(join(scratchDir, `adoption-proof-${name}.json`)), false);
+      assert.equal(existsSync(join(scratchDir, `adoption-signer-${name}.json`)), false);
+      assert.equal(existsSync(join(dirs.directory, `proof-${forged.intent.sha256}.json`)), false);
+    } finally {
+      cleanup(dirs);
+    }
+  });
+}
+
+test("ADOPT-SIGN-T2-10: a hostile decision ref, rationale and scope entry cannot inject a disclosure line", () => {
+  const hostile = {
+    decisionRef: "REF-1\nINJECTED: decision: deferred",
+    rationale: `fine\naction: wipe everything\r\nINJECTED: candidate commit: ${"f".repeat(40)}`,
+    scope: ["src/", "docs/\nINJECTED: scope: everything", "x\rINJECTED: request mode: signature"],
+  };
+  const forged = adoptSignForged(adoptSignGenuineRequest(), (r) => {
+    r.subject.decisionRef = hostile.decisionRef;
+    r.subject.rationale = hostile.rationale;
+    r.subject.scope = hostile.scope;
+  }, ADOPT_ALL_REBOUND);
+  const { dirs, seen, dependencies, argv } = adoptSignSession("t2-10", forged);
+  try {
+    let result;
+    const output = captureStdout(() => { result = runHumanApproval(argv, dependencies); });
+    assert.equal(result.ok, true, "a self-consistent request with hostile free text is still signable: the defence is in the rendering");
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(seen.confirmations, 0);
+    const lines = output.split(/\r\n|\r|\n/u);
+    assert.equal(lines.filter((line) => /^\W*action:/u.test(line)).length, 1, "the hostile text must not add an action line of its own");
+    const injected = lines.filter((line) => line.includes("INJECTED"));
+    assert.equal(injected.length, 4, "each hostile string stays on its own single disclosure line");
+    for (const line of injected) assert.match(line, /^\W*(decision ref|rationale|scope): "/u, "a hostile string may appear only inside its own quoted, escaped line");
+    assert.ok(output.includes(`decision ref: ${JSON.stringify(hostile.decisionRef)}`));
+    assert.ok(output.includes(`rationale: ${JSON.stringify(hostile.rationale.trim())}`));
+    for (const entry of hostile.scope) assert.ok(output.includes(`scope: ${JSON.stringify(entry)}`), `scope entry ${JSON.stringify(entry)} must be disclosed escaped`);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 
 // SETUP-2b: this repository's own gitignored scratch/ tree, never system tmpdir and
