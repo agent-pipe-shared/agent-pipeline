@@ -31,6 +31,7 @@ import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.
 import { GOVERNANCE_ACTION_EVENT_SCHEMA, validateGovernanceActionEvent } from "./governance-action-events.mjs";
 import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { ensureAgentPipelineRoot, ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -152,7 +153,12 @@ async function bindLocalRepositoryFingerprint(gitCommonDir, root) {
   if (!existing) {
     const legacyAliases = await discoverLegacyRepositoryFingerprints(root);
     const generated = randomBytes(32).toString("hex");
-    await mkdir(directory, { recursive: true, mode: 0o755 });
+    // This is the first creator of `<common>/agent-pipeline` on a fresh repository (Ruling 141): the
+    // root goes through the one hardened entry point, and the `governance-events` child is created
+    // owner-private beneath it. A recursive mkdir at 0o755 left the root world-readable on POSIX and
+    // with inherited ACEs on win32.
+    const { path: privateRoot } = ensureAgentPipelineRoot(gitCommonDir);
+    ensureHardenedPrivateDirectory(privateRoot, directory);
     await assertNoSymlink(directory, { directory: true });
     await writeAtomic(target, `${canonicalizeJson({ schema: LOCAL_REPOSITORY_BINDING_SCHEMA, repositoryFingerprint: generated, legacyAliases, boundAtEpochMs: Date.now() })}\n`);
     return { fingerprint: generated, legacyAliases };
