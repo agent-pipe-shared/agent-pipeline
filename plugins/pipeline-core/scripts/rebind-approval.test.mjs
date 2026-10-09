@@ -61,13 +61,13 @@
 //              ancestry (no `gitCandidate` stub), so the candidate-ancestry leg of
 //              section 22.5 is exercised against real commits.
 // NOT pinned here (left to the fix wave and its own Critic): the signing request
-// after `digest-set-changed` (21.0), the per-path BOUND-PATH codes of R7-3, and
-// the signature-mode (Ed25519) approval variant; the approval fixture uses the
-// chat-mode human approval of the existing runner suite.
+// after `digest-set-changed` (21.0) and the per-path BOUND-PATH codes of R7-3.
+// The historical approval fixture uses a
+// historical signed v7 approval, verified with a real fixture-owned Ed25519 key.
 // Registration: this file needs a harness/verify-suites.json entry (protected
 // path TP-13); it is intentionally NOT registered by this dispatch.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { afterEach, test } from "node:test";
 import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -75,6 +75,10 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
+import { createPoApprovalIntent, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { rereadApprovedDesignWorkflowPackage } from "../lib/design-workflow-package.mjs";
+import { verifyStoredDesignWorkflowPackageSignature } from "../lib/design-workflow-approval.mjs";
+import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/plan-spec-state-v2.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
@@ -131,7 +135,7 @@ function enrollFixtureGovernance(root) {
 }
 
 /**
- * Origin device: a real git repo whose final plan approval (chat mode) binds
+ * Origin device: a real git repo whose frozen signed v7 plan approval binds
  * PRD, Spec and the design-workflow bound set against a REAL candidate commit.
  * `hideReadiness` models the 2026-10-06 incident: one bound artifact exists in
  * the origin working tree but is git-ignored, so it never reaches a clone.
@@ -169,19 +173,55 @@ function approvedOrigin(name, { hideReadiness = false } = {}) {
   // set is committed on top of the candidate before presenting. Staging everything is scoped to
   // this throwaway fixture repo, not a wildcard add in the real repository.
   git(dir, ["add", "-A"]); git(dir, ["commit", "-q", "-m", "fixture: bound set"]);
-  const deps = { dir, now: () => "2026-10-08T10:01:00.000Z", ownerNonce: () => `rebind-fixture-${String(++nonce).padStart(8, "0")}`,
-    env: ENV, readHumanApprovalMode: () => null, poGateProfile: () => ({ ok: true, value: profile }),
-    poGateAuthority: (request) => request.expectedPlanSha256 === undefined ? { ok: true, value: authority }
-      : { ok: false, code: "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", reason: "marker missing", repair: "PO acknowledgement required" },
-    observeBootstrapBindAcknowledgement: () => ({ acknowledged: false, exempt: true, prd: { path: planPath, sha256: planSha256 }, spec: { path: specPath, sha256: specSha256 } }),
-    designAdvisoryAdmission: () => ({ ok: true, id: h("e"), mode: "admitted" }), ...pkg.deps };
-  const fixtureStep = (label, result) => assert.equal(result.status, 0, `fixture ${label}: ${result.err}\n${result.out}`.slice(0, 1500));
-  fixtureStep("submit-plan", invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
-  fixtureStep("present-plan", invoke(["present-plan", "--by", "coordinator", "--design-workflow-package", pkg.packagePath], deps));
-  const presented = JSON.parse(readFileSync(statePath(dir), "utf8")).planPresentation;
-  const approve = invoke(["approve-plan", "--by", "Fixture PO", "--design-workflow-approval-request", presented.designWorkflowApprovalRequestPath],
-    { ...deps, isattyFn: () => true, readLineFn: () => "approve-" + presented.designWorkflowPackageSha256.slice(0, 12) });
-  assert.equal(approve.status, 0, "fixture chat-mode approve-plan: " + approve.err);
+  // Historical artifact setup only: no retired submit/present/approve CLI is called.
+  // The frozen reader and public intent/proof APIs verify a real fixture-owned
+  // Ed25519 signature over the exact immutable package, PRD, Spec and candidate.
+  const packageSha256 = hash(readFileSync(join(dir, pkg.packagePath)));
+  const packageBinding = { repoRoot: dir, packagePath: pkg.packagePath, packageSha256,
+    featureId, planPath, planSha256, specPath, specSha256 };
+  const frozen = rereadApprovedDesignWorkflowPackage(packageBinding);
+  assert.equal(frozen.ok, true, "fixture frozen legacy package: " + frozen.code);
+  const privateKey = generateKeyPairSync("ed25519").privateKey;
+  const publicKey = createPublicKey(privateKey).export({ type: "spki", format: "pem" }).toString();
+  const trustAnchor = { keyReference: "rebind-frozen-fixture-key", publicKeySha256: hash(publicKey) };
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"],
+    waivedKinds: [], trustAnchors: [trustAnchor],
+  }, null, 2) + "\n");
+  const approvalIntent = createPoApprovalIntent({ kind: "design-workflow-package", featureId,
+    planSha256, specSha256, candidate, policyRevision: "design-workflow-package-v1",
+    subjectSha256: packageSha256, decision: "approve" });
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: approvalIntent.sha256,
+    keyReference: trustAnchor.keyReference, publicKey,
+    signatureBase64: sign(null, Buffer.from(approvalIntent.sha256), privateKey).toString("base64") };
+  const verifiedProof = verifyPoApprovalProof({ intent: approvalIntent, trustPolicy: trustAnchor, proof });
+  assert.equal(verifiedProof.verified, true, "fixture real signature: " + verifiedProof.code);
+  const approvedBy = "verified:" + trustAnchor.keyReference;
+  const approvedAt = "2026-09-27T10:01:00.000Z";
+  const workflowApproval = { schema: "pipeline.design-workflow-package-approval.v1", mode: "signature",
+    approvedBy, approvedAt, packageSha256, intentSha256: approvalIntent.sha256,
+    proofSha256: verifiedProof.proofSha256, proof };
+  const stored = verifyStoredDesignWorkflowPackageSignature({ ...packageBinding,
+    approval: workflowApproval, anchors: [trustAnchor] });
+  assert.equal(stored.ok, true, "fixture stored frozen signature: " + stored.code);
+  const planSubmission = { schema: "pipeline.plan-submission.v1", featureId, planPath, planSha256,
+    specPath, specSha256, profile: "feature", profileSha256: h("5"),
+    submittedBy: "frozen-fixture-coordinator", submittedAt: "2026-09-27T10:00:00.000Z" };
+  assert.equal(validPlanSubmission(planSubmission), true, "fixture frozen submission shape");
+  const submissionSha256 = sha256CanonicalJson(planSubmission);
+  const planApproval = { schema: "pipeline.plan-approval.v7", approvedBy, approvedAt,
+    submissionSha256, profileSha256: planSubmission.profileSha256, poGateAuthority: authority,
+    priorInvalidationSha256: null, designAdvisorAdmissionSha256: h("e"),
+    designWorkflowPackagePath: pkg.packagePath, designWorkflowPackageSha256: packageSha256,
+    designWorkflowApproval: workflowApproval };
+  assert.equal(validPreviousCurrentPlanApproval(planApproval), true, "fixture genuine frozen v7 approval shape");
+  const initial = JSON.parse(readFileSync(statePath(dir), "utf8"));
+  writeFileSync(statePath(dir), JSON.stringify({ ...initial, planApproved: true, planSubmission,
+    planPresentation: { schema: "pipeline.plan-presentation.v2", submissionSha256,
+      presentedBy: "frozen-fixture-coordinator", presentedAt: "2026-09-27T10:00:30.000Z",
+      designWorkflowPackagePath: pkg.packagePath, designWorkflowPackageSha256: packageSha256,
+      designWorkflowApprovalRequestPath: "scratch/design-workflow-approval-request-" + packageSha256 + ".json" },
+    planApproval, updatedAt: approvedAt }, null, 2) + "\n");
   // The bound artifact is tracked while the plan is presented and approved (R7-3 demands it), then
   // untracked and git-ignored: its bytes survive only on the origin device, which is exactly the
   // state a clone cannot reproduce (section 22.5, DWP-REBIND-ARTIFACT-LOST).
@@ -189,7 +229,7 @@ function approvedOrigin(name, { hideReadiness = false } = {}) {
     git(dir, ["rm", "-q", "--cached", "--", readinessPath]);
     mkdirSync(join(dir, ".git", "info"), { recursive: true }); writeFileSync(join(dir, ".git", "info", "exclude"), readinessPath + "\n");
   }
-  // The approval flow also writes the approval request under scratch/ (untracked here). Staging
+  // The historical approval record and committed trust anchor travel with the clone. Staging
   // everything is scoped to this throwaway fixture repo; it is not a wildcard add in the real
   // repository. Ignored paths (the hideReadiness exclude above) stay out of the commit.
   git(dir, ["add", "-A"]); git(dir, ["commit", "-q", "-m", "fixture: approved"]);

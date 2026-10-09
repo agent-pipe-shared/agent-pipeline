@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_ADVISORY_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 
 /**
  * Runner-neutral writer for the durable initial-design Advisor admission.
@@ -104,6 +105,8 @@ function disposition(root, values) {
 }
 
 export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED);
   const { command, values } = parsed(argv);
   const root = resolve(values["--repo-root"]);
   safePath(values["--plan"], "plan"); safePath(values["--spec"], "spec");
@@ -137,6 +140,6 @@ export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try { process.stdout.write(`${JSON.stringify(runDesignAdvisoryAdmission())}\n`); }
+  try { const result = runDesignAdvisoryAdmission(); process.stdout.write(`${JSON.stringify(result)}\n`); if (!result.ok) process.exitCode = 2; }
   catch (error) { process.stderr.write(`DESIGN-ADVISORY-ADMISSION-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
 }

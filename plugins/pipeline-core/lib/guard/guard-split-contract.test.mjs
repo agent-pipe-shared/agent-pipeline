@@ -139,7 +139,7 @@ function laneEdges(name, source) {
 
 test("GSC01 the module files of lib/guard are exactly the modules of the split map", () => {
   const { moduleNames } = loadMap();
-  assert.equal(moduleNames.length, 22, "the map names 22 modules besides the facade");
+  assert.equal(moduleNames.length, 23, "the map names 23 modules besides the facade");
   assert.deepEqual(diskModuleNames(), moduleNames);
 });
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 
 /** Explicit refs-only readiness call site for the generic selected transport. */
 import { readFileSync } from "node:fs";
@@ -66,6 +67,8 @@ function hostUnavailable() {
 
 /** Delegates a fresh refs-only readiness review to the selected generic host. */
 export async function runSpecReadinessHost({ dispatch, dispatchId, sources, references, repoFingerprint, requested, sandboxRuntime, hostBridge }, dependencies = undefined) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_COURSE_RETIRED);
   validateDispatch(dispatch);
   if (!ID.test(dispatchId ?? "")) fail("readiness dispatch id is invalid");
   const freshReferences = referencesOnly(references);
@@ -126,4 +129,11 @@ export async function runSpecReadinessHost({ dispatch, dispatchId, sources, refe
   const schemaResult = validateAgainstSchema(readinessReceipt, READINESS_SCHEMA);
   if (!schemaResult.valid) fail(`readiness report schema is invalid: ${schemaResult.errors.join("; ")}`);
   return { ...result, readinessReceipt };
+}
+
+/** Direct invocation refuses without starting a host or reading caller inputs. */
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+if (isDirectInvocation(import.meta.url)) {
+  process.stdout.write(`${JSON.stringify(retiredDesignResult(DESIGN_COURSE_RETIRED))}\n`);
+  process.exitCode = 2;
 }

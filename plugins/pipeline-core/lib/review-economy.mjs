@@ -737,15 +737,8 @@ export function admitCapacity(input) {
     || (input.preauthorizedFallbackEvidenceSha256 !== null && !SHA256.test(input.preauthorizedFallbackEvidenceSha256))) {
     return { ok: false, action: "block", code: "RE-CAPACITY-SHAPE" };
   }
-  if (!input.candidateFrozen && (!input.criticSlotReserved || input.availableSlots < 1)) {
-    return { ok: false, action: "capacity-blocker", code: "RE-CRITIC-SLOT-NOT-RESERVED" };
-  }
-  if (input.sandboxedWork && (!input.recoverySlotReserved || input.availableSlots < 1)) {
-    return { ok: false, action: "capacity-blocker", code: "RE-RECOVERY-SLOT-NOT-RESERVED" };
-  }
-  const requiredDistinctSlots = (!input.candidateFrozen ? 1 : 0) + (input.sandboxedWork ? 1 : 0);
-  if (input.availableSlots < requiredDistinctSlots) {
-    return { ok: false, action: "capacity-blocker", code: "RE-DISTINCT-RESERVED-SLOTS-UNAVAILABLE" };
+  if ((!input.candidateFrozen || input.sandboxedWork) && input.availableSlots < 1) {
+    return { ok: false, action: "capacity-blocker", code: "RE-CAPACITY-NO-AVAILABLE-SLOT" };
   }
   if (!input.reviewRouteAvailable) {
     if (input.unavailabilityPolicy === "preauthorized-fallback" && input.preauthorizedFallbackAvailable

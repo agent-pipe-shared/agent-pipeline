@@ -35,7 +35,7 @@ import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { gateConfig, loadManifest } from "./manifest.mjs";
-import { CURRENT_APPROVAL_SCHEMA, derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import { CURRENT_APPROVAL_SCHEMA, derivePlanLifecycle, validCurrentPlanApproval } from "./plan-spec-state-v2.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,
@@ -52,11 +52,13 @@ import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-appr
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
 import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { readHumanApprovalMode, verifyAgainstTrustAnchors, readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+
+import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
 
 // The v7 approval record is verified through the re-read of its package. The lib
 // constant for this schema is not exported, so the literal is local; a v8 record
-// keeps falling through to the pre-v7 branch until its own branch lands.
+// is verified separately against its stored U3 binding.
 const V7_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
 
 // Validate before hashing: the final authority reader must never read a state-
@@ -105,6 +107,43 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const planSha256 = advisorPackageSha256(root, planPath);
     const specSha256 = advisorPackageSha256(root, specPath);
     const approval = state?.planApproval;
+    if (approval?.schema === "pipeline.plan-approval.v8") {
+      if (state?.planApproved !== true) return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      const binding = approval.designApprovalBinding;
+      const record = approval.designApproval;
+      if (state?.planSubmission?.profile === "mini") {
+        return validCurrentPlanApproval(approval) && binding === null && record === null
+          ? { ok: true, id: "mini-no-design-approval", mode: "not-required" }
+          : { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
+      }
+      const checked = validateDesignApprovalBinding(binding);
+      if (!checked.ok || checked.bindingSha256 !== record?.bindingSha256 || binding.featureId !== featureId)
+        return { ok: false, code: "DAA-DESIGN-APPROVAL-BINDING-DRIFT" };
+      if (!["feature", "epic"].includes(state?.planSubmission?.profile)
+        || !validCurrentPlanApproval(approval) || record.approvedBy !== approval.approvedBy)
+        return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      if (readHumanApprovalMode(root).mode === "signature" && record.mode === "chat")
+        return { ok: false, code: "DAA-PO-APPROVAL-MODE-MISMATCH" };
+      if (record.mode === "signature") {
+        const trust = readCriticalHumanProofPolicy(root);
+        if (!trust.ok) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-POLICY" };
+        const anchors = trust.trustAnchors ?? (trust.trustAnchor === null ? [] : [trust.trustAnchor]);
+        if (anchors.length === 0) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP" };
+        const verified = verifyAgainstTrustAnchors({ intent: { sha256: record.intentSha256 }, anchors, proof: record.proof });
+        if (!verified.verified) return { ok: false, code: `DAA-${verified.code ?? "PO-APPROVAL-PROOF-INVALID"}` };
+        if (verified.proofSha256 !== record.proofSha256) return { ok: false, code: "DAA-PO-APPROVAL-RECORD-DRIFT" };
+      }
+      const sources = binding.sources;
+      if (sources.prd.path !== planPath || sources.spec.path !== specPath)
+        return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
+      try {
+        for (const source of [sources.prd, sources.spec, ...sources.companions]) {
+          if (advisorPackageSha256(root, source.path) !== source.sha256)
+            return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" };
+        }
+      } catch { return { ok: false, code: "DAA-DESIGN-SOURCE-DRIFT" }; }
+      return { ok: true, id: checked.bindingSha256, mode: `approved-design-${record.mode}` };
+    }
     if (approval?.schema === V7_APPROVAL_SCHEMA && state?.planApproved === true) {
       if (state?.planSubmission?.profile === "mini"
         && approval.designWorkflowPackagePath === null
@@ -206,14 +245,39 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
   }
 }
 
+/** Diagnostic only: classify an already-denied implementation envelope.
+ * Never call admission here or turn a successful diagnostic into authority.
+ * A malformed or half-null pair retains the ordinary lifecycle refusal.
+ */
+export function lifecycleDesignApprovalDenial(state, lifecycle) {
+  if (lifecycle?.ok !== false
+    || lifecycle.code !== "PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED"
+    || lifecycle.nextAction !== "reopen-design"
+    || lifecycle.phase !== "implementation"
+    || lifecycle.submissionCurrent !== true
+    || lifecycle.approvalCurrent !== false
+    || state?.planApproval?.schema !== "pipeline.plan-approval.v8") return null;
+  const approval = state.planApproval;
+  if (approval.designApprovalBinding === null || approval.designApproval === null
+    || !/^[a-f0-9]{64}$/u.test(approval.designApproval?.bindingSha256 ?? "")) return null;
+  const checked = validateDesignApprovalBinding(approval.designApprovalBinding);
+  if (!checked.ok || checked.bindingSha256 === approval.designApproval.bindingSha256) return null;
+  return designAdvisoryRemediation("DAA-DESIGN-APPROVAL-BINDING-DRIFT");
+}
+
 export function designAdvisoryRemediation(code) {
-  return [
-    `[guard-devplan] implementation requires a valid private design Advisor transaction (${code}).`,
-    "Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,",
-    "complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.",
-    "Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.",
-    "An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.",
-  ].join("\n");
+  const prefix = `[guard-devplan] implementation requires a valid design approval (${code}).`;
+  if (code === "DAA-DESIGN-APPROVAL-BINDING-DRIFT") return [prefix,
+    "Current design approval binding differs from the stored approval. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+  if (code === "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP") return [prefix,
+    "Complete PO key setup and pin a matching public trust anchor, then run present-plan --review-receipt and approve-plan in the configured mode."].join("\n");
+  const contentDrift = ["DAA-DESIGN-SOURCE-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DAA-DWP-APPROVAL-SOURCE-DRIFT", "DAA-DWP-APPROVAL-PLAN-SPEC-MISMATCH"];
+  if (contentDrift.includes(code)) return [prefix,
+    "Current design content differs from the approved sources. Run reopen-design --by <human attribution> before editing; finish the sources, run one review, then present-plan --review-receipt, approve-plan and set-phase --phase implementation."].join("\n");
+  return [prefix,
+    "Re-present the same current design through present-plan --review-receipt, then obtain one PO approval through approve-plan in the configured mode.",
+    "Use one ordinary review for finished sources; approval checks the stored binding, current source digests and configured proof or chat attribution."].join("\n");
+
 }
 
 
@@ -444,13 +508,13 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
   if (isExempt) return { verdict: "allow" };
 
   // ---- verdict --------------------------------------------------------------------------
-  const lifecycleReason = lifecycle.nextAction === "reopen-design"
+  const lifecycleReason = lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
     ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
     : lifecycle.status === "awaiting-approval"
       ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
       : lifecycle.status === "approved"
         ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
-        : "The feature is still in draft design and has no implementation authority.";
+        : "The feature is still in draft design and has no implementation authority.");
   const message = [
     `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
     `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,

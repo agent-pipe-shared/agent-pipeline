@@ -69,6 +69,7 @@ import {
   hardenWindowsPrivateDirectory,
 } from "./windows-private-state.mjs";
 import { buildGovernanceHgoConsumptionSource } from "./governance-hgo-consumption-source.mjs";
+import { PrivateBoundaryError, ensureAgentPipelineSegmentOf } from "./private-boundary.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
@@ -657,6 +658,22 @@ function secureDirectory(path, {
   assessWindowsPrivatePathFn = assessWindowsPrivatePath,
   hardenWindowsPrivateDirectoryFn = hardenWindowsPrivateDirectory,
 } = {}) {
+  // WIN-AP-S6 (Ruling 162): the repository-private `agent-pipeline` segment of `path` is created, repaired in
+  // place or refused by the one hardened entry point BEFORE anything below it is touched, so the walk below
+  // only ever sees a segment that already ended private. The injected platform and Windows probes are passed
+  // through; the entry point's typed refusals are mapped onto this function's own closed error vocabulary.
+  try {
+    ensureAgentPipelineSegmentOf(path, {
+      platform,
+      assess: assessWindowsPrivatePathFn,
+      harden: hardenWindowsPrivateDirectoryFn,
+    });
+  } catch (error) {
+    if (!(error instanceof PrivateBoundaryError)) throw error;
+    if (error.code === "PB-WINDOWS-ASSURANCE") fail("HGO-DACL", "override directory DACL is not owner-private");
+    if (error.code === "PB-ROOT-INSECURE") fail("HGO-PERMISSIONS", "override directory is not owner-private");
+    fail("HGO-STORAGE", "override directory is unsafe");
+  }
   // `mkdirSync(path, { recursive: true })` can silently create several missing
   // intermediate components in one call (e.g. a shared `.../agent-pipeline/`
   // parent AND its child in one shot). Walking and hardening only the final

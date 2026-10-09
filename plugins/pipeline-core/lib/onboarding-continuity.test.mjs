@@ -4300,10 +4300,35 @@ for (const key of INTAKE_GENERATE_STAGING_KEYS) {
 // unit suite deliberately uses its chat-mode test receipt; the signature
 // proof selection and verification live in the dedicated onboarding and
 // pipeline-state suites.
+// Complete only explicitly positive acknowledgement setups; draft refusal fixtures stay generated.
+function finishPositiveAcknowledgementFixture(root, generatePlan) {
+  const prdPath = join(root, generatePlan.targets.prd.path);
+  const language = readFileSync(prdPath, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+  const spec = "# Completed acknowledgement specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed intake package is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n- AC-03: WHEN the promotion is replayed, the system SHALL preserve its published action and receipt.\n- AC-04: WHEN document language differs from operator language, the system SHALL preserve the configured language contract.\n- AC-05: WHEN an acknowledged package requests mechanical marker repair, the system SHALL refuse that repair.\n\n## Architecture\nThe intake checkpoint owns package paths. The existing mechanical marker writer binds the final specification digest before the existing acknowledgement writer records consent. Promotion owns continuity, language propagation and profile authority.\n";
+  const prd = "<!-- po-language: " + language + " -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed acknowledgement design\n\n## Goal\nBind the final intake design package through the configured human acknowledgement and preserve its exact authority.\n\n## Scope\nExercise digest refusal, consent persistence, promotion action reconstruction, language propagation and acknowledged-marker protection through the existing public writers.\n\n## Acceptance\nThe completed specification defines each observable authority and language outcome. The intake checkpoint owns the paths; acknowledgement and promotion retain their existing responsibilities.\n";
+  writeFileSync(join(root, generatePlan.targets.spec.path), spec);
+  writeFileSync(prdPath, prd);
+  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+}
+
 function bootstrapBindReadyRoot(name) {
   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  // These five positive binding fixtures require completed design content.
+  // Other helper callers retain their original generated-draft setup.
+  if (["happy", "replay", "already-bound", "activation", "po-gate"].includes(name)) {
+    const spec = "# Bootstrap binding specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed package is acknowledged, the system SHALL bind its exact PRD and Spec digests to the active feature.\n- AC-02: WHEN the same binding is applied twice, the system SHALL preserve all stored bytes on replay.\n- AC-03: WHEN activation is absent, the system SHALL refuse binding without publishing authority.\n- AC-04: WHEN binding succeeds, the system SHALL publish authority accepted by the PO gate.\n\n## Architecture\nThe intake checkpoint owns the design paths. The existing acknowledgement writer binds the final documents; the existing promotion writer publishes continuity and profile authority. No new decision is introduced.\n";
+    const prd = "<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed bootstrap binding design\n\n## Goal\nBind the reviewed intake design package to a local active feature so implementation can use its exact authority.\n\n## Scope\nPreserve digest checks, explicit activation, byte-null replay and PO profile validation. Refuse re-planning once continuity is bound.\n\n## Acceptance\nThe specification defines observable binding, replay, activation and authority outcomes. The existing writers own these transitions.\n";
+    writeFileSync(join(root, generatePlan.targets.spec.path), spec);
+    writeFileSync(join(root, generatePlan.targets.prd.path), prd);
+    const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
+    applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+  }
+  if (["promotionaction-coordinator-fresh", "promotionaction-coordinator-replay", "spec-marker-ack", "spec-marker-bound"].includes(name)) {
+    finishPositiveAcknowledgementFixture(root, generatePlan);
+  }
   const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
   const applied = applyOnboardingBootstrapAcknowledgement({
     rootDir: root,
@@ -4451,6 +4476,9 @@ function bootstrapBindPureGeneratorRoot(name, { acknowledged = false, profile = 
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
   if (acknowledged) {
+    if (["acknowledged", "edit-after-plan", "consent-withdrawn-after-plan"].includes(name)) {
+      finishPositiveAcknowledgementFixture(root, generatePlan);
+    }
     const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
     applyOnboardingBootstrapAcknowledgement({
       rootDir: root,
@@ -4738,6 +4766,7 @@ check("applyOnboardingBootstrapBind: a PO answer of de propagates into the confi
   });
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const prdText = readFileSync(prdAbsolute, "utf8");
   assert.equal(prdText.startsWith("<!-- po-language: de -->"), true, prdText);
@@ -4783,6 +4812,7 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   });
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  finishPositiveAcknowledgementFixture(root, generatePlan);
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const original = readFileSync(prdAbsolute, "utf8");
   assert.equal(original.startsWith("<!-- po-language: en -->"), true, original);

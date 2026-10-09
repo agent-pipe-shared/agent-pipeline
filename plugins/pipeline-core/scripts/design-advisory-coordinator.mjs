@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_ADVISORY_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 
 /**
  * Versioned five-source initial-design Advisor entry for productive runners.
@@ -53,6 +54,8 @@ function rationale(root, path) {
 }
 
 export async function runDesignAdvisoryCoordinator(argv = process.argv.slice(2), dependencies = {}) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED);
   if(!argv.includes('--legacy-v1'))return runInitialCoordinator(argv);
   // Explicit historical diagnostics preserve their actual v1 contract. They
   // cannot supply initial-five-source provenance to the productive v2 reader.

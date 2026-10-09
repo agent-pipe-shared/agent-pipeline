@@ -129,4 +129,6 @@ const cases = [
   }) },
 ];
 
-if (isDirectInvocation(import.meta.url)) registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+if (isDirectInvocation(import.meta.url)) {
+  registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+}

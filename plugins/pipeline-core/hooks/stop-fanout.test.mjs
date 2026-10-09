@@ -16,8 +16,10 @@ const HOOK = join(dirname(fileURLToPath(import.meta.url)), "stop-fanout.mjs");
 const SESSION = "s5-session";
 
 const cases = [];
-function check(name, run) {
-  cases.push({ id: `SF${String(cases.length + 1).padStart(2, "0")}`, name, run });
+let autoNumbered = 0;
+// An explicit `id` is for a case that sits between two auto-numbered ones (SF22b, Ruling 87): the neighbours keep their ids.
+function check(name, run, id = `SF${String(++autoNumbered).padStart(2, "0")}`) {
+  cases.push({ id, name, run });
 }
 
 // ---------------------------------------------------------------- fixtures
@@ -356,15 +358,18 @@ check("no config or no queuePath returns silently having spawned nothing; a conf
 // boolean `requiresEnforcement` (lib/governance-scope.mjs:256-258 -> lib/worktree-lifecycle.mjs:255-277); every config
 // in this file carries one, so that route is not exercised here. (2) The ledger's native-Windows private-state hardening
 // (lib/windows-private-state.mjs, reached through lib/private-boundary.mjs from lib/fanout-ledger.mjs) spawns.
-// FANOUT-SF22t: SF22 PINS those spawns exactly instead of tolerating them. They are a KNOWN DEVIATION from design 3.6 and
-// 8 ("native Windows": the Stop hook spawns nothing), tracked in
-// backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md. What IS asserted: no `git`
-// executable is spawned anywhere on the path; no spawn of any executable happens outside the ledger chain (every recorded
-// spawn has `fanout-ledger.mjs` in its call chain); on win32 every ledger-side spawn is the PowerShell executable reached
-// through windows-private-state.mjs > private-boundary.mjs > fanout-ledger.mjs, EXACTLY LEDGER_POWERSHELL_SPAWN_BOUND_WIN32
-// of them per enforce-mode evaluation (an equality, so SF22 is red on a reduction as well as on an increase); on every
-// other platform there are none. When the backlog item is fixed SF22 turns red on purpose, and whoever fixes it must set
-// that constant to 0.
+// FANOUT-SF22t / Ruling 87: SF22 PINS those spawns exactly instead of tolerating them, for the FIRST Stop per git common dir.
+// SF22 runs in a fresh sandbox, so its Stop creates the ledger directory, and creating it spawns PowerShell on native
+// Windows. That is a one-time directory-creation latency per common dir, ACCEPTED (Ruling 87, measured by
+// FANOUT-WIN-M-20261009): the backlog item backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md
+// is re-scoped to exactly that. It stays a known deviation from design 3.6 and 8 ("native Windows": the Stop hook spawns
+// nothing) for that first Stop only. What SF22 asserts: no `git` executable is spawned anywhere on the path; no spawn of
+// any executable happens outside the ledger chain (every recorded spawn has `fanout-ledger.mjs` in its call chain); on win32
+// every ledger-side spawn is the PowerShell executable reached through windows-private-state.mjs > private-boundary.mjs >
+// fanout-ledger.mjs, EXACTLY LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 of them per enforce-mode evaluation in the fresh sandbox
+// (an equality, so SF22 is red on a reduction as well as on an increase); on every other platform there are none. SF22b
+// pins the STEADY STATE: a second Stop against the same common dir spawns nothing at all, so a regression to per-Stop
+// spawning turns red there.
 
 // A preload for the REAL hook process: it wraps every `node:child_process` entry point, appends one line per call to a
 // log file and then calls through, and `syncBuiltinESMExports()` makes the ESM named imports of the hook, and of every
@@ -426,10 +431,11 @@ function spawnRecords(trip) {
 }
 const isGit = (record) => /^git(?:\.(?:exe|cmd|bat|com))?$/iu.test(record.executable);
 // FANOUT-SF22t (used by SF22 only): the pinned ledger-side spawn shape on native Windows, observed as 4 `powershell.exe`
-// runs per enforce-mode evaluation. KNOWN DEVIATION from design 3.6 and 8, tracked in
-// backlog/items/2026-10-06-fanout-ledger-spawns-powershell-on-every-stop-on-windows.md; SF22 asserts this count with an
-// equality, so fixing that item turns SF22 red until the constant is set to 0. The executable is matched by basename and
-// the chain by module basenames, innermost first.
+// runs for the FIRST ledger-writing Stop against a fresh git common dir (SF22's sandbox is exactly that). All four come
+// from ensureLedgerDirectory > ensurePrivateDirectory creating the ledger directory: a one-time directory-creation latency
+// per common dir, ACCEPTED (Ruling 87), so the bound stays 4. SF22 asserts the count with an equality, so a reduction or an
+// increase turns SF22 red. The steady state (a second Stop against the same common dir) is SF22b's concern: no spawn at
+// all. The executable is matched by basename and the chain by module basenames, innermost first.
 const LEDGER_POWERSHELL_SPAWN_BOUND_WIN32 = 4;
 const LEDGER_POWERSHELL_CHAIN = ["windows-private-state.mjs", "private-boundary.mjs", "fanout-ledger.mjs"];
 const isPowerShell = (record) => /^powershell\.exe$/iu.test(record.executable);
@@ -534,6 +540,60 @@ check("an absolute commonDir is the only source of the git common dir: no git sp
   });
 });
 
+// FANOUT-SF22b / Ruling 87 (FANOUT-WIN-M-20261009): the STEADY STATE. SF22 pins the FIRST Stop per git common dir, whose
+// ledger-directory creation spawns PowerShell on native Windows (one-time, accepted). This case runs that first Stop and
+// then a SECOND Stop against the same common dir and the same session, each as its own real hook process with its own
+// tripwire (own preload and own log directory, so the second log cannot inherit the first one's lines), and pins that the
+// second Stop spawns NOTHING, of any executable, on every platform: an existing ledger directory is only lstat'd
+// (lib/fanout-ledger.mjs ensureLedgerDirectory), never re-hardened. It does not pin the first Stop's count (SF22 owns that),
+// so the two cases have separate reasons to fail, and a regression to per-Stop spawning turns only this one red.
+// Non-vacuity: (1) the second Stop must still decide `block` and really append to the ledger, so it ran the whole path;
+// (2) the second Stop's own tripwire files then record a control spawn made in the same sandbox, so an empty second log is
+// a measured zero and not a dead preload; (3) SF23 proves the wrapper sees an ESM-style spawn at all, and on win32 SF22
+// proves the hook process loads this very preload (its exact count). Off win32 the first Stop spawns nothing either, so
+// there (1) and (2) carry the non-vacuity.
+check("steady state: a second Stop against the same common dir spawns no child process at all, with the same block decision and a real ledger append (the first Stop's one-time directory creation is SF22's)", (t) => {
+  withBox({}, (box) => {
+    assert.deepEqual(readdirSync(box.common), [], "precondition: a fresh git common dir with no ledger directory yet");
+    const ledgerDirectory = dirname(fanoutStatePath(box.common, "claude", SESSION));
+    const stop = (label) => {
+      const directory = join(box.root, label);
+      mkdirSync(directory);
+      const trip = tripwire({ root: directory });
+      return { trip, directory, result: hook(box, stopPayload(box), { nodeArgs: trip.nodeArgs, env: trip.env }) };
+    };
+
+    const first = stop("first-stop");
+    assert.equal(first.result.status, 0, first.result.stderr);
+    assert.equal(JSON.parse(first.result.stdout).decision, "block", "first Stop: normal evaluation in the real process");
+    assert.deepEqual(ledgerTypes(box), ["stop-eval", "block"]);
+    assert.equal(existsSync(ledgerDirectory), true, "the first Stop created the ledger directory");
+    const firstRecords = spawnRecords(first.trip);
+
+    const second = stop("second-stop");
+    assert.equal(second.result.status, 0, second.result.stderr);
+    const secondRecords = spawnRecords(second.trip);
+    assert.deepEqual(
+      secondRecords.map((record) => record.line),
+      [],
+      `the second Stop against the same common dir spawned ${secondRecords.length} child process(es) on ${process.platform}; Ruling 87: the steady state spawns none (only the first Stop creates the ledger directory)`,
+    );
+    assert.equal(JSON.parse(second.result.stdout).decision, "block", "second Stop: the same decision as the first");
+    assert.deepEqual(ledgerTypes(box), ["stop-eval", "block", "stop-eval", "block"], "second Stop: a real ledger append, after the first Stop's two events");
+
+    // Control: the second Stop's OWN preload and log, used for a spawn made in this same sandbox, record it.
+    const control = join(second.directory, "spawn-control.mjs");
+    writeFileSync(control, 'import { execFileSync } from "node:child_process";\nexecFileSync(process.execPath, ["--version"], { stdio: "ignore" });\n');
+    const probe = spawnSync(process.execPath, [...second.trip.nodeArgs, control], { encoding: "utf8", env: { ...process.env, ...second.trip.env } });
+    assert.equal(probe.status, 0, probe.stderr);
+    const controlLines = second.trip.spawned();
+    assert.equal(controlLines.length, 1, "control: the second Stop's tripwire records exactly the control spawn, so the zero above is measured");
+    assert.match(controlLines[0], /^execFileSync /u);
+
+    t.diagnostic(`first Stop: ${firstRecords.length} spawn(s), second Stop: ${secondRecords.length} on ${process.platform}; first Stop spawns: ${JSON.stringify(firstRecords.map((record) => record.line))}`);
+  });
+}, "SF22b");
+
 check("the spawn tripwire is live: a control module that spawns through an ESM named import is recorded", () => {
   withBox({}, (box) => {
     const trip = tripwire(box);
@@ -547,7 +607,7 @@ check("the spawn tripwire is live: a control module that spawns through an ESM n
   });
 });
 
-assert.equal(cases.length, 23, "the complete stop-fanout corpus must be registered before execution begins");
+assert.equal(cases.length, 24, "the complete stop-fanout corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -710,7 +710,7 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
 }
 
 function isSafeExactGrepArgs(args, root, extraRoots = []) {
-  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename"]);
+  const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
   let index = 0;
   while (flags.has(args[index])) index += 1;
   const endedOptions = args[index] === "--";

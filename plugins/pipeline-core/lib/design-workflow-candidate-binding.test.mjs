@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import nodeTest from 'node:test';
+import { registerTestCaseCompletion } from './test-case-completion.mjs';
 
 import { advisorHostFixture } from './codex-advisor-host.fixture.mjs';
 import { coordinateInitialDesignAdvisory } from './design-advisory-coordinator-v2.mjs';
@@ -46,7 +46,6 @@ const READINESS_DISPATCH_ID = 'failure-final-readiness';
 // so off Linux every case would die in fixture setup before reaching an assertion about the defect.
 // A typed skip reports "skipped: <reason>" instead of a failure that looks like the defect.
 const PLATFORM_SKIP = process.platform !== 'linux' ? 'CANDBIND fixture store is linux-only (codex-design-readiness-host-store)' : false;
-const test = (name, body) => nodeTest(name, { skip: PLATFORM_SKIP }, body);
 
 /**
  * Build a Claude-runner (no-child Advisor unavailability) v2 package whose final independent
@@ -118,7 +117,8 @@ async function unavailableAdvisorPackage(t) {
   return { root, candidate, input, moveHead, verifySupplemental, sources };
 }
 
-test('CANDBIND-a implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false)', async (t) => {
+const cases = [
+  { id: 'CANDBIND-a', name: 'implementation-boundary read of an unavailable-advisor v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false)', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await unavailableAdvisorPackage(t);
   const control = readDesignWorkflowPackageV2FromRepository({ ...fixture.input, requireCurrentCandidate: false });
   assert.equal(control.ok, true, `control at HEAD == candidate must verify, got ${brief(control)}`);
@@ -126,9 +126,9 @@ test('CANDBIND-a implementation-boundary read of an unavailable-advisor v2 packa
   const moved = readDesignWorkflowPackageV2FromRepository({ ...fixture.input, requireCurrentCandidate: false });
   assert.equal(moved.ok, true, `with requireCurrentCandidate:false a HEAD descended from the candidate must verify, got ${brief(moved)}`);
   assert.deepEqual(moved.candidate, fixture.candidate, 'the recorded design candidate stays the provenance; later HEAD is never substituted into it');
-});
+} },
 
-test('CANDBIND-b the default (strict) read of the same package still refuses a HEAD that moved past the candidate', async (t) => {
+  { id: 'CANDBIND-b', name: 'the default (strict) read of the same package still refuses a HEAD that moved past the candidate', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await unavailableAdvisorPackage(t);
   const control = readDesignWorkflowPackageV2FromRepository(fixture.input);
   assert.equal(control.ok, true, `strict control at HEAD == candidate must verify, got ${brief(control)}`);
@@ -136,9 +136,9 @@ test('CANDBIND-b the default (strict) read of the same package still refuses a H
   const moved = readDesignWorkflowPackageV2FromRepository(fixture.input);
   assert.equal(moved.ok, false, 'the default must stay strict: a moved HEAD is not the approved candidate');
   assert.equal(moved.code, 'DWP2-CURRENT-CANDIDATE');
-});
+} },
 
-test('CANDBIND-c the host verifier\'s supplemental Advisor re-read stays strict by default once HEAD moved past the candidate', async (t) => {
+  { id: 'CANDBIND-c', name: 'the host verifier\'s supplemental Advisor re-read stays strict by default once HEAD moved past the candidate', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   // Only the strict half is reachable one level down without a new seam: relaxing the re-read needs
   // a caller-visible option on verifyDesignReadinessHostExecution, which does not exist yet.
   const fixture = await unavailableAdvisorPackage(t);
@@ -148,4 +148,7 @@ test('CANDBIND-c the host verifier\'s supplemental Advisor re-read stays strict 
   fixture.moveHead();
   const moved = fixture.verifySupplemental();
   assert.equal(moved.ok, false, 'the default re-read must stay strict once HEAD moved past the candidate');
-});
+} },
+];
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

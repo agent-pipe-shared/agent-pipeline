@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 /**
  * Executable handoff for the existing design-course producers. This module
  * never synthesizes Advisor/readiness evidence or signs a package. It emits
@@ -558,6 +559,8 @@ export async function buildFinalDesignReviewRequest({
  * preparation and final package, and return the unsigned final PO request.
  * Execution is impossible without the caller's explicit confirmation bit. */
 export async function runDesignCourseV2(input = {}, dependencies = {}) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_COURSE_RETIRED);
   if (input.confirmProducerExecution !== true) {
     return { ok: false, status: "producer-confirmation-required", code: "DESIGN-COURSE-EXECUTION-EXPLICIT-CONFIRMATION-REQUIRED",
       implementationAuthority: false };
@@ -669,6 +672,10 @@ function readBoundInput(root, ref, kind) {
 }
 
 export async function main(argv = process.argv.slice(2), io = process, dependencies = {}) {
+  const retirement = retiredDesignResult(DESIGN_COURSE_RETIRED);
+  io.stdout.write(`${JSON.stringify(retirement)}\n`);
+  io.exitCode = 2;
+  return retirement;
   const input = parseCli(argv);
   if (input.inspect) {
     if (input.runV2 || input.execute || input.stage !== undefined || input.sources && Object.keys(input.sources).length

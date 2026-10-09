@@ -7,6 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { validateContinuityState } from "./continuity-state.mjs";
+import { validateDesignApprovalBinding } from "./design-approval-binding.mjs";
 
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
 const LEGACY_SUBMISSION_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
@@ -131,8 +132,8 @@ const V7_CURRENT_APPROVAL_KEYS = [
   "designWorkflowPackageSha256",
   "designWorkflowApproval",
 ];
-// v8 (ADR-0085 C4): one designApproval record replaces the four v7 design
-// fields. v7 stays readable through validPreviousCurrentPlanApproval.
+// v8 (ADR-0085 C4): a U3 binding and its designApproval record replace the
+// four v7 design fields. v7 stays readable through validPreviousCurrentPlanApproval.
 const CURRENT_APPROVAL_KEYS = [
   "schema",
   "approvedBy",
@@ -141,6 +142,7 @@ const CURRENT_APPROVAL_KEYS = [
   "profileSha256",
   "poGateAuthority",
   "priorInvalidationSha256",
+  "designApprovalBinding",
   "designApproval",
 ];
 const V6_CURRENT_APPROVAL_KEYS = V7_CURRENT_APPROVAL_KEYS.filter((key) => key !== "designWorkflowApproval");
@@ -412,9 +414,16 @@ export function validCurrentPlanApproval(value) {
     && SHA256.test(value.submissionSha256)
     && SHA256.test(value.profileSha256)
     && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
-    // null is the mini-profile shape (no design review, so no design approval).
-    && (value.designApproval === null || validDesignApproval(value.designApproval))
+    && validDesignApprovalPair(value.designApprovalBinding, value.designApproval)
     && validAuthority(value.poGateAuthority);
+}
+
+function validDesignApprovalPair(binding, approval) {
+  // Mini has neither design object; a half-null pair is never a stored envelope.
+  if (binding === null || approval === null) return binding === null && approval === null;
+  if (!validDesignApproval(approval)) return false;
+  const checked = validateDesignApprovalBinding(binding);
+  return checked.ok && checked.bindingSha256 === approval.bindingSha256;
 }
 
 export function validPreviousCurrentPlanApproval(value) {

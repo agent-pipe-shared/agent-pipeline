@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 
 /**
  * Read-only Codex readiness producer for one already-authored design package.
@@ -167,6 +168,8 @@ function readSources(root, paths, candidate, deps) {
 
 /** Run one separately dispatched, exact-candidate Codex readiness review. */
 export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_COURSE_RETIRED);
   const args = parseArgs(argv);
   const rootInfo = lstatSync(args.repoRoot);
   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || realpathSync(args.repoRoot) !== args.repoRoot) fail("repository root must be a physical absolute directory");

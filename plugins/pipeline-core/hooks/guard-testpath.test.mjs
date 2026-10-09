@@ -21,6 +21,19 @@
  *
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a temp dir so a real project
  * guard-config on the machine can never leak into these cases.
+ *
+ * TR-L / T84 (specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md section 2 row T84,
+ * section 5 row 9; tranche-2 post-image, new cases TP19-TP21): "one protection decision per file
+ * across hunks". The verdict for a shipped-baseline guard source (PB-GUARD-HOOKS, here
+ * `lib/guard/sanctioned-args-onboarding.mjs`) must be a function of the FILE only: not of which
+ * hunk is edited (including the revert of a hunk and a Write of the committed bytes), not of the
+ * file's index or working-tree state, not of how its path is spelled. TR-L "makes the decision
+ * consistent, never weaker" (invariant I4), so these are invariants the TR-L change must keep;
+ * each case is run, not assumed, and its colour is recorded in TR-L-MANIFEST.md.
+ * The restore half of T84 is a SHELL-lane decision and lives in guard-testpath-override.test.mjs
+ * (OT20-OT23). NOT reproduced here: the mechanism by which the toil log (L88) saw hunk 1 admitted.
+ * Nothing in this write lane reads index or working-tree state; the only per-call state is a spent
+ * one-time capability, which OT20 of the sibling suite pins.
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -521,7 +534,81 @@ yield { id: "TPC018", name: "TP18 block  briefed test-change authorization block
   },
 ) };
 
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR, BRIEFED_DIR]) {
+// ---- T84 (TR-L): ONE protection decision per file, whatever the hunk, index state or spelling --
+// A real git repository with the guard source committed, enrolled like every fixture above, and
+// ABSOLUTE file_path values built from the fixture root (the harness contract; TP01-TP09 use a
+// synthetic "D:/repo/..." placeholder that a state-dependent mechanism would never see). The
+// project config is absent on purpose: the verdict comes from the shipped baseline alone.
+// `File:` is left out of the compared lines because it echoes the spelling under test.
+const T84_REL = "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs";
+const T84_V0 = "export const ONBOARDING = 1;\nexport const SECOND = 2;\n";
+const T84_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-t84-"));
+mkdirSync(join(T84_DIR, "plugins", "pipeline-core", "lib", "guard"), { recursive: true });
+writeFileSync(join(T84_DIR, T84_REL), T84_V0);
+writeFileSync(join(T84_DIR, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+gitCommitAll(T84_DIR);
+const T84_ABS = join(T84_DIR, T84_REL);
+const T84_STABLE = /^(BLOCKED \(guard-testpath|Rule ID:|Briefed test-change route:|Clearance:)/u;
+function t84Decision(toolName, filePath, extraInput) {
+  const { code, stderr } = runGuard(toolName, filePath, T84_DIR, extraInput);
+  return { code, decision: stderr.split("\n").filter((line) => T84_STABLE.test(line)) };
+}
+function t84Reference(label) {
+  const reference = t84Decision("Edit", T84_ABS, { old_string: "ONBOARDING = 1", new_string: "ONBOARDING = 11" });
+  assert.equal(reference.code, 2, `${label}: the shipped baseline did not refuse the guard source at all (exit ${reference.code})`);
+  assert.ok(reference.decision.some((line) => line === "Rule ID: PB-GUARD-HOOKS"),
+    `${label}: expected Rule ID: PB-GUARD-HOOKS, got ${JSON.stringify(reference.decision)}`);
+  return reference;
+}
+
+const T84_HUNKS_NAME = "TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes)";
+yield { id: "TPC019", name: T84_HUNKS_NAME, run: () => {
+  const reference = t84Reference("TP19");
+  const calls = [
+    ["a second hunk", "Edit", { old_string: "SECOND = 2", new_string: "SECOND = 22" }],
+    ["the revert of the first hunk", "Edit", { old_string: "ONBOARDING = 11", new_string: "ONBOARDING = 1" }],
+    ["a Write of the committed bytes", "Write", { content: T84_V0 }],
+  ];
+  for (const [label, toolName, input] of calls) {
+    assert.deepEqual(t84Decision(toolName, T84_ABS, input), reference, `T84: ${label} was decided differently from the first hunk of the same file`);
+  }
+  console.log(`PASS  ${T84_HUNKS_NAME}`);
+} };
+
+const T84_STATE_NAME = "TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again";
+yield { id: "TPC020", name: T84_STATE_NAME, run: () => {
+  const reference = t84Reference("TP20");
+  const hunk = { old_string: "SECOND = 2", new_string: "SECOND = 22" };
+  assert.deepEqual(t84Decision("Edit", T84_ABS, hunk), reference, "T84: clean file");
+  writeFileSync(T84_ABS, "export const ONBOARDING = 1;\nexport const SECOND = 22;\n");
+  assert.deepEqual(t84Decision("Edit", T84_ABS, hunk), reference, "T84: the file is dirty in the working tree");
+  execFileSync("git", ["add", "--", T84_REL], { cwd: T84_DIR });
+  assert.deepEqual(t84Decision("Edit", T84_ABS, hunk), reference, "T84: the same change is staged");
+  writeFileSync(T84_ABS, "export const ONBOARDING = 1;\nexport const SECOND = 222;\n");
+  assert.deepEqual(
+    t84Decision("Edit", T84_ABS, { old_string: "SECOND = 222", new_string: "SECOND = 2" }),
+    reference,
+    "T84: the file is staged and edited again, and the hunk is a revert towards the committed bytes",
+  );
+  console.log(`PASS  ${T84_STATE_NAME}`);
+} };
+
+const T84_SPELLING_NAME = "TP21 block  T84 the decision for the file does not depend on how its path is spelled";
+yield { id: "TPC021", name: T84_SPELLING_NAME, run: () => {
+  const reference = t84Reference("TP21");
+  const hunk = { old_string: "SECOND = 2", new_string: "SECOND = 22" };
+  const spellings = [
+    ["relative", T84_REL],
+    ["dot-relative", `./${T84_REL}`],
+    ["absolute with backslashes", T84_ABS.split("/").join("\\")],
+  ];
+  for (const [label, spelling] of spellings) {
+    assert.deepEqual(t84Decision("Edit", spelling, hunk), reference, `T84: the ${label} spelling of the same file was decided differently from the absolute one`);
+  }
+  console.log(`PASS  ${T84_SPELLING_NAME}`);
+} };
+
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR, BRIEFED_DIR, T84_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
@@ -549,7 +636,10 @@ const names = [
   "TP15 block  test path refusal clearly states route-available-via-briefed-authorization",
   "TP16 block  non-test path refusal clearly states no-route-for-this-target",
   "TP17 allow  briefed test-change authorization admits exact target with matching digest",
-  "TP18 block  briefed test-change authorization blocks when presenting mismatching digest"
+  "TP18 block  briefed test-change authorization blocks when presenting mismatching digest",
+  "TP19 block  T84 one decision per file across hunks (two hunks, the revert of a hunk, a Write of the committed bytes)",
+  "TP20 block  T84 the decision for the file does not move when it is dirtied, staged, or staged and edited again",
+  "TP21 block  T84 the decision for the file does not depend on how its path is spelled"
 ];
 const cases = names.map((name, index) => {
   const id = `TPC${String(index + 1).padStart(3, "0")}`;

@@ -2753,8 +2753,9 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, in
       : `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}If the PO's material already exists in a regular file inside this repository, use existingFileApplyAction directly with that file's repository-relative path and SHA-256; do not copy it to scratch or repeat its contents. If material exists only in chat, write the bytes once to ${INTAKE_TEXT_FILE} and use applyAction. Replace only typed placeholders with the matching verbatim answers. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
     applyAction: commandAction(argv, true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"]),
     existingFileApplyAction: commandAction(
-      [...argv.slice(0, argv.indexOf("--text-file")), "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
-        "--text-file-sha256", INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
+      runner === "claude" ? [...argv] :
+        [...argv.slice(0, argv.indexOf("--text-file")), "--text-file", INTAKE_EXISTING_FILE_PLACEHOLDER,
+          "--text-file-sha256", INTAKE_EXISTING_FILE_SHA256_PLACEHOLDER, "--activate", "--runner", runner],
       true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"],
     ),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },

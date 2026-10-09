@@ -7,6 +7,7 @@ import { renderProjectOnboardingAction } from "../project-onboarding-v3.mjs";
 import { observeReturnedActionDenial, resetLifecycleDenial } from "../lifecycle-denial-loop.mjs";
 import { readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
 import { resolveGitCommonDir } from "../../hooks/guard-dispatch-budget.mjs";
+import { ensureAgentPipelineRoot, ensureHardenedPrivateDirectory } from "../hardened-private-directory.mjs";
 import { REPAIR_MAP_SCRIPT } from "./constants.mjs";
 import { verdict } from "./verdict.mjs";
 import { lifecycleSubagentIdentity } from "./bootstrap-receipt.mjs";
@@ -27,6 +28,18 @@ import { observedOnboardingCommandMatch } from "./command-catalogue.mjs";
  */
 function guardDenialClassesDir(commonDir) {
   return join(commonDir, "agent-pipeline", "guard-denial-classes");
+}
+
+/**
+ * WIN-AP-S4 (Ruling 141): the only place this module creates the private tree. The root
+ * `<common>/agent-pipeline` goes through the one hardened entry point and the `guard-denial-classes` child
+ * is created owner-private beneath it, instead of by a recursive mkdir that handed each new segment the
+ * parent's permissions (a world-readable root on POSIX, an inherited foreign-ACE DACL on native Windows).
+ * The `mkdirSyncFn` seam is passed through; a refusal lands in the caller's existing fail-open `catch`.
+ */
+function ensureGuardDenialClassesDir(commonDir, mkdirSyncFn) {
+  const { path: privateRoot } = ensureAgentPipelineRoot(commonDir, { mkdir: mkdirSyncFn });
+  ensureHardenedPrivateDirectory(privateRoot, guardDenialClassesDir(commonDir), { mkdir: mkdirSyncFn });
 }
 
 function guardDenialClassesPath(commonDir, scopeKey) {
@@ -109,7 +122,7 @@ export function isFirstDenialThisScope(input, root, classKey, dependencies) {
       if (Array.isArray(parsed?.seenClasses)) seenClasses = parsed.seenClasses;
     }
     if (seenClasses.includes(classKey)) return false;
-    mkdirSyncFn(guardDenialClassesDir(commonDir), { recursive: true, mode: 0o700 });
+    ensureGuardDenialClassesDir(commonDir, mkdirSyncFn);
     const updated = {
       schema: "pipeline.guard-denial-classes-seen.v1",
       seenClasses: [...seenClasses, classKey],

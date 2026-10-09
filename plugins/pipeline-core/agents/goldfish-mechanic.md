@@ -1,8 +1,8 @@
 ---
 name: goldfish-mechanic
-description: "Agent-Pipeline Goldfish (mechanic tier, effort low) - fresh-context executor for PURELY mechanical, uniform, plan-execution tasks with a fully-specified briefing and NO in-task design decisions (e.g. bulk rename, whitespace/formatting sweeps, config-value bumps, uniform doc-sync edits following an exact pattern). Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for guardrail/class-high work or anything requiring a judgment call mid-task - use goldfish-implementor (clearly-briefed implementation, effort medium) or goldfish-deep (design-latitude/guardrail/test-authorship, effort xhigh) instead. Delivers diff + condensed evidence-backed report, or a clean stop."
-model: sonnet
-effort: low
+description: "Agent-Pipeline Goldfish (mechanic tier, effort medium) - fresh-context executor for PURELY mechanical, uniform, plan-execution tasks with a fully-specified briefing and NO in-task design decisions (e.g. bulk rename, whitespace/formatting sweeps, config-value bumps, uniform doc-sync edits following an exact pattern). Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for guardrail/class-high work or anything requiring a judgment call mid-task - use goldfish-implementor (clearly-briefed implementation, effort medium) or goldfish-deep (design-latitude/guardrail/test-authorship, effort xhigh) instead. Delivers diff + condensed evidence-backed report, or a clean stop."
+model: haiku
+effort: medium
 maxTurns: 50
 tools: Read, Edit, Write, Grep, Glob, Bash
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
@@ -12,17 +12,18 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 #   else `.claude/pipeline.json`, field `worktree`). Caution: a
 #   project's compile/type-check gate can be fail-open inside a worktree - verify this per project
 #   when enabling worktree isolation.
-# model: sonnet = mechanic-tier shipped default (MP-02; configured in pipeline.user.yaml ->
-#   models.mechanic, overridable per project). The mechanic tier is the floor for a Goldfish dispatch
-#   (MP-03/MP-25 rescope): no weaker model for THIS implementing role; a weakest-tier model is
-#   permitted only for a separate, non-implementing read-only research-fetcher role. Escalation to a
+# model: haiku = mechanic-tier route (MP-02; Rulings 158/161; configured in pipeline.user.yaml ->
+#   models.mechanic, overridable per project). The mechanic tier is Haiku at effort medium and is the
+#   floor for a Goldfish dispatch (MP-03/MP-25 rescope): no weaker model for THIS implementing role; the
+#   weakest-tier exception for a separate, non-implementing read-only research-fetcher role is
+#   unchanged. Escalation to a
 #   higher-capability (design-tier) model is an ELEPHANT dispatch decision, passed as invocation model
 #   parameter WITH a model justification in briefing field 6 (MP-05) - never self-chosen. Every
 #   dispatch names the model explicitly. CLAUDE_CODE_SUBAGENT_MODEL must stay unset (MP-04) or it
 #   silently overrides this frontmatter.
-# effort: low = the MECHANIC tier of the 3-tier goldfish effort matrix (MP-27): mechanical/uniform/
-#   pure-plan-execution work with a fully-specified briefing and NO in-task design decisions. This is
-#   the LOWEST of the three tiers - NOT a general-purpose default. The scope boundary below is a HARD
+# effort: medium = the MECHANIC tier of the 3-tier goldfish effort matrix (MP-27): mechanical/uniform/
+#   pure-plan-execution work with a fully-specified briefing and NO in-task design decisions. The
+#   mechanic tier runs Haiku at effort medium (Rulings 158/161) - NOT a general-purpose default. The scope boundary below is a HARD
 #   FORBID, not just a preference: guardrail/hook/canon code, test-suite/verify authorship, class-high
 #   work, and any task with genuine in-task design latitude belong to goldfish-deep (effort xhigh)
 #   instead; ordinary clearly-briefed implementation belongs to goldfish-implementor (effort medium,

@@ -24,9 +24,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join as joinPath, parse as parsePath, resolve, sep as pathSep } from "node:path";
 import { randomBytes } from "node:crypto";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { ensureAgentPipelineRoot } from "./hardened-private-directory.mjs";
 
 export class PrivateBoundaryError extends Error {
   constructor(code, message) {
@@ -76,7 +77,33 @@ export function assureWindowsPrivateDirectories(entries, {
   }
 }
 
+const AGENT_PIPELINE_SEGMENT = "agent-pipeline";
+
+/**
+ * WIN-AP-S6 (Ruling 162, slice S6 of Ruling 141): the one place a path BELOW the repository-private
+ * `agent-pipeline` segment is routed through the hardened entry point `ensureAgentPipelineRoot`. The shared
+ * private-directory helpers receive only that path, never the git common directory, so the anchor (the
+ * directory that contains the segment) is derived from the path: its LAST `agent-pipeline` component. The
+ * segment is then created owner-only, repaired in place when it is an insecure segment owned by the current
+ * user (one typed `PB-ROOT-REPAIRED` warning), or refused with the entry point's typed error, before the
+ * caller creates anything below it. `options` are the entry point's own injection seams.
+ *
+ * Returns `null` and touches nothing when the path has no such component, or when the directory that would
+ * contain it does not exist (it is then no git common directory, and the caller keeps its existing walk).
+ */
+export function ensureAgentPipelineSegmentOf(path, options = {}) {
+  const target = resolve(path);
+  const { root } = parsePath(target);
+  const names = target.slice(root.length).split(pathSep).filter((name) => name.length > 0);
+  const index = names.lastIndexOf(AGENT_PIPELINE_SEGMENT);
+  if (index < 0) return null;
+  const anchor = joinPath(root, ...names.slice(0, index));
+  if (!existsSync(anchor)) return null;
+  return ensureAgentPipelineRoot(anchor, options);
+}
+
 export function ensurePrivateDirectory(path) {
+  ensureAgentPipelineSegmentOf(path);
   const existing = nearestExistingParent(path);
   physicalDirectory(existing, "private-state parent");
   const target = resolve(path);

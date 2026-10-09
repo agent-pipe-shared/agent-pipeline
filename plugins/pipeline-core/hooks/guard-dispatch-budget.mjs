@@ -38,7 +38,11 @@
  *   role gets an allow verdict carrying `additionalContext` telling it to
  *   commit what is green, write an interim report and hand back.
  * - Critic notes lane: the Critic's closing lane also admits its own
- *   `scratch/dispatch/<subdir>/critic-notes.md` (that exact file name only).
+ *   `scratch/dispatch/critic-<id>/critic-notes.md` (that exact file name only).
+ * - Critic write confinement (CRITIC-CKPT-F2, Rulings 157/159/161): a dispatched Critic's Write/Edit/NotebookEdit is refused
+ *   with DISPATCH-BUDGET-CRITIC-WRITE-CONFINED at every call the budget admits (before the working cap and inside the closing
+ *   allowance) unless it targets that one notes file. The refusal is counted like any other call and sits BEHIND the budget
+ *   decision, so a write after the allowance still answers the budget's own exhaustion code.
  * - Grant store: an orchestrator-written, digest-chained per-agent grant
  *   adds working calls; any dispatched agent touching it is refused.
  *
@@ -93,6 +97,18 @@
  * This adapter recognizes the permitted shapes below and persists nextCount
  * even for denied attempts, so those attempts also consume the fixed reserve.
  * Neither repeating a closing shape nor retrying a denial renews the reserve.
+ *
+ * ## TR-G-F behaviour (toil rows T49 and T37, 2026-10-09)
+ * - Closing acts after the working cap are the dispatch record, `git add`, `git commit` and now also the
+ *   read-only commit-flow producer `goldfish-commit-command-flow.mjs`, spelled `node <script> <args>` with the
+ *   script path equal to `<plugin root this guard resolves>/scripts/goldfish-commit-command-flow.mjs` and no shell
+ *   control character in the arguments. It is counted like every closing act and the shared core still ends the
+ *   allowance after five counted attempts, so it can neither renew nor extend it. Nothing else becomes admitted.
+ * - A first-call binding miss (`DBB-PENDING-BINDING-MISSING`: no pending binding exists for this child, for example
+ *   a second child of the same role launched under ONE parent Dispatch call after the first consumed the binding)
+ *   is refused with its own text, which names the re-dispatch action instead of offering a counter repair. The
+ *   binding stays one per role per parent call and is consumed by its child; binding a second child would need a
+ *   change to `lib/dispatch-budget-binding.mjs` and would contradict the consumption pins of this suite.
  *
  * ## Parallel tool calls of one agent (Spec 22.11 R7-11, PO decision #26)
  * The counter lock is per agent (`<agentId>.json.binding.lock`), so parallel
@@ -219,17 +235,22 @@ export { CLOSING_ALLOWANCE, DENIAL_CODE, INVALID_INPUT_CODE, SAFETY_MARGIN };
 /** The hook's own refusal code for a bounded counter-lock wait that timed out (contention, not invalid budget state). */
 export const COUNTER_LOCK_TIMEOUT_CODE = "DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT";
 const DISPATCH_RECORD_PATTERN = /^evidence\/dispatch-record-.*\.json$/u;
-const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)\b/u;
+// TR-G-F4 (Ruling 150, Finding 3): the verb is followed by whitespace or the end of the command. `\b` also matched
+// before a hyphen, so `git commit-graph write` and `git commit-tree HEAD` were taken for a closing `git commit`.
+const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)(\s|$)/u;
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
 }
 
-function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false }) {
+function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
-      + `Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) \`git add\` your own paths, (3) \`git commit\` your own paths${closingNotesClause(agentType)}.\n`
+      + `Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) \`git add\` your own paths, (3) \`git commit\` your own paths${closingNotesClause(agentType)}, plus the read-only commit-flow producer \`goldfish-commit-command-flow.mjs\` from the plugin scripts directory (it is counted like any closing call).\n`
+      // TR-G-F4 (Ruling 150, Finding 1): a refusal that only says "from the plugin scripts directory" leaves the agent to guess
+      // the spelling; the one admitted absolute path is named, and a relative spelling (a different program) is said to stay refused.
+      + (producerPath === null ? "" : `The only admitted spelling of the producer is \`node "${producerPath}" <args>\` -- exactly this absolute path below the plugin root this guard resolves. A relative spelling names a different program and stays refused; on win32 a bare (unquoted) token containing a backslash is refused too, so quote the path or write it with forward slashes.\n`)
       + "Stop working and emit the closing report when finished.\n"
     : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
       + "Emit the closing report without another tool call.\n";
@@ -244,7 +265,27 @@ function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, s
   );
 }
 
+const PENDING_BINDING_MISSING_CODE = "DBB-PENDING-BINDING-MISSING";
+
+/**
+ * TR-G-F (toil row T37): a first-call binding miss is not corrupt counter state. No counter exists for this child
+ * (the binding lookup runs only while the counter file is absent, and the consume-race path removes the counter it
+ * just created), so there is nothing to repair; the one action that works is to re-dispatch the task as its own
+ * Dispatch call so that its launch records a binding for it.
+ */
+function pendingBindingMissingBlocked({ agentId, agentType }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${INVALID_INPUT_CODE}: this dispatch (${agentType}, agent ${agentId}) has invalid budget state (${PENDING_BINDING_MISSING_CODE}).\n`
+      + "No budget was bound to this child: its launch recorded no pending binding for this role, or a sibling child of the same role under the same parent Dispatch call already consumed it. "
+      + "No budget counter was written for this child, so every further call it makes is refused the same way and there is nothing to repair.\n"
+      + "Stop and report this to the dispatcher. The action is to re-dispatch this task as its own Dispatch call (one child per role per Dispatch call), so that the launch records a fresh budget binding for it.\n",
+  );
+}
+
 function invalidBudgetInputBlocked({ agentId, agentType, reason }) {
+  if (reason === PENDING_BINDING_MISSING_CODE) return pendingBindingMissingBlocked({ agentId, agentType });
   return verdict(
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
@@ -456,18 +497,22 @@ function budgetContractOptions(rootDir, options) {
 
 /**
  * The exact permitted-after-cap shape set (DoD): a write/update of
- * `evidence/dispatch-record-*.json`, or a Bash call whose command begins
- * with `git add` / `git commit`. Ownership of the exact paths inside a
+ * `evidence/dispatch-record-*.json`, a Bash call whose command begins
+ * with `git add` / `git commit` AND is one simple git command (TR-G-F3, Ruling 138 F2; see `isSingleGitClosingCommand`:
+ * a chain, a redirect, a pipe or a substitution after the cap is never a closing act), or the one read-only
+ * commit-flow producer call (TR-G-F, toil row T49; see `isCommitFlowProducerCommand`). Ownership of the exact paths inside a
  * `git add`/`git commit` call is not something a PreToolUse payload lets
  * this guard verify; the other guards in the union (guard-git.mjs,
  * guard-testpath.mjs) already own that narrower question.
  */
 // ALFRED-BUDGET-20261005: the dispatching Critic hands back through its own
-// `scratch/dispatch/<subdir>/critic-notes.md` (critic-review.md CR-06-D). Exact
-// shape only: one safe subdirectory segment (never `.`/`..`, no separators) and
-// that one file name, admitted for the Critic agent type alone.
-const CRITIC_NOTES_PATTERN = /^scratch\/dispatch\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/critic-notes\.md$/u;
+// `scratch/dispatch/critic-<id>/critic-notes.md` (critic-review.md CR-06-D; the fresh per-dispatch directory
+// agents/critic.md tells it to create). Exact shape only: one safe subdirectory segment that starts with `critic-`
+// (never `.`/`..`, no separators) and that one file name, admitted for the Critic agent type alone. The prefix is the
+// CRITIC-CKPT-T2 (d4) pin: `scratch/dispatch/other/critic-notes.md` is not the Critic's own scratchpad.
+const CRITIC_NOTES_PATTERN = /^scratch\/dispatch\/critic-[A-Za-z0-9][A-Za-z0-9._-]{0,120}\/critic-notes\.md$/u;
 export const GRANT_REFUSAL_CODE = "DISPATCH-BUDGET-GRANT-ORCHESTRATOR-ONLY";
+export const CRITIC_WRITE_CONFINED_CODE = "DISPATCH-BUDGET-CRITIC-WRITE-CONFINED";
 
 function isCriticAgentType(agentType) {
   return normalizedAgentType(agentType) === "critic";
@@ -475,8 +520,32 @@ function isCriticAgentType(agentType) {
 
 function closingNotesClause(agentType) {
   return isCriticAgentType(agentType)
-    ? ", (4) write your own scratch/dispatch/<subdir>/critic-notes.md (that exact file name only)"
+    ? ", (4) write your own scratch/dispatch/critic-<id>/critic-notes.md (that exact file name only)"
     : "";
+}
+
+/**
+ * CRITIC-CKPT-F2 (Rulings 157/159/161): the refusal for a dispatched Critic whose Write/Edit/NotebookEdit targets anything
+ * but its own notes file. A `tools` frontmatter list cannot confine a path, so the confinement is this guard's. Its text
+ * names neither the budget's exhaustion code nor its exhausted-allowance sentence: the cap is not what refused the call.
+ */
+function criticWriteConfined({ agentId, agentType }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${CRITIC_WRITE_CONFINED_CODE}: this dispatch (${agentType}, agent ${agentId}) tried to write a file other than its own notes file. `
+      + "A Critic is read-only toward the repository; its one writable file is scratch/dispatch/critic-<id>/critic-notes.md (Write or Edit, that exact file name only). "
+      + "Persist your material there, or return your report as text.\n",
+  );
+}
+
+/** Does this Write/Edit/NotebookEdit call aim anywhere but the Critic's own notes file? An empty target path is outside it. */
+function writesOutsideCriticNotes(input, rootDir) {
+  const toolName = String(input?.tool_name ?? "");
+  if (!WRITE_TOOLS.includes(toolName)) return false;
+  const filePath = String(writeTargetPath(input?.tool_input, toolName) ?? "");
+  const rel = (isAbsolute(filePath) ? relative(rootDir, filePath) : filePath).replaceAll("\\", "/");
+  return !CRITIC_NOTES_PATTERN.test(rel);
 }
 
 /**
@@ -537,7 +606,7 @@ function checkpointNoticeStdout({ agentType, count, workingCap, remaining }) {
   const critic = isCriticAgentType(agentType);
   const calls = `${remaining} call${remaining === 1 ? "" : "s"}`;
   const steps = critic
-    ? "(1) start no new review work; (2) write your interim notes (done / remaining / next step) into your own scratch/dispatch/<subdir>/critic-notes.md; (3) end your turn with that hand-back."
+    ? "(1) start no new review work; (2) write your interim notes (done / remaining / next step) into your own scratch/dispatch/critic-<id>/critic-notes.md; (3) end your turn with that hand-back."
     : "(1) commit what is already green now (never a known-red regression); (2) write an interim report (done / remaining / next step) into your dispatch record, evidence/dispatch-record-<TASK_ID>.json (log + report); (3) end your turn with that hand-back.";
   const additionalContext = `DISPATCH-BUDGET-CHECKPOINT: ${calls} of your working budget remain after this call (counted call ${count} of ${workingCap}). `
     + "Do not start new work. Hand back to the dispatcher now: "
@@ -547,7 +616,62 @@ function checkpointNoticeStdout({ agentType, count, workingCap, remaining }) {
   return `${JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", additionalContext } })}\n`;
 }
 
-function isClosingAct(input, rootDir, agentType) {
+const COMMIT_FLOW_PRODUCER_SCRIPT = "goldfish-commit-command-flow.mjs";
+// `node` or `node.exe`, then the script as the very next token: double-quoted, single-quoted or bare.
+const PRODUCER_COMMAND_PATTERN = /^node(?:\.exe)?\s+(?:"([^"]+)"|'([^']+)'|([^\s"']+))(?:\s|$)/u;
+// Any shell control or substitution character in the arguments means the call is not ONE plain `node <script> <args>`.
+const PRODUCER_ARGS_CONTROL_PATTERN = /[;&|<>`$()\r\n]/u;
+
+/**
+ * The form two script paths are compared in. TR-G-F3 (Ruling 138, F1): the backslash is a path separator on win32
+ * ONLY, so it is mapped to "/" there and nowhere else, exactly as lower-casing is win32-only. On a POSIX host a
+ * backslash is an ordinary file-name character: `<plugin root>/scripts\goldfish-commit-command-flow.mjs` is a
+ * different path from `<plugin root>/scripts/goldfish-commit-command-flow.mjs` and must not compare equal. Trailing
+ * slashes (after the win32 conversion) are dropped on every platform.
+ */
+function comparableScriptPath(value) {
+  const win32 = process.platform === "win32";
+  const slashed = (win32 ? String(value).replaceAll("\\", "/") : String(value)).replace(/\/+$/u, "");
+  return win32 ? slashed.toLowerCase() : slashed;
+}
+
+/**
+ * TR-G-F (toil row T49): is this Bash command exactly one plain call of the read-only commit-flow producer shipped
+ * in THIS guard's plugin (the root `resolveAgentPluginRoot` answers, the same one the maxTurns read uses)? The script
+ * path must equal `<plugin root>/scripts/goldfish-commit-command-flow.mjs` once separators are normalised (win32
+ * only, see `comparableScriptPath`; a copy of
+ * the script elsewhere is a different program), and the arguments may carry no shell control character, so a chained
+ * second command, a redirect or a substitution is never admitted through this lane. Whether the call is admitted at
+ * all is still the shared core's decision: it counts the attempt and ends the allowance after five.
+ */
+function isCommitFlowProducerCommand(command, pluginRoot) {
+  if (typeof command !== "string" || typeof pluginRoot !== "string" || pluginRoot === "") return false;
+  const match = PRODUCER_COMMAND_PATTERN.exec(command);
+  if (match === null) return false;
+  if (PRODUCER_ARGS_CONTROL_PATTERN.test(command.slice(match[0].length))) return false;
+  // TR-G-F4 (Ruling 150, Finding 2): a shell reads a backslash in an unquoted token as an escape, so a bare
+  // `...\scripts\goldfish-commit-command-flow.mjs` does not run the file whose path the guard compared. Only a quoted
+  // token gets the win32 backslash mapping; a bare token containing one is no closing act on win32. On a POSIX host a
+  // backslash is an ordinary file-name character and the comparison below already keeps such a path distinct.
+  if (match[3] !== undefined && process.platform === "win32" && match[3].includes("\\")) return false;
+  const scriptPath = match[1] ?? match[2] ?? match[3];
+  return comparableScriptPath(scriptPath) === comparableScriptPath(join(pluginRoot, "scripts", COMMIT_FLOW_PRODUCER_SCRIPT));
+}
+
+/**
+ * TR-G-F3 (Ruling 138, F2): is this Bash command ONE simple `git add` / `git commit`? The verb pattern tests only the
+ * start of the command, so on its own `git add -- x && <other>` or `git commit -F f -- p | <other>` would be admitted
+ * after the working cap. The same control-character refusal the producer lane applies (`;`, `&`, `|`, `<`, `>`,
+ * backtick, `$`, parentheses, CR, LF) is applied to the WHOLE git command, so a chain, a redirect, a pipe or a
+ * substitution is never a closing act. This only narrows what was admitted: plain `git add -- <p>` and
+ * `git commit -F <f> -- <p>` are unchanged. A path or message that itself contains one of those characters (a
+ * parenthesised directory, `git commit -m "feat(x): y"`) is refused too, the safe direction; use `-F <file>`.
+ */
+function isSingleGitClosingCommand(command) {
+  return typeof command === "string" && GIT_CLOSING_VERB_PATTERN.test(command) && !PRODUCER_ARGS_CONTROL_PATTERN.test(command);
+}
+
+function isClosingAct(input, rootDir, agentType, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   if (WRITE_TOOLS.includes(toolName)) {
     const filePath = writeTargetPath(input?.tool_input, toolName);
@@ -558,7 +682,8 @@ function isClosingAct(input, rootDir, agentType) {
   if (toolName === "Bash") {
     const command = input?.tool_input?.command ?? input?.tool_input?.CommandLine;
     if (typeof command !== "string") return false;
-    return GIT_CLOSING_VERB_PATTERN.test(command.trim());
+    const trimmed = command.trim();
+    return isSingleGitClosingCommand(trimmed) || isCommitFlowProducerCommand(trimmed, resolveAgentPluginRoot(rootDir, dependencies));
   }
   return false;
 }
@@ -1035,13 +1160,19 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   if (preliminaryBudget.decision === "invalid-input") {
     return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
   }
-  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir, identity.agentType)
+  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir, identity.agentType, dependencies)
     ? decideDispatchBudgetCall({ maxTurns: policyMaxTurns, baseCalls, currentCount: counter.count, isClosingAct: true, grantedCalls })
     : preliminaryBudget;
   counter.count = budget.nextCount;
   counter.updatedAt = nowFn();
   saveCounter(path, counter, dependencies);
   if (budget.allowed) {
+    // CRITIC-CKPT-F2 (Rulings 157/159/161): behind the budget decision on purpose. A write after the allowance is already
+    // answered by the budget's own exhaustion refusal (CRITIC-CKPT-T2 (d2)-(d4)); only a call the budget admits reaches
+    // this line, and a Critic write to anything but its notes file is then refused with a typed code (CRITIC-CKPT-T3).
+    if (isCriticAgentType(identity.agentType) && writesOutsideCriticNotes(input, rootDir)) {
+      return criticWriteConfined({ agentId: identity.agentId, agentType: identity.agentType });
+    }
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
     const checkpoint = contract.applicable
@@ -1059,6 +1190,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   return blocked({
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
     workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
+    producerPath: join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", COMMIT_FLOW_PRODUCER_SCRIPT),
   });
 }
 

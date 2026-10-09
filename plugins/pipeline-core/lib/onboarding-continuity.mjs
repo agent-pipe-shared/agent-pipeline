@@ -59,6 +59,7 @@ import {observeGovernanceScope} from "./governance-scope.mjs";
 import {validateRetirementJournal} from "./enrollment-retirement-coordinator.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { applyBoundDesignLineEndings, planBoundDesignLineEndings } from "./bound-design-line-endings.mjs";
+import { parseArchitectureDesign } from "./architecture-design.mjs";
 import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton } from "./design-authoring.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
@@ -5182,12 +5183,21 @@ function promotionArtifacts(root, input, { checkMarkers = true, checkAcknowledge
     // acknowledgement always certifies the exact PRD/Spec pair that becomes
     // bindable authority.
     if (checkAcknowledgement && acknowledgementMarkers.length !== 1) {
-      fail(
+      let nextAction;
+      try { parseArchitectureDesign(prdText); } catch (error) {
+        nextAction = { kind: "architecture-design-required", mutation: false, requiresConfirmation: false,
+          schema: "pipeline.architecture-design-remediation.v1", code: error.message,
+          prdPath: input.prdPath, specPath: input.specPath,
+          guidance: "Author and review the staging architecture design before the single PO approval." };
+      }
+      const refusal = new KickoffError(
         "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
         "The promoted PRD must carry the PO's plan acknowledgement marker exactly once, as"
           + " <!-- po-plan-acknowledged: content-sound-and-spec-consistent --> on its own line;"
           + " the PO plan gate will otherwise refuse it with no sanctioned repair route once bound.",
       );
+      if (nextAction) refusal.nextAction = nextAction;
+      throw refusal;
     }
   }
   return {
@@ -6870,18 +6880,18 @@ function buildIntakeSpecContent(checkpoint, featureId, chunks) {
 // (`commandAction()` in project-onboarding-v3.mjs): `kind: "command"` with a
 // ready-to-run `{ executable, argv }`, the `--plan-sha256` already filled in
 // from the SAME value the caller would otherwise have copied by hand.
-function intakeGenerateApplyAction(root, planSha256) {
+function intakeGenerateApplyAction(root, planSha256, runner) {
   return {
     kind: "command",
     executable: "node",
-    argv: [DEFAULT_ONBOARDING_SCRIPT, "intake-generate-apply", "--root", root, "--plan-sha256", planSha256, "--activate"],
+    argv: [DEFAULT_ONBOARDING_SCRIPT, "intake-generate-apply", "--root", root, "--plan-sha256", planSha256, "--activate", ...(runner === undefined ? [] : ["--runner", runner])],
     mutation: true,
     requiresConfirmation: true,
   };
 }
 
 function buildOnboardingIntakeGeneratePlan({
-  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+  rootDir, runner, repositoryCapability = "local", spawn = defaultGitSpawn,
 } = {}) {
   const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
   if (observed.status !== "present") {
@@ -6931,7 +6941,7 @@ function buildOnboardingIntakeGeneratePlan({
     targets,
   };
   const planSha256 = canonicalSha256(binding);
-  return { ...binding, planSha256, nextAction: intakeGenerateApplyAction(binding.root, planSha256) };
+  return { ...binding, planSha256, nextAction: intakeGenerateApplyAction(binding.root, planSha256, runner) };
 }
 
 export function planOnboardingIntakeGenerate(options = {}) {
@@ -7351,6 +7361,15 @@ function bootstrapAcknowledgementPlan({ rootDir, repositoryCapability = "local",
   }
   const prdText = decodeBootstrapAcknowledgementPrd(prd.raw);
   if (prdText === null) fail("BOOTSTRAP-ACK-PRD-ENCODING", "the staging PRD is not valid UTF-8");
+  const specText = decodeBootstrapAcknowledgementPrd(spec.raw);
+  if (specText === null) fail("BOOTSTRAP-ACK-SPEC-ENCODING", "the staging specification is not valid UTF-8");
+  const unfinished = (text) => text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
+    || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+    || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+    || /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/mu.test(text);
+  if (unfinished(prdText) || unfinished(specText)) {
+    fail("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", "complete the generated PRD and specification before acknowledgement");
+  }
   const markers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
   if (markers.length !== 0) fail("BOOTSTRAP-ACK-ALREADY-ACKNOWLEDGED", "the staging PRD already carries an acknowledgement marker");
   const action = {

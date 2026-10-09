@@ -22,7 +22,7 @@
       },
       "duties": {
         "implement": { "capability": "implement", "effort": "medium" },
-        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "mechanic": { "capability": "mechanic", "effort": "medium" },
         "deep": { "capability": "deep", "effort": "xhigh" },
         "review": { "capability": "review", "effort": "max" }
       }
@@ -59,7 +59,7 @@
       },
       "models": {
         "implement": { "capability": "implement", "effort": "medium" },
-        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "mechanic": { "capability": "mechanic", "effort": "medium" },
         "deep": { "capability": "deep", "effort": "xhigh" },
         "review": { "capability": "review", "effort": "max" }
       }
@@ -84,14 +84,14 @@
       },
       "models": {
         "implement": { "capability": "implement", "effort": "medium" },
-        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "mechanic": { "capability": "mechanic", "effort": "medium" },
         "deep": { "capability": "deep", "effort": "xhigh" },
         "review": { "capability": "review", "effort": "max" }
       }
     }
   },
   "agentAssignments": {
-    "plugins/pipeline-core/agents/goldfish-mechanic.md": { "capability": "mechanic", "effort": "low" },
+    "plugins/pipeline-core/agents/goldfish-mechanic.md": { "capability": "mechanic", "effort": "medium" },
     "plugins/pipeline-core/agents/goldfish-implementor.md": { "capability": "implement", "effort": "medium" },
     "plugins/pipeline-core/agents/goldfish-deep.md": { "capability": "deep", "effort": "xhigh" },
     "plugins/pipeline-core/agents/critic.md": { "capability": "review", "effort": "max" },

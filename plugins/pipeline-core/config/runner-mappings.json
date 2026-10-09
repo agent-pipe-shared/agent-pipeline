@@ -5,7 +5,7 @@
       "capabilities": {
         "design": "opus",
         "implement": "sonnet",
-        "mechanic": "sonnet",
+        "mechanic": "haiku",
         "deep": "sonnet",
         "review": "sonnet"
       },
@@ -15,7 +15,7 @@
       "directSelectors": {
         "design": { "kind": "alias", "value": "opus", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
         "implement": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
-        "mechanic": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "mechanic": { "kind": "alias", "value": "haiku", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
         "deep": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
         "review": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null }
       },

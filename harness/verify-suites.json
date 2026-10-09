@@ -1765,6 +1765,348 @@
       "file": "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs",
       "invariantPinned": "approve-push anchors the push proof in the machine-plane key directory first and refuses an authority whose key pair disagrees with it",
       "nonOverlapNote": "Push-approval anchor resolution (R7-6-P); other pipeline-state verbs keep their own suites"
+    },
+    {
+      "name": "design-approval-command-admission-tests",
+      "file": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "DAGA001",
+          "DAGA002",
+          "DAGA003",
+          "DAGA004",
+          "DAGA005",
+          "DAGA006",
+          "DAGA007",
+          "DAGA008",
+          "DAGA009",
+          "DAGA010",
+          "DAGA011",
+          "DAGA012",
+          "DAGA013"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "agent-pipeline-root-creation-tests",
+      "file": "plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agent-pipeline-root-creation.test.mjs"
+    },
+    {
+      "name": "continuity-authority-drift-tests",
+      "file": "plugins/pipeline-core/lib/continuity-authority-drift.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/continuity-authority-drift.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/continuity-authority-drift.test.mjs"
+    },
+    {
+      "name": "continuity-capacity-shared-tests",
+      "file": "plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs"
+    },
+    {
+      "name": "critic-verify-lifecycle-route-tests",
+      "file": "plugins/pipeline-core/lib/critic-verify-lifecycle-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-verify-lifecycle-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-verify-lifecycle-route.test.mjs"
+    },
+    {
+      "name": "design-approval-route-tests",
+      "file": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ADR0085-ROUTE-001",
+          "ADR0085-ROUTE-002",
+          "ADR0085-ROUTE-003",
+          "ADR0085-ROUTE-004",
+          "ADR0085-ROUTE-005",
+          "ADR0085-ROUTE-006",
+          "ADR0085-ROUTE-007",
+          "ADR0085-ROUTE-008",
+          "ADR0085-ROUTE-009",
+          "ADR0085-ROUTE-010",
+          "ADR0085-ROUTE-011",
+          "ADR0085-ROUTE-012",
+          "ADR0085-ROUTE-013",
+          "ADR0085-ROUTE-014",
+          "ADR0085-ROUTE-015",
+          "ADR0085-ROUTE-016",
+          "ADR0085-ROUTE-017",
+          "ADR0085-ROUTE-018",
+          "ADR0085-ROUTE-019",
+          "ADR0085-ROUTE-020",
+          "ADR0085-ROUTE-021",
+          "ADR0085-ROUTE-022",
+          "ADR0085-ROUTE-023",
+          "ADR0085-ROUTE-024",
+          "ADR0085-ROUTE-025",
+          "ADR0085-ROUTE-026",
+          "ADR0085-ROUTE-027",
+          "ADR0085-ROUTE-028",
+          "ADR0085-ROUTE-029",
+          "ADR0085-ROUTE-030",
+          "ADR0085-ROUTE-031",
+          "ADR0085-ROUTE-032",
+          "ADR0085-ROUTE-033",
+          "ADR0085-ROUTE-034",
+          "ADR0085-ROUTE-035",
+          "ADR0085-ROUTE-036",
+          "ADR0085-ROUTE-037",
+          "ADR0085-ROUTE-038",
+          "ADR0085-ROUTE-039",
+          "ADR0085-ROUTE-040",
+          "ADR0085-ROUTE-041",
+          "ADR0085-ROUTE-042",
+          "ADR0085-ROUTE-043",
+          "ADR0085-ROUTE-044",
+          "ADR0085-ROUTE-045",
+          "ADR0085-ROUTE-046",
+          "ADR0085-ROUTE-047",
+          "ADR0085-ROUTE-048",
+          "ADR0085-ROUTE-049",
+          "ADR0085-ROUTE-050"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "design-workflow-candidate-binding-codex-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs"
+    },
+    {
+      "name": "design-workflow-candidate-binding-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs"
+    },
+    {
+      "name": "design-workflow-evidence-descendant-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs"
+    },
+    {
+      "name": "design-workflow-package-route-tests",
+      "file": "plugins/pipeline-core/lib/design-workflow-package-route.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-workflow-package-route.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-workflow-package-route.test.mjs"
+    },
+    {
+      "name": "execution-lane-credential-tests",
+      "file": "plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/execution-lane-credential.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/execution-lane-credential.test.mjs"
+    },
+    {
+      "name": "governance-scope-retirement-retry-tests",
+      "file": "plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/governance-scope-retirement-retry.test.mjs"
+    },
+    {
+      "name": "governance-scope-win32-acl-tests",
+      "file": "plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "WINACL001"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "onboarding-greenfield-walk-tests",
+      "file": "plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "GFW001",
+          "GFW002"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "project-onboarding-v3-answers-file-tests",
+      "file": "plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs"
+    },
+    {
+      "name": "role-route-preflight-tests",
+      "file": "plugins/pipeline-core/lib/role-route-preflight.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/role-route-preflight.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/role-route-preflight.test.mjs"
+    },
+    {
+      "name": "schema-lite-alternatives-tests",
+      "file": "plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SC-ALTERNATIVES-ACCEPT",
+          "SC-ALTERNATIVES-AMBIGUOUS",
+          "SC-ALTERNATIVES-CLOSED",
+          "SC-ALTERNATIVES-MALFORMED",
+          "SC-ALTERNATIVES-NESTED-ARRAY",
+          "SC-ALTERNATIVES-Z-REGRESSION",
+          "SC-ALTERNATIVES-ZZ-MATCH",
+          "SC-REF-CYCLE",
+          "SC-REF-DISJOINT",
+          "SC-REF-LOCAL",
+          "SC-REF-NESTED",
+          "SC-REF-NULLABLE",
+          "SC-REF-OVERLAP",
+          "SC-REF-POINTER",
+          "SC-REF-UNRESOLVED",
+          "SC-REF-UNSUPPORTED"
+        ],
+        "maxBytes": 32768
+      }
+    },
+    {
+      "name": "shared-pool-bounds-tests",
+      "file": "plugins/pipeline-core/lib/shared-pool-bounds.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/shared-pool-bounds.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/shared-pool-bounds.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SP-BND01",
+          "SP-BND02",
+          "SP-BND03",
+          "SP-BND04",
+          "SP-BND05",
+          "SP-BND06",
+          "SP-BND07",
+          "SP-BND08"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "shared-pool-occupancy-tests",
+      "file": "plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "SP-OCC01",
+          "SP-OCC02",
+          "SP-OCC03",
+          "SP-OCC04",
+          "SP-OCC05",
+          "SP-OCC06",
+          "SP-OCC07",
+          "SP-OCC08"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "worktree-process-start-tests",
+      "file": "plugins/pipeline-core/lib/worktree-process-start.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/worktree-process-start.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/worktree-process-start.test.mjs"
+    },
+    {
+      "name": "bootstrap-acknowledgement-mode-tests",
+      "file": "plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "BAM001",
+          "BAM002",
+          "BAM003",
+          "BAM004"
+        ],
+        "maxBytes": 16384
+      }
+    },
+    {
+      "name": "clone-hook-readiness-partial-tests",
+      "file": "plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs"
+    },
+    {
+      "name": "design-approval-route-e2e-tests",
+      "file": "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs"
+    },
+    {
+      "name": "model-role-bootstrap-readonly-tests",
+      "file": "plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/model-role-bootstrap.readonly.test.mjs"
+    },
+    {
+      "name": "pipeline-start-preflight-enforcement-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs"
+    },
+    {
+      "name": "pipeline-state-inspect-continuity-drift-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs"
+    },
+    {
+      "name": "r7-3-bound-paths-tests",
+      "file": "plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs"
+    },
+    {
+      "name": "rebind-approval-tests",
+      "file": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/rebind-approval.test.mjs"
+    },
+    {
+      "name": "refresh-mandatory-hooks-tests",
+      "file": "plugins/pipeline-core/scripts/refresh-mandatory-hooks.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/refresh-mandatory-hooks.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/refresh-mandatory-hooks.test.mjs"
+    },
+    {
+      "name": "security-scan-snapshot-tests",
+      "file": "plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/security-scan-snapshot.test.mjs"
+    },
+    {
+      "name": "guard-devplan-design-approval-tests",
+      "file": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs"
+    },
+    {
+      "name": "guard-devplan-design-approval-v7-tests",
+      "file": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs"
     }
   ]
 }

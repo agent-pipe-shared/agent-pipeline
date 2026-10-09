@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import nodeTest from 'node:test';
+import { registerTestCaseCompletion } from './test-case-completion.mjs';
 
 import { advisorHostFixture } from './codex-advisor-host.fixture.mjs';
 import { coordinateInitialDesignAdvisory } from './design-advisory-coordinator-v2.mjs';
@@ -51,7 +51,6 @@ const SOURCE_NAMES = ['input', 'prd', 'spec', 'design', 'traceability'];
 // constructor is Linux-only (codex-design-readiness-host-store.mjs refuses any other process.platform),
 // so off Linux every case would die in fixture setup before reaching an assertion about the defect.
 const PLATFORM_SKIP = process.platform !== 'linux' ? 'CANDBINDX fixture store is linux-only (codex-design-readiness-host-store)' : false;
-const test = (name, body) => nodeTest(name, { skip: PLATFORM_SKIP }, body);
 
 /**
  * Build a package whose Advisor is unavailable (no-child, native runner) and whose final independent
@@ -131,7 +130,8 @@ async function codexReadinessPackage(t) {
   return { root, candidate, input, moveHead, verifySupplemental, sources, advisorObservation };
 }
 
-test('CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false)', async (t) => {
+const cases = [
+  { id: 'CANDBINDX-a', name: 'implementation-boundary read of a Codex-readiness v2 package verifies after HEAD moves past the candidate (requireCurrentCandidate:false)', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await codexReadinessPackage(t);
   const control = readDesignWorkflowPackageV2FromRepository({ ...fixture.input, requireCurrentCandidate: false });
   assert.equal(control.ok, true, `control at HEAD == candidate must verify, got ${brief(control)}`);
@@ -139,9 +139,9 @@ test('CANDBINDX-a implementation-boundary read of a Codex-readiness v2 package v
   const moved = readDesignWorkflowPackageV2FromRepository({ ...fixture.input, requireCurrentCandidate: false });
   assert.equal(moved.ok, true, `with requireCurrentCandidate:false a HEAD descended from the candidate must verify on the Codex tool-free route too, got ${brief(moved)}`);
   assert.deepEqual(moved.candidate, fixture.candidate, 'the recorded design candidate stays the provenance; later HEAD is never substituted into it');
-});
+} },
 
-test('CANDBINDX-b the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate', async (t) => {
+  { id: 'CANDBINDX-b', name: 'the default (strict) read of the same Codex-readiness package still refuses a HEAD that moved past the candidate', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await codexReadinessPackage(t);
   const control = readDesignWorkflowPackageV2FromRepository(fixture.input);
   assert.equal(control.ok, true, `strict control at HEAD == candidate must verify, got ${brief(control)}`);
@@ -149,9 +149,9 @@ test('CANDBINDX-b the default (strict) read of the same Codex-readiness package 
   const moved = readDesignWorkflowPackageV2FromRepository(fixture.input);
   assert.equal(moved.ok, false, 'the default must stay strict: a moved HEAD is not the approved candidate');
   assert.equal(moved.code, 'DWP2-CURRENT-CANDIDATE');
-});
+} },
 
-test('CANDBINDX-c the host verifier\'s Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default', async (t) => {
+  { id: 'CANDBINDX-c', name: 'the host verifier\'s Codex branch honours requireCurrentCandidate:false for the supplemental Advisor re-read and stays strict by default', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await codexReadinessPackage(t);
   const control = fixture.verifySupplemental();
   assert.equal(control.ok, true, `control at HEAD == candidate must verify, got ${brief(control)}`);
@@ -161,9 +161,9 @@ test('CANDBINDX-c the host verifier\'s Codex branch honours requireCurrentCandid
   assert.equal(strict.ok, false, 'the default re-read must stay strict once HEAD moved past the candidate');
   const relaxed = fixture.verifySupplemental({ requireCurrentCandidate: false });
   assert.equal(relaxed.ok, true, `requireCurrentCandidate:false must reach the Codex branch's Advisor re-read, got ${brief(relaxed)}`);
-});
+} },
 
-test('CANDBINDX-d (diagnostic) the Codex branch\'s re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts', async (t) => {
+  { id: 'CANDBINDX-d', name: '(diagnostic) the Codex branch\'s re-read helper refuses a moved HEAD only because it does not forward the flag the v2 reader accepts', run: PLATFORM_SKIP ? (t) => t.skip(PLATFORM_SKIP) : async (t) => {
   const fixture = await codexReadinessPackage(t);
   fixture.moveHead();
   // The helper the Codex branch calls (4 arguments, no flag) refuses with the strict-default code ...
@@ -172,4 +172,7 @@ test('CANDBINDX-d (diagnostic) the Codex branch\'s re-read helper refuses a move
   // ... while the same observation re-reads cleanly through the v2 reader when the flag is passed.
   const relaxed = rereadReadinessAdvisorContextV2(fixture.root, fixture.advisorObservation, fixture.sources, null, false);
   assert.deepEqual(relaxed, fixture.advisorObservation, 'the v2 reader accepts a descendant HEAD when the flag is forwarded, so the Codex failure is the dropped flag alone');
-});
+} },
+];
+
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

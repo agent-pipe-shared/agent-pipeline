@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 
 /**
  * Independent design-readiness producer for a Claude-only or Antigravity-only
@@ -278,6 +279,8 @@ function privateRunnerExecutable(runner, deps) {
 
 /** Produce one independently reviewed, execution-bound Claude or Agy receipt. */
 export async function runRunnerDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_COURSE_RETIRED);
   const args = parseArgs(argv);
   physicalDirectory(args.repoRoot);
   const config = parseYaml(readFileSync(join(args.repoRoot, "pipeline.user.yaml"), "utf8"));

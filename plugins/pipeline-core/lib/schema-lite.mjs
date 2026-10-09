@@ -17,7 +17,11 @@
  * Understands exactly the keywords used by critic-verdict.schema.json: type,
  * required, properties, items, enum, additionalProperties. Extend in lockstep
  * with any schema file that starts relying on more -- it silently ignores
- * keywords it does not know (unchanged behavior from the original).
+ * keywords it does not know (unchanged behavior from the original). This
+ * proposal also recognizes `oneOf` as a non-empty array of object schemas,
+ * requiring exactly one branch to accept; schemas without `oneOf` retain the
+ * prior behavior. Local `$ref` JSON pointers resolve against the original root;
+ * external, unresolved and cyclic references fail closed without importing data.
  *
  * EXTENSION vs. the original (additive, existing semantics unchanged): when
  * `additionalProperties` is a schema OBJECT (not the literal boolean `false`),
@@ -35,13 +39,61 @@ function jsTypeOf(value) {
   return typeof value; // "object" | "string" | "boolean" | "number" | "undefined"
 }
 
-function typeMatches(actual, expectedType) {
+function typeMatches(value, expectedType) {
   const expectedList = Array.isArray(expectedType) ? expectedType : [expectedType];
-  return expectedList.includes(actual);
+  return expectedList.some((expected) => expected === "integer"
+    ? Number.isFinite(value) && Number.isInteger(value)
+    : expected === jsTypeOf(value));
 }
 
-function validateNode(value, schema, path, errors) {
-  if (schema.type && !typeMatches(jsTypeOf(value), schema.type)) {
+function isSchemaObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function resolveLocalRef(root, ref) {
+  if (typeof ref !== "string" || ref.length > 4096 || (ref !== "#" && !ref.startsWith("#/"))) {
+    return { error: "unsupported $ref; expected a bounded local JSON pointer" };
+  }
+  let pointer;
+  try { pointer = decodeURIComponent(ref.slice(1)); }
+  catch { return { error: "malformed $ref JSON pointer" }; }
+  const segments = pointer === "" ? [] : pointer.slice(1).split("/");
+  if (segments.length > 128) return { error: "$ref JSON pointer exceeds segment limit" };
+  let target = root;
+  for (const segment of segments) {
+    if (/~(?:[^01]|$)/u.test(segment)) return { error: "malformed $ref JSON pointer escape" };
+    const key = segment.replace(/~1/gu, "/").replace(/~0/gu, "~");
+    if (target === null || typeof target !== "object" || !Object.prototype.hasOwnProperty.call(target, key)) {
+      return { error: "unresolved $ref JSON pointer" };
+    }
+    target = target[key];
+  }
+  return isSchemaObject(target) ? { schema: target } : { error: "$ref target must be an object schema" };
+}
+
+function validateNode(value, schema, path, errors, context, ancestors = []) {
+  if (!isSchemaObject(schema)) {
+    errors.push(`${path}: expected an object schema`);
+    return;
+  }
+  if (ancestors.length >= 256 || ancestors.some((entry) => entry.schema === schema && Object.is(entry.value, value))) {
+    const error = `${path}: cyclic schema evaluation or recursion limit exceeded`;
+    errors.push(error);
+    context.referenceErrors.add(error);
+    return;
+  }
+  const nextAncestors = [...ancestors, { schema, value }];
+  if (Object.prototype.hasOwnProperty.call(schema, "$ref")) {
+    const resolved = resolveLocalRef(context.root, schema.$ref);
+    if (resolved.error) {
+      const error = `${path}: ${resolved.error}`;
+      errors.push(error);
+      context.referenceErrors.add(error);
+      return;
+    }
+    validateNode(value, resolved.schema, path, errors, context, nextAncestors);
+  }
+  if (schema.type && !typeMatches(value, schema.type)) {
     errors.push(`${path}: expected type "${schema.type}", got "${jsTypeOf(value)}"`);
     return;
   }
@@ -58,7 +110,7 @@ function validateNode(value, schema, path, errors) {
     if (schema.properties) {
       for (const [key, subschema] of Object.entries(schema.properties)) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          validateNode(obj[key], subschema, `${path}.${key}`, errors);
+          validateNode(obj[key], subschema, `${path}.${key}`, errors, context, nextAncestors);
         }
       }
     }
@@ -73,20 +125,40 @@ function validateNode(value, schema, path, errors) {
       const allowed = new Set(Object.keys(schema.properties ?? {}));
       for (const key of Object.keys(obj)) {
         if (!allowed.has(key)) {
-          validateNode(obj[key], schema.additionalProperties, `${path}.${key}`, errors);
+          validateNode(obj[key], schema.additionalProperties, `${path}.${key}`, errors, context, nextAncestors);
         }
       }
     }
   }
   if (schema.type === "array" && schema.items) {
     const arr = Array.isArray(value) ? value : [];
-    arr.forEach((item, i) => validateNode(item, schema.items, `${path}[${i}]`, errors));
+    arr.forEach((item, i) => validateNode(item, schema.items, `${path}[${i}]`, errors, context, nextAncestors));
+  }
+  if (Object.prototype.hasOwnProperty.call(schema, "oneOf")) {
+    const branches = schema.oneOf;
+    if (!Array.isArray(branches) || branches.length === 0 || !branches.every(isSchemaObject)) {
+      errors.push(`${path}: oneOf must be a non-empty array of object schemas`);
+    } else {
+      let matches = 0;
+      for (const branch of branches) {
+        const branchErrors = [];
+        validateNode(value, branch, path, branchErrors, context, nextAncestors);
+        if (branchErrors.length === 0) matches += 1;
+      }
+      if (matches !== 1) {
+        errors.push(`${path}: oneOf matched ${matches} branches; expected exactly one`);
+      }
+    }
   }
 }
 
-/** Returns { valid: boolean, errors: string[] }. Never throws on a malformed verdict. */
+/** Returns { valid: boolean, errors: string[] }. Never throws on a malformed oneOf. */
 export function validateAgainstSchema(value, schema) {
   const errors = [];
-  validateNode(value, schema, "$", errors);
+  const context = { root: schema, referenceErrors: new Set() };
+  validateNode(value, schema, "$", errors, context);
+  for (const error of context.referenceErrors) {
+    if (!errors.includes(error)) errors.push(error);
+  }
   return { valid: errors.length === 0, errors };
 }

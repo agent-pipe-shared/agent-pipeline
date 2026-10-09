@@ -36,6 +36,7 @@ import {
   planOnboardingBootstrapBind,
   applyOnboardingBootstrapBind,
   planOnboardingBootstrapAcknowledgement,
+  planOnboardingBootstrapAcknowledgementChat,
   applyOnboardingBootstrapAcknowledgement,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
@@ -963,7 +964,7 @@ export function main(args = process.argv.slice(2), {
       if (resolvedAnswers.answersFile !== undefined) output = { ...output, answersFile: resolvedAnswers.answersFile };
     }
     else if (options.command === "intake-generate-plan") {
-      const fullPlan = planOnboardingIntakeGenerate({ rootDir: options.root, repositoryCapability, deps });
+      const fullPlan = planOnboardingIntakeGenerate({ rootDir: options.root, repositoryCapability, runner: options.runner, deps });
       output = options.verbose
         ? fullPlan
         : summarizeOnboardingIntakeGeneratePlan(fullPlan, { runner: options.runner, intent: options.intent });
@@ -985,7 +986,11 @@ export function main(args = process.argv.slice(2), {
     });
     else if (options.command === "bootstrap-acknowledge-plan") {
       if (!options.activate) throw Object.assign(new Error("signature acknowledgement request requires explicit activation"), { code: "BOOTSTRAP-ACK-ACTIVATION-REQUIRED" });
-      output = planOnboardingBootstrapAcknowledgement({
+      const approval = readHumanApprovalMode(options.root, { spawn: deps?.spawnSync ?? deps?.spawn });
+      const planner = approval.mode === "chat"
+        ? planOnboardingBootstrapAcknowledgementChat
+        : planOnboardingBootstrapAcknowledgement;
+      output = planner({
         rootDir: options.root, runner: options.runner, spawn: deps?.spawn ?? hostSpawnSync, deps,
       });
     }
@@ -1015,6 +1020,11 @@ export function main(args = process.argv.slice(2), {
         runner: options.runner,
         operatorAuthority: operation === "repair" ? (options.operatorAuthority ?? null) : null,
       });
+    }
+    if (["intake-consent-apply", "intake-capture-apply", "intake-design-questions-apply", "intake-generate-apply"].includes(options.command)) {
+      output = { ...output, nextAction: inspectProjectOnboardingV3({
+        rootDir: options.root, runner: options.runner, intent: options.intent, deps,
+      }).nextAction };
     }
   } catch (error) {
     const code = typeof error?.code === "string" ? error.code : "ONBOARDING-ERROR";
@@ -1060,6 +1070,9 @@ export function main(args = process.argv.slice(2), {
     INTAKE_GENERATE_APPLY_SCHEMA,
     "pipeline.bootstrap-plan-acknowledgement-plan.v1", "pipeline.bootstrap-plan-acknowledgement-apply.v1",
   ].includes(output.schema)) return 0;
+  // The chat planner succeeded when it offers the confirmation boundary;
+  // acknowledgement is applied only by the separate digest-bound apply action.
+  if (output.schema === "pipeline.bootstrap-plan-acknowledgement-chat-plan.v1") return output.status === "confirmation-required" ? 0 : 1;
   // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2): bootstrap-bind-apply calls
   // applyOnboardingBootstrapBind(), which calls applyOnboardingKickoffPromotion() DIRECTLY --
   // bypassing the v4Inspection wrapper kickoff-promote-apply goes through

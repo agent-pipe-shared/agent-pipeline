@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Explicit architecture content in the PO-approved design, never inferred from a repository. */
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
-import { readDesignWorkflowPackageFromRepository } from "./design-workflow-package.mjs";
+import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
@@ -206,9 +206,17 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       expectedPlanSha256: observation.planSha256, expectedSpecSha256: observation.specSha256 });
     const bootstrapAcknowledgementValid = verified.ok
       && Object.entries(authority).every(([key, value]) => verified.value[key] === value);
-    const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
-    requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
-      finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
+    if (state.planApproval?.schema === "pipeline.plan-approval.v8") {
+      // The complete stored v8 binding is authority. Reuse the implementation
+      // boundary's current-source, mode and actual proof checks; a bootstrap
+      // acknowledgement cannot replace the final design approval.
+      const finalDesignApproval = designAdvisoryAdmission(state, root, authority.planPath, authority.specPath);
+      requireValue(finalDesignApproval.ok, finalDesignApproval.code ?? "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
+    } else {
+      const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
+      requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
+        finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
+    }
     // Brownfield and other non-greenfield repositories never carried the fresh
     // greenfield map scaffold, so they cannot hold the greenfield design block
     // either. Apply exactly the applicability predicate that
@@ -263,9 +271,9 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
   }
 }
 
-// `requireReadinessExecution` is true for every caller except the explicit rebind route
-// (lib/rebind-approval.mjs, PO decision BL): only the exact value `false` relaxes the
-// device-local readiness host-execution proof; every other value keeps it required.
+// Stored final approval is portable: reread its exact package and sources, then
+// verify the recorded signature against current policy trust anchors. The legacy
+// readiness argument remains accepted for caller compatibility.
 export function verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps = {}, requireReadinessExecution = true) {
   try {
     if (state.planApproved !== true || !["epic", "feature"].includes(state.planSubmission?.profile)
@@ -280,32 +288,11 @@ export function verifyFinalDesignWorkflowApproval(root, state, authority, observ
       || presentation?.designWorkflowPackageSha256 !== packageSha256
       || workflowApproval?.packageSha256 !== packageSha256
       || !["chat", "signature"].includes(workflowApproval?.mode)) return { ok: false, code: "DWP-FINAL-APPROVAL-PRESENTATION" };
-    const readCandidate = () => {
-      if (typeof deps.gitCandidate === "function") {
-        const candidate = deps.gitCandidate();
-        return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
-      }
-      const run = (args) => execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 10_000, shell: false,
-        stdio: ["ignore", "pipe", "pipe"] }).trim();
-      try { return { commit: run(["rev-parse", "HEAD"]), tree: run(["rev-parse", "HEAD^{tree}"]) }; }
-      catch {
-        // A genuinely uninitialized greenfield root has no HEAD yet. The
-        // package candidate may seed the canonical reader only after the
-        // exact package bytes match both the presented digest and the
-        // approval record; final signature verification still follows below.
-        const packageBytes = Buffer.from(bytes(root, packagePath), "utf8");
-        if (hash(packageBytes) !== packageSha256) return null;
-        const candidate = JSON.parse(packageBytes.toString("utf8"))?.candidate;
-        if (!candidate || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit ?? "")
-          || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree ?? "")) return null;
-        return { commit: candidate.commit, tree: candidate.tree };
-      }
-    };
-    const packageRead = readDesignWorkflowPackageFromRepository({
-      repoRoot: root, packagePath, readCandidate, requireCurrentCandidate: false,
-      requireReadinessExecution: requireReadinessExecution !== false,
-      ...(deps.trustedAdvisorExecutablePath ? { trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath } : {}),
-      ...(typeof deps.verifyReadinessExecution === "function" ? { verifyReadinessExecution: deps.verifyReadinessExecution } : {}),
+    const packageRead = rereadApprovedDesignWorkflowPackage({
+      repoRoot: root, packagePath, packageSha256, featureId: state.activeFeature.id,
+      planPath: authority.planPath, planSha256: observation.planSha256,
+      specPath: authority.specPath, specSha256: observation.specSha256,
+      advisorExceptionBinding: workflowApproval.advisorException ?? null,
     });
     if (!packageRead.ok) return { ok: false, code: packageRead.code ?? "DWP-FINAL-PACKAGE-INVALID" };
     if (packageRead.packageSha256 !== packageSha256
@@ -322,7 +309,7 @@ export function verifyFinalDesignWorkflowApproval(root, state, authority, observ
       repoRoot: root, packagePath, packageSha256, featureId: state.activeFeature.id,
       planPath: authority.planPath, planSha256: observation.planSha256,
       specPath: authority.specPath, specSha256: observation.specSha256,
-      approval: workflowApproval, anchors, readCandidate,
+      approval: workflowApproval, anchors,
     });
     return signature.ok === true ? { ok: true } : { ok: false, code: signature.code ?? "DWP-FINAL-SIGNATURE-INVALID" };
   } catch (error) { return { ok: false, code: error?.message ?? "DWP-FINAL-APPROVAL-ERROR" }; }

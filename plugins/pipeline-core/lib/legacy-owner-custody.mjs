@@ -388,9 +388,9 @@ export function verifyLegacyCustodyProof({ package: pkg, proof, anchor } = {}) {
 //   3. classify the target (candidates, lstat, bounded read, RV-2) -> unavailable
 //   4. act: preserve / bind-absence write nothing; replay is not yet defined;
 //      archive is the only mutation.
-// No lock is taken: a concurrent writer, receipt drift between the signed digest
-// and the bytes on disk, and an interrupted archive are RV-5; State/proof/history
-// byte-identity is RV-6. Drift observed here is refused (never acted on).
+// No lock is taken. Signed-byte readbacks and append-only audit checks refuse
+// observed concurrent changes. Interrupted publication resumes forward only;
+// the archive copy never grants authority to a changed or absent live receipt.
 // ---------------------------------------------------------------------------
 
 export const LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA = "pipeline.legacy-custody-archive-audit.v1";
@@ -563,8 +563,9 @@ function archiveDestinationUsable({ archiveRoot, archivedDirectory, archivePath,
     if (root === null || root.isSymbolicLink() || !root.isDirectory()) return false;
     const archived = lstatOrNull(archivedDirectory);
     if (archived !== null && (archived.isSymbolicLink() || !archived.isDirectory())) return false;
-    // Never overwrite: an existing archived copy is RV-5's resume question, not ours.
-    if (lstatOrNull(archivePath) !== null) return false;
+    // An existing copy can be resumed only after its signed-byte readback below.
+    const copy = lstatOrNull(archivePath);
+    if (copy !== null && (copy.isSymbolicLink() || !copy.isFile() || copy.nlink !== 1)) return false;
     const audit = lstatOrNull(auditPath);
     if (audit !== null) {
       if (audit.isSymbolicLink() || !audit.isFile()) return false;
@@ -594,7 +595,7 @@ function readSyncAt(fd, buffer, position) {
  * append-only audit line, and only then removal of the original name. Never
  * throws; `mutated` reports exactly what was left behind.
  */
-function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classification, proof, archiveRoot }) {
+function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, size, classification, proof, archiveRoot }) {
   const archivedDirectory = join(String(archiveRoot), ARCHIVE_DIRECTORY_NAME);
   const archivePath = join(archivedDirectory, `${sessionId}.${sha256}.json`);
   const auditPath = join(String(archiveRoot), ARCHIVE_AUDIT_NAME);
@@ -605,25 +606,7 @@ function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classific
 
   let mutated = false;
   try {
-    if (lstatOrNull(archivedDirectory) === null) {
-      mkdirSync(archivedDirectory, { mode: 0o700 });
-      mutated = true;
-    }
-    publishExclusiveCopy(archivedDirectory, archivePath, bytes);
-    mutated = true;
-    const published = lstatSync(archivePath);
-    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1 || !readFileSync(archivePath).equals(bytes)) {
-      return unavailableResult(RV4_CODES.targetUnsafe, mutated);
-    }
-
-    // TOCTOU: the original must still be the exact signed bytes right before it is removed.
-    const again = readReceiptBytes(receiptPath);
-    if (again.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
-    // The copy is already published (mutated is true): leave the changed original in place, write no
-    // audit line, and say that an orphaned archived copy exists rather than a dead-end refusal.
-    if (!again.bytes.equals(bytes)) return refusedResult(RV4_CODES.archiveOrphanedCopy, mutated);
-
-    const entry = {
+    const binding = {
       schema: LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA,
       sessionId,
       receiptSha256: sha256,
@@ -631,12 +614,71 @@ function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classific
       classification,
       intentSha256: proof.intentSha256,
       keyReference: proof.keyReference,
-      archivedAt: new Date().toISOString(),
     };
-    appendArchiveAudit(auditPath, entry);
-    fsyncDirectory(archiveRoot);
-    const lines = readFileSync(auditPath, "utf8").split("\n").filter((line) => line !== "");
-    if (lines.at(-1) !== JSON.stringify(entry)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    // A completed audit is recognized only by the entire signed binding, never
+    // by a receipt digest or session alone. Keep all prior log bytes intact.
+    const priorAudit = lstatOrNull(auditPath) === null ? Buffer.alloc(0) : readReceiptBytes(auditPath).bytes;
+    if (priorAudit === undefined) return unavailableResult(RV4_CODES.targetUnsafe);
+    const entries = priorAudit.toString("utf8").split("\n").filter((line) => line !== "").map((line) => JSON.parse(line));
+    const matchingAudit = entries.filter((entry) => entry !== null && typeof entry === "object"
+      && Object.entries(binding).every(([key, value]) => entry[key] === value)
+      && typeof entry.archivedAt === "string" && Number.isFinite(Date.parse(entry.archivedAt)));
+    if (matchingAudit.length > 1) return unavailableResult(RV4_CODES.targetUnsafe);
+
+    const hasCopy = lstatOrNull(archivePath) !== null;
+    if (hasCopy) {
+      const copy = readReceiptBytes(archivePath);
+      if (copy.unsafe === true || copy.bytes.length !== size || sha256Hex(copy.bytes) !== sha256) {
+        return unavailableResult(RV4_CODES.targetUnsafe);
+      }
+    } else if (matchingAudit.length !== 0) {
+      // A log without its published bytes is not an interrupted publication.
+      return unavailableResult(RV4_CODES.targetUnsafe);
+    }
+    if (bytes.length !== size || sha256Hex(bytes) !== sha256) {
+      return refusedResult(hasCopy && matchingAudit.length === 0
+        ? RV4_CODES.archiveOrphanedCopy : RV3_CODES.bindingMismatch);
+    }
+    if (lstatOrNull(archivedDirectory) === null) {
+      mkdirSync(archivedDirectory, { mode: 0o700 });
+      mutated = true;
+    }
+    if (!hasCopy) {
+      publishExclusiveCopy(archivedDirectory, archivePath, bytes);
+      mutated = true;
+    }
+    const published = lstatSync(archivePath);
+    const publishedRead = readReceiptBytes(archivePath);
+    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1
+      || publishedRead.unsafe === true || !publishedRead.bytes.equals(bytes)) {
+      return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    }
+
+    // TOCTOU: the original must still be the exact signed bytes right before it is removed.
+    const again = readReceiptBytes(receiptPath);
+    if (again.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    // Leave an intervening original in place. A copy without this audit binding
+    // is orphaned; an audited archive cannot claim a newer writer's receipt.
+    if (!again.bytes.equals(bytes)) return refusedResult(matchingAudit.length === 0
+      ? RV4_CODES.archiveOrphanedCopy : RV3_CODES.bindingMismatch, mutated);
+
+    // Refuse a changed log before appending or trusting the saved audit.
+    const auditAgain = lstatOrNull(auditPath) === null ? Buffer.alloc(0) : readReceiptBytes(auditPath).bytes;
+    if (auditAgain === undefined || !auditAgain.equals(priorAudit)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    if (matchingAudit.length === 0) {
+      const entry = { ...binding, archivedAt: new Date().toISOString() };
+      appendArchiveAudit(auditPath, entry);
+      mutated = true;
+      fsyncDirectory(archiveRoot);
+      const audited = readReceiptBytes(auditPath);
+      const expected = Buffer.concat([priorAudit, Buffer.from(`${JSON.stringify(entry)}\n`)]);
+      if (audited.unsafe === true || !audited.bytes.equals(expected)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    }
+
+    // Recheck after audit, too: a writer during append must never lose its bytes.
+    const beforeRemoval = readReceiptBytes(receiptPath);
+    if (beforeRemoval.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+    if (!beforeRemoval.bytes.equals(bytes)) return refusedResult(RV3_CODES.bindingMismatch, mutated);
 
     unlinkSync(receiptPath);
     fsyncDirectory(receiptsDirectory);
@@ -688,8 +730,9 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
   if (read.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe);
   const sha256 = sha256Hex(read.bytes);
   // The signature binds exact bytes: what is on disk must still be what was signed.
-  if (sha256 !== authorized.sha256 || read.bytes.length !== authorized.size) return refusedResult(RV3_CODES.bindingMismatch);
-  if (observedClassification(receiptsDirectory, sessionId, authorized.compare) !== authorized.classification) {
+  const bytesMatch = sha256 === authorized.sha256 && read.bytes.length === authorized.size;
+  if (!bytesMatch && authorized.disposition !== "archive") return refusedResult(RV3_CODES.bindingMismatch);
+  if (bytesMatch && observedClassification(receiptsDirectory, sessionId, authorized.compare) !== authorized.classification) {
     return refusedResult(RV3_CODES.bindingMismatch);
   }
 
@@ -723,7 +766,8 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
         receiptsDirectory,
         sessionId,
         bytes: read.bytes,
-        sha256,
+        sha256: authorized.sha256,
+        size: authorized.size,
         classification: authorized.classification,
         proof,
         archiveRoot: signedArchiveRoot,

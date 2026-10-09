@@ -148,7 +148,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
-import { designAdvisoryAdmission, designAdvisoryRemediation, isDispatchRecordCoordinationPath } from "../lib/guard-devplan-policy.mjs";
+import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath } from "../lib/guard-devplan-policy.mjs";
 // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
 // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
 // the policy module both of this gate's lanes already share, never re-decided here. See that
@@ -560,13 +560,13 @@ const lifecycleReason = ledgerAuthorityUnresolved
     + "it did not. A mutable planApproved projection is never authority by itself. "
     + "Re-record it: node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
     + "--human-decision-file <repo-relative-reference>."
-  : lifecycle.nextAction === "reopen-design"
+  : lifecycleDesignApprovalDenial(state, lifecycle) ?? (lifecycle.nextAction === "reopen-design"
   ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
   : lifecycle.status === "awaiting-approval"
     ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
     : lifecycle.status === "approved"
       ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
-      : "The feature is still in draft design and has no implementation authority.";
+      : "The feature is still in draft design and has no implementation authority.");
 const message = [
   `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
   `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,

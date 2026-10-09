@@ -120,14 +120,14 @@ function configureAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cl
         sshHostAlias: "github-share",
         sshAccount: "agent-pipe-shared",
         authorName: "The Agent-Pipeline Contributors",
-        authorEmail: "301875187+agent-pipe-shared@users.noreply.github.com",
+        authorEmail: "pipeline-fixture@example.invalid",
       },
     }),
   );
   gitAt(dir, "config", "--local", "user.useConfigOnly", "true");
   gitAt(dir, "config", "--local", "commit.gpgSign", "false");
   gitAt(dir, "config", "--local", "user.name", "The Agent-Pipeline Contributors");
-  gitAt(dir, "config", "--local", "user.email", "301875187+agent-pipe-shared@users.noreply.github.com");
+  gitAt(dir, "config", "--local", "user.email", "pipeline-fixture@example.invalid");
   gitAt(dir, "config", "--local", "remote.origin.url", "git@github-share:agent-pipe-shared/agent-pipeline.git");
   const base = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
   gitAt(dir, "update-ref", `refs/remotes/origin/${branch}`, base);
@@ -2302,7 +2302,7 @@ function freshRepoIn(parentDir, name) {
   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
   gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
-  check("PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, ALLOW, { stderrEmpty: true });
+  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --checkpoint"] });
   check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
   check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
   check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
@@ -2317,16 +2317,58 @@ function freshRepoIn(parentDir, name) {
   const branch = "feat/checkpoint-bound";
   gitAt(dir, "checkout", "-q", "-b", branch);
   writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  const key = pushKeypair();
+  writeProofPolicy(dir, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+  const threatModelBody = "# fixture threat model\n";
+  writeEvidence(dir, THREAT_MODEL_REL, threatModelBody);
   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
-  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "project/critical-human-proof.json", THREAT_MODEL_REL, "checkpoint.txt");
   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
 
   const source = join(dir, "clean-bound-source");
   gitAt(dir, "worktree", "add", "--force", "-q", source, branch);
+  // Approval is read from the explicit -C source. Keep that source strictly clean:
+  // the local ignored record is not part of the commit whose signature it carries.
+  const excludePath = gitAt(source, "rev-parse", "--git-path", "info/exclude").stdout.trim();
+  writeFileSync(excludePath, `${readFileSync(excludePath, "utf8")}\n.claude/pipeline-state.json\n`);
+  const head = gitAt(source, "rev-parse", "HEAD").stdout.trim();
+  const candidate = { commit: head, tree: gitAt(source, "rev-parse", `${head}^{tree}`).stdout.trim() };
+  const destination = `refs/heads/${branch}`;
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: head, remote: "origin", destination, threatModel } }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA,
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: intent.sha256, keyReference: "po-key-1", publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+  writeState(source, {
+    schema: "pipeline.state.v0", activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head, remote: "origin", destination, threatModel,
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+    } },
+    criticalProofConsumption: [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }],
+  });
   writeFileSync(join(dir, "primary-is-dirty.txt"), "dirty primary\n");
+  if (gitAt(source, "status", "--porcelain").stdout !== "" || gitAt(dir, "status", "--porcelain").stdout === "") {
+    throw new Error("checkpoint worktree fixture must retain a clean explicit source and dirty primary");
+  }
   const refspec = `refs/heads/${branch}:refs/heads/${branch}`;
   check(
-    "PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary",
+    "PG-CHECKPOINT-WORKTREE allow signed explicit clean attached -C source over dirty primary",
     `git -C ${source} push origin ${refspec}`,
     dir,
     ALLOW,
@@ -2363,6 +2405,168 @@ function freshRepoIn(parentDir, name) {
     BLOCK,
     { stderrIncludes: ["explicit source branch has no matching attached worktree"] },
   );
+}
+
+// ---- TR-C: push classifier scoping (toil-resolution rows T38, T42, T80, T82, T85) -----------------
+// Added by the tranche-2 post-image of dispatch TR-C-T-20261009. Contract: toil-resolution design section 2
+// rows T38, T42, T80, T82 and T85, read together with Rulings 81 and 157 (GREP-PUSH): the exact plain,
+// single-line grep/commit shapes with quoted parentheses are admitted by GREP-PUSH-F. BRE backslashes,
+// heredocs and nested shell receivers remain refused; nested push/alias denials below remain mandatory.
+// Refused shapes name the relief: commit with git commit -F <file>, search with rg. The text needles are deliberate literals, not
+// prose: "git commit -F" and "use rg" (the bare letters rg also occur in the word target, which today's text
+// holds, so a looser needle would pass vacuously). Rows with no marker involved pin the row's own contract:
+// T85a (git --version is not a push) is the one RED contract pin of this block.
+// Fixture: an ACTIVE gate (manifest plus verify evidence), otherwise allowExit() fires before the refusal and a
+// BLOCK expectation would be vacuous.
+{
+  const { dir, head } = freshRepo("trc-classifier");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const REFUSAL = "push target is not unambiguous";
+  const RELIEF_NEEDLES = ["git commit -F", "use rg"];
+
+  // T38 -- a read-only git grep.
+  check("PGC-T38a allow  a plain git grep (no marker) never reaches the push gate",
+    "git grep -n needle -- README.md", dir, ALLOW, { stderrEmpty: true });
+  const GREP_PAREN = 'git grep -n "(alpha|beta)" -- README.md';
+  check("PGC-T38b allow  a plain git grep with quoted parentheses is admitted (Ruling 157 GREP-PUSH-F)",
+    GREP_PAREN, dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T38c text   admitted plain quoted-parentheses git grep emits no refusal or relief text",
+    GREP_PAREN, dir, ALLOW, { stderrEmpty: true });
+
+  // T80 -- a git grep with a quoted BRE alternation.
+  const GREP_BRE = 'git grep -n -e "\\(alpha\\|beta\\)" -- README.md';
+  check("PGC-T80a block  a git grep with a quoted BRE alternation stays refused (Ruling 81 option B)",
+    GREP_BRE, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T80b text   the refusal of a BRE-alternation git grep names the relief shapes (git commit -F, use rg)",
+    GREP_BRE, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+
+  // T42 -- a heredoc commit message; PG-HD1 above stays an allow (PO decision 1, default: keep).
+  check("PGC-T42a allow  a heredoc commit message with no marker stays allowed (PG-HD1 keeps its allow)",
+    "git commit -q -F - <<EOF\nfix: pin the classifier\n\nDispatch: TR-C-T-20261009 goldfish\nEOF", dir, ALLOW, { stderrEmpty: true });
+  const HEREDOC_PAREN = "git commit -q -F - <<EOF\nfix: pin the classifier\n\nDispatch: TR-C-T-20261009 (goldfish)\nEOF";
+  check("PGC-T42b block  a heredoc commit message holding a parenthesis stays refused (Ruling 81 option B)",
+    HEREDOC_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T42c text   the refusal of a parenthesised heredoc commit names the relief shapes (git commit -F, use rg)",
+    HEREDOC_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+  check("PGC-T42d allow  the relief shape git commit -F <file> -- <paths> carries no marker and passes",
+    "git commit -F scratch/commit-msg/slice.txt -- docs/a.md", dir, ALLOW, { stderrEmpty: true });
+
+  // T82 -- the commit form the producer prints (-m ... --trailer ...).
+  check("PGC-T82a allow  the printed commit form is admitted when its trailer values hold no marker",
+    'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 goldfish" -- docs/a.md', dir, ALLOW, { stderrEmpty: true });
+  const TRAILER_PAREN = 'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 (goldfish)" -- docs/a.md';
+  check("PGC-T82b allow  the plain printed commit form with a quoted parenthesised Dispatch trailer is admitted (Ruling 157 GREP-PUSH-F)",
+    TRAILER_PAREN, dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T82c text   admitted plain quoted-parentheses trailer form emits no refusal or relief text",
+    TRAILER_PAREN, dir, ALLOW, { stderrEmpty: true });
+
+  // T85 -- git --version and nested shell text that merely mentions git.
+  check("PGC-T85a allow  git --version is not a push and never reaches the push gate",
+    "git --version", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85b allow  git version is not a push and never reaches the push gate",
+    "git version", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85c allow  a recognised global option before a non-push verb never reaches the push gate",
+    "git -C . status --short", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T85d block  WSL command text holding git inside a nested bash -lc stays refused (option B accepted false positive)",
+    'wsl.exe -e bash -lc "cd /mnt/d/repo; git status"', dir, BLOCK, { stderrIncludes: [REFUSAL] });
+  check("PGC-T85e block  a real push inside the same nested shell stays refused (I5: a real push stays fail-closed)",
+    'wsl.exe -e bash -lc "git push origin main"', dir, BLOCK);
+  check("PGC-T85f block  a real push after a recognised global option stays refused (I5)",
+    "git --no-pager push origin main:refs/heads/feature-test", dir, BLOCK);
+
+  // ---- TR-C-T5: the Why line scope, and git --help (TR-C Critic findings F3 and F4) -------------
+  // Added by the tranche-2 post-image of dispatch TR-C-T5-20261009. F3: the Why line says the command was refused because
+  // it names git together with a marker or a nested shell. That is true for the bundle, quoting and expansion refusals
+  // only; a push option or a refspec refusal involves no marker, so the line would mislead there. T5F3b and T5F3c are RED
+  // while the Why line is emitted on every refusal. Each also pins the exact Reason line, so a refusal for another cause
+  // can never satisfy the pin. T5F3a is the GREEN control (a bundle refusal keeps the line). The Instead line is not pinned.
+  // F4: git --help is pinned as TR-C-F-MANIFEST.md declares it (collapsed like --version); both are GREEN by design.
+  const WHY_LINE = "Why:";
+  check("PGC-T5F3a control  a shell-bundle refusal keeps the Why line (the marker is the cause)",
+    HEREDOC_PAREN, dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push must be a standalone command", WHY_LINE] });
+  check("PGC-T5F3b text   a push-option refusal carries no Why line (no marker is involved)",
+    "git push --tags origin", dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push option cannot be bound to exactly one source commit"], stderrNotIncludes: [WHY_LINE] });
+  check("PGC-T5F3c text   a refspec-count refusal carries no Why line (no marker is involved)",
+    "git push origin", dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push must name exactly one remote and one explicit source refspec"], stderrNotIncludes: [WHY_LINE] });
+  check("PGC-T5F4a allow  git --help is collapsed like --version: a bare git word that never reaches the push gate",
+    "git --help", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T5F4b block  a real push after --help is still a push candidate and stays refused (as declared for --version)",
+    "git --help push origin main:refs/heads/feature-test", dir, BLOCK);
+
+  // ---- GREP-PUSH-T: markers after a clearly non-push subcommand (Ruling 157 GREP-PUSH bullet; Ruling 81 trigger) -----------
+  // Added by the tranche-2 post-image of dispatch GREP-PUSH-T-20261009b. Ruling 81 found the trigger: the marker set ( ) { $
+  // and the backtick after a git word, not the caret and not --no-index. Ruling 157 accepted the security trade for the
+  // subcommands commit, grep, log, show, diff and status on ONE condition: a push hidden in a command substitution, a
+  // backtick pair or a process substitution in ANY argument, and a push-capable subcommand (push, remote, config, an
+  // alias form) that carries a marker, stay refused.
+  // PGM-A* (admitted) are RED today: each is a push candidate on the marker rule alone, so guard-push refuses it (exit 2
+  // where 0 is expected). PGM-R* (refused) are GREEN today and are the condition of the trade: GREP-PUSH-F may not make
+  // them pass by loosening the rule. T38b/c and T82b/c now pin the permitted plain shapes. T80a/b, T42b/c and the
+  // HEREDOC_PAREN control of T5F3a retain their refusals (TR-C-MANIFEST.md / GREP-PUSH-MANIFEST.md).
+  const PGM_PUSH = "git push origin main:refs/heads/feature-test";
+  const PGM_ADMITTED = [
+    ["A01", "commit: ( ) in a Dispatch trailer beside -F (the T91 shape)", 'git commit -F scratch/commit-msg/slice.txt --trailer "Dispatch: GREP-PUSH-T-20261009 (goldfish)" --trailer "AI-Assisted: true" -- docs/a.md'],
+    ["A02", "commit: ( ) in a plain -m message", 'git commit -m "s (goldfish)"'],
+    ["A03", "commit: ( ) in the Dispatch trailer of the printed -m form", 'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: GREP-PUSH-T-20261009 (goldfish)" -- docs/a.md'],
+    ["A04", "commit: $ of a harmless command substitution", 'git commit -m "$(date)"'],
+    ["A05", "commit: backtick in a single-quoted message", "git commit -m 'built with `date`'"],
+    ["A06", "commit: { } in a JSON-looking message", "git commit -m '{\"a\":1}'"],
+    ["A07", "commit: a lone ) in a message", "git commit -m 'closes the loop :)'"],
+    ["A08", "grep: ( ) in an alternation pattern", 'git grep -n "(alpha|beta)" -- README.md'],
+    ["A09", "grep: { } in a pattern", "git grep -n -e '{alpha}' -- README.md"],
+    ["A10", "grep: $ of a variable", 'git grep -n "$HOME" -- README.md'],
+    ["A11", "grep: backtick in a pattern", "git grep -n 'alpha`beta' -- README.md"],
+    ["A12", "log: ( ) in a --grep pattern", "git log -n 5 --grep='fix(core)'"],
+    ["A13", "log: { } in a --format", "git log -n 1 --format='%h {%s}'"],
+    ["A14", "log: $ of a variable", 'git log -n 1 --author="$USER"'],
+    ["A15", "log: backtick in a --grep pattern", "git log -n 1 --grep='a`b'"],
+    ["A16", "show: ( ) in a --format", "git show --no-patch --format='%h (%s)' HEAD"],
+    ["A17", "show: { } in a --format", "git show --no-patch --format='{%h}' HEAD"],
+    ["A18", "show: $ of a variable in a pathspec", 'git show HEAD -- "$PWD"'],
+    ["A19", "show: backtick in a --format", "git show --no-patch --format='a`b' HEAD"],
+    ["A20", "diff: ( ) in a pathspec", "git diff -- 'a (1).txt'"],
+    ["A21", "diff: { } in a pathspec", "git diff --stat -- '{a,b}.txt'"],
+    ["A22", "diff: $( ) of a nested NON-push git command (the accepted false positive named in lib/git-cmd.mjs)", 'git diff "$(git merge-base HEAD main)" -- README.md'],
+    ["A23", "diff: backtick in a pathspec", "git diff -- 'a`b'"],
+    ["A24", "status: ( ) in a pathspec", "git status --short -- 'dir (copy)'"],
+    ["A25", "status: { } in a pathspec", "git status --short -- '{a,b}.txt'"],
+    ["A26", "status: $ of a variable", 'git status --short -- "$PWD"'],
+    ["A27", "status: backtick in a pathspec", "git status --short -- 'a`b'"],
+  ];
+  for (const [id, label, command] of PGM_ADMITTED) {
+    check(`PGM-${id} allow  ${label}`, command, dir, ALLOW, { stderrEmpty: true });
+  }
+  const PGM_REFUSED = [
+    ["R01", "commit: a push inside $( ) in -m", `git commit -m "$(${PGM_PUSH})"`],
+    ["R02", "commit: a push inside a backtick pair in -m", 'git commit -m "`' + PGM_PUSH + '`"'],
+    ["R03", "commit: a push inside <( ) as an argument", `git commit -m x <(${PGM_PUSH})`],
+    ["R04", "diff: a push inside <( ) as an argument", `git diff <(${PGM_PUSH}) README.md`],
+    ["R05", "grep: a push inside $( ) in the pattern", `git grep -n "$(${PGM_PUSH})" -- README.md`],
+    ["R06", "log: a push inside $( ) in --grep", `git log -n 1 --grep="$(${PGM_PUSH})"`],
+    ["R07", "log: a push inside a backtick pair in --grep", 'git log -n 1 --grep="`' + PGM_PUSH + '`"'],
+    ["R08", "show: a push inside $( ) as the revision", `git show "$(${PGM_PUSH})"`],
+    ["R09", "diff: a push inside $( ) as the revision", `git diff "$(${PGM_PUSH})" -- README.md`],
+    ["R10", "status: a push inside $( ) in a pathspec", `git status --short -- "$(${PGM_PUSH})"`],
+    ["R11", "commit: a harmless ( ) message beside a push inside $( ) in a later trailer", `git commit -m "s (goldfish)" --trailer "X: $(${PGM_PUSH})"`],
+    ["R12", "commit: a push inside $( ) behind a global option", `git -C . commit -m "$(${PGM_PUSH})"`],
+    ["R13", "push: a ( ) in the refspec", 'git push origin "main:refs/heads/feature(x)"'],
+    ["R14", "push: a nested $( ) in the refspec", 'git push origin "$(git rev-parse HEAD):refs/heads/feature-test"'],
+    ["R15", "push: { } in the refspec", "git push origin 'main:refs/heads/{a,b}'"],
+    ["R16", "remote: $( ) in the url of an added remote", 'git remote add origin2 "$(echo https://example.invalid/r.git)"'],
+    ["R17", "remote: ( ) in the push url", "git remote set-url --push origin '(x)'"],
+    ["R18", "config: ( ) in a push url setting", "git config remote.origin.pushurl '(x)'"],
+    ["R19", "config: an alias that runs a push, with { } ( )", 'git config alias.p "!f() { git push origin main:refs/heads/feature-test; }; f"'],
+    ["R20", "alias form: -c alias that runs a push, with a ( ) marker", `git -c "alias.ps=!${PGM_PUSH}" ps -- "(x)"`],
+    ["R21", "alias form: -c alias that shadows an exempt subcommand name (status)", `git -c "alias.status=!${PGM_PUSH}" status -- "(x)"`],
+    ["R22", "alias form: -c alias for an unknown subcommand beside a commit-style ( ) message", `git -c "alias.ci=!${PGM_PUSH}" ci -m "s (goldfish)"`],
+  ];
+  for (const [id, label, command] of PGM_REFUSED) {
+    check(`PGM-${id} block  ${label}`, command, dir, BLOCK);
+  }
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------

@@ -196,7 +196,7 @@ const HF9_STUB_SOURCES = {
   "controls.mjs": `export const controls = { lifecycle: { ok: true, status: "approved" }, authorityOk: true };\n`,
   "stub-lifecycle.mjs": `import { controls } from "./controls.mjs";\nexport function derivePlanLifecycle() { return controls.lifecycle; }\n`,
   "stub-authority.mjs": `import { readFileSync } from "node:fs";\nimport { join } from "node:path";\nimport { controls } from "./controls.mjs";\nexport function validatePoGateAuthorityForRepository({ repoRoot }) {\n  if (!controls.authorityOk) return { ok: false, code: "TEST-AUTHORITY-REFUSED" };\n  const state = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline-state.json"), "utf8"));\n  return { ok: true, value: state.planApproval.poGateAuthority };\n}\n`,
-  "stub-dwp.mjs": `export function readDesignWorkflowPackageFromRepository() { return { ok: false, code: "TEST-DWP-UNUSED" }; }\n`,
+  "stub-dwp.mjs": `export function readDesignWorkflowPackageFromRepository() { return { ok: false, code: "TEST-DWP-UNUSED" }; }\nexport function rereadApprovedDesignWorkflowPackage() { return { ok: false, code: "TEST-DWP-UNUSED" }; }\n`,
   "stub-dwa.mjs": `export function verifyStoredDesignWorkflowPackageSignature() { return { ok: false, code: "TEST-DWA-UNUSED" }; }\n`,
   "stub-policy.mjs": `export function readCriticalHumanProofPolicy() { return { ok: false, code: "TEST-POLICY-UNUSED" }; }\n`,
 };

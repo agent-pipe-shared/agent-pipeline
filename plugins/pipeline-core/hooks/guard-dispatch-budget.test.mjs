@@ -1778,3 +1778,572 @@ test("R7-11d-T4: a main-lock republish that hits EEXIST because a fresh caller p
   });
   r711t4AssertBenign(call, ["release-main:true"]);
 });
+
+// ===========================================================================
+// TR-G-T (tranche-2 post-image, 2026-10-09): pins for the toil-resolution rows T34, T37, T49 and for the T57
+// clause "a denial shows the budget charge" (Ruling 115, TR-K4). Appended; every case above is unchanged.
+// Design: specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md section 2 (rows) and section 5 row 11.
+//
+// ASSUMPTIONS (the rows fix behaviour, not these names; a fix that spells them differently re-points the pin):
+//   A1. T37: the log's root cause is not in the pin author's context. The construction used here is two children
+//       of the SAME agentType launched under ONE parent tool id (one pending record, one binding for the role).
+//       The first child consumes the binding (dispatch-budget-binding.mjs unlinks the record when no bindings
+//       remain), so the second finds none. The row offers two cures ("key the pending binding per dispatch, or
+//       name the re-dispatch action"); the pin accepts either: the second child is admitted with the briefed
+//       cap, OR it is refused with a message that names a re-dispatch action (matched by /re-?dispatch/i).
+//   A2. T49: the commit-flow producer is `goldfish-commit-command-flow.mjs` (agent-obligations.md section 6).
+//       Its argument spelling is NOT pinned; the pin only needs the script name. The admitted location is taken
+//       to be the plugin root the guard itself resolves (the runner passes `<rootDir>/plugins/pipeline-core`).
+//       "Nothing else" is pinned with four refusals that stay refusals: another script, the producer chained
+//       to a second command with `&&` or `;`, and two non-closing git verbs.
+//   A3. T57: the budget guard's OWN exhaustion denial already names the charge (counted attempts), the working
+//       cap and the remaining closing slots, so that half is pinned GREEN here to stop TR-K4 regressing it. The
+//       half Ruling 115 found unmet -- refusals by the OTHER guards -- cannot be expressed in this file (this
+//       guard never sees their verdicts) and is left to TR-K4's own pins in the owning suites.
+//   A4. T34: the cache is a performance change with no seam in this guard (evaluateDispatchBudgetGuard calls
+//       observeGovernanceScope directly, no injectable) and no decided cache location, so its speed-up cannot be
+//       pinned here. The row's INVARIANT can: "any change ... recomputes". The pin retires the governance scope
+//       between two guard calls (decision "decline") and requires the very next call to see it. It is GREEN
+//       today and goes RED if a future cache serves a stale "active" verdict.
+// ===========================================================================
+const TRG_PRODUCER = "goldfish-commit-command-flow.mjs";
+const trgProducerCommand = (tail = "--task TR-G-T-20261009 -- evidence/x.json") => `node "${FAKE_ROOT}/plugins/pipeline-core/scripts/${TRG_PRODUCER}" ${tail}`;
+const trgCounterPath = (agentId) => `${COMMON_DIR}/agent-pipeline/dispatch-budget/${agentId}.json`;
+const trgChildMetaPath = (agentId) => `/fake/session/parent/subagents/agent-${agentId}.meta.json`;
+const trgChildMeta = (toolUseId) => JSON.stringify({ agentType: "pipeline-core:goldfish-implementor", description: "x", toolUseId, spawnDepth: 1 });
+const trgImplementorPayload = (agentId) => measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor", agent_id: agentId });
+const trgDeepCall = (tool_name, tool_input) => ({ transcript_path: SUBAGENT_TRANSCRIPT, agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep", tool_name, tool_input });
+// workingCap = maxTurns 20 - (5 closing + 10 safety) = 5; the closing allowance is 5 more counted calls.
+const trgCapSteps = () => Array.from({ length: 5 }, () => ({ op: "guard", input: readInputObj({ file_path: "/x" }) }));
+
+test("TR-G T49 (a): after the working cap, the commit-flow producer is an admitted closing act and stays counted", () => {
+  const steps = [
+    ...trgCapSteps(),
+    { op: "guard", input: trgDeepCall("Bash", { command: trgProducerCommand() }) },
+    { op: "guard", input: trgDeepCall("Bash", { command: trgProducerCommand("--task TR-G-T-20261009 --paths evidence/x.json") }) },
+    { op: "getFile", path: COUNTER_PATH },
+  ];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
+  assert.equal(results[5].exitCode, 0, `the producer after the cap must be admitted -- got: ${results[5].stderr.trim().slice(0, 300)}`);
+  assert.equal(results[6].exitCode, 0, `a second producer call after the cap must be admitted -- got: ${results[6].stderr.trim().slice(0, 300)}`);
+  assert.equal(JSON.parse(results[7]).count, 7, "admitted closing calls remain counted");
+});
+
+test("TR-G T49 (b): after the working cap nothing but the named closing acts is admitted (control, green today)", () => {
+  const refused = [
+    `node "${FAKE_ROOT}/plugins/pipeline-core/scripts/some-other-script.mjs" --task TR-G-T-20261009`,
+    `${trgProducerCommand()} && git push origin main`,
+    `${trgProducerCommand()}; echo done`,
+    "git push origin main",
+    "git reset --hard HEAD~1",
+  ];
+  const steps = [...trgCapSteps(), ...refused.map((command) => ({ op: "guard", input: trgDeepCall("Bash", { command }) }))];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  refused.forEach((command, index) => {
+    const verdict = results[5 + index];
+    assert.equal(verdict.exitCode, 2, `must stay refused after the cap: ${command}`);
+    assert.match(verdict.stderr, /DISPATCH-BUDGET-EXHAUSTED/u, `must be the budget refusal: ${command}`);
+  });
+});
+
+test("TR-G T49 (c): the producer cannot renew the closing allowance -- five post-cap producer calls pass, the sixth is refused", () => {
+  const steps = [
+    ...trgCapSteps(),
+    ...Array.from({ length: 6 }, () => ({ op: "guard", input: trgDeepCall("Bash", { command: trgProducerCommand() }) })),
+    { op: "getFile", path: COUNTER_PATH },
+  ];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
+    assert.equal(results[4 + ordinal].exitCode, 0, `producer closing call ${ordinal} of 5 -- got: ${results[4 + ordinal].stderr.trim().slice(0, 300)}`);
+  }
+  assert.equal(results[10].exitCode, 2, "the sixth post-cap call is outside the allowance");
+  assert.match(results[10].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+  assert.equal(JSON.parse(results[11]).count, 11, "every attempt stays counted");
+});
+
+// ---------------------------------------------------------------------------
+// TR-G-T3 (tranche-2 post-image, 2026-10-09): pins for the two post-cap admission gaps the TR-G-F Critic (Opus,
+// partial) found in the producer lane and in the git closing verb (Ruling 138, F1 and F2). Appended after T49 (c);
+// every case above is unchanged.
+//   F1. comparableScriptPath maps "\" to "/" on EVERY platform, so on a POSIX host
+//       `<plugin root>/scripts\goldfish-commit-command-flow.mjs` (a different path there) is admitted as the producer.
+//       Pins (d) quoted and (e) bare: refused after the cap. They are POSIX-host pins and are skipped on a win32
+//       host, where "\" is a path separator and that spelling is rightly admitted. There is NO platform seam to
+//       inject: the guard reads process.platform directly and this runner has no scenario field that sets it, so no
+//       injected-win32 admission control exists here and none is invented.
+//   F2. The git closing verb is matched at the START of the command only, so a chained command that begins with
+//       `git add` / `git commit` is admitted after the cap. Pins (f) `&&`, (g) `;`, (h) `|`: refused. Controls (i)
+//       plain `git add -- <p>` / `git commit -F <f> -- <p>` and (j) the forward-slash producer spellings: admitted.
+// Every test keeps its post-cap calls within the five-call closing allowance, so a refusal below is the shape's and
+// never allowance exhaustion (the exhaustion text is asserted ABSENT).
+// ---------------------------------------------------------------------------
+const TRG_SKIP_ON_WIN32 = process.platform === "win32" ? "POSIX-host pin: on a win32 host the backslash is a path separator and that spelling stays admitted (the guard reads process.platform directly; no platform seam to inject)" : false;
+const TRG_SKIP_BARE_ON_WIN32 = process.platform === "win32" ? "POSIX-host pin: on a win32 host a bare token containing a backslash is refused by the bare-token rule (pins (p) and (q)), not by the POSIX refusal this case pins (the guard reads process.platform directly; no platform seam to inject)" : false;
+const TRG_TAIL = "--task TR-G-T3-20261009 -- evidence/x.json";
+const trgBackslashQuoted = () => `node "${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER}" ${TRG_TAIL}`;
+const trgBackslashBare = () => `node ${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER} ${TRG_TAIL}`;
+const trgForwardBare = () => `node ${FAKE_ROOT}/plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG_TAIL}`;
+const trgPostCap = (commands) => {
+  const steps = [...trgCapSteps(), ...commands.map((command) => ({ op: "guard", input: trgDeepCall("Bash", { command }) }))];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
+  return results.slice(5);
+};
+const trgAssertRefusedAfterCap = (verdict, command) => {
+  assert.equal(verdict.exitCode, 2, `must stay refused after the cap, but it was admitted: ${command}`);
+  assert.match(verdict.stderr, /DISPATCH-BUDGET-EXHAUSTED/u, `must be the budget refusal: ${command}`);
+  assert.doesNotMatch(verdict.stderr, /closing allowance of 5 tool calls is exhausted/u, `the refusal must be the shape's, not allowance exhaustion: ${command}`);
+};
+const trgAssertAdmittedAfterCap = (verdict, command) => {
+  assert.equal(verdict.exitCode, 0, `must be admitted as a closing act after the cap: ${command} -- got: ${verdict.stderr.trim().slice(0, 300)}`);
+};
+
+test("TR-G T49 (d): after the working cap, a quoted producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_ON_WIN32 }, () => {
+  const command = trgBackslashQuoted();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_BARE_ON_WIN32 }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = trgBackslashBare();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (f): after the working cap, `git add <x> && <other>` is refused -- only one simple git command is a closing act", () => {
+  const command = "git add -- evidence/x.json && git push origin main";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (g): after the working cap, `git add <x>; <other>` is refused", () => {
+  const command = "git add -- evidence/x.json; echo done";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (h): after the working cap, `git commit -F <f> | <other>` is refused", () => {
+  const command = "git commit -F scratch/commit-msg/TR-G-T3.txt -- evidence/x.json | tee scratch/out.txt";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control, green today)", () => {
+  const commands = ["git add -- evidence/x.json", "git commit -F scratch/commit-msg/TR-G-T3.txt -- evidence/x.json"];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
+test("TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today)", () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const forwardRoot = FAKE_ROOT.replaceAll("\\", "/");
+  const commands = [
+    `node "${forwardRoot}/plugins/pipeline-core/scripts/${TRG_PRODUCER}" ${TRG_TAIL}`,
+    `node ${forwardRoot}/plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG_TAIL}`,
+  ];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
+// ---------------------------------------------------------------------------
+// TR-G-T4 (tranche-2 post-image, 2026-10-09): pins for the three guard corrections of Ruling 150 (TR-G delta Critic
+// FAIL, findings 1 to 3). Appended after T49 (j); every earlier line is unchanged. The guard fix that turns the red
+// pins green is TR-G-F4, a separate dispatch (QG-04).
+//   Finding 1. The producer is admitted only in its absolute plugin-root spelling, but the refusal text names only the
+//       script. Pin (l): the refusal of a relative spelling names the exact admitted absolute path, compared after
+//       mapping "\" to "/" (and lower-casing on win32) on both sides so the fix may choose either separator. Pin (k)
+//       is its control: the relative spelling is refused, today and after the fix. A relative spelling is NOT
+//       admitted because in a source checkout it is the source copy, a different program from the installed plugin.
+//   Finding 3. The verb pattern `^git\s+(add|commit)\b` lets a hyphenated lookalike through as a closing act, because
+//       `\b` matches between "t" and "-". Pins (m) `git commit-graph write` and (n) `git commit-tree HEAD`: refused.
+//       Neither carries a shell control character, so today they are admitted for the verb pattern alone. The fix
+//       pattern is `^git\s+(add|commit)(\s|$)`.
+//   Finding 2. On win32 only a QUOTED token gets the backslash mapping; a bare (unquoted) token that contains "\" is
+//       refused, because a shell eats an unquoted backslash. Pins (p) all separators backslashes and (q) a backslash
+//       only before the script name: refused, win32-native only. The guard reads process.platform directly and this
+//       runner has no platform seam, so (p) and (q) carry a typed probe-based skip on every other host, and no
+//       injected-win32 variant is invented.
+//   Controls: (o) the exact path the refusal text names is admitted (quoted, and bare with forward slashes only), and
+//       `git commit -F <f> -- <p>` stays admitted. Each test spends at most three post-cap calls (allowance: five).
+// ---------------------------------------------------------------------------
+const TRG4_TAIL = "--task TR-G-T4-20261009 -- evidence/x.json";
+const TRG4_PLUGIN_ROOT = `${FAKE_ROOT}/plugins/pipeline-core`;
+// The one admitted producer path, spelled with the same join the guard uses for its comparison.
+const TRG4_ADMITTED = join(TRG4_PLUGIN_ROOT, "scripts", TRG_PRODUCER);
+const trg4Comparable = (text) => {
+  const slashed = String(text).replaceAll("\\", "/");
+  return process.platform === "win32" ? slashed.toLowerCase() : slashed;
+};
+const trg4RelativeCommand = () => `node plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG4_TAIL}`;
+const TRG4_WIN32_ONLY_SKIP = process.platform === "win32" ? false : "TRG4-WIN32-ONLY: native-win32 pin; the guard reads process.platform directly (no platform seam) and on a POSIX host a backslash is an ordinary character, already pinned by T49 (d) and (e)";
+
+test("TR-G T49 (k): after the working cap, a relative spelling of the producer script stays refused (control, green today)", () => {
+  const command = trg4RelativeCommand();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (l): after the working cap, the refusal text names the exact admitted absolute producer path", () => {
+  const command = trg4RelativeCommand();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+  assert.ok(
+    trg4Comparable(verdict.stderr).includes(trg4Comparable(TRG4_ADMITTED)),
+    `the refusal must name the admitted absolute path ${TRG4_ADMITTED} -- got: ${verdict.stderr.trim().slice(0, 700)}`,
+  );
+});
+
+test("TR-G T49 (m): after the working cap, `git commit-graph write` is refused -- a hyphenated lookalike is not a closing git verb", () => {
+  const command = "git commit-graph write";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (n): after the working cap, `git commit-tree HEAD` is refused -- a second hyphenated lookalike", () => {
+  const command = "git commit-tree HEAD";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (o): after the working cap, the exact admitted producer command (quoted, and bare with forward slashes) and `git commit -F <f> -- <p>` stay admitted (control, green today)", () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const commands = [
+    `node "${TRG4_ADMITTED}" ${TRG4_TAIL}`,
+    `node ${TRG4_ADMITTED.replaceAll("\\", "/")} ${TRG4_TAIL}`,
+    "git commit -F scratch/commit-msg/TR-G-T4.txt -- evidence/x.json",
+  ];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
+test("TR-G T49 (p): on win32, after the working cap, a bare producer path whose separators are all backslashes is refused", { skip: TRG4_WIN32_ONLY_SKIP }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = `node ${TRG4_ADMITTED.replaceAll("/", "\\")} ${TRG4_TAIL}`;
+  assert.ok(command.slice(5, command.indexOf(" ", 5)).includes("\\"), "the bare script token must contain a backslash");
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (q): on win32, after the working cap, a bare producer path with a backslash only before the script name is refused", { skip: TRG4_WIN32_ONLY_SKIP }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = `node ${TRG4_PLUGIN_ROOT.replaceAll("\\", "/")}/scripts\\${TRG_PRODUCER} ${TRG4_TAIL}`;
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+function trgTwoChildrenOneParentFiles() {
+  const files = boundImplementorFiles(20, 20);
+  files[trgChildMetaPath("def456")] = trgChildMeta("parent-tool-1");
+  return files;
+}
+
+test("TR-G T37 (a): a second same-role child under one parent tool id is bound per dispatch, or its refusal names the re-dispatch action", () => {
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    realBudgetBinding: true,
+    files: trgTwoChildrenOneParentFiles(),
+    steps: [
+      { op: "guard", input: trgImplementorPayload("abc123") },
+      { op: "guard", input: trgImplementorPayload("def456") },
+      { op: "getFile", path: trgCounterPath("def456") },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0, "the first child consumes the binding and is admitted");
+  if (results[1].exitCode === 0) {
+    const counter = JSON.parse(results[2]);
+    assert.equal(counter.baseCalls, 20, "an admitted second child carries the briefed base cap, not a default");
+    assert.equal(counter.workingCap, 20);
+    assert.equal(counter.count, 1);
+    return;
+  }
+  assert.equal(results[1].exitCode, 2, "the only other admissible outcome is a refusal");
+  assert.match(results[1].stderr, /re-?dispatch/iu, `a refusal must name the re-dispatch action -- got: ${results[1].stderr.trim().slice(0, 400)}`);
+});
+
+test("TR-G T37 (b): concurrent launches under DISTINCT parent tool ids each resolve their own binding (control, green today)", () => {
+  const files = boundImplementorFiles(20, 20);
+  files[trgChildMetaPath("def456")] = trgChildMeta("parent-tool-2");
+  files[pendingBindingPath("parent-tool-2")] = pendingBinding({ toolUseId: "parent-tool-2", baseCalls: 30, effectiveCap: 30 });
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    realBudgetBinding: true,
+    files,
+    steps: [
+      { op: "guard", input: trgImplementorPayload("abc123") },
+      { op: "guard", input: trgImplementorPayload("def456") },
+      { op: "getFile", path: trgCounterPath("abc123") },
+      { op: "getFile", path: trgCounterPath("def456") },
+      { op: "getFile", path: pendingBindingPath("parent-tool-1") },
+      { op: "getFile", path: pendingBindingPath("parent-tool-2") },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0);
+  assert.equal(results[1].exitCode, 0, `the second launch must not starve -- got: ${results[1].stderr.trim().slice(0, 300)}`);
+  assert.deepEqual([JSON.parse(results[2]).baseCalls, JSON.parse(results[2]).workingCap], [20, 20]);
+  assert.deepEqual([JSON.parse(results[3]).baseCalls, JSON.parse(results[3]).workingCap], [30, 30]);
+  assert.equal(results[4], null, "each pending record is consumed by its own child");
+  assert.equal(results[5], null);
+});
+
+test("TR-G T57 (Ruling 115, TR-K4 clause 2): this guard's own denial shows the budget charge -- counted attempts, working cap and remaining closing slots (green today)", () => {
+  const steps = Array.from({ length: 10 }, () => ({ op: "guard", input: readInputObj({ file_path: "/x" }) }));
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let count = 6; count <= 9; count += 1) {
+    const remaining = 10 - count;
+    const verdict = results[count - 1];
+    assert.equal(verdict.exitCode, 2, `attempt ${count} is refused`);
+    assert.match(verdict.stderr, new RegExp(`has counted ${count} tool-call attempts against a working cap of 5`, "u"), `attempt ${count} must show its charge`);
+    assert.match(verdict.stderr, new RegExp(`${remaining} closing-call ${remaining === 1 ? "slot remains" : "slots remain"}`, "u"), `attempt ${count} must show what remains`);
+  }
+  assert.match(results[9].stderr, /has counted 10 tool-call attempts against a working cap of 5/u);
+  assert.match(results[9].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+});
+
+test("TR-G T34: a governance state change between two guard calls takes effect on the second call -- the scope observation recomputes (invariant for a future cache, green today)", () => {
+  const root = activeGovernanceRoot("t34");
+  try {
+    const files = {
+      [META_PATH]: JSON.stringify({ agentType: "pipeline-core:goldfish-deep", description: "x", toolUseId: "t1", spawnDepth: 1 }),
+      [`${root}/plugins/pipeline-core/agents/goldfish-deep.md`]: "---\nname: goldfish-deep\nmodel: sonnet\nmaxTurns: 20\ntools: Read\n---\nbody\n",
+    };
+    const steps = [{ op: "guard", input: readInputObj({ file_path: "/x" }) }, { op: "getFile", path: COUNTER_PATH }];
+    const first = run({ rootDir: root, files, steps });
+    assert.equal(first.results[0].exitCode, 0);
+    assert.equal(JSON.parse(first.results[1]).count, 1, "an enrolled scope counts the call");
+    const plan = planGovernanceScopeDecision({ rootDir: root, decision: "decline", by: "TR-G T34 fixture" });
+    applyGovernanceScopeDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, false, "fixture precondition: the scope no longer requires enforcement");
+    const second = run({ rootDir: root, files: { ...files, [COUNTER_PATH]: first.results[1] }, steps });
+    assert.equal(second.results[0].exitCode, 0);
+    assert.equal(JSON.parse(second.results[1]).count, 1, "after the scope was retired the next call must not be counted: a cached 'active' verdict would count it");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CRITIC-CKPT-T2 (tranche-2 post-image, 2026-10-09): RED pins for the Critic's checkpoint budget and its confined notes lane
+// (Ruling 161, which corrects Ruling 159). Appended after TR-G T34; every case above is unchanged. Test-only (QG-04): the change
+// that turns the red cases green is CRITIC-CKPT-F.
+//   The subject is a `pipeline-core:critic` subagent whose agent definition is the SHIPPED agents/critic.md, read at test time (no
+//   hard-coded maxTurns), with a preflight-bound base cap of 50. The binding is real (realBudgetBinding) because the checkpoint
+//   notice is only emitted for a budget-bearing role. A second runner, derived at run time from the shared runner source, also
+//   returns each call's stdout (the notice is stdout) and expands a `repeat` field so a 90-call scenario stays a short argv.
+//   (a) 50 working calls are admitted and the 51st is DISPATCH-BUDGET-EXHAUSTED.
+//   (b) the first checkpoint notice is on call 40, not on call 39.
+//   (c) five closing acts after the 50th call pass; the sixth names the exhausted closing allowance.
+//   (d) after the cap, a Write to scratch/dispatch/critic-<id>/critic-notes.md is the one admitted write; scratch/x.md,
+//       evidence/other.json, scratch/dispatch/critic-abc/other.md, scratch/critic-notes.md, an Edit of another path and
+//       scratch/dispatch/other/critic-notes.md stay refused. Control: a goldfish-deep Write to a critic-notes.md path stays
+//       refused after its own cap. The (d) cases reach "after the cap" by measuring the cap with a probe run, so they do not
+//       depend on which cap the shipped definition yields.
+// ---------------------------------------------------------------------------
+import { effectiveDispatchBaseCap } from "../lib/dispatch-budget-core.mjs";
+import { readAgentMaxTurns } from "../lib/dispatch-budget-binding.mjs";
+
+const CKPT_BASE_CALLS = 50;
+const CKPT_TOOL_USE_ID = "parent-tool-critic-1";
+const CKPT_NOTES_PATH = "scratch/dispatch/critic-abc/critic-notes.md";
+
+function ckptCriticFiles() {
+  const definition = readFileSync(fileURLToPath(new URL("../agents/critic.md", import.meta.url)), "utf8");
+  const maxTurns = readAgentMaxTurns("critic", "/shipped-plugin", { existsSyncFn: () => true, readFileSyncFn: () => definition });
+  assert.ok(Number.isSafeInteger(maxTurns), "the shipped agents/critic.md must carry a well-formed maxTurns line");
+  const effectiveCap = effectiveDispatchBaseCap(CKPT_BASE_CALLS, maxTurns);
+  assert.ok(Number.isSafeInteger(effectiveCap), `the shipped maxTurns ${maxTurns} must leave a working cap for a base cap of ${CKPT_BASE_CALLS}`);
+  return {
+    [agentDefPath("critic")]: definition,
+    [PARENT_META_PATH]: JSON.stringify({ agentType: "pipeline-core:critic", description: "x", toolUseId: CKPT_TOOL_USE_ID, spawnDepth: 1 }),
+    [pendingBindingPath(CKPT_TOOL_USE_ID)]: `${JSON.stringify({
+      schema: "pipeline.pending-dispatch-budget-binding.v1",
+      toolUseIdSha256: createHash("sha256").update(CKPT_TOOL_USE_ID).digest("hex"),
+      bindings: [{ agentType: "critic", baseCalls: CKPT_BASE_CALLS, maxTurns, effectiveCap }],
+    })}\n`,
+  };
+}
+
+const ckptCriticCall = (tool_name, tool_input) => ({ op: "guard", input: measuredSubagentPayload({ agent_type: "pipeline-core:critic", tool_name, tool_input }) });
+const ckptReads = (count) => ({ ...ckptCriticCall("Read", { file_path: "/x" }), repeat: count });
+const ckptWrite = (path) => ckptCriticCall("Write", { file_path: path, content: "interim notes" });
+
+let ckptRunnerPath;
+function ckptRun(scenario) {
+  if (ckptRunnerPath === undefined) {
+    const resultLine = "results.push({ exitCode: r.exitCode, stderr: r.stderr });";
+    const scenarioLine = "const scenario = JSON.parse(Buffer.from(scenarioB64, 'base64').toString('utf8'));";
+    assert.ok(RUNNER_SOURCE.includes(resultLine) && RUNNER_SOURCE.includes(scenarioLine), "the shared runner no longer has the lines this block extends");
+    ckptRunnerPath = join(runnerDir, "critic-ckpt-runner.mjs");
+    writeFileSync(ckptRunnerPath, RUNNER_SOURCE
+      .replace(resultLine, "results.push({ exitCode: r.exitCode, stderr: r.stderr, stdout: r.stdout ?? '' });")
+      .replace(scenarioLine, `${scenarioLine}\nscenario.steps = (scenario.steps || []).flatMap((s) => Array.from({ length: s.repeat || 1 }, () => s));`));
+  }
+  const b64 = Buffer.from(JSON.stringify(scenario), "utf8").toString("base64");
+  // A Critic scenario is 41 to 90 sequential guard calls; on a mounted drive each call spends hundreds of milliseconds inside
+  // observeGovernanceScope (the same cost the file-top bound note describes), so the shared 10 s bound would only measure the host.
+  const res = spawnSync(process.execPath, [ckptRunnerPath, GUARD, b64], { input: "", encoding: "utf8", timeout: Math.max(RUNNER_TIMEOUT_MS, 240000) });
+  const stdout = res.stdout ?? "";
+  assert.equal(res.status, 0, `critic runner child exited ${res.status} (expected 0) -- stderr: ${(res.stderr ?? "").trim().slice(0, 500)}`);
+  assert.ok(stdout.includes("BUDGETRUN-OK"), `critic runner did not print the success marker BUDGETRUN-OK -- stdout ${JSON.stringify(stdout)}`);
+  const line = stdout.split("\n").find((l) => l.startsWith("RESULT: "));
+  assert.ok(line, `critic runner did not print a RESULT line -- stdout ${JSON.stringify(stdout)}`);
+  return JSON.parse(line.slice("RESULT: ".length));
+}
+
+const ckptScenario = (steps) => ({ rootDir: FAKE_ROOT, realBudgetBinding: true, files: ckptCriticFiles(), steps });
+const ckptWhy = (verdict) => `${verdict.stderr.trim().slice(0, 300)}`;
+
+let ckptMeasuredCap;
+/** The number of working calls the shipped definition admits for a base cap of 50: the index of the first refusal in a long run of reads. */
+function ckptCap() {
+  if (ckptMeasuredCap === undefined) {
+    const { results } = ckptRun(ckptScenario([ckptReads(90)]));
+    const firstRefusal = results.findIndex((verdict) => verdict.exitCode !== 0);
+    assert.ok(firstRefusal > 0, `the probe needs a Critic that is admitted first and refused later; first refusal at index ${firstRefusal}: ${ckptWhy(results[0])}`);
+    ckptMeasuredCap = firstRefusal;
+  }
+  return ckptMeasuredCap;
+}
+
+test("CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(51)]));
+  const firstRefusal = results.findIndex((verdict) => verdict.exitCode !== 0);
+  assert.equal(firstRefusal, 50, `the Critic must be admitted for exactly 50 working calls; the first refusal was call ${firstRefusal + 1}: ${firstRefusal < 0 ? "none" : ckptWhy(results[firstRefusal])}`);
+  assert.equal(results[50].exitCode, 2, "the 51st call is outside the working cap");
+  assert.match(results[50].stderr, /DISPATCH-BUDGET-EXHAUSTED/u);
+});
+
+test("CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(41)]));
+  const noticeCalls = results.map((verdict, index) => (verdict.stdout.includes("DISPATCH-BUDGET-CHECKPOINT") ? index + 1 : null)).filter((call) => call !== null);
+  assert.equal(noticeCalls[0], 40, `the first DISPATCH-BUDGET-CHECKPOINT notice must be on call 40; notices were on calls [${noticeCalls.join(", ")}]`);
+  assert.doesNotMatch(results[38].stdout, /DISPATCH-BUDGET-CHECKPOINT/u, "call 39 carries no notice");
+  assert.equal(results[39].exitCode, 0, `call 40 is admitted with its notice -- got: ${ckptWhy(results[39])}`);
+});
+
+test("CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance", () => {
+  const { results } = ckptRun(ckptScenario([ckptReads(50), { ...ckptWrite(CKPT_NOTES_PATH), repeat: 6 }]));
+  const refusedWorking = results.slice(0, 50).findIndex((verdict) => verdict.exitCode !== 0);
+  assert.equal(refusedWorking, -1, `all 50 working calls must be admitted; call ${refusedWorking + 1} was refused: ${ckptWhy(results[Math.max(refusedWorking, 0)])}`);
+  for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
+    assert.equal(results[49 + ordinal].exitCode, 0, `closing act ${ordinal} of 5 -- got: ${ckptWhy(results[49 + ordinal])}`);
+  }
+  assert.equal(results[55].exitCode, 2, "the sixth post-cap call is outside the allowance");
+  assert.match(results[55].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+});
+
+test("CRITIC-CKPT-T2 (d1): after the cap a Critic Write to scratch/dispatch/critic-<id>/critic-notes.md is admitted as a closing act (green today)", () => {
+  const cap = ckptCap();
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptWrite(CKPT_NOTES_PATH)]));
+  assert.ok(results.slice(0, cap).every((verdict) => verdict.exitCode === 0), `the ${cap} working calls are admitted`);
+  assert.equal(results[cap].exitCode, 0, `the confined notes write must be admitted after the cap -- got: ${ckptWhy(results[cap])}`);
+});
+
+test("CRITIC-CKPT-T2 (d2): after the cap a Critic Write anywhere else, or to another file name, stays refused (green today)", () => {
+  const cap = ckptCap();
+  const refused = ["scratch/x.md", "evidence/other.json", "scratch/dispatch/critic-abc/other.md", "scratch/critic-notes.md"];
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ...refused.map(ckptWrite)]));
+  refused.forEach((path, index) => trgAssertRefusedAfterCap(results[cap + index], path));
+});
+
+test("CRITIC-CKPT-T2 (d3): after the cap a Critic Edit of another path stays refused (green today)", () => {
+  const cap = ckptCap();
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptCriticCall("Edit", { file_path: "scratch/x.md", old_string: "a", new_string: "b" })]));
+  trgAssertRefusedAfterCap(results[cap], "Edit scratch/x.md");
+});
+
+test("CRITIC-CKPT-T2 (d4): after the cap a Critic Write to scratch/dispatch/other/critic-notes.md is refused -- the subdirectory must be critic-prefixed", () => {
+  const cap = ckptCap();
+  const path = "scratch/dispatch/other/critic-notes.md";
+  const { results } = ckptRun(ckptScenario([ckptReads(cap), ckptWrite(path)]));
+  trgAssertRefusedAfterCap(results[cap], path);
+});
+
+test("CRITIC-CKPT-T2 (d5, control): a goldfish-deep Write to a critic-notes.md path stays refused after its own cap (green today)", () => {
+  const steps = [...trgCapSteps(), { op: "guard", input: trgDeepCall("Write", { file_path: CKPT_NOTES_PATH, content: "interim notes" }) }];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
+  trgAssertRefusedAfterCap(results[5], `goldfish-deep Write ${CKPT_NOTES_PATH}`);
+});
+
+// ---------------------------------------------------------------------------
+// CRITIC-CKPT-T3 (tranche-2 post-image, 2026-10-09): RED pins for the Critic's confined Write lane BEFORE the cap. Appended after the
+// CRITIC-CKPT-T2 block; every line above is unchanged. Test-only (QG-04): the change that turns the red cases green is CRITIC-CKPT-F.
+//   Ruling 157 (Write/Edit confined by a guard to scratch/dispatch/critic-*/critic-notes.md) and Ruling 159 (the confined Write is
+//   admitted, every other path refused) bind at EVERY call, not only after the cap. The T2 block pinned only the post-cap lane and
+//   claimed that the agent's `tools` frontmatter settles pre-cap confinement; a `tools` list cannot confine paths, so that claim is
+//   overruled and the lane is pinned here at call 1 and at call 20, both well below the cap. Same subject and harness as T2: the
+//   shipped agents/critic.md, a preflight-bound cap of 50, the derived runner, and the T2 helpers.
+//   (a) at call 1 and at call 20 a Critic Write and a Critic Edit of scratch/dispatch/critic-<id>/critic-notes.md are admitted.
+//   (b)-(e) at call 1 and at call 20 a Critic Write (b, c) and a Critic Edit (d, e) of every other path -- the four T2 (d) paths, a
+//       plugin source file and evidence/x.json -- is refused with a typed DISPATCH-BUDGET-* code that is neither the budget
+//       exhaustion code nor the exhausted-allowance text (the cap is not reached, so either would be the wrong refusal). The six
+//       paths of a case run as ONE scenario: the first is call 1 (or 20), the others the calls right after it, all below the cap.
+//   (f) T2 open item (d4): scratch/dispatch/other/critic-notes.md is refused at call 1 and at call 20, as a Write and an Edit.
+//   (g) control: a goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1 stays admitted -- the confinement is the Critic's.
+// ---------------------------------------------------------------------------
+const CKPT3_REFUSED_PATHS = [
+  "scratch/x.md",
+  "evidence/other.json",
+  "scratch/dispatch/critic-abc/other.md",
+  "scratch/critic-notes.md",
+  "plugins/pipeline-core/lib/x.mjs",
+  "evidence/x.json",
+];
+const CKPT3_OTHER_DIR_NOTES_PATH = "scratch/dispatch/other/critic-notes.md";
+
+const ckptEdit = (path) => ckptCriticCall("Edit", { file_path: path, old_string: "a", new_string: "b" });
+const ckptMutate = (tool, path) => (tool === "Edit" ? ckptEdit(path) : ckptWrite(path));
+/** A scenario whose first listed step is call number `call` (call - 1 admitted reads come first; ckptReads(0) would expand to one read). */
+const ckptAt = (call, steps) => ckptScenario([...(call > 1 ? [ckptReads(call - 1)] : []), ...steps]);
+
+/** Why `verdict` is not the typed pre-cap confinement refusal, or null when it is. */
+function ckpt3Problem(verdict) {
+  if (verdict.exitCode === 0) return "admitted (exit 0)";
+  const problems = [];
+  if (verdict.exitCode !== 2) problems.push(`exit ${verdict.exitCode}, expected 2`);
+  if (!/BLOCKED \(guard-dispatch-budget/u.test(verdict.stderr)) problems.push("not a guard-dispatch-budget refusal");
+  if (!/DISPATCH-BUDGET-[A-Z-]+/u.test(verdict.stderr)) problems.push("no typed DISPATCH-BUDGET-* code");
+  if (/DISPATCH-BUDGET-EXHAUSTED/u.test(verdict.stderr)) problems.push("budget exhaustion, but the cap is not reached");
+  if (/closing allowance of 5 tool calls is exhausted/u.test(verdict.stderr)) problems.push("exhausted-allowance text, but the cap is not reached");
+  return problems.length === 0 ? null : problems.join(", ");
+}
+
+/** Every [tool, path] pair, run as consecutive calls starting at call number `call`, must be refused with the typed pre-cap code. */
+function ckpt3AssertConfined(call, pairs) {
+  const reads = call - 1;
+  const { results } = ckptRun(ckptAt(call, pairs.map(([tool, path]) => ckptMutate(tool, path))));
+  assert.ok(results.slice(0, reads).every((verdict) => verdict.exitCode === 0), `the ${reads} working reads before the first write are admitted (the cap is not reached)`);
+  const problems = pairs.flatMap(([tool, path], index) => {
+    const problem = ckpt3Problem(results[reads + index]);
+    return problem === null ? [] : [`${tool} ${path} (call ${call + index}): ${problem}`];
+  });
+  assert.equal(problems.length, 0, `a Critic write outside scratch/dispatch/critic-<id>/critic-notes.md must be refused with a typed DISPATCH-BUDGET-* code before the cap; ${problems.length} of ${pairs.length} were not -- ${problems.join(" | ")}`);
+}
+
+test("CRITIC-CKPT-T3 (a): a Critic Write and a Critic Edit of scratch/dispatch/critic-<id>/critic-notes.md are admitted at call 1 and at call 20 (green today)", () => {
+  for (const call of [1, 20]) {
+    for (const tool of ["Write", "Edit"]) {
+      const reads = call - 1;
+      const { results } = ckptRun(ckptAt(call, [ckptMutate(tool, CKPT_NOTES_PATH)]));
+      assert.ok(results.slice(0, reads).every((verdict) => verdict.exitCode === 0), `the ${reads} working reads before the ${tool} are admitted`);
+      assert.equal(results[reads].exitCode, 0, `a ${tool} of the confined notes file must be admitted at call ${call} -- got: ${ckptWhy(results[reads])}`);
+    }
+  }
+});
+
+for (const [label, tool, call] of [["b", "Write", 1], ["c", "Write", 20], ["d", "Edit", 1], ["e", "Edit", 20]]) {
+  test(`CRITIC-CKPT-T3 (${label}): a Critic ${tool} of any path but its notes file is refused with a typed code at call ${call}, before the cap`, () => {
+    ckpt3AssertConfined(call, CKPT3_REFUSED_PATHS.map((path) => [tool, path]));
+  });
+}
+
+for (const call of [1, 20]) {
+  test(`CRITIC-CKPT-T3 (f): a Critic Write and Edit of scratch/dispatch/other/critic-notes.md are refused with a typed code from call ${call}, before the cap (T2 open item d4)`, () => {
+    ckpt3AssertConfined(call, [["Write", CKPT3_OTHER_DIR_NOTES_PATH], ["Edit", CKPT3_OTHER_DIR_NOTES_PATH]]);
+  });
+}
+
+test("CRITIC-CKPT-T3 (g, control): a goldfish-deep Write to plugins/pipeline-core/lib/x.mjs at call 1 stays admitted (green today)", () => {
+  const steps = [{ op: "guard", input: trgDeepCall("Write", { file_path: "plugins/pipeline-core/lib/x.mjs", content: "export {};" }) }];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  assert.equal(results[0].exitCode, 0, `a goldfish-deep source Write at call 1 must stay admitted -- got: ${results[0].stderr.trim().slice(0, 300)}`);
+});

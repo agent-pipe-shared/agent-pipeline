@@ -2,7 +2,7 @@
 // Guard module "sanctioned-args-scripts" (layer 2), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
 
 import { isPhysicalScratchTarget } from "../physical-scratch-boundary.mjs";
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
@@ -334,6 +334,26 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
   return rebindApply && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
 }
 
+// Review receipts must be existing regular files reached without physical aliases.
+function designReviewReceiptPath(value, root) {
+  if (typeof value !== "string" || value.length === 0
+    || Buffer.byteLength(value, "utf8") > 500 || isAbsolute(value)
+    || /[\\:\x00-\x1f\x7f]/u.test(value) || !value.endsWith(".json")) return false;
+  const parts = value.split("/");
+  if (parts.some(part => part === "" || part === "." || part === "..")) return false;
+  try {
+    let current = realpathSync(root);
+    if (!lstatSync(current).isDirectory()) return false;
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink() || realpathSync(current) !== current
+        || (index < parts.length - 1 ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
 export function sanctionedPipelineStateArgs(args, root) {
   // `inspect` is a pure read of the current working tree and intentionally has no
   // `--root` override; the caller must run it from the repository it is inspecting.
@@ -385,7 +405,28 @@ export function sanctionedPipelineStateArgs(args, root) {
       && args[3] === "--profile" && new Set(["epic", "feature", "mini"]).has(args[4])
       && args.length === 5;
   }
+  if (args[0] === "present-plan") {
+    if (args[1] !== "--by" || !validBy(args[2]) || args[2].startsWith("--")
+      || ![3, 5, 7].includes(args.length)) return false;
+    const receipts = new Set();
+    for (let index = 3; index < args.length; index += 2) {
+      if (args[index] !== "--review-receipt" || receipts.has(args[index + 1])
+        || !designReviewReceiptPath(args[index + 1], root)) return false;
+      receipts.add(args[index + 1]);
+    }
+    return true;
+  }
   if (args[0] === "approve-plan") {
+    if (args[3] === "--design-approval-request") {
+      const requestPath = args[4];
+      if (args.length !== 5 || args[1] !== "--by" || !validBy(args[2])
+        || args[2].startsWith("--")
+        || !/^scratch\/design-approval-request-[a-f0-9]{64}\.json$/u.test(requestPath ?? "")) return false;
+      try {
+        return isPhysicalScratchTarget(requestPath, { rootDir: root })
+          && lstatSync(resolve(root, requestPath)).isFile();
+      } catch { return false; }
+    }
     const attributedLegacy = args[1] === "--by" && validBy(args[2]) && args.length === 3;
     const bootstrapReceipt = args[1] === "--bootstrap-acknowledgement-receipt"
       && /^scratch\/bootstrap-plan-acknowledgement-receipt-[a-f0-9]{64}\.json$/u.test(args[2] ?? "")

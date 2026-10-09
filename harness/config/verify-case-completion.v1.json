@@ -79,6 +79,11 @@
       "disposition": "required"
     },
     {
+      "name": "bootstrap-acknowledgement-mode-tests",
+      "path": "plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "bootstrap-payload-budget-tests",
       "path": "plugins/pipeline-core/lib/bootstrap-payload-budget.test.mjs",
       "disposition": "required"
@@ -434,6 +439,16 @@
       "disposition": "required"
     },
     {
+      "name": "design-approval-command-admission-tests",
+      "path": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-approval-route-tests",
+      "path": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "design-authoring-tests",
       "path": "plugins/pipeline-core/lib/design-authoring.test.mjs",
       "disposition": "required"
@@ -456,6 +471,16 @@
     {
       "name": "design-readiness-course-e2e-tests",
       "path": "plugins/pipeline-core/scripts/design-readiness-course.e2e.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-workflow-candidate-binding-codex-tests",
+      "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding-codex.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "design-workflow-candidate-binding-tests",
+      "path": "plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs",
       "disposition": "required"
     },
     {
@@ -585,6 +610,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "gitleaks-repair-ignore-cli-tests",
+      "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "goldfish-antigravity-host-tests",
       "path": "plugins/pipeline-core/scripts/goldfish-antigravity-host.test.mjs",
       "disposition": "required"
@@ -615,8 +645,18 @@
       "disposition": "required"
     },
     {
+      "name": "governance-scope-win32-acl-tests",
+      "path": "plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "governance-verification-action-tests",
       "path": "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "guard-devplan-design-approval-v7-tests",
+      "path": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
       "disposition": "required"
     },
     {
@@ -676,6 +716,11 @@
       "path": "plugins/pipeline-core/lib/handover-rotation.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "hardened-private-directory-install-tests",
+      "path": "plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "harness-lib-plan-spec-state-v2-tests",
@@ -1039,6 +1084,11 @@
     {
       "name": "onboarding-first-restart-intake-tests",
       "path": "plugins/pipeline-core/lib/onboarding-first-restart-intake.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "onboarding-greenfield-walk-tests",
+      "path": "plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs",
       "disposition": "required"
     },
     {
@@ -1461,6 +1511,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "schema-lite-alternatives-tests",
+      "path": "plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "scripts-pipeline-state-tests",
       "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
       "disposition": "legacy-process-only",
@@ -1500,6 +1555,16 @@
       "path": "harness/scripts/self-verify-selection.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "shared-pool-bounds-tests",
+      "path": "plugins/pipeline-core/lib/shared-pool-bounds.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "shared-pool-occupancy-tests",
+      "path": "plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "slice-queue-cli-tests",

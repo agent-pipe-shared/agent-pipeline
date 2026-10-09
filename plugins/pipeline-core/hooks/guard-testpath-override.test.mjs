@@ -31,6 +31,33 @@
  * below exercise exactly that boundary.
  *
  * Lives in its own file because `guard-testpath.test.mjs` is TP-2 protected.
+ *
+ * TR-L / T84 (specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md section 2 row T84,
+ * section 5 row 9; tranche-2 post-image, new cases OT20-OT23): "one protection decision per file
+ * across hunks; `git restore -- <file>` to its committed bytes admitted, since a revert only
+ * reduces risk [C: bound to HEAD bytes, never an arbitrary ref]". Invariant I4: TR-L makes the
+ * decision consistent, never weaker.
+ *   - OT20 pins the write-lane half at the override layer: a one-time capability spent on one
+ *     hunk leaves every other hunk, and the revert of the admitted hunk, under the SAME refusal
+ *     (same rule, same clearance text, and a route offered again). Expected GREEN today.
+ *   - OT21-OT23 pin the restore half. It is a SHELL-lane decision, so it is driven through the
+ *     library classifier `protectedTestPathShellHit({ command, rules, root })` that
+ *     guard-lifecycle-ready.mjs calls; "admitted" means it returns null. Every case first runs the
+ *     real git command in the fixture, to prove the pinned command really yields the committed
+ *     bytes (otherwise the pin would describe nothing). OT21 and OT23 are RED today (the
+ *     classifier treats every `git restore` of a protected path as a write); OT22 is the
+ *     never-weaker half and is GREEN today. A RED case makes this file exit 1 -- that is the
+ *     evidence for it, not a regression in the other cases, which are judged by their own PASS lines.
+ *   - Assumptions this text does not fix, named instead of invented:
+ *       1. The admitted spellings are the two that provably yield HEAD's bytes: a plain
+ *          `git restore -- <file>` whose index equals HEAD (OT21), and the explicit
+ *          `git restore --source=HEAD --staged --worktree -- <file>` (OT23, the only spelling that
+ *          takes a STAGED file back to committed bytes).
+ *       2. NOT pinned either way: a plain `git restore -- <file>` while the index differs from HEAD
+ *          (it restores the INDEX bytes, which are not committed bytes), `git checkout -- <file>`,
+ *          `--staged` or `--worktree` alone, `--source=<sha of HEAD>`, several pathspecs at once.
+ *       3. "Never an arbitrary ref" is pinned as: `--source=HEAD~1`, `--source HEAD~1`, `-s HEAD~1`,
+ *          `git checkout HEAD~1 -- <file>` stay refused, as does every non-git writer (OT22).
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -58,6 +85,7 @@ import {
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { protectedTestPathShellHit } from "../lib/protected-test-paths.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HOOKS, "guard-testpath.mjs");
@@ -119,6 +147,26 @@ function ask(root, filePath) {
 }
 
 /**
+ * Like ask(), but the tool call carries a HUNK, so the capability's tool-input digest is
+ * hunk-specific (T84: the log saw one hunk admitted and the next refused).
+ */
+function askHunk(root, filePath, hunk) {
+  const result = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath, ...hunk }, cwd: root }),
+    encoding: "utf8",
+    cwd: root,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+  return { blocked: result.status !== 0, status: result.status, stderr: result.stderr ?? "" };
+}
+
+/** The lines of a refusal that name the DECISION (rule, clearance, route class); digests and paths are left out. */
+const DECISION_LINE = /^(BLOCKED \(guard-testpath|Rule ID:|Briefed test-change route:|Clearance:)/u;
+function decisionLines(stderr) {
+  return stderr.split("\n").filter((line) => DECISION_LINE.test(line));
+}
+
+/**
  * Arm a real one-time capability through the whole v2 chain, exactly as the human would:
  * denial -> plan -> prepare-authorization -> authorize --activate.
  *
@@ -150,6 +198,33 @@ function arm(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
   });
   assert.equal(armed.status, "armed");
   return { planSha256: planned.planSha256, requestSha256 };
+}
+
+/** One git call in a fixture; a non-zero exit is a fixture defect, not a verdict. */
+function git(root, ...args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`fixture: git ${args.join(" ")} failed: ${result.stderr}`);
+  return result.stdout;
+}
+
+/** T84: the protected path as a TP-3-style rule, exactly the shape the shell lane receives. */
+const RESTORE_RULES = [{ id: "TP-3", re: /harness\/scripts\/verify\.mjs$/iu, reason: "the single verify-gate script" }];
+const shellHit = (root, command) => protectedTestPathShellHit({ command, rules: RESTORE_RULES, root });
+
+/**
+ * T84: a repository in which HEAD~1 holds "v0\n" and HEAD holds "v1\n" for the protected file, so
+ * both "the committed bytes" and "an arbitrary older ref" exist and differ.
+ */
+function restoreFixture() {
+  const root = fixture({ mode: "chat" });
+  mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+  writeFileSync(join(root, PROTECTED), "v0\n");
+  git(root, "add", "--", PROTECTED);
+  git(root, "commit", "-qm", "v0");
+  writeFileSync(join(root, PROTECTED), "v1\n");
+  git(root, "add", "--", PROTECTED);
+  git(root, "commit", "-qm", "v1");
+  return root;
 }
 
 let passed = 0;
@@ -514,6 +589,80 @@ try {
       assert.equal(blocked, true, `${label}: the guard admitted the edit after a refused arming`);
       assert.doesNotMatch(stderr, /capability consumed/u, `${label}: something was armed anyway`);
     }
+  });
+
+  // ---- T84 (TR-L): one protection decision per file across hunks; the committed-bytes restore ----
+
+  check("OT20 T84 a capability spent on one hunk leaves every other hunk, and the revert, under the same refusal and route", () => {
+    const root = fixture({ mode: "chat" });
+    const hunkA = { old_string: "alpha", new_string: "beta" };
+    const hunkB = { old_string: "gamma", new_string: "delta" };
+    const revertA = { old_string: "beta", new_string: "alpha" };
+    const unarmed = askHunk(root, PROTECTED, hunkA);
+    assert.equal(unarmed.blocked, true, "precondition: refused while unarmed");
+    assert.match(unarmed.stderr, /--request-sha256\s+[a-f0-9]{64}\b/u,
+      "precondition: this fixture offers a route, so 'refused with a route' is observable");
+    const reference = decisionLines(unarmed.stderr);
+    assert.ok(reference.some((line) => line === "Rule ID: TP-3"), `precondition: ${JSON.stringify(reference)}`);
+
+    arm(root, { file_path: PROTECTED, ...hunkA }, TP3_DENIAL);
+    const spent = askHunk(root, PROTECTED, hunkA);
+    assert.equal(spent.blocked, false, `the armed hunk was not admitted (exit ${spent.status}):\n${spent.stderr}`);
+    assert.match(spent.stderr, /capability consumed/u);
+
+    for (const [label, hunk] of [["another hunk of the same file", hunkB], ["the revert of the admitted hunk", revertA], ["the admitted hunk again", hunkA]]) {
+      const after = askHunk(root, PROTECTED, hunk);
+      assert.equal(after.blocked, true, `${label}: admitted without a capability of its own`);
+      assert.doesNotMatch(after.stderr, /capability consumed/u, label);
+      assert.deepEqual(decisionLines(after.stderr), reference, `${label}: the decision for the file moved after one hunk was admitted`);
+      assert.match(after.stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, `${label}: refused without the route the first refusal offered`);
+    }
+  });
+
+  check("OT21 T84 `git restore -- <file>` that puts a protected file back to its committed bytes is admitted by the shell lane", () => {
+    const root = restoreFixture();
+    writeFileSync(join(root, PROTECTED), "v2 (an in-session edit)\n");
+    assert.equal(git(root, "status", "--porcelain", "--", PROTECTED), ` M ${PROTECTED}\n`, "precondition: modified in the tree only, index equals HEAD");
+    const hit = shellHit(root, `git restore -- ${PROTECTED}`);
+    // The pinned command is real and yields HEAD's bytes, so admitting it admits nothing else.
+    git(root, "restore", "--", PROTECTED);
+    assert.equal(readFileSync(join(root, PROTECTED), "utf8"), "v1\n", "the restore did not yield HEAD's bytes, so the premise of this pin is false");
+    assert.equal(hit, null, `T84: the restore to committed bytes was refused (lane=${hit?.lane}, rule=${hit?.rule?.id})`);
+  });
+
+  check("OT22 T84 a restore from any ref but HEAD, and every other writer of the protected path, stays refused", () => {
+    const root = restoreFixture();
+    writeFileSync(join(root, PROTECTED), "v2 (an in-session edit)\n");
+    for (const command of [
+      `git restore --source=HEAD~1 -- ${PROTECTED}`,
+      `git restore --source HEAD~1 -- ${PROTECTED}`,
+      `git restore -s HEAD~1 -- ${PROTECTED}`,
+      `git checkout HEAD~1 -- ${PROTECTED}`,
+      `git rm -- ${PROTECTED}`,
+      `cp scratch/other.mjs ${PROTECTED}`,
+    ]) {
+      const hit = shellHit(root, command);
+      assert.notEqual(hit, null, `an arbitrary-ref restore or a non-restore writer was admitted: ${command}`);
+      assert.equal(hit.rule.id, "TP-3", command);
+    }
+    // The ref used above is genuinely different bytes from HEAD's, so "arbitrary ref" is observable.
+    assert.equal(git(root, "show", `HEAD~1:${PROTECTED}`), "v0\n");
+    assert.equal(git(root, "show", `HEAD:${PROTECTED}`), "v1\n");
+    // Differential: the same fixture admits a restore of an unprotected path, so the refusals above are the rule firing.
+    assert.equal(shellHit(root, "git restore -- scratch/notes.txt"), null);
+  });
+
+  check("OT23 T84 the committed-bytes restore of a STAGED protected file (explicit --source=HEAD, index and tree) is admitted", () => {
+    const root = restoreFixture();
+    writeFileSync(join(root, PROTECTED), "v2 (staged)\n");
+    git(root, "add", "--", PROTECTED);
+    writeFileSync(join(root, PROTECTED), "v3 (staged, then edited again)\n");
+    assert.equal(git(root, "status", "--porcelain", "--", PROTECTED), `MM ${PROTECTED}\n`, "precondition: staged and modified again");
+    const hit = shellHit(root, `git restore --source=HEAD --staged --worktree -- ${PROTECTED}`);
+    git(root, "restore", "--source=HEAD", "--staged", "--worktree", "--", PROTECTED);
+    assert.equal(readFileSync(join(root, PROTECTED), "utf8"), "v1\n", "the restore did not yield HEAD's bytes, so the premise of this pin is false");
+    assert.equal(git(root, "status", "--porcelain", "--", PROTECTED), "", "the restore left the file staged or modified");
+    assert.equal(hit, null, `T84: the committed-bytes restore of a staged file was refused (lane=${hit?.lane}, rule=${hit?.rule?.id})`);
   });
 
   console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed`);

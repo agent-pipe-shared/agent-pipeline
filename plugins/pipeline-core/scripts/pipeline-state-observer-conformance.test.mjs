@@ -19,7 +19,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -59,9 +59,17 @@ function tempRoot(name, { withStateMd = true } = {}) {
   return root;
 }
 
+function fixtureAuthoritySha256(root, relativePath) {
+  const filePath = join(root, relativePath);
+  // Positive fixtures bind actual authority bytes; absent-file fixtures retain
+  // their historical path-based digest without creating an authority file.
+  const bytes = existsSync(filePath) ? readFileSync(filePath) : relativePath;
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function createDeps(root, featureId, planPath, specPath, now = "2026-09-13T12:00:00.000Z") {
-  const planSha256 = createHash("sha256").update(planPath).digest("hex");
-  const specSha256 = createHash("sha256").update(specPath).digest("hex");
+  const planSha256 = fixtureAuthoritySha256(root, planPath);
+  const specSha256 = fixtureAuthoritySha256(root, specPath);
   const profile = {
     schema: "pipeline.po-gate-authority-evidence.v1",
     humanFacing: "en",
@@ -104,8 +112,8 @@ function initContinuity(root, featureId, planPath, specPath, deps) {
     revision: 0,
     runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
     authority: {
-      prd: { path: planPath, sha256: createHash("sha256").update(planPath).digest("hex") },
-      spec: { path: specPath, sha256: createHash("sha256").update(specPath).digest("hex") },
+      prd: { path: planPath, sha256: fixtureAuthoritySha256(root, planPath) },
+      spec: { path: specPath, sha256: fixtureAuthoritySha256(root, specPath) },
       result: null,
     },
     queueHead: {
@@ -418,8 +426,8 @@ test("conformance: close-feature verb (continuity close request) produces state 
         revision: 1,
         runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
         authority: {
-          prd: { path: planPath, sha256: createHash("sha256").update(planPath).digest("hex") },
-          spec: { path: specPath, sha256: createHash("sha256").update(specPath).digest("hex") },
+          prd: { path: planPath, sha256: fixtureAuthoritySha256(root, planPath) },
+          spec: { path: specPath, sha256: fixtureAuthoritySha256(root, specPath) },
           result: { path: resultPath, sha256: resultSha256 },
         },
         queueHead: { packageId: "close-pkg", actionId: "close-action", nextAction: "close", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
@@ -479,8 +487,8 @@ test("conformance: discard-feature produces valid state without SESSION-CLEANUP-
         revision: 2,
         runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
         authority: {
-          prd: { path: planPath, sha256: createHash("sha256").update(planPath).digest("hex") },
-          spec: { path: specPath, sha256: createHash("sha256").update(specPath).digest("hex") },
+          prd: { path: planPath, sha256: fixtureAuthoritySha256(root, planPath) },
+          spec: { path: specPath, sha256: fixtureAuthoritySha256(root, specPath) },
           result: null,
         },
         queueHead: { packageId: "work-pkg", actionId: "implement", nextAction: "dispatch", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },

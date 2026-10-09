@@ -18,11 +18,14 @@ const SEARCH_BOOLEAN = new Set([
   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
   "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
   "--files-without-match", "--no-messages",
+  // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
+  "-o", "--only-matching",
 ]);
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "-t", "--type", "-T", "--type-not", "-e", "--regexp",
   "--max-count", "--max-depth", "-g", "--glob", "-f", "--file",
+  "--max-columns",
 ]);
 // Recursive rg must use its default hidden/ignore policy. Only a basename
 // extension filter is admitted below; path globs and hidden-name selectors
@@ -31,7 +34,7 @@ const FILE_BOOLEAN = new Set(["--no-messages"]);
 const FILE_VALUE = new Set(["-t", "--type", "-T", "--type-not", "--max-depth", "-g", "--glob"]);
 const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
-  "--max-count", "--max-depth",
+  "--max-count", "--max-depth", "--max-columns",
 ]);
 const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
 
@@ -359,6 +362,8 @@ function validateRg(argv, root, windows, additionalRoots = []) {
         const value = args[index + 1];
         if (typeof value !== "string" || value === "" || value.startsWith("-")) return false;
         if (NUMERIC_VALUE.has(arg) && !canonicalInteger(value, 500)) return false;
+        // TR-B-F (T74): rg reads --max-columns 0 as "no limit", so only a positive bound (1..500) is admitted for it.
+        if (arg === "--max-columns" && value === "0") return false;
         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
         if (["-g", "--glob"].includes(arg)) {
           if (globProvided || !isBoundedFilenameFilter(value)) return false;

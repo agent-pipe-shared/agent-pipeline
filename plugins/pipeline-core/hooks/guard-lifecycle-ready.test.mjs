@@ -12043,3 +12043,157 @@ for (const shape of ENVDUMP_SHAPES) {
     });
   }
 }
+
+// ============================================================================================================================
+// TR-B-T (dispatch TR-B-T-20261009; design specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md rows T74 and T77, slice TR-B).
+// RED pins for the read-grammar spellings TR-B will admit, each paired with a per-spelling KEY-OPERAND corpus (the I1-P gap of section 3.2:
+// nothing pinned that a newly admitted spelling routes its operand to isAllowedPassiveReadTarget). Appended at EOF; no existing case touched.
+//
+// Cases (every title starts with "TR-B <row> <spelling>"):
+//   admit pin   the spelling is admitted for an ordinary in-project operand (scratch/notes.md).
+//   refuse pin  the same spelling in the same operand shape with a key or credential operand is refused. A refusal CODE cannot tell an operand
+//               refusal from a spelling refusal here: the first run of this block showed that an admitted spelling given an in-root key operand
+//               reports GUARD-READ-COMMAND-UNSUPPORTED as its first GUARD- code. So the pin is non-vacuous by construction instead; per shape it
+//               requires (1) the unmodified admitted spelling to refuse the key operand, (2) the spelling under test to be ADMITTED for an
+//               ordinary operand of that shape, and (3) the spelling under test to REFUSE the key operand. A spelling still refused for its own
+//               sake fails at (2) and is RED (never vacuously green); after admission the pin is green only if the key operand is still refused.
+//   control     the already-admitted spelling admits an ordinary operand and refuses every corpus operand (the oracle the pins are measured against).
+//   T77 lane    the rg -g filename-filter lane is characterised (GREEN by design, see assumption 4); directory Grep stays refused (GREEN).
+//
+// Assumptions (named, not fixed by the design):
+//   1. Spellings in scope: rg -o / --only-matching, grep -o / --only-matching, rg --max-columns N (T74); quoted alternation for rg ("a|b") and
+//      grep ("a\|b") (named in the T74 row; the `git grep` half belongs to TR-C and is not touched here); rg -g / --glob "*.md" (T77).
+//      The `=` spellings (--max-columns=200) stay refused by the grammar's own rule and are not pinned as admits.
+//   2. Key corpus = the basenames SECRET_BASENAME of lib/passive-read-policy.mjs refuses: po-private.pem, id_ed25519, id_rsa, *.key, *.pem.
+//      Fixtures hold path names only, content "x" (SEC-03: no key material).
+//   3. Operand positions per spelling: first positional, -e pattern + positional (every positional is a file operand, Ruling 106), -f value
+//      (a read file, Ruling 106), second positional, and a directory holding keys (rg). A shape whose unmodified control is not admitted for an
+//      ordinary operand (for example grep -e if the grammar never admits it) is skipped; at least the first-positional shape must be checked for
+//      every key. A directory shape is also skipped when the unmodified control admits the key directory (no directory scope is decided here).
+//   4. The T77 log row does not preserve the refused rg -g spelling. The lane test pins what the grammar does TODAY (guard-command-grammar.mjs
+//      isBoundedFilenameFilter, comment :27-29: path globs and hidden-name selectors stay closed): one bounded basename-extension filter is
+//      admitted, a multi-dot, path, recursive or negated glob is refused with GUARD-READ-COMMAND-UNSUPPORTED. A repeated -g is pinned by QP4-1.
+//      Whether TR-B admits any of those is a decision for the fix dispatch; flipping that case then is deliberate.
+//   5. The state of every case at authoring time is recorded in specs/sprint-alfred-epic/signed-package/tranche-2/TR-B-MANIFEST.md; the run is
+//      the evidence, not this comment.
+// ============================================================================================================================
+const TRB_KEY_OPERANDS = ["vault/po-private.pem", "vault/id_ed25519", "vault/id_rsa", "vault/server.key", "vault/client.pem"];
+
+const TRB_TEMPLATES = {
+  rg: [
+    (o, p, k) => ["rg", "-n", ...o, p, k],
+    (o, p, k) => ["rg", "-n", ...o, "-e", p, k],
+    (o, p, k) => ["rg", "-n", ...o, "-f", k, "scratch/notes.md"],
+    (o, p, k) => ["rg", "-n", ...o, p, "scratch/notes.md", k],
+    (o, p) => ["rg", "-n", ...o, p, "vault"],
+  ],
+  grep: [
+    (o, p, k) => ["grep", "-n", ...o, p, k],
+    (o, p, k) => ["grep", "-n", ...o, p, "scratch/notes.md", k],
+    (o, p, k) => ["grep", "-n", ...o, "-e", p, k],
+  ],
+};
+
+const TRB_SPELLINGS = [
+  { row: "T74", id: "rg -o", tool: "rg", opt: ["-o"], pat: "apply" },
+  { row: "T74", id: "rg --only-matching", tool: "rg", opt: ["--only-matching"], pat: "apply" },
+  { row: "T74", id: "rg --max-columns 200", tool: "rg", opt: ["--max-columns", "200"], pat: "apply" },
+  { row: "T74", id: "grep -o", tool: "grep", opt: ["-o"], pat: "apply" },
+  { row: "T74", id: "grep --only-matching", tool: "grep", opt: ["--only-matching"], pat: "apply" },
+  { row: "T74", id: "rg quoted alternation", tool: "rg", opt: [], pat: '"apply|authorize"' },
+  { row: "T74", id: "grep quoted alternation", tool: "grep", opt: [], pat: '"apply\\|authorize"' },
+  { row: "T77", id: "rg -g", tool: "rg", opt: ["-g", '"*.md"'], pat: "apply" },
+  { row: "T77", id: "rg --glob", tool: "rg", opt: ["--glob", '"*.md"'], pat: "apply" },
+];
+
+function trbFixture() {
+  const path = qp4Fixture();
+  for (const name of ["vault/po-private.pem", "vault/id_ed25519", "vault/server.key", "vault/client.pem"]) {
+    writeFileSync(join(path, ...name.split("/")), "x\n");
+  }
+  return path;
+}
+
+for (const { row, id, tool, opt, pat } of TRB_SPELLINGS) {
+  const admit = [tool, "-n", ...opt, pat, "scratch/notes.md"].join(" ");
+  test(`TR-B ${row} ${id}: admitted for an ordinary in-project operand`, () => {
+    const path = trbFixture();
+    try {
+      qp4WithoutAppDataRoots(() => { qp4Admit(admit, path); });
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+  test(`TR-B ${row} ${id}: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus)`, () => {
+    const path = trbFixture();
+    try {
+      qp4WithoutAppDataRoots(() => {
+        let firstShapeChecked = 0;
+        for (const key of TRB_KEY_OPERANDS) {
+          TRB_TEMPLATES[tool].forEach((template, shape) => {
+            const directory = tool === "rg" && shape === 4;
+            if (directory && key !== TRB_KEY_OPERANDS[0]) return;
+            const build = directory ? ((o, p, k) => [tool, "-n", ...o, p, k]) : template;
+            const ordinary = directory ? "scratch/sub" : "scratch/notes.md";
+            const keyed = directory ? "vault" : key;
+            if (!isReadOnlyDiagnosticCommand(build([], "apply", ordinary).join(" "), path)) return;
+            const control = build([], "apply", keyed).join(" ");
+            if (directory && isReadOnlyDiagnosticCommand(control, path)) return;
+            qp4Refuse(control, path);
+            qp4Admit(build(opt, pat, ordinary).join(" "), path);
+            qp4Refuse(build(opt, pat, keyed).join(" "), path);
+            if (shape === 0) firstShapeChecked += 1;
+          });
+        }
+        assert.equal(firstShapeChecked, TRB_KEY_OPERANDS.length, "the first-positional shape was checked for every corpus operand");
+      });
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+}
+
+test("TR-B T74/T77 control: the already-admitted rg and grep spellings admit an ordinary operand and refuse every key operand", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      qp4Admit("rg -n private scratch/notes.md", path);
+      qp4Admit("grep -n private scratch/notes.md", path);
+      for (const key of TRB_KEY_OPERANDS) {
+        for (const tool of ["rg", "grep"]) qp4Refuse(`${tool} -n private ${key}`, path);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one)", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      qp4Admit('rg -n -g "*.md" apply scratch/notes.md', path);
+      qp4Admit('rg -n apply scratch/notes.md --glob "*.md"', path);
+      for (const glob of ['"*.test.mjs"', '"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
+        qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("TR-B T74 directory Grep: the Grep tool on a directory stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4, repeated here under the row)", () => {
+  const path = trbFixture();
+  try {
+    qp4WithoutAppDataRoots(() => {
+      for (const input of [{ pattern: "apply", path: join(path, "scratch") }, { pattern: "apply", path: join(path, "vault") }]) {
+        const verdict = qp4Verdict({ tool_name: "Grep", tool_input: input }, path);
+        assert.equal(verdict.exitCode, 2, JSON.stringify(input));
+        assert.match(verdict.text, new RegExp(QP4_READ_TARGET), JSON.stringify(input));
+      }
+    });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});

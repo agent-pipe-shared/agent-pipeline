@@ -513,6 +513,17 @@ security-scanner readiness probes. Each is imported by a kernel module and
 executes in that module's process, so it is protected through both the project
 and the installed-plugin anchors for the same reason as the dependencies above.
 
+The approved design-flow closure additionally protects, in kernel-array order,
+`lib/design-approval-binding.mjs`, `lib/design-consistency-check.mjs`,
+`lib/design-review-receipt.mjs`, `lib/rebind-approval.mjs`, and
+`lib/retired-design-codes.mjs`. The imported binding, consistency and receipt
+modules validate the approval subject, current source digests, review chain and
+complete open-finding set. The imported legacy rebind module rechecks bound
+artifacts, candidate ancestry and the existing final approval; the shared
+retirement module supplies typed refusals with no implementation authority.
+These delegates execute with kernel authority, so a maintenance window cannot
+rewrite their decisions while leaving the importing authority reader intact.
+
 This source closure does not establish protected-source delivery, independent
 review, native qualification or activation.
 

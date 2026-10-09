@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { resolveGitCommonDir, subagentIdentity } from "../../hooks/guard-dispatch-budget.mjs";
 import { RUNTIME_AGENT_ID, RUNTIME_AGENT_TYPE, START_PREFLIGHT_SCRIPT } from "./constants.mjs";
 import { verdict } from "./verdict.mjs";
+import { ensureAgentPipelineRoot, ensureHardenedPrivateDirectory } from "../hardened-private-directory.mjs";
 
 /**
  * NVA-BOOTRECEIPT-1: the private, agent-write-refused tree a dispatched subagent's
@@ -16,6 +17,20 @@ import { verdict } from "./verdict.mjs";
  */
 function bootstrapReceiptDir(commonDir) {
   return join(commonDir, "agent-pipeline", "bootstrap-receipt");
+}
+
+/**
+ * WIN-AP-S4 (Ruling 141): the only place this module creates the private tree. The root
+ * `<common>/agent-pipeline` goes through the one hardened entry point (created owner-only, repaired in
+ * place when it is an insecure root owned by the current user, refused otherwise) and the
+ * `bootstrap-receipt` child is created owner-private beneath it. A recursive mkdir handed every segment it
+ * introduced whatever its parent handed down: a world-readable root on POSIX, an inherited foreign-ACE
+ * DACL on native Windows. The `mkdirSyncFn` seam is passed through; a refusal is thrown to the caller's
+ * existing fail-open branch, unchanged.
+ */
+function ensureBootstrapReceiptDir(commonDir, mkdirSyncFn) {
+  const { path: privateRoot } = ensureAgentPipelineRoot(commonDir, { mkdir: mkdirSyncFn });
+  ensureHardenedPrivateDirectory(privateRoot, bootstrapReceiptDir(commonDir), { mkdir: mkdirSyncFn });
 }
 
 // The live PreToolUse payload identifies dispatched callers with agent_id and
@@ -60,7 +75,7 @@ function recordBootstrapObservation(commonDir, record, dependencies) {
   try {
     const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
     const appendFileSyncFn = dependencies.appendFileSyncFn ?? appendFileSync;
-    mkdirSyncFn(bootstrapReceiptDir(commonDir), { recursive: true, mode: 0o700 });
+    ensureBootstrapReceiptDir(commonDir, mkdirSyncFn);
     appendFileSyncFn(bootstrapObservationsPath(commonDir), `${JSON.stringify(record)}\n`, "utf8");
   } catch {
     // best-effort observability only -- never let a logging failure change the guard's verdict
@@ -90,7 +105,7 @@ export function recordBootstrapPreflightReceipt(input, root, dependencies) {
   try {
     const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
     const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
-    mkdirSyncFn(bootstrapReceiptDir(commonDir), { recursive: true, mode: 0o700 });
+    ensureBootstrapReceiptDir(commonDir, mkdirSyncFn);
     const receipt = {
       schema: "pipeline.bootstrap-receipt.v1",
       agentId: identity.agentId,

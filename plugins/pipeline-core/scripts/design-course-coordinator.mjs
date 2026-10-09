@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
 /** Read-only route handoff for the Epic/Feature Advisor -> readiness -> one-approval course. */
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
@@ -11,6 +12,8 @@ const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
 export function inspectDesignCourse({ rootDir, runner = null, read = readFileSync, runGit = execFileSync } = {}) {
+  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
+  return retiredDesignResult(DESIGN_COURSE_RETIRED);
   const root = resolve(rootDir ?? "");
   if (!isAbsolute(rootDir ?? "") || root !== rootDir) fail("DESIGN-COURSE-ROOT-UNSAFE");
   const rootInfo = lstatSync(root);
@@ -63,6 +66,9 @@ export function inspectDesignCourse({ rootDir, runner = null, read = readFileSyn
 }
 
 export function main(argv = process.argv.slice(2), io = console) {
+  const retirement = retiredDesignResult(DESIGN_COURSE_RETIRED);
+  io.log(JSON.stringify(retirement));
+  return retirement;
   let rootDir = null; let runner = null;
   for (let index = 0; index < argv.length; index++) {
     if (argv[index] === "--root" && typeof argv[index + 1] === "string") rootDir = argv[++index];
@@ -76,5 +82,5 @@ export function main(argv = process.argv.slice(2), io = console) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try { main(); } catch (error) { process.stderr.write(`${error.code ?? "DESIGN-COURSE-ERROR"}\n`); process.exitCode = 2; }
+  try { const result = main(); if (!result.ok) process.exitCode = 2; } catch (error) { process.stderr.write(`${error.code ?? "DESIGN-COURSE-ERROR"}\n`); process.exitCode = 2; }
 }

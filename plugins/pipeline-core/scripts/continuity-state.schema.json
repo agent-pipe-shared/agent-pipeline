@@ -285,15 +285,29 @@
       }
     },
     "capacity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy"],
-      "properties": {
-        "concurrencyLimit": { "type": "integer", "minimum": 2, "maximum": 64 },
-        "reservedCriticSlots": { "type": "integer", "enum": [1] },
-        "reservedRecoverySlots": { "type": "integer", "enum": [1] },
-        "fallbackPolicy": { "type": "string", "enum": ["defer", "pre-authorized-mapped-fallback"] }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concurrencyLimit", "allocation", "fallbackPolicy"],
+          "properties": {
+            "concurrencyLimit": { "type": "integer", "minimum": 2, "maximum": 64 },
+            "allocation": { "type": "string", "enum": ["shared"] },
+            "fallbackPolicy": { "type": "string", "enum": ["defer", "pre-authorized-mapped-fallback"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy"],
+          "properties": {
+            "concurrencyLimit": { "type": "integer", "minimum": 2, "maximum": 64 },
+            "reservedCriticSlots": { "type": "integer", "enum": [1] },
+            "reservedRecoverySlots": { "type": "integer", "enum": [1] },
+            "fallbackPolicy": { "type": "string", "enum": ["defer", "pre-authorized-mapped-fallback"] }
+          }
+        }
+      ]
     }
   }
 }

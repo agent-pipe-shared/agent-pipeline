@@ -15,7 +15,8 @@
       "nativeModelAliases": {
         "fable": "fable",
         "opus": "opus",
-        "sonnet": "sonnet-5"
+        "sonnet": "sonnet-5",
+        "haiku": "haiku"
       },
       "bindings": [
         { "targetKey": "elephant_design_design", "kind": "profile-phase", "profileId": "design", "phaseId": "design_phase" },

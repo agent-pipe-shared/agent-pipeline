@@ -57,6 +57,7 @@ const V0_MODELS = new Map([
   // They are exact compatibility spellings, not an open alias namespace.
   ["opus", { kind: "alias", value: "opus" }],
   ["sonnet", { kind: "alias", value: "sonnet" }],
+  ["haiku", { kind: "alias", value: "haiku" }],
 ]);
 const PROFILE_IDS = ["design", "feature", "mini"];
 const PHASE_IDS = ["design_phase", "execution_phase", "advisory"];
@@ -286,7 +287,7 @@ function directRoute(value, path, expectedRunner, diagnostics, { advisory = fals
     return null;
   }
   const allowedSelectors = expectedRunner === "claude"
-    ? [["alias", "fable"], ["alias", "opus"], ["alias", "sonnet"]]
+    ? [["alias", "fable"], ["alias", "opus"], ["alias", "sonnet"], ["alias", "haiku"]]
     : [["model-id", "gpt-5.6-sol"], ["model-id", "gpt-5.6-terra"], ["model-id", "gpt-6-astra"], ["model-id", "gpt-5.6-luna"], ["alias", "terra"]];
   if (!allowedSelectors.some(([kind, selector]) => value.selector.kind === kind && value.selector.value === selector)) {
     diagnostics.push(diagnostic(`${path}.selector`, "unknown_selector", "direct route selector is not registered", "use a supported requested selector"));

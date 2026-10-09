@@ -31,12 +31,14 @@
 //   A3  Only the package, the current PRD and the current Spec bytes are read. The package's
 //       design/input/traceability sources, the readiness receipt, the Advisor failure evidence and the
 //       initial-context file are deliberately ABSENT in every fixture.
+// Complete-envelope fixture correction: integration contract 2026-10-09.
+// Base source SHA256: 9b319aa0b41ad7918caba095d2dd49a80e32867da60273efff78c9f977334249
 //   A4  v8 follows the v5 -> v6 -> v7 bump pattern of plan-spec-state-v2.mjs: CURRENT_APPROVAL_SCHEMA
 //       becomes "pipeline.plan-approval.v8", `validCurrentPlanApproval` validates the v8 shape, and
 //       `validPreviousCurrentPlanApproval` takes over a v7 record. The v8 key set is the v7 key set
 //       minus designAdvisorAdmissionSha256, designWorkflowPackagePath, designWorkflowPackageSha256 and
-//       designWorkflowApproval, plus `designApproval` (a non-null object for the epic/feature profile
-//       under test; the mini profile is not pinned here).
+//       designWorkflowApproval, plus `designApprovalBinding` and `designApproval`. Both are null for mini;
+//       feature/epic carries a valid U3 binding and its matching approval digest.
 //   A5  designApproval is the closed key set { schema: "pipeline.design-approval.v1", mode, approvedBy,
 //       approvedAt, bindingSha256, intentSha256, proofSha256, proof }, mode in { "signature", "chat" }.
 //       Signature: intentSha256, proofSha256 and proof non-null, proof in the pipeline.po-approval-proof.v1
@@ -46,7 +48,7 @@
 //
 // NOT PINNED HERE (owned by other slices): the signature check of the re-read against the trust anchor
 // (note C2 item 5; slice F2b and the T0c boundary cases), the boundary and its mode check (T0c), the
-// lifecycle verbs and retired entry points (T0b), the mini profile record, the approvedBy equality of a
+// lifecycle verbs and retired entry points (T0b), the approvedBy equality of a
 // chat record with the plan approval's (boundary, T0c).
 //
 // VACUITY GUARD: every "invalid" case below starts with a positive control (the same record without the
@@ -64,7 +66,11 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const completionCases = [];
+const test = (name, run) => completionCases.push({
+  id: `ADR0085-ROUTE-${String(completionCases.length + 1).padStart(3, "0")}`, name, run,
+});
 
 // ---------------------------------------------------------------------------
 // Dynamic imports: a missing module or export fails ONLY the case that needs it.
@@ -426,7 +432,23 @@ function chatRecord() {
   };
 }
 
+function v8Binding() {
+  return {
+    schema: "pipeline.design-approval-binding.v1",
+    featureId: FEATURE,
+    sources: {
+      prd: { path: PRD_PATH, sha256: authority().planSha256 },
+      spec: { path: SPEC_PATH, sha256: authority().specSha256 },
+      companions: [],
+    },
+    reviewReceipts: [{ path: "specs/feat-x/review/design-review-1.json", sha256: digest("review-receipt"), round: 1 }],
+    verdict: "pass",
+    openFindingIds: [],
+  };
+}
+
 function v8Approval(designApproval) {
+  const designApprovalBinding = designApproval === null ? null : v8Binding();
   return {
     schema: SCHEMA_V8,
     approvedBy: "po",
@@ -435,7 +457,8 @@ function v8Approval(designApproval) {
     profileSha256: digest("profile"),
     poGateAuthority: authority(),
     priorInvalidationSha256: null,
-    designApproval,
+    designApprovalBinding,
+    designApproval: designApproval === null ? null : { ...designApproval, bindingSha256: sha256(canon(designApprovalBinding)) },
   };
 }
 
@@ -969,3 +992,70 @@ test("FINAL-READER refuses Advisor-exception attribution drift after its valid p
     assertNoCandidateReads();
   });
 });
+
+// Complete stored envelope: every denial retains the valid positive control.
+test("V12 v8: the fixture binding independently validates through U3 and its canonical digest matches", async () => {
+  const validateBinding = await loadExport("./design-approval-binding.mjs", "validateDesignApprovalBinding", "U3");
+  for (const approval of [signatureRecord(), chatRecord()]) {
+    const record = v8Approval(approval);
+    const checked = validateBinding(record.designApprovalBinding);
+    assert.equal(checked.ok, true, "fixture binding must be accepted by real U3");
+    assert.equal(checked.bindingSha256, sha256(canon(record.designApprovalBinding)));
+    assert.equal(record.designApproval.bindingSha256, checked.bindingSha256);
+  }
+});
+
+test("V13 v8: a missing, null or malformed feature binding is refused", async () => {
+  const validate = await loadV8Validator();
+  assertVariantsInvalid(validate, v8Approval(chatRecord()), [
+    ["binding key missing", r => { delete r.designApprovalBinding; }],
+    ["binding null beside approval", r => { r.designApprovalBinding = null; }],
+    ["binding array", r => { r.designApprovalBinding = []; }],
+    ["binding wrong schema", r => { r.designApprovalBinding.schema = "pipeline.design-approval-binding.v2"; }],
+    ["binding malformed source digest", r => { r.designApprovalBinding.sources.prd.sha256 = "not-a-digest"; }],
+  ]);
+});
+
+test("V14 v8: binding and nested source and receipt key sets are closed", async () => {
+  const validate = await loadV8Validator();
+  assertVariantsInvalid(validate, v8Approval(signatureRecord()), [
+    ["binding extra key", r => { r.designApprovalBinding.unexpected = true; }],
+    ["binding required key missing", r => { delete r.designApprovalBinding.reviewReceipts; }],
+    ["source extra key", r => { r.designApprovalBinding.sources.prd.unexpected = true; }],
+    ["receipt extra key", r => { r.designApprovalBinding.reviewReceipts[0].unexpected = true; }],
+    ["plan approval extra key", r => { r.unexpected = true; }],
+  ]);
+});
+
+test("V15 v8: a shape-valid binding with a mismatched approval digest is refused in both modes", async () => {
+  const validate = await loadV8Validator();
+  const validateBinding = await loadExport("./design-approval-binding.mjs", "validateDesignApprovalBinding", "U3");
+  for (const approval of [signatureRecord(), chatRecord()]) {
+    const control = v8Approval(approval);
+    assertV8Valid(validate, control, "digest control");
+    const drifted = structuredClone(control);
+    drifted.designApprovalBinding.reviewReceipts[0].sha256 = digest("different-review-receipt");
+    const checked = validateBinding(drifted.designApprovalBinding);
+    assert.equal(checked.ok, true, "drift keeps U3 binding shape valid");
+    assert.notEqual(checked.bindingSha256, drifted.designApproval.bindingSha256);
+    assert.equal(validate(drifted), false, "shape-valid stored binding digest mismatch must be refused");
+    assertVariantsInvalid(validate, control, [
+      ["approval digest changed", r => { r.designApproval.bindingSha256 = digest("different-binding"); }],
+    ]);
+  }
+});
+
+test("V16 v8: mini accepts both design keys null and refuses either half-null or missing key", async () => {
+  const validate = await loadV8Validator();
+  const mini = v8Approval(null);
+  assert.equal(mini.designApprovalBinding, null);
+  assert.equal(mini.designApproval, null);
+  assertVariantsInvalid(validate, mini, [
+    ["approval present beside null binding", r => { r.designApproval = v8Approval(chatRecord()).designApproval; }],
+    ["binding present beside null approval", r => { r.designApprovalBinding = v8Binding(); }],
+    ["null binding key missing", r => { delete r.designApprovalBinding; }],
+    ["null approval key missing", r => { delete r.designApproval; }],
+  ]);
+});
+
+registerTestCaseCompletion({ cases: completionCases, fd: 3, maxBytes: 65536 });

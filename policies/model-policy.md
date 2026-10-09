@@ -36,7 +36,7 @@ The pipeline distinguishes two config layers: **orchestrator/advisor routing per
 |---------------------|-------------------------------------|------------------------------|-----------------|
 | `worktypes.<profile>.{design_phase,execution_phase}` | Elephant (Orchestrator), routed per session profile & phase | opus (`design` profile, both phases) / opus→sonnet (`feature` profile: opus design phase, sonnet execution phase, revised 2026-07-10) / sonnet (`mini` profile, both phases) | high — see `pipeline.user.yaml` → `worktypes` for the full per-profile/phase matrix (revised 2026-07-10, was high–max) |
 | `models.implement`  | Goldfish (Implementor)             | sonnet                       | medium          |
-| `models.mechanic`   | Goldfish (Mechanic)                | sonnet                       | low             |
+| `models.mechanic`   | Goldfish (Mechanic)                | haiku                        | medium          |
 | `models.deep`       | Goldfish (Deep, MP-27)             | sonnet                       | xhigh           |
 | `models.review`     | Critic                             | sonnet                       | max             |
 | `worktypes.<profile>.advisor` | optional second-opinion advisor, per session profile | `off` (`design` profile) / opus (`feature`/`mini` profiles, fixed pairing — `feature` advisor changed from `off` to `opus` 2026-07-10) | — |
@@ -58,14 +58,14 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
 
 ### MP-02 — Goldfish: model floor = Mechanic-tier model, effort per MP-27
 
-- **Must:** Goldfish never run below the configured Mechanic-tier model for repository writing (hard model floor — no downgrade to a smaller/cheaper model class, even for trivial edits). Pure read-only fetch/extraction is governed separately by MP-25. Effort allocation follows the 3-tier matrix in MP-27.
+- **Must:** Goldfish never run below the configured Mechanic-tier model for repository writing (hard model floor — the Mechanic tier is Haiku since the 2026-10-09 route change, Rulings 158/161; no downgrade below it, even for trivial edits). Pure read-only fetch/extraction is governed separately by MP-25. Effort allocation follows the 3-tier matrix in MP-27.
 - **Implementation:** Subagent frontmatter sets model + effort explicitly per subagent (plugin level) — never implicit inheritance from the main model (related trap: MP-04, global model-override env var).
 - **How to check:** Frontmatter of the versioned plugin agents shows the model floor; telemetry line per Goldfish block.
 
 ### MP-27 — Goldfish 3-tier effort matrix
 
 - **Must:** Goldfish dispatches run on one of three dedicated subagents, each with a fixed effort (frontmatter, not prose):
-  - **`goldfish-mechanic`** — effort **`low`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Pending route change (PO decision 2026-10-09, Ruling 158):** this tier moves to Haiku at effort `medium`. NOT yet installed: the mechanic route is pinned in `plugins/pipeline-core/config/routing-authority.json` (checked against the agent frontmatter by `check-routing-projections.mjs`) and `runner-mappings.json` has no Haiku alias yet (follow-up slice MECH-HAIKU, tracked in `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`). Until then the agent stays on Sonnet at `low`, and a mechanic dispatch that wants Haiku passes it as the tool-layer `model` parameter.
+  - **`goldfish-mechanic`** — effort **`medium`**: mechanical, uniform, pure plan execution with no in-task design decisions, fully specified briefing. **Installed route (PO decision 2026-10-09, Rulings 158/161):** this tier runs on Haiku at effort `medium`. The route is pinned in `plugins/pipeline-core/config/routing-authority.json` (checked against the agent frontmatter by `check-routing-projections.mjs`) and `runner-mappings.json` maps the Claude mechanic to Haiku (slice MECH-HAIKU, tracked in `backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md`).
   - **`goldfish-implementor`** — effort **`medium`** — the default for clearly briefed implementation tasks.
   - **`goldfish-deep`** — effort **`xhigh`**: test-suite/verify authorship, guardrail/hook/canon code, tasks with genuine in-task design latitude, senior-class work.
   Planning/design and analysis synthesis stay unchanged on the Design tier at `xhigh`+ (MP-01/MP-22/MP-23 untouched).
@@ -85,7 +85,7 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
 
 ### MP-03 — MUST NOT: models below the Mechanic tier for implementation/judgment/review
 
-- **Must not (hard):** No model below the Mechanic-tier class for implementation, repository writing, judgment, or review work in the pipeline — not as Goldfish, not as Critic, not as a workflow stage that produces or evaluates artifacts. The three read-only/runtime exceptions below are exhaustive.
+- **Must not (hard):** No model below the Mechanic-tier class (Haiku at effort `medium`, MP-27) for implementation, repository writing, judgment, or review work in the pipeline — not as Goldfish, not as Critic, not as a workflow stage that produces or evaluates artifacts. The three read-only/runtime exceptions below are exhaustive.
 - **Why:** Quality risk creates iteration loops that eat nominal savings. A smaller model does not gain writing authority merely because a diff is mechanical or narrowly briefed.
 - **Exception (a) — built-in runtime mechanisms:** Excepted are built-in agent-runtime mechanisms that internally use a smaller model class (e.g. a `/goal` evaluator) — that isn't a role assignment.
 - **Exception (b) — harness-internal read-only summarizer:** WebFetch/WebSearch summarization may run internally on the smallest model class — sanctioned-but-noted, as long as the output stays a pure fetch summary (no judgment, no artifact creation). Telemetry may report the model without that counting as a violation.
@@ -117,7 +117,7 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
 
 ### MP-06 — De-escalation within the matrix
 
-- **Must:** De-escalation means lower effort, never a lower writing tier/model. For mechanical/uniform Goldfish tasks, the `goldfish-mechanic` subagent (effort `low`, MP-27) remains the target. MP-25 permits a separate read-only fetch/extraction class; Critic and Design-tier floors are never undercut.
+- **Must:** De-escalation means lower effort, never a lower writing tier/model. For mechanical/uniform Goldfish tasks, the `goldfish-mechanic` subagent (Haiku at effort `medium`, MP-27) remains the target. MP-25 permits a separate read-only fetch/extraction class; Critic and Design-tier floors are never undercut.
 - **Why:** Effort is the ordinary savings lever for writing. Caution: the effort scale is calibrated PER MODEL — "high" on a smaller model ≠ "high" on a larger one; don't compare effort levels across models.
 - **How to check:** telemetry; frontmatter defaults in the plugin.
 

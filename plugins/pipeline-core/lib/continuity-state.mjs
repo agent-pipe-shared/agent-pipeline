@@ -48,8 +48,11 @@ const DECISION_KEYS = new Set([
   "idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId",
   "preSelectionRevision", "selectedRevision", "dispatchableRevision", "phase",
 ]);
-const CAPACITY_KEYS = new Set([
+const LEGACY_CAPACITY_KEYS = new Set([
   "concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy",
+]);
+const SHARED_CAPACITY_KEYS = new Set([
+  "concurrencyLimit", "allocation", "fallbackPolicy",
 ]);
 const CLOSE_TRANSITION_KEYS = new Set([
   "intentId", "expectedRevision", "authorityDigests", "graphSha256",
@@ -329,13 +332,29 @@ function validDecisionTxn(value, revision) {
     && value.phase === "state-applied");
 }
 
-function validCapacity(value) {
-  return exactKeys(value, CAPACITY_KEYS)
-    && safeInteger(value.concurrencyLimit, 2, 64)
+export function normalizeContinuityCapacity(value) {
+  const legacy = exactKeys(value, LEGACY_CAPACITY_KEYS)
     && value.reservedCriticSlots === 1
-    && value.reservedRecoverySlots === 1
-    && value.concurrencyLimit >= value.reservedCriticSlots + value.reservedRecoverySlots
-    && FALLBACK_POLICIES.has(value.fallbackPolicy);
+    && value.reservedRecoverySlots === 1;
+  const shared = exactKeys(value, SHARED_CAPACITY_KEYS)
+    && value.allocation === "shared";
+  if ((!legacy && !shared)
+    || !safeInteger(value.concurrencyLimit, 2, 64)
+    || !FALLBACK_POLICIES.has(value.fallbackPolicy)) {
+    return { ok: false, code: "CS-CAPACITY-SHAPE" };
+  }
+  return {
+    ok: true,
+    capacity: {
+      concurrencyLimit: value.concurrencyLimit,
+      allocation: "shared",
+      fallbackPolicy: value.fallbackPolicy,
+    },
+  };
+}
+
+function validCapacity(value) {
+  return normalizeContinuityCapacity(value).ok;
 }
 
 function validAuthorityDigests(value) {

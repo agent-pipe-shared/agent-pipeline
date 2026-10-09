@@ -957,16 +957,16 @@ const Q12_PLAIN_TABLE = [
 ];
 recordQ12Table("Q12-PLAIN", false, Q12_PLAIN_TABLE);
 
-// Option-B accepted false positives, pinned as candidates ON PURPOSE. Neither command is a push. Under the decided
-// fail-closed marker rule a dollar sign in any position after a git word makes the command a push candidate, so both
-// are routed to the push gate for nothing. This is the accepted Codex-route cost of Q12 option B (the alternative,
-// classifying what an expansion produces, is the deny-list that never converged). A later change that "fixes" these
-// by exempting expansions reopens the bypass class and must be a new PO decision, not a test edit.
+// GREP-PUSH-F reconciles only the quoted date substitution's expectation. Historical
+// case identifiers and fixture descriptions are retained for comparison; the unquoted
+// revision substitution remains a candidate, as do every real push and ambiguous case.
 const Q12_ACCEPTED_FALSE_POSITIVE_TABLE = [
   ['git commit -m "$(date)"', "ACCEPTED false positive: command substitution inside a double-quoted commit message"],
   ["git diff $(git merge-base HEAD main)", "ACCEPTED false positive: command substitution as a revision argument"],
 ];
-recordQ12Table("Q12-ACCEPTED-FP", true, Q12_ACCEPTED_FALSE_POSITIVE_TABLE);
+for (const row of Q12_ACCEPTED_FALSE_POSITIVE_TABLE) {
+  recordQ12Table("Q12-ACCEPTED-FP", row[0] !== 'git commit -m "$(date)"', [row]);
+}
 
 // ---- commandIsGitPush: the heredoc narrowing, both sides (PO decision X, Q12-T3) ----
 // Test-only pin. Contract: PO decision X (2026-10-07), recorded in specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md
@@ -1331,6 +1331,45 @@ for (const [cmd, why] of GITCLS_T2_NEGATIVE_TABLE) {
   const out = commandIsGitPush(cmd);
   record(`GITCLS-T2: ${JSON.stringify(cmd)} is not a push  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
 }
+
+// ---- GREP-PINS-R2: independent quoted non-push acceptance and fail-closed controls ----
+// These strings are classifier inputs only; no shell command or substitution is executed.
+const GREP_PINS_R2_ACCEPT_TABLE = [
+  ["git grep '(alpha|beta)' -- a.mjs", "single-quoted regex parentheses and pipe are data"],
+  ['git grep "(alpha|beta)" -- a.mjs', "double-quoted regex parentheses and pipe are data"],
+  ["git log --grep='cost $5 {item} (note) `literal`'", "single-quoted marker characters are inert"],
+  ["git show 'HEAD:dir/(item){x}$file'", "quoted revision path markers are data"],
+  ["git diff -- 'dir/(item){x}$file'", "quoted pathspec markers are data"],
+  ["git status -- 'dir/(item){x}$file'", "quoted status pathspec markers are data"],
+  ["git commit -m 'cost $5 {item} (note) `literal`'", "single-quoted commit markers are inert"],
+  ['git log --grep="$(date)"', "plain non-push substitution in double quotes"],
+  ['git grep "$(git status)" -- a.mjs', "recursive plain read substitution"],
+  ['git show "$(git log)"', "recursive log substitution"],
+  ['git diff -- "$NAME"', "plain variable in double quotes"],
+  ['git status -- "(dir){x}"', "double-quoted balanced parentheses and brace"],
+];
+recordQ12Table("GREP-PINS-R2: ACCEPT", false, GREP_PINS_R2_ACCEPT_TABLE);
+const GREP_PINS_R2_DENY_TABLE = [
+  ["git push origin main", "literal real push stays a candidate"],
+  ["git push 'origin' 'main'", "quoted real push operands stay candidates"],
+  ['git commit -m "$(git push origin main)"', "real push inside substitution stays a candidate"],
+  ['git grep "`git push origin main`"', "push in backtick substitution stays a candidate"],
+  ['git status -- "${NAME:-push}"', "parameter operator remains ambiguous"],
+  ['git grep "$(date; git push origin main)"', "composed substitution remains a candidate"],
+  ["git grep (alpha)", "unquoted parentheses remain ambiguous"],
+  ["git log --grep={alpha,beta}", "unquoted brace expansion remains ambiguous"],
+  ["git grep '$NAME' && git push origin main", "composition cannot gain the exemption"],
+  ["git grep '(alpha)' > result.txt", "redirect cannot gain the exemption"],
+  ["git grep '(alpha)' | cat", "pipeline cannot gain the exemption"],
+  ["git grep '(alpha)' # comment", "comment cannot gain the exemption"],
+  ["git grep '(alpha)'\ngit push origin main", "multiple lines cannot gain the exemption"],
+  ["git -c alias.x=status x '(alpha)'", "global option and alias remain ambiguous"],
+  ["git remote '(alpha)'", "push-capable subcommand is excluded"],
+  ["git config '(alpha)'", "configuration subcommand is excluded"],
+  ["git grep '(alpha)", "unterminated quote remains ambiguous"],
+  ["bash -c 'git grep (alpha)'", "nested shell remains ambiguous"],
+];
+recordQ12Table("GREP-PINS-R2: DENY", true, GREP_PINS_R2_DENY_TABLE);
 
 // ---- Summary ------------------------------------------------------------------------------
 const total = pass + failures.length;
