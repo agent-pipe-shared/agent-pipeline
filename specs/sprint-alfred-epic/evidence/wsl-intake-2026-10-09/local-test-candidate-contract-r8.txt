@@ -1,0 +1,28 @@
+command: node scratch/local-contract-r8-20261009.mjs validate
+label: ALFRED-LOCAL-CONTRACT-R8-20261009
+exitCode: 0
+head: 00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e
+tree: 1901cfee78951cc9f07d3799fd2dc61f7c439b79
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.local-candidate-validation.v1",
+  "passed": true,
+  "r7Sha256": "00575e9fea7bba9a9500f7d5ed96ea9e6748176108df7bd28a18ae1baa73cd4c",
+  "r8Sha256": "e9211b57b77ba3fc0e5cc838d0c05fbd2800705e764f0366f7d3a24c62f3abb9",
+  "contractSha256": "eac856e07dd1a91014f124c722be0389e688adeec6f5236dce732c0773b49fa5",
+  "markdownSha256": "539a64118d8c5a2e1f35e869e848464a3296ff67cf20c93e600f5d4115de2cc4",
+  "sourceInputsMatched": 3718,
+  "packageInputsMatched": 92,
+  "targetsMatched": 71,
+  "oldTargetsRetained": 69,
+  "effectiveActualGreen": 24,
+  "fd3FullyMatched": 9,
+  "observerRegistered": false,
+  "sourceUnchanged": true,
+  "signingReady": false,
+  "independentReview": "deferred-local-candidate; release pending",
+  "poAcceptance": "open"
+}
+
+--- stderr ---

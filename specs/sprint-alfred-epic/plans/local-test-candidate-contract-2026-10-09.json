@@ -1,0 +1,90 @@
+{
+  "schema": "alfred.frozen-local-candidate-contract.v1",
+  "date": "2026-10-09",
+  "status": "local-test-assembly-ready",
+  "signingReady": false,
+  "proposalBaseCommit": "00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e",
+  "qualityBaseCommit": null,
+  "assembly": {
+    "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r8.json",
+    "sha256": "e9211b57b77ba3fc0e5cc838d0c05fbd2800705e764f0366f7d3a24c62f3abb9",
+    "mirror": "scratch/alfred-candidate-assembly-20261009-r7/b",
+    "targets": 71,
+    "oldTargetsRetained": 69
+  },
+  "provenance": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r7.json",
+      "sha256": "00575e9fea7bba9a9500f7d5ed96ea9e6748176108df7bd28a18ae1baa73cd4c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r7.txt",
+      "sha256": "f099ad3c1e3656513dc4e2686dbd0753988251c406ca6ac015126296db665458"
+    },
+    {
+      "path": "scratch/alfred-r7-focused-push-results.json",
+      "sha256": "c066cc3cbc0ee5aa3060695372c56c1d74042a85caaf1e1a92534562562886a1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-focused-push-r7.txt",
+      "sha256": "680f92dbd9cde4c362d08bbf05d343cae3c47971c3dc45a66f6c739574e49a61"
+    }
+  ],
+  "effectiveTests": {
+    "actualGreen": 24,
+    "r7Green": 23,
+    "focusedPushGreen": 1,
+    "all24Rerun": false,
+    "fd3FullyMatched": 9
+  },
+  "historicalFindings": [
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations",
+      "historical": true,
+      "disposition": "deferred-local-candidate"
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-push.test.mjs",
+      "reason": "Behavior setup/time bound failed",
+      "historical": true,
+      "disposition": "resolved-by-actual-focused-retry"
+    }
+  ],
+  "policy": {
+    "authority": "Explicit PO instruction on 2026-10-09: local candidate after green individual tests; postpone unimportant tests and full checks.",
+    "supersedes": "Only pre-local-candidate timing in design-flow-integration-contract-2026-10-09.md; accepted behavior and release gates remain binding.",
+    "deferred": [
+      "observer Verify registration",
+      "batched independent Critic",
+      "full Verify",
+      "broad AC coverage",
+      "Release Reader",
+      "native Windows",
+      "native hook checks",
+      "ignored Windows dispatch corpus debt"
+    ],
+    "independentReview": "deferred-local-candidate; release pending",
+    "poAcceptance": "open"
+  },
+  "functionalScope": "All partially included functional features and the complete accepted new design approval, reopen and security routes remain included; all 71 exact R7 targets, mapping operations, pre/postimage hashes and maintained patch inputs are preserved.",
+  "qualityRoute": {
+    "status": "pending-exact-package",
+    "schema": "pipeline.signed-quality-package.v1",
+    "baseCommit": "Use actual committed metadata-only proposal HEAD when building the exact quality intent; no future commit is asserted.",
+    "signing": "PO signs the complete digest-bound exact package after proposals are committed.",
+    "functionalImport": "Verify, apply and authorize the exact signed-quality package; bind actual functional import commit, all paths, postimages and modes.",
+    "stampPattern": "0.7.0+codex.<UTC14>.<actualFunctionalImport8>",
+    "stamp": "Exact matching Codex and Claude source stamp only after actual functional import; UTC14 and commit suffix measured then, not guessed.",
+    "installation": "Human installs complete stamped source; verify actual Codex and Claude registry identities and full installed/source byte equality.",
+    "readyCondition": "Exact source proof, actual source stamp and installed readback required before signingReady can become true."
+  },
+  "qualification": {
+    "oldInventoryBaseline": "unqualified; later exact candidate bind pending",
+    "oldCriticMetadata": "unqualified; later exact candidate bind pending",
+    "nativeAuthorship": "unavailable; no qualifying native author record fabricated",
+    "release": "pending",
+    "poAcceptance": "open"
+  },
+  "validationEvidence": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/local-test-candidate-contract-r8.txt"
+}

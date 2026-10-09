@@ -1,0 +1,403 @@
+command: node scratch/observer-byte-fixture-reconciliation-r2.mjs
+label: ALFRED-OBSERVER-FIXTURE-R2-20261009
+exitCode: 0
+head: 00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e
+tree: 1901cfee78951cc9f07d3799fd2dc61f7c439b79
+dirty: true
+--- stdout ---
+{"stage":"graph","mirror":"scratch/alfred-candidate-assembly-20261009-r6/b","clone":"scratch/observer-byte-fixture-reconciliation-r2-graph","assemblySha256":"376eccef9dd63568ed7febfdbf9678df3f3e3487e641a6904651a65434ffc56a","fileCount":3882,"inventorySha256":"14f2e87db04ac36881db5382ffbe7511298c43f50a371afea93d5f0d69397931","rootTestSha256Before":"00c722ea174ee39bd3dac7326c3fd47f4c038588d376344273b615c2de8b65e4"}
+{"stage":"baseline-original-R6","command":"node --test-reporter=tap plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs","cwd":"scratch/observer-byte-fixture-reconciliation-r2-graph","fd3":"pipe","env":{"PIPELINE_VERIFY_CASE_COMPLETION_FD":"3"}}
+--- baseline-original-R6 stdout ---
+Feature "feature-continuity-init" set. Plan path: specs/feature-continuity-init/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Feature "feature-set" set. Plan path: specs/feature-set/prd.md. planApproved=false, phase="design".
+Feature "feature-submit" set. Plan path: specs/feature-submit/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Feature "feature-cancel-submission" set. Plan path: specs/feature-cancel-submission/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Feature "feature-approve" set. Plan path: specs/feature-approve/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-approve/prd.md(ae7b50e471a7...)+specs/feature-approve/spec.md(2c005a0f1dc3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 63365c5fb09c....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-approve/prd.md(ae7b50e471a7...)+specs/feature-approve/spec.md(2c005a0f1dc3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Feature "feature-reopen" set. Plan path: specs/feature-reopen/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-reopen/prd.md(a08f1dad3ac1...)+specs/feature-reopen/spec.md(e04e4a2a34bd...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission c406ea9cd0db....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-reopen/prd.md(a08f1dad3ac1...)+specs/feature-reopen/spec.md(e04e4a2a34bd...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Design reopened by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="draft".
+Feature "feature-revoke" set. Plan path: specs/feature-revoke/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-revoke/prd.md(6fdbfed0e690...)+specs/feature-revoke/spec.md(7ad447f48aaa...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission d48de74be109....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-revoke/prd.md(6fdbfed0e690...)+specs/feature-revoke/spec.md(7ad447f48aaa...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan approval revoked by "PO" on 2026-09-13T12:00:00.000Z.
+Feature "feature-phase" set. Plan path: specs/feature-phase/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-phase/prd.md(9caa613636d0...)+specs/feature-phase/spec.md(3d2721235032...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission f3c0c0fa0ca9....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-phase/prd.md(9caa613636d0...)+specs/feature-phase/spec.md(3d2721235032...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Feature "feature-close-design" set. Plan path: specs/feature-close-design/prd.md. planApproved=false, phase="design".
+Feature "feature-close-design" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "feature-close-continuity" set. Plan path: specs/feature-close-continuity/prd.md. planApproved=false, phase="design".
+Feature "feature-close-continuity" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "feature-discard" set. Plan path: specs/feature-discard/prd.md. planApproved=false, phase="design".
+Feature "feature-discard" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: abandoned prior to implementation per product direction. activeFeature removed, planApproved=false.
+Feature "feature-recovered" set. Plan path: specs/feature-recovered/prd.md. planApproved=false, phase="design".
+Feature "first-feature" set. Plan path: specs/first-feature/prd.md. planApproved=false, phase="design".
+Feature "first-feature" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "second-feature" set. Plan path: specs/second-feature/prd.md. planApproved=false, phase="design".
+Feature "second-feature" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: discarded after earlier close. activeFeature removed, planApproved=false.
+Feature "feature-e2e" set. Plan path: specs/feature-e2e/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-e2e/prd.md(01b4efd79626...)+specs/feature-e2e/spec.md(9d1711d9c9e8...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 69d56386fba7....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-e2e/prd.md(01b4efd79626...)+specs/feature-e2e/spec.md(9d1711d9c9e8...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Feature "feature-e2e" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: pivoting direction in implementation. activeFeature removed, planApproved=false.
+Feature "feature-e2e-followup" set. Plan path: specs/feature-e2e-followup/prd.md. planApproved=false, phase="design".
+Feature "feature-e2e-followup" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T13:00:00.000Z). activeFeature removed, planApproved=false.
+TAP version 13
+# Subtest: conformance: init (kickoff initialization) produces state accepted by both observers
+ok 1 - conformance: init (kickoff initialization) produces state accepted by both observers
+  ---
+  duration_ms: 50.187685
+  type: 'test'
+  ...
+# Subtest: conformance: continuity-init verb produces state accepted by both observers
+ok 2 - conformance: continuity-init verb produces state accepted by both observers
+  ---
+  duration_ms: 41.002936
+  type: 'test'
+  ...
+# Subtest: conformance: set-feature verb produces state accepted by both observers
+ok 3 - conformance: set-feature verb produces state accepted by both observers
+  ---
+  duration_ms: 27.772289
+  type: 'test'
+  ...
+# Subtest: conformance: submit-plan verb produces state accepted by both observers
+not ok 4 - conformance: submit-plan verb produces state accepted by both observers
+  ---
+  duration_ms: 33.656544
+  type: 'test'
+  location: '<repo-root>/scratch/observer-byte-fixture-reconciliation-r2-graph/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs:215:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/observer-byte-fixture-reconciliation-r2-graph/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs:230:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers
+not ok 5 - conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers
+  ---
+  duration_ms: 34.020847
+  type: 'test'
+  location: '<repo-root>/scratch/observer-byte-fixture-reconciliation-r2-graph/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs:241:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/observer-byte-fixture-reconciliation-r2-graph/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs:253:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: conformance: approve-plan verb produces state accepted by both observers
+ok 6 - conformance: approve-plan verb produces state accepted by both observers
+  ---
+  duration_ms: 100.799991
+  type: 'test'
+  ...
+# Subtest: conformance: reopen-design after approved plan produces state accepted by both observers
+ok 7 - conformance: reopen-design after approved plan produces state accepted by both observers
+  ---
+  duration_ms: 105.917465
+  type: 'test'
+  ...
+# Subtest: conformance: revoke-plan after approved plan produces state accepted by both observers
+ok 8 - conformance: revoke-plan after approved plan produces state accepted by both observers
+  ---
+  duration_ms: 102.920322
+  type: 'test'
+  ...
+# Subtest: conformance: set-phase verb produces state accepted by both observers
+ok 9 - conformance: set-phase verb produces state accepted by both observers
+  ---
+  duration_ms: 107.942313
+  type: 'test'
+  ...
+# Subtest: conformance: close-feature verb (design close) produces state accepted by both observers
+ok 10 - conformance: close-feature verb (design close) produces state accepted by both observers
+  ---
+  duration_ms: 38.644496
+  type: 'test'
+  ...
+# Subtest: conformance: close-feature verb (continuity close request) produces state accepted by both observers
+ok 11 - conformance: close-feature verb (continuity close request) produces state accepted by both observers
+  ---
+  duration_ms: 43.300586
+  type: 'test'
+  ...
+# Subtest: conformance: discard-feature produces valid state without SESSION-CLEANUP-STATE-MALFORMED
+ok 12 - conformance: discard-feature produces valid state without SESSION-CLEANUP-STATE-MALFORMED
+  ---
+  duration_ms: 53.420409
+  type: 'test'
+  ...
+# Subtest: conformance: discard-feature with prior closed feature produces state accepted by both observers
+ok 13 - conformance: discard-feature with prior closed feature produces state accepted by both observers
+  ---
+  duration_ms: 63.231781
+  type: 'test'
+  ...
+# Subtest: conformance: complete end-to-end lifecycle progression through all transition verbs
+ok 14 - conformance: complete end-to-end lifecycle progression through all transition verbs
+  ---
+  duration_ms: 169.668317
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 12
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 984.718084
+
+--- baseline-original-R6 stderr ---
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PRD-DIGEST-STALE; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+Error: submit-plan blocked by ARCHITECTURE-DESIGN-PRD-DIGEST-STALE; complete the exact draft architecture design before submission. No submission or signature request was recorded.
+
+--- baseline-original-R6 fd3 ---
+
+{"stage":"baseline-original-R6","exitCode":1,"signal":null,"tests":14,"pass":12,"fail":2,"cancelled":0,"skipped":0,"todo":0,"fd3Bytes":0}
+{"stage":"overlay","changedOriginalGraphPaths":["plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs"],"parked":"specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state-observer-conformance.test.mjs","postimageSha256":"59b2b7e047297f9201f59080c5ba41df0e8948c4b1fbd80392fd8bc763c80362","assertionsAndProfilesPreserved":true}
+{"stage":"repaired-full-original-suite","command":"node --test-reporter=tap plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs","cwd":"scratch/observer-byte-fixture-reconciliation-r2-graph","fd3":"pipe","env":{"PIPELINE_VERIFY_CASE_COMPLETION_FD":"3"}}
+--- repaired-full-original-suite stdout ---
+Feature "feature-continuity-init" set. Plan path: specs/feature-continuity-init/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Feature "feature-set" set. Plan path: specs/feature-set/prd.md. planApproved=false, phase="design".
+Feature "feature-submit" set. Plan path: specs/feature-submit/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-submit/prd.md(0de84339d5a8...)+specs/feature-submit/spec.md(45cdb8e3c854...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Feature "feature-cancel-submission" set. Plan path: specs/feature-cancel-submission/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-cancel-submission/prd.md(1701544fdb07...)+specs/feature-cancel-submission/spec.md(4ad412f8690f...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Submitted plan cancelled by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="draft".
+Feature "feature-approve" set. Plan path: specs/feature-approve/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-approve/prd.md(eded5d6e2bad...)+specs/feature-approve/spec.md(8fd06fbbada3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 9697ddec2b38....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-approve/prd.md(eded5d6e2bad...)+specs/feature-approve/spec.md(8fd06fbbada3...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Feature "feature-reopen" set. Plan path: specs/feature-reopen/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-reopen/prd.md(43dd9465efaa...)+specs/feature-reopen/spec.md(b07b460f2749...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 0bf176f31c2d....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-reopen/prd.md(43dd9465efaa...)+specs/feature-reopen/spec.md(b07b460f2749...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Design reopened by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="draft".
+Feature "feature-revoke" set. Plan path: specs/feature-revoke/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-revoke/prd.md(d2fba4950e63...)+specs/feature-revoke/spec.md(0bcdb4242e00...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 10a13e3c8836....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-revoke/prd.md(d2fba4950e63...)+specs/feature-revoke/spec.md(0bcdb4242e00...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan approval revoked by "PO" on 2026-09-13T12:00:00.000Z.
+Feature "feature-phase" set. Plan path: specs/feature-phase/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-phase/prd.md(6254d232dbd9...)+specs/feature-phase/spec.md(9bb1bf87e9a2...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 6779eefad399....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-phase/prd.md(6254d232dbd9...)+specs/feature-phase/spec.md(9bb1bf87e9a2...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Feature "feature-close-design" set. Plan path: specs/feature-close-design/prd.md. planApproved=false, phase="design".
+Feature "feature-close-design" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "feature-close-continuity" set. Plan path: specs/feature-close-continuity/prd.md. planApproved=false, phase="design".
+Feature "feature-close-continuity" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "feature-discard" set. Plan path: specs/feature-discard/prd.md. planApproved=false, phase="design".
+Feature "feature-discard" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: abandoned prior to implementation per product direction. activeFeature removed, planApproved=false.
+Feature "feature-recovered" set. Plan path: specs/feature-recovered/prd.md. planApproved=false, phase="design".
+Feature "first-feature" set. Plan path: specs/first-feature/prd.md. planApproved=false, phase="design".
+Feature "first-feature" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). activeFeature removed, planApproved=false.
+Feature "second-feature" set. Plan path: specs/second-feature/prd.md. planApproved=false, phase="design".
+Feature "second-feature" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: discarded after earlier close. activeFeature removed, planApproved=false.
+Feature "feature-e2e" set. Plan path: specs/feature-e2e/prd.md. planApproved=false, phase="design".
+PS-CONTINUITY-INITIALIZED: continuity revision 0 written.
+Plan submitted by "Elephant" on 2026-09-13T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/feature-e2e/prd.md(984d4b2e588e...)+specs/feature-e2e/spec.md(1815a48cd14f...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "Elephant" on 2026-09-13T12:00:00.000Z; bound to submission 8c67b9426924....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Plan approved by "PO" on 2026-09-13T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/feature-e2e/prd.md(984d4b2e588e...)+specs/feature-e2e/spec.md(1815a48cd14f...) profile=mini change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Feature "feature-e2e" discarded by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T12:00:00.000Z). Reason: pivoting direction in implementation. activeFeature removed, planApproved=false.
+Feature "feature-e2e-followup" set. Plan path: specs/feature-e2e-followup/prd.md. planApproved=false, phase="design".
+Feature "feature-e2e-followup" closed by "PO" (commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, 2026-09-13T13:00:00.000Z). activeFeature removed, planApproved=false.
+TAP version 13
+# Subtest: conformance: init (kickoff initialization) produces state accepted by both observers
+ok 1 - conformance: init (kickoff initialization) produces state accepted by both observers
+  ---
+  duration_ms: 48.504567
+  type: 'test'
+  ...
+# Subtest: conformance: continuity-init verb produces state accepted by both observers
+ok 2 - conformance: continuity-init verb produces state accepted by both observers
+  ---
+  duration_ms: 41.413718
+  type: 'test'
+  ...
+# Subtest: conformance: set-feature verb produces state accepted by both observers
+ok 3 - conformance: set-feature verb produces state accepted by both observers
+  ---
+  duration_ms: 27.920261
+  type: 'test'
+  ...
+# Subtest: conformance: submit-plan verb produces state accepted by both observers
+ok 4 - conformance: submit-plan verb produces state accepted by both observers
+  ---
+  duration_ms: 57.036485
+  type: 'test'
+  ...
+# Subtest: conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers
+ok 5 - conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers
+  ---
+  duration_ms: 72.25931
+  type: 'test'
+  ...
+# Subtest: conformance: approve-plan verb produces state accepted by both observers
+ok 6 - conformance: approve-plan verb produces state accepted by both observers
+  ---
+  duration_ms: 98.504572
+  type: 'test'
+  ...
+# Subtest: conformance: reopen-design after approved plan produces state accepted by both observers
+ok 7 - conformance: reopen-design after approved plan produces state accepted by both observers
+  ---
+  duration_ms: 104.174346
+  type: 'test'
+  ...
+# Subtest: conformance: revoke-plan after approved plan produces state accepted by both observers
+ok 8 - conformance: revoke-plan after approved plan produces state accepted by both observers
+  ---
+  duration_ms: 103.142943
+  type: 'test'
+  ...
+# Subtest: conformance: set-phase verb produces state accepted by both observers
+ok 9 - conformance: set-phase verb produces state accepted by both observers
+  ---
+  duration_ms: 108.431014
+  type: 'test'
+  ...
+# Subtest: conformance: close-feature verb (design close) produces state accepted by both observers
+ok 10 - conformance: close-feature verb (design close) produces state accepted by both observers
+  ---
+  duration_ms: 38.655846
+  type: 'test'
+  ...
+# Subtest: conformance: close-feature verb (continuity close request) produces state accepted by both observers
+ok 11 - conformance: close-feature verb (continuity close request) produces state accepted by both observers
+  ---
+  duration_ms: 45.833656
+  type: 'test'
+  ...
+# Subtest: conformance: discard-feature produces valid state without SESSION-CLEANUP-STATE-MALFORMED
+ok 12 - conformance: discard-feature produces valid state without SESSION-CLEANUP-STATE-MALFORMED
+  ---
+  duration_ms: 54.528534
+  type: 'test'
+  ...
+# Subtest: conformance: discard-feature with prior closed feature produces state accepted by both observers
+ok 13 - conformance: discard-feature with prior closed feature produces state accepted by both observers
+  ---
+  duration_ms: 64.024846
+  type: 'test'
+  ...
+# Subtest: conformance: complete end-to-end lifecycle progression through all transition verbs
+ok 14 - conformance: complete end-to-end lifecycle progression through all transition verbs
+  ---
+  duration_ms: 175.713093
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1053.336079
+
+--- repaired-full-original-suite stderr ---
+
+--- repaired-full-original-suite fd3 ---
+
+{"stage":"repaired-full-original-suite","exitCode":0,"signal":null,"tests":14,"pass":14,"fail":0,"cancelled":0,"skipped":0,"todo":0,"fd3Bytes":0}
+{"stage":"final-check","rootTestSha256Before":"00c722ea174ee39bd3dac7326c3fd47f4c038588d376344273b615c2de8b65e4","rootTestSha256After":"00c722ea174ee39bd3dac7326c3fd47f4c038588d376344273b615c2de8b65e4","mirrorInventoryUnchanged":true,"fullSuite":{"stage":"repaired-full-original-suite","exitCode":0,"signal":null,"tests":14,"pass":14,"fail":0,"cancelled":0,"skipped":0,"todo":0,"fd3Bytes":0},"qualification":"isolated R6 fixture suite only; full release Verify, independent review, PO acceptance and genuine native-host capture remain pending/unverified"}
+
+--- stderr ---

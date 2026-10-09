@@ -1,0 +1,1385 @@
+command: node scratch/legacy-custody-forward-evidence.mjs
+label: ALFRED-RV-S6-F-20261009-source-only
+exitCode: 0
+head: 00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e
+tree: 1901cfee78951cc9f07d3799fd2dc61f7c439b79
+dirty: true
+--- stdout ---
+SOURCE-ONLY RV-S6-F forward-only archive recovery; candidate 00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e; independent review and PO acceptance pending.
+No native prelaunch capture/authorship attestation; no dispatch record or host observation created; source uncommitted.
+{"ownedSource":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/legacy-owner-custody.mjs","sourceSha256":"4eb37b09cd3a5dffc02075802882a9ecda534394452ce012db14bea79b9dd385","rootSourceSha256":"d4061868f5de2c01ab4d6deca3e9f13f86865eb654fb1518279a6cf28b7bcfae","graphDifferences":["plugins/pipeline-core/lib/legacy-owner-custody.mjs"],"unchangedTests":[{"path":"plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs","sha256":"a31a8134f88dafe23f3f8a7ad14cbb0ddb8937a543d8dd1cd3b8d26c215b23aa"},{"path":"plugins/pipeline-core/lib/legacy-owner-custody.test.mjs","sha256":"8ea0773039c9b48765609c6b5db61ec117d280e6a5b0e4e8b46bfdef21b24fd0"}]}
+--- genuine baseline RED, prior to overlay ---
+command: node --test scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs
+label: RV-S6-F-baseline-unchanged-archive
+exitCode: 1
+head: 00ba7c0e387f6b0d89c39b1cd1792b727dcdcf3e
+tree: 1901cfee78951cc9f07d3799fd2dc61f7c439b79
+dirty: true
+--- stdout ---
+▶ RV-4: legacy custody disposition - preserve, replay, archive, absence
+  ✔ RV-4: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts (1.989249ms)
+  ✔ RV-4: matching receipt + disposition preserve keeps bytes and mtime exact and reports preserved (3.088903ms)
+  ✔ RV-4: matching receipt + disposition replay without the replay preconditions returns typed unavailable LOC-REPLAY-PRECONDITION and keeps the bytes (1.220005ms)
+  ✔ RV-4: conflicting receipt + valid signed archive moves the receipt under archiveRoot byte-identically, removes the original and appends one audit line (2.25341ms)
+  ✔ RV-4: a second archive appends to the audit log and never rewrites an earlier line (2.662212ms)
+  ✔ RV-4: conflicting receipt + archive with no proof at all refuses with LOC-PROOF-INVALID and mutates nothing (0.730643ms)
+  ✔ RV-4: conflicting receipt + archive with a null proof refuses with LOC-PROOF-INVALID and mutates nothing (1.009805ms)
+  ✔ RV-4: conflicting receipt + archive with a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH and mutates nothing (0.668273ms)
+  ✔ RV-4: conflicting receipt + archive whose package changed after signing refuses with LOC-PROOF-BINDING-MISMATCH and mutates nothing (0.884444ms)
+  ✔ RV-4: malformed receipt (non-JSON text) + valid signed archive archives it byte-identically (1.071714ms)
+  ✔ RV-4: malformed receipt (non-JSON text) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing (0.432802ms)
+  ✔ RV-4: malformed receipt (truncated JSON) + valid signed archive archives it byte-identically (1.033015ms)
+  ✔ RV-4: malformed receipt (truncated JSON) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing (0.428031ms)
+  ✔ RV-4: malformed receipt (binary garbage) + valid signed archive archives it byte-identically (1.206615ms)
+  ✔ RV-4: malformed receipt (binary garbage) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing (0.378442ms)
+  ✔ RV-4: absent receipt + package binding { absent: true } + signed disposition reports absence-bound and creates nothing at the receipt path (0.610362ms)
+  ✔ RV-4: a symlinked receipt path returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing (0.841963ms)
+  ✔ RV-4: two candidate receipts for one session return typed unavailable LOC-RECEIPT-AMBIGUOUS and mutate nothing (0.818804ms)
+  ✔ RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling directory, refuses with LOC-PROOF-BINDING-MISMATCH before any write (1.472007ms)
+  ✔ RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling whose name only extends the signed destination's name, refuses with LOC-PROOF-BINDING-MISMATCH before any write (0.806063ms)
+  ✔ RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a subdirectory of the signed destination, refuses with LOC-PROOF-BINDING-MISMATCH before any write (0.873754ms)
+  ✔ RV-S5-T2: positive control - the same signed archive applied with archiveRoot equal to the resolved signed destination archives under it (1.103855ms)
+  ✔ RV-S5-T2: a validly signed archive whose archiveDestination resolves outside the repository root refuses with LOC-PACKAGE-INVALID and writes nothing (0.732593ms)
+  ✔ RV-S5-T3: a validly signed archive whose repositoryRoot is missing refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt (0.799024ms)
+  ✔ RV-S5-T3: a validly signed archive whose repositoryRoot is relative refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt (0.832353ms)
+  ✔ RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place (1.482247ms)
+  ✔ RV-S5-T2: a receipt path that is a directory named <sessionId>.json returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing (0.809283ms)
+  ✔ RV-S6 RV-5 readback after apply: the archived copy reads back byte-identical to the original, its name digest and its audit line agree, and the original name is gone (2.08123ms)
+  ✔ RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed preserve naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched (2.721592ms)
+  ✔ RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed replay naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched (2.499251ms)
+  ✔ RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a repeated signed archive naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched (2.29494ms)
+  ✔ RV-S6 RV-5 receipt drift: a receipt rewritten after it was signed is refused LOC-PROOF-BINDING-MISMATCH, publishes nothing and keeps the drifted bytes (1.629518ms)
+  ✔ RV-S6 RV-5 concurrent writer: an audit log whose last line is unterminated returns typed unavailable LOC-TARGET-UNSAFE before anything is published (1.423786ms)
+  ✔ RV-S6 RV-5 interrupted archive: a published copy that does not read back as the signed bytes is never trusted - typed unavailable LOC-TARGET-UNSAFE, the original stays and the copy is not overwritten (1.303455ms)
+  ✔ RV-S6 RV-6 State, activeFeature, proofs and history stay byte-for-byte unchanged across a signed archive (bytes, size, mtime; no other entry changed) (1.612587ms)
+  ✔ RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash before the publish (archived/ exists and is empty) completes the archive and leaves State, proofs and history byte-identical (1.953729ms)
+  ✖ RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the exclusive publish and before the audit line completes the archive and leaves State, proofs and history byte-identical (1.486307ms)
+  ✖ RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the audit line and before the original is removed completes the archive and leaves State, proofs and history byte-identical (1.207455ms)
+  ✖ RV-S6 RV-6 crash recovery preserves intervening changes: a published copy plus an original that no longer holds the signed bytes is refused LOC-ARCHIVE-ORPHANED-COPY, nothing is written or rolled back (1.189656ms)
+  ✔ RV-S6 RV-6 forward-only: a second apply of the same signed archive after it completed is refused LOC-PROOF-BINDING-MISMATCH - never re-archived, never rolled back (2.213929ms)
+  ✔ RV-S6 RV-6 forward-only: a receipt another writer put at the original name after a completed archive survives a re-run of the old signed archive byte-for-byte (2.32279ms)
+✖ RV-4: legacy custody disposition - preserve, replay, archive, absence (61.989871ms)
+ℹ tests 41
+ℹ suites 1
+ℹ pass 38
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117.965365
+
+✖ failing tests:
+
+test at scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1071:5
+✖ RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the exclusive publish and before the audit line completes the archive and leaves State, proofs and history byte-identical (1.486307ms)
+  AssertionError [ERR_ASSERTION]: after the exclusive publish and before the audit line: expected archived, got {"status":"unavailable","code":"LOC-TARGET-UNSAFE","mutated":false}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'archived'
+  
+      at assertResumedForward (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:929:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1078:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'archived',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1071:5
+✖ RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the audit line and before the original is removed completes the archive and leaves State, proofs and history byte-identical (1.207455ms)
+  AssertionError [ERR_ASSERTION]: after the audit line and before the original is removed: expected archived, got {"status":"unavailable","code":"LOC-TARGET-UNSAFE","mutated":false}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'archived'
+  
+      at assertResumedForward (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:929:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1078:7)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'archived',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1084:3
+✖ RV-S6 RV-6 crash recovery preserves intervening changes: a published copy plus an original that no longer holds the signed bytes is refused LOC-ARCHIVE-ORPHANED-COPY, nothing is written or rolled back (1.189656ms)
+  AssertionError [ERR_ASSERTION]: intervening change next to a published copy: wrong code
+  + actual - expected
+  
+  + 'LOC-PROOF-BINDING-MISMATCH'
+  - 'LOC-ARCHIVE-ORPHANED-COPY'
+         ^
+  
+      at assertTypedAndUntouched (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:372:12)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs:1092:5)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'LOC-PROOF-BINDING-MISMATCH',
+    expected: 'LOC-ARCHIVE-ORPHANED-COPY',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
+
+--- focused source diff ---
+diff --git a/plugins/pipeline-core/lib/legacy-owner-custody.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/legacy-owner-custody.mjs
+index 1ec9d2d7b..5da0a0e3d 100644
+--- a/plugins/pipeline-core/lib/legacy-owner-custody.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/legacy-owner-custody.mjs
+@@ -388,9 +388,9 @@ export function verifyLegacyCustodyProof({ package: pkg, proof, anchor } = {}) {
+ //   3. classify the target (candidates, lstat, bounded read, RV-2) -> unavailable
+ //   4. act: preserve / bind-absence write nothing; replay is not yet defined;
+ //      archive is the only mutation.
+-// No lock is taken: a concurrent writer, receipt drift between the signed digest
+-// and the bytes on disk, and an interrupted archive are RV-5; State/proof/history
+-// byte-identity is RV-6. Drift observed here is refused (never acted on).
++// No lock is taken. Signed-byte readbacks and append-only audit checks refuse
++// observed concurrent changes. Interrupted publication resumes forward only;
++// the archive copy never grants authority to a changed or absent live receipt.
+ // ---------------------------------------------------------------------------
+ 
+ export const LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA = "pipeline.legacy-custody-archive-audit.v1";
+@@ -563,8 +563,9 @@ function archiveDestinationUsable({ archiveRoot, archivedDirectory, archivePath,
+     if (root === null || root.isSymbolicLink() || !root.isDirectory()) return false;
+     const archived = lstatOrNull(archivedDirectory);
+     if (archived !== null && (archived.isSymbolicLink() || !archived.isDirectory())) return false;
+-    // Never overwrite: an existing archived copy is RV-5's resume question, not ours.
+-    if (lstatOrNull(archivePath) !== null) return false;
++    // An existing copy can be resumed only after its signed-byte readback below.
++    const copy = lstatOrNull(archivePath);
++    if (copy !== null && (copy.isSymbolicLink() || !copy.isFile() || copy.nlink !== 1)) return false;
+     const audit = lstatOrNull(auditPath);
+     if (audit !== null) {
+       if (audit.isSymbolicLink() || !audit.isFile()) return false;
+@@ -594,7 +595,7 @@ function readSyncAt(fd, buffer, position) {
+  * append-only audit line, and only then removal of the original name. Never
+  * throws; `mutated` reports exactly what was left behind.
+  */
+-function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classification, proof, archiveRoot }) {
++function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, size, classification, proof, archiveRoot }) {
+   const archivedDirectory = join(String(archiveRoot), ARCHIVE_DIRECTORY_NAME);
+   const archivePath = join(archivedDirectory, `${sessionId}.${sha256}.json`);
+   const auditPath = join(String(archiveRoot), ARCHIVE_AUDIT_NAME);
+@@ -605,38 +606,79 @@ function archiveReceipt({ receiptsDirectory, sessionId, bytes, sha256, classific
+ 
+   let mutated = false;
+   try {
++    const binding = {
++      schema: LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA,
++      sessionId,
++      receiptSha256: sha256,
++      disposition: "archive",
++      classification,
++      intentSha256: proof.intentSha256,
++      keyReference: proof.keyReference,
++    };
++    // A completed audit is recognized only by the entire signed binding, never
++    // by a receipt digest or session alone. Keep all prior log bytes intact.
++    const priorAudit = lstatOrNull(auditPath) === null ? Buffer.alloc(0) : readReceiptBytes(auditPath).bytes;
++    if (priorAudit === undefined) return unavailableResult(RV4_CODES.targetUnsafe);
++    const entries = priorAudit.toString("utf8").split("\n").filter((line) => line !== "").map((line) => JSON.parse(line));
++    const matchingAudit = entries.filter((entry) => entry !== null && typeof entry === "object"
++      && Object.entries(binding).every(([key, value]) => entry[key] === value)
++      && typeof entry.archivedAt === "string" && Number.isFinite(Date.parse(entry.archivedAt)));
++    if (matchingAudit.length > 1) return unavailableResult(RV4_CODES.targetUnsafe);
++
++    const hasCopy = lstatOrNull(archivePath) !== null;
++    if (hasCopy) {
++      const copy = readReceiptBytes(archivePath);
++      if (copy.unsafe === true || copy.bytes.length !== size || sha256Hex(copy.bytes) !== sha256) {
++        return unavailableResult(RV4_CODES.targetUnsafe);
++      }
++    } else if (matchingAudit.length !== 0) {
++      // A log without its published bytes is not an interrupted publication.
++      return unavailableResult(RV4_CODES.targetUnsafe);
++    }
++    if (bytes.length !== size || sha256Hex(bytes) !== sha256) {
++      return refusedResult(hasCopy && matchingAudit.length === 0
++        ? RV4_CODES.archiveOrphanedCopy : RV3_CODES.bindingMismatch);
++    }
+     if (lstatOrNull(archivedDirectory) === null) {
+       mkdirSync(archivedDirectory, { mode: 0o700 });
+       mutated = true;
+     }
+-    publishExclusiveCopy(archivedDirectory, archivePath, bytes);
+-    mutated = true;
++    if (!hasCopy) {
++      publishExclusiveCopy(archivedDirectory, archivePath, bytes);
++      mutated = true;
++    }
+     const published = lstatSync(archivePath);
+-    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1 || !readFileSync(archivePath).equals(bytes)) {
++    const publishedRead = readReceiptBytes(archivePath);
++    if (published.isSymbolicLink() || !published.isFile() || published.nlink !== 1
++      || publishedRead.unsafe === true || !publishedRead.bytes.equals(bytes)) {
+       return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+     }
+ 
+     // TOCTOU: the original must still be the exact signed bytes right before it is removed.
+     const again = readReceiptBytes(receiptPath);
+     if (again.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
+-    // The copy is already published (mutated is true): leave the changed original in place, write no
+-    // audit line, and say that an orphaned archived copy exists rather than a dead-end refusal.
+-    if (!again.bytes.equals(bytes)) return refusedResult(RV4_CODES.archiveOrphanedCopy, mutated);
++    // Leave an intervening original in place. A copy without this audit binding
++    // is orphaned; an audited archive cannot claim a newer writer's receipt.
++    if (!again.bytes.equals(bytes)) return refusedResult(matchingAudit.length === 0
++      ? RV4_CODES.archiveOrphanedCopy : RV3_CODES.bindingMismatch, mutated);
++
++    // Refuse a changed log before appending or trusting the saved audit.
++    const auditAgain = lstatOrNull(auditPath) === null ? Buffer.alloc(0) : readReceiptBytes(auditPath).bytes;
++    if (auditAgain === undefined || !auditAgain.equals(priorAudit)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
++    if (matchingAudit.length === 0) {
++      const entry = { ...binding, archivedAt: new Date().toISOString() };
++      appendArchiveAudit(auditPath, entry);
++      mutated = true;
++      fsyncDirectory(archiveRoot);
++      const audited = readReceiptBytes(auditPath);
++      const expected = Buffer.concat([priorAudit, Buffer.from(`${JSON.stringify(entry)}\n`)]);
++      if (audited.unsafe === true || !audited.bytes.equals(expected)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
++    }
+ 
+-    const entry = {
+-      schema: LEGACY_CUSTODY_ARCHIVE_AUDIT_SCHEMA,
+-      sessionId,
+-      receiptSha256: sha256,
+-      disposition: "archive",
+-      classification,
+-      intentSha256: proof.intentSha256,
+-      keyReference: proof.keyReference,
+-      archivedAt: new Date().toISOString(),
+-    };
+-    appendArchiveAudit(auditPath, entry);
+-    fsyncDirectory(archiveRoot);
+-    const lines = readFileSync(auditPath, "utf8").split("\n").filter((line) => line !== "");
+-    if (lines.at(-1) !== JSON.stringify(entry)) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
++    // Recheck after audit, too: a writer during append must never lose its bytes.
++    const beforeRemoval = readReceiptBytes(receiptPath);
++    if (beforeRemoval.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe, mutated);
++    if (!beforeRemoval.bytes.equals(bytes)) return refusedResult(RV3_CODES.bindingMismatch, mutated);
+ 
+     unlinkSync(receiptPath);
+     fsyncDirectory(receiptsDirectory);
+@@ -688,8 +730,9 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
+   if (read.unsafe === true) return unavailableResult(RV4_CODES.targetUnsafe);
+   const sha256 = sha256Hex(read.bytes);
+   // The signature binds exact bytes: what is on disk must still be what was signed.
+-  if (sha256 !== authorized.sha256 || read.bytes.length !== authorized.size) return refusedResult(RV3_CODES.bindingMismatch);
+-  if (observedClassification(receiptsDirectory, sessionId, authorized.compare) !== authorized.classification) {
++  const bytesMatch = sha256 === authorized.sha256 && read.bytes.length === authorized.size;
++  if (!bytesMatch && authorized.disposition !== "archive") return refusedResult(RV3_CODES.bindingMismatch);
++  if (bytesMatch && observedClassification(receiptsDirectory, sessionId, authorized.compare) !== authorized.classification) {
+     return refusedResult(RV3_CODES.bindingMismatch);
+   }
+ 
+@@ -723,7 +766,8 @@ export function applyLegacyCustodyDisposition({ receiptsDirectory, sessionId, pa
+         receiptsDirectory,
+         sessionId,
+         bytes: read.bytes,
+-        sha256,
++        sha256: authorized.sha256,
++        size: authorized.size,
+         classification: authorized.classification,
+         proof,
+         archiveRoot: signedArchiveRoot,
+--- unchanged suites, direct Node TAP; FD3 pipe announced, no suite FD3 contract ---
+{"executable":"node","argv":["--test","--test-reporter=tap","scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs","scratch/legacy-custody-forward-r1/plugins/pipeline-core/lib/legacy-owner-custody.test.mjs"],"fd3":"pipe","environmentOverrides":[]}
+TAP version 13
+# Subtest: RV-4: legacy custody disposition - preserve, replay, archive, absence
+    # Subtest: RV-4: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts
+    ok 1 - RV-4: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts
+      ---
+      duration_ms: 2.101369
+      type: 'test'
+      ...
+    # Subtest: RV-4: matching receipt + disposition preserve keeps bytes and mtime exact and reports preserved
+    ok 2 - RV-4: matching receipt + disposition preserve keeps bytes and mtime exact and reports preserved
+      ---
+      duration_ms: 3.306344
+      type: 'test'
+      ...
+    # Subtest: RV-4: matching receipt + disposition replay without the replay preconditions returns typed unavailable LOC-REPLAY-PRECONDITION and keeps the bytes
+    ok 3 - RV-4: matching receipt + disposition replay without the replay preconditions returns typed unavailable LOC-REPLAY-PRECONDITION and keeps the bytes
+      ---
+      duration_ms: 1.364366
+      type: 'test'
+      ...
+    # Subtest: RV-4: conflicting receipt + valid signed archive moves the receipt under archiveRoot byte-identically, removes the original and appends one audit line
+    ok 4 - RV-4: conflicting receipt + valid signed archive moves the receipt under archiveRoot byte-identically, removes the original and appends one audit line
+      ---
+      duration_ms: 7.342202
+      type: 'test'
+      ...
+    # Subtest: RV-4: a second archive appends to the audit log and never rewrites an earlier line
+    ok 5 - RV-4: a second archive appends to the audit log and never rewrites an earlier line
+      ---
+      duration_ms: 3.444625
+      type: 'test'
+      ...
+    # Subtest: RV-4: conflicting receipt + archive with no proof at all refuses with LOC-PROOF-INVALID and mutates nothing
+    ok 6 - RV-4: conflicting receipt + archive with no proof at all refuses with LOC-PROOF-INVALID and mutates nothing
+      ---
+      duration_ms: 0.655243
+      type: 'test'
+      ...
+    # Subtest: RV-4: conflicting receipt + archive with a null proof refuses with LOC-PROOF-INVALID and mutates nothing
+    ok 7 - RV-4: conflicting receipt + archive with a null proof refuses with LOC-PROOF-INVALID and mutates nothing
+      ---
+      duration_ms: 1.123645
+      type: 'test'
+      ...
+    # Subtest: RV-4: conflicting receipt + archive with a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH and mutates nothing
+    ok 8 - RV-4: conflicting receipt + archive with a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH and mutates nothing
+      ---
+      duration_ms: 0.656603
+      type: 'test'
+      ...
+    # Subtest: RV-4: conflicting receipt + archive whose package changed after signing refuses with LOC-PROOF-BINDING-MISMATCH and mutates nothing
+    ok 9 - RV-4: conflicting receipt + archive whose package changed after signing refuses with LOC-PROOF-BINDING-MISMATCH and mutates nothing
+      ---
+      duration_ms: 0.975834
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (non-JSON text) + valid signed archive archives it byte-identically
+    ok 10 - RV-4: malformed receipt (non-JSON text) + valid signed archive archives it byte-identically
+      ---
+      duration_ms: 1.231576
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (non-JSON text) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+    ok 11 - RV-4: malformed receipt (non-JSON text) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+      ---
+      duration_ms: 0.417312
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (truncated JSON) + valid signed archive archives it byte-identically
+    ok 12 - RV-4: malformed receipt (truncated JSON) + valid signed archive archives it byte-identically
+      ---
+      duration_ms: 1.222265
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (truncated JSON) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+    ok 13 - RV-4: malformed receipt (truncated JSON) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+      ---
+      duration_ms: 0.575753
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (binary garbage) + valid signed archive archives it byte-identically
+    ok 14 - RV-4: malformed receipt (binary garbage) + valid signed archive archives it byte-identically
+      ---
+      duration_ms: 1.328575
+      type: 'test'
+      ...
+    # Subtest: RV-4: malformed receipt (binary garbage) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+    ok 15 - RV-4: malformed receipt (binary garbage) + archive without a signature refuses with LOC-PROOF-INVALID and mutates nothing
+      ---
+      duration_ms: 0.440392
+      type: 'test'
+      ...
+    # Subtest: RV-4: absent receipt + package binding { absent: true } + signed disposition reports absence-bound and creates nothing at the receipt path
+    ok 16 - RV-4: absent receipt + package binding { absent: true } + signed disposition reports absence-bound and creates nothing at the receipt path
+      ---
+      duration_ms: 0.738303
+      type: 'test'
+      ...
+    # Subtest: RV-4: a symlinked receipt path returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing
+    ok 17 - RV-4: a symlinked receipt path returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing
+      ---
+      duration_ms: 0.908053
+      type: 'test'
+      ...
+    # Subtest: RV-4: two candidate receipts for one session return typed unavailable LOC-RECEIPT-AMBIGUOUS and mutate nothing
+    ok 18 - RV-4: two candidate receipts for one session return typed unavailable LOC-RECEIPT-AMBIGUOUS and mutate nothing
+      ---
+      duration_ms: 1.025525
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling directory, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+    ok 19 - RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling directory, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+      ---
+      duration_ms: 1.474826
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling whose name only extends the signed destination's name, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+    ok 20 - RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a sibling whose name only extends the signed destination's name, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+      ---
+      duration_ms: 0.773533
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a subdirectory of the signed destination, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+    ok 21 - RV-S5-T2: a signed archive whose destination resolves to archive/, applied with archiveRoot a subdirectory of the signed destination, refuses with LOC-PROOF-BINDING-MISMATCH before any write
+      ---
+      duration_ms: 0.879344
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: positive control - the same signed archive applied with archiveRoot equal to the resolved signed destination archives under it
+    ok 22 - RV-S5-T2: positive control - the same signed archive applied with archiveRoot equal to the resolved signed destination archives under it
+      ---
+      duration_ms: 1.172565
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a validly signed archive whose archiveDestination resolves outside the repository root refuses with LOC-PACKAGE-INVALID and writes nothing
+    ok 23 - RV-S5-T2: a validly signed archive whose archiveDestination resolves outside the repository root refuses with LOC-PACKAGE-INVALID and writes nothing
+      ---
+      duration_ms: 0.601363
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T3: a validly signed archive whose repositoryRoot is missing refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt
+    ok 24 - RV-S5-T3: a validly signed archive whose repositoryRoot is missing refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt
+      ---
+      duration_ms: 0.933934
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T3: a validly signed archive whose repositoryRoot is relative refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt
+    ok 25 - RV-S5-T3: a validly signed archive whose repositoryRoot is relative refuses with LOC-PACKAGE-INVALID, writes nothing and keeps the receipt
+      ---
+      duration_ms: 0.844734
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place
+    ok 26 - RV-S5-T2: a binding mismatch detected after the exclusive publish returns LOC-ARCHIVE-ORPHANED-COPY with mutated true and leaves the copy in place
+      ---
+      duration_ms: 1.611527
+      type: 'test'
+      ...
+    # Subtest: RV-S5-T2: a receipt path that is a directory named <sessionId>.json returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing
+    ok 27 - RV-S5-T2: a receipt path that is a directory named <sessionId>.json returns typed unavailable LOC-TARGET-UNSAFE and mutates nothing
+      ---
+      duration_ms: 0.888844
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 readback after apply: the archived copy reads back byte-identical to the original, its name digest and its audit line agree, and the original name is gone
+    ok 28 - RV-S6 RV-5 readback after apply: the archived copy reads back byte-identical to the original, its name digest and its audit line agree, and the original name is gone
+      ---
+      duration_ms: 2.569771
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed preserve naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+    ok 29 - RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed preserve naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+      ---
+      duration_ms: 2.895583
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed replay naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+    ok 30 - RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a signed replay naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+      ---
+      duration_ms: 2.513741
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a repeated signed archive naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+    ok 31 - RV-S6 RV-5 an archived receipt grants no authority: after a completed archive, a repeated signed archive naming the archived bytes is refused LOC-PROOF-BINDING-MISMATCH, resurrects nothing and leaves the archive untouched
+      ---
+      duration_ms: 2.669901
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 receipt drift: a receipt rewritten after it was signed is refused LOC-PROOF-BINDING-MISMATCH, publishes nothing and keeps the drifted bytes
+    ok 32 - RV-S6 RV-5 receipt drift: a receipt rewritten after it was signed is refused LOC-PROOF-BINDING-MISMATCH, publishes nothing and keeps the drifted bytes
+      ---
+      duration_ms: 1.602367
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 concurrent writer: an audit log whose last line is unterminated returns typed unavailable LOC-TARGET-UNSAFE before anything is published
+    ok 33 - RV-S6 RV-5 concurrent writer: an audit log whose last line is unterminated returns typed unavailable LOC-TARGET-UNSAFE before anything is published
+      ---
+      duration_ms: 1.529986
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-5 interrupted archive: a published copy that does not read back as the signed bytes is never trusted - typed unavailable LOC-TARGET-UNSAFE, the original stays and the copy is not overwritten
+    ok 34 - RV-S6 RV-5 interrupted archive: a published copy that does not read back as the signed bytes is never trusted - typed unavailable LOC-TARGET-UNSAFE, the original stays and the copy is not overwritten
+      ---
+      duration_ms: 1.547407
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 State, activeFeature, proofs and history stay byte-for-byte unchanged across a signed archive (bytes, size, mtime; no other entry changed)
+    ok 35 - RV-S6 RV-6 State, activeFeature, proofs and history stay byte-for-byte unchanged across a signed archive (bytes, size, mtime; no other entry changed)
+      ---
+      duration_ms: 1.877388
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash before the publish (archived/ exists and is empty) completes the archive and leaves State, proofs and history byte-identical
+    ok 36 - RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash before the publish (archived/ exists and is empty) completes the archive and leaves State, proofs and history byte-identical
+      ---
+      duration_ms: 2.044268
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the exclusive publish and before the audit line completes the archive and leaves State, proofs and history byte-identical
+    ok 37 - RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the exclusive publish and before the audit line completes the archive and leaves State, proofs and history byte-identical
+      ---
+      duration_ms: 1.437156
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the audit line and before the original is removed completes the archive and leaves State, proofs and history byte-identical
+    ok 38 - RV-S6 RV-6 crash recovery is forward-only: a re-run after a crash after the audit line and before the original is removed completes the archive and leaves State, proofs and history byte-identical
+      ---
+      duration_ms: 1.856908
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 crash recovery preserves intervening changes: a published copy plus an original that no longer holds the signed bytes is refused LOC-ARCHIVE-ORPHANED-COPY, nothing is written or rolled back
+    ok 39 - RV-S6 RV-6 crash recovery preserves intervening changes: a published copy plus an original that no longer holds the signed bytes is refused LOC-ARCHIVE-ORPHANED-COPY, nothing is written or rolled back
+      ---
+      duration_ms: 1.513786
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 forward-only: a second apply of the same signed archive after it completed is refused LOC-PROOF-BINDING-MISMATCH - never re-archived, never rolled back
+    ok 40 - RV-S6 RV-6 forward-only: a second apply of the same signed archive after it completed is refused LOC-PROOF-BINDING-MISMATCH - never re-archived, never rolled back
+      ---
+      duration_ms: 2.33798
+      type: 'test'
+      ...
+    # Subtest: RV-S6 RV-6 forward-only: a receipt another writer put at the original name after a completed archive survives a re-run of the old signed archive byte-for-byte
+    ok 41 - RV-S6 RV-6 forward-only: a receipt another writer put at the original name after a completed archive survives a re-run of the old signed archive byte-for-byte
+      ---
+      duration_ms: 2.336829
+      type: 'test'
+      ...
+    1..41
+ok 1 - RV-4: legacy custody disposition - preserve, replay, archive, absence
+  ---
+  duration_ms: 72.872813
+  type: 'suite'
+  ...
+# Subtest: RV-2: legacy receipt CAS-conflict classification
+    # Subtest: RV-2: matching status, schema and digest with all compare flags true classifies as matching
+    ok 1 - RV-2: matching status, schema and digest with all compare flags true classifies as matching
+      ---
+      duration_ms: 1.820998
+      type: 'test'
+      ...
+    # Subtest: RV-2: a receipt of another session in the same directory is not a candidate and does not break matching
+    ok 2 - RV-2: a receipt of another session in the same directory is not a candidate and does not break matching
+      ---
+      duration_ms: 0.667643
+      type: 'test'
+      ...
+    # Subtest: RV-2: a status mismatch returns typed unavailable and preserves the bytes
+    ok 3 - RV-2: a status mismatch returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.592702
+      type: 'test'
+      ...
+    # Subtest: RV-2: a schema mismatch returns typed unavailable and preserves the bytes
+    ok 4 - RV-2: a schema mismatch returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.457252
+      type: 'test'
+      ...
+    # Subtest: RV-2: a digest mismatch returns typed unavailable and preserves the bytes
+    ok 5 - RV-2: a digest mismatch returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.452572
+      type: 'test'
+      ...
+    # Subtest: RV-2: compare flag statusMatches=false returns typed unavailable and preserves the bytes
+    ok 6 - RV-2: compare flag statusMatches=false returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.468472
+      type: 'test'
+      ...
+    # Subtest: RV-2: compare flag schemaMatches=false returns typed unavailable and preserves the bytes
+    ok 7 - RV-2: compare flag schemaMatches=false returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.592163
+      type: 'test'
+      ...
+    # Subtest: RV-2: compare flag digestMatches=false returns typed unavailable and preserves the bytes
+    ok 8 - RV-2: compare flag digestMatches=false returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.465862
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - required receipt field schema missing returns typed unavailable and preserves the bytes
+    ok 9 - RV-2: ambiguity - required receipt field schema missing returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.517572
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - required receipt field status missing returns typed unavailable and preserves the bytes
+    ok 10 - RV-2: ambiguity - required receipt field status missing returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.391522
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - required receipt field sessionSha256 missing returns typed unavailable and preserves the bytes
+    ok 11 - RV-2: ambiguity - required receipt field sessionSha256 missing returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.378171
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - compare flag statusMatches absent returns typed unavailable and preserves the bytes
+    ok 12 - RV-2: ambiguity - compare flag statusMatches absent returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.949063
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - compare flag schemaMatches absent returns typed unavailable and preserves the bytes
+    ok 13 - RV-2: ambiguity - compare flag schemaMatches absent returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.415491
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - compare flag digestMatches absent returns typed unavailable and preserves the bytes
+    ok 14 - RV-2: ambiguity - compare flag digestMatches absent returns typed unavailable and preserves the bytes
+      ---
+      duration_ms: 0.268861
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - two identical candidate receipts for one session return typed unavailable and preserve the bytes
+    ok 15 - RV-2: ambiguity - two identical candidate receipts for one session return typed unavailable and preserve the bytes
+      ---
+      duration_ms: 0.276921
+      type: 'test'
+      ...
+    # Subtest: RV-2: ambiguity - two conflicting candidate receipts for one session return typed unavailable and preserve the bytes
+    ok 16 - RV-2: ambiguity - two conflicting candidate receipts for one session return typed unavailable and preserve the bytes
+      ---
+      duration_ms: 0.322061
+      type: 'test'
+      ...
+    # Subtest: RV-2: classification never writes - listing, bytes, sizes and mtimes are identical after every call
+    ok 17 - RV-2: classification never writes - listing, bytes, sizes and mtimes are identical after every call
+      ---
+      duration_ms: 6.020536
+      type: 'test'
+      ...
+    1..17
+ok 2 - RV-2: legacy receipt CAS-conflict classification
+  ---
+  duration_ms: 17.437005
+  type: 'suite'
+  ...
+# Subtest: RV-3: detached human proof binds the legacy custody authorization
+    # Subtest: RV-3: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts
+    ok 1 - RV-3: fixture guard - the signing helper emits an envelope the real po-approval-proof verifier accepts
+      ---
+      duration_ms: 0.793123
+      type: 'test'
+      ...
+    # Subtest: RV-3: builder emits the canonical package for a present receipt - sha256 and size, never bytes - and does not mutate its inputs
+    ok 2 - RV-3: builder emits the canonical package for a present receipt - sha256 and size, never bytes - and does not mutate its inputs
+      ---
+      duration_ms: 0.466742
+      type: 'test'
+      ...
+    # Subtest: RV-3: builder binds explicit absence as { absent: true } without fabricating a digest or size
+    ok 3 - RV-3: builder binds explicit absence as { absent: true } without fabricating a digest or size
+      ---
+      duration_ms: 0.247921
+      type: 'test'
+      ...
+    # Subtest: RV-3: a valid proof over the package verifies - present receipt
+    ok 4 - RV-3: a valid proof over the package verifies - present receipt
+      ---
+      duration_ms: 0.491022
+      type: 'test'
+      ...
+    # Subtest: RV-3: a valid proof over the package verifies - explicit absence
+    ok 5 - RV-3: a valid proof over the package verifies - explicit absence
+      ---
+      duration_ms: 0.325481
+      type: 'test'
+      ...
+    # Subtest: RV-3: a valid proof over a builder-produced package verifies end to end
+    ok 6 - RV-3: a valid proof over a builder-produced package verifies end to end
+      ---
+      duration_ms: 0.426821
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - receipt sha256
+    ok 7 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - receipt sha256
+      ---
+      duration_ms: 0.618523
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - receipt size
+    ok 8 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - receipt size
+      ---
+      duration_ms: 0.492652
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - absence flag flipped (present receipt -> absent)
+    ok 9 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - absence flag flipped (present receipt -> absent)
+      ---
+      duration_ms: 0.615572
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - absence flag flipped (absent -> present receipt)
+    ok 10 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - absence flag flipped (absent -> present receipt)
+      ---
+      duration_ms: 0.440012
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - repository commit
+    ok 11 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - repository commit
+      ---
+      duration_ms: 0.381512
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - repository tree
+    ok 12 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - repository tree
+      ---
+      duration_ms: 0.549532
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - classification
+    ok 13 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - classification
+      ---
+      duration_ms: 0.406622
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - comparison flag
+    ok 14 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - comparison flag
+      ---
+      duration_ms: 0.305541
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - disposition
+    ok 15 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - disposition
+      ---
+      duration_ms: 0.473862
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - sessionEnded set to false
+    ok 16 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - sessionEnded set to false
+      ---
+      duration_ms: 0.351372
+      type: 'test'
+      ...
+    # Subtest: RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - casPrecondition
+    ok 17 - RV-3: changing the bound field after signing refuses with LOC-PROOF-BINDING-MISMATCH - casPrecondition
+      ---
+      duration_ms: 0.302591
+      type: 'test'
+      ...
+    # Subtest: RV-3: a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH
+    ok 18 - RV-3: a proof signed by a key other than the anchor refuses with LOC-PROOF-SIGNER-MISMATCH
+      ---
+      duration_ms: 0.231231
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - null
+    ok 19 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - null
+      ---
+      duration_ms: 0.138411
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - undefined
+    ok 20 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - undefined
+      ---
+      duration_ms: 0.482822
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - a string
+    ok 21 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - a string
+      ---
+      duration_ms: 0.08913
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an array
+    ok 22 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an array
+      ---
+      duration_ms: 0.081531
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an empty object
+    ok 23 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an empty object
+      ---
+      duration_ms: 0.0782
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - missing signatureBase64
+    ok 24 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - missing signatureBase64
+      ---
+      duration_ms: 0.083561
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - missing publicKey
+    ok 25 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - missing publicKey
+      ---
+      duration_ms: 0.08388
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an extra key
+    ok 26 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an extra key
+      ---
+      duration_ms: 0.156521
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - the wrong envelope schema
+    ok 27 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - the wrong envelope schema
+      ---
+      duration_ms: 0.16466
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an empty signature
+    ok 28 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - an empty signature
+      ---
+      duration_ms: 0.101181
+      type: 'test'
+      ...
+    # Subtest: RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - a non-string signature
+    ok 29 - RV-3: a malformed envelope refuses with LOC-PROOF-INVALID - a non-string signature
+      ---
+      duration_ms: 0.08744
+      type: 'test'
+      ...
+    # Subtest: RV-3: a proof whose signature bytes are corrupted never verifies
+    ok 30 - RV-3: a proof whose signature bytes are corrupted never verifies
+      ---
+      duration_ms: 0.375162
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - false
+    ok 31 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - false
+      ---
+      duration_ms: 0.120871
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - undefined
+    ok 32 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - undefined
+      ---
+      duration_ms: 0.05575
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - absent
+    ok 33 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - absent
+      ---
+      duration_ms: 0.05237
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - null
+    ok 34 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - null
+      ---
+      duration_ms: 0.100131
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - the string 'true'
+    ok 35 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - the string 'true'
+      ---
+      duration_ms: 0.0562
+      type: 'test'
+      ...
+    # Subtest: RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - the number 1
+    ok 36 - RV-3: sessionEnded that is not exactly true refuses at build time with LOC-SESSION-NOT-ENDED - the number 1
+      ---
+      duration_ms: 0.04502
+      type: 'test'
+      ...
+    1..36
+ok 3 - RV-3: detached human proof binds the legacy custody authorization
+  ---
+  duration_ms: 10.816146
+  type: 'suite'
+  ...
+# Subtest: RV-S4-T2: the builder validates the shape of every package key (ruling 25, RV-F1)
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt undefined
+    ok 1 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt undefined
+      ---
+      duration_ms: 0.247551
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt missing
+    ok 2 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt missing
+      ---
+      duration_ms: 0.067981
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - raw receipt bytes (Buffer)
+    ok 3 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - raw receipt bytes (Buffer)
+      ---
+      duration_ms: 0.14428
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - raw receipt bytes (string)
+    ok 4 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - raw receipt bytes (string)
+      ---
+      duration_ms: 0.088081
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt sha256 is not 64 hex
+    ok 5 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt sha256 is not 64 hex
+      ---
+      duration_ms: 0.07466
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt sha256 is uppercase hex
+    ok 6 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt sha256 is uppercase hex
+      ---
+      duration_ms: 0.074641
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt size is negative
+    ok 7 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt size is negative
+      ---
+      duration_ms: 0.06886
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt size is fractional
+    ok 8 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt size is fractional
+      ---
+      duration_ms: 0.209711
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt carries an extra key
+    ok 9 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt carries an extra key
+      ---
+      duration_ms: 0.09587
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a sha256
+    ok 10 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a sha256
+      ---
+      duration_ms: 0.081981
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a size
+    ok 11 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a size
+      ---
+      duration_ms: 0.220981
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that carries sha256 and size
+    ok 12 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - absent receipt that carries sha256 and size
+      ---
+      duration_ms: 0.11129
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt { absent: false }
+    ok 13 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - receipt { absent: false }
+      ---
+      duration_ms: 0.090021
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository missing tree
+    ok 14 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository missing tree
+      ---
+      duration_ms: 0.07349
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository missing commit
+    ok 15 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository missing commit
+      ---
+      duration_ms: 0.06376
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository commit of 41 hex characters
+    ok 16 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository commit of 41 hex characters
+      ---
+      duration_ms: 0.068491
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository tree that is not hex
+    ok 17 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository tree that is not hex
+      ---
+      duration_ms: 0.06484
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository carries an extra key
+    ok 18 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - repository carries an extra key
+      ---
+      duration_ms: 0.06339
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - unknown classification
+    ok 19 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - unknown classification
+      ---
+      duration_ms: 0.063161
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - classification missing
+    ok 20 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - classification missing
+      ---
+      duration_ms: 0.06447
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - classification is a bare string
+    ok 21 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - classification is a bare string
+      ---
+      duration_ms: 0.093321
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition missing
+    ok 22 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition missing
+      ---
+      duration_ms: 0.11857
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition null
+    ok 23 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition null
+      ---
+      duration_ms: 0.075211
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition without receiptPath
+    ok 24 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition without receiptPath
+      ---
+      duration_ms: 0.06798
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition with an empty receiptPath
+    ok 25 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - casPrecondition with an empty receiptPath
+      ---
+      duration_ms: 0.06489
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId missing
+    ok 26 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId missing
+      ---
+      duration_ms: 0.069851
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId empty
+    ok 27 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId empty
+      ---
+      duration_ms: 0.06295
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId not a string
+    ok 28 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - sessionId not a string
+      ---
+      duration_ms: 0.06808
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt missing
+    ok 29 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt missing
+      ---
+      duration_ms: 0.063281
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt empty
+    ok 30 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt empty
+      ---
+      duration_ms: 0.05864
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt not a date
+    ok 31 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt not a date
+      ---
+      duration_ms: 0.05841
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt a number
+    ok 32 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt a number
+      ---
+      duration_ms: 0.655233
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt with a non-UTC offset
+    ok 33 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - expiresAt with a non-UTC offset
+      ---
+      duration_ms: 0.093121
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive without archiveDestination (key missing)
+    ok 34 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive without archiveDestination (key missing)
+      ---
+      duration_ms: 0.07058
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with archiveDestination null
+    ok 35 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with archiveDestination null
+      ---
+      duration_ms: 0.155501
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an empty archiveDestination
+    ok 36 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an empty archiveDestination
+      ---
+      duration_ms: 0.13771
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an absolute archiveDestination
+    ok 37 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an absolute archiveDestination
+      ---
+      duration_ms: 0.097221
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an archiveDestination escaping the repository
+    ok 38 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - archive with an archiveDestination escaping the repository
+      ---
+      duration_ms: 0.07466
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - preserve with a non-null archiveDestination
+    ok 39 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - preserve with a non-null archiveDestination
+      ---
+      duration_ms: 0.077501
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - replay with a non-null archiveDestination
+    ok 40 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - replay with a non-null archiveDestination
+      ---
+      duration_ms: 0.07294
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - bind-absence with a non-null archiveDestination
+    ok 41 - RV-S4-T2: the builder refuses with LOC-PACKAGE-INVALID - bind-absence with a non-null archiveDestination
+      ---
+      duration_ms: 0.100911
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - archive
+    ok 42 - RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - archive
+      ---
+      duration_ms: 0.14903
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - preserve
+    ok 43 - RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - preserve
+      ---
+      duration_ms: 0.095501
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - replay
+    ok 44 - RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - replay
+      ---
+      duration_ms: 0.09292
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - bind-absence
+    ok 45 - RV-S4-T2: positive control - all ruling-25 fields build the ten-key package - bind-absence
+      ---
+      duration_ms: 0.124561
+      type: 'test'
+      ...
+    1..45
+ok 4 - RV-S4-T2: the builder validates the shape of every package key (ruling 25, RV-F1)
+  ---
+  duration_ms: 5.391514
+  type: 'suite'
+  ...
+# Subtest: RV-S4-T2: the verifier re-checks the package shape before the proof and enforces expiry (ruling 25, RV-F1, RV-F3)
+    # Subtest: RV-S4-T2: control - the verifier accepts a hand-built well-formed package - archive
+    ok 1 - RV-S4-T2: control - the verifier accepts a hand-built well-formed package - archive
+      ---
+      duration_ms: 0.474012
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: control - the verifier accepts a hand-built well-formed package - preserve
+    ok 2 - RV-S4-T2: control - the verifier accepts a hand-built well-formed package - preserve
+      ---
+      duration_ms: 0.369871
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: control - the verifier accepts a hand-built well-formed package - replay
+    ok 3 - RV-S4-T2: control - the verifier accepts a hand-built well-formed package - replay
+      ---
+      duration_ms: 0.273191
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: control - the verifier accepts a hand-built well-formed package - bind-absence
+    ok 4 - RV-S4-T2: control - the verifier accepts a hand-built well-formed package - bind-absence
+      ---
+      duration_ms: 0.311082
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - receipt missing
+    ok 5 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - receipt missing
+      ---
+      duration_ms: 0.185951
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - receipt sha256 is not 64 hex
+    ok 6 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - receipt sha256 is not 64 hex
+      ---
+      duration_ms: 0.16717
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a sha256
+    ok 7 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - absent receipt that also carries a sha256
+      ---
+      duration_ms: 0.135501
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - repository missing tree
+    ok 8 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - repository missing tree
+      ---
+      duration_ms: 0.254711
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - unknown classification
+    ok 9 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - unknown classification
+      ---
+      duration_ms: 0.138271
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - casPrecondition missing
+    ok 10 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - casPrecondition missing
+      ---
+      duration_ms: 0.125
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - casPrecondition with an empty receiptPath
+    ok 11 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - casPrecondition with an empty receiptPath
+      ---
+      duration_ms: 0.127971
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - sessionId missing
+    ok 12 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - sessionId missing
+      ---
+      duration_ms: 0.12309
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - expiresAt missing
+    ok 13 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - expiresAt missing
+      ---
+      duration_ms: 0.122251
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - expiresAt not a date
+    ok 14 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - expiresAt not a date
+      ---
+      duration_ms: 0.129971
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - archive without archiveDestination
+    ok 15 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - archive without archiveDestination
+      ---
+      duration_ms: 0.239581
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - preserve with an archiveDestination
+    ok 16 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - preserve with an archiveDestination
+      ---
+      duration_ms: 0.244091
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - wrong package schema
+    ok 17 - RV-S4-T2: a validly signed malformed package refuses with LOC-PACKAGE-INVALID - wrong package schema
+      ---
+      duration_ms: 0.14073
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the shape is checked before the proof - a malformed package with a null proof refuses with LOC-PACKAGE-INVALID
+    ok 18 - RV-S4-T2: the shape is checked before the proof - a malformed package with a null proof refuses with LOC-PACKAGE-INVALID
+      ---
+      duration_ms: 0.105051
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: the shape is checked before the proof - a malformed package signed by a stranger refuses with LOC-PACKAGE-INVALID
+    ok 19 - RV-S4-T2: the shape is checked before the proof - a malformed package signed by a stranger refuses with LOC-PACKAGE-INVALID
+      ---
+      duration_ms: 0.14217
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - null
+    ok 20 - RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - null
+      ---
+      duration_ms: 1.082565
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - undefined
+    ok 21 - RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - undefined
+      ---
+      duration_ms: 0.188241
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - a string
+    ok 22 - RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - a string
+      ---
+      duration_ms: 0.130521
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - an array
+    ok 23 - RV-S4-T2: a package that is not an object refuses with LOC-PACKAGE-INVALID - an array
+      ---
+      duration_ms: 0.12234
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: an otherwise valid, validly signed package whose expiresAt is years in the past refuses with LOC-PROOF-EXPIRED
+    ok 24 - RV-S4-T2: an otherwise valid, validly signed package whose expiresAt is years in the past refuses with LOC-PROOF-EXPIRED
+      ---
+      duration_ms: 0.308132
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: an otherwise valid, validly signed package whose expiresAt is one minute in the past refuses with LOC-PROOF-EXPIRED
+    ok 25 - RV-S4-T2: an otherwise valid, validly signed package whose expiresAt is one minute in the past refuses with LOC-PROOF-EXPIRED
+      ---
+      duration_ms: 0.497192
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: control - the same package with an expiresAt one hour ahead verifies
+    ok 26 - RV-S4-T2: control - the same package with an expiresAt one hour ahead verifies
+      ---
+      duration_ms: 0.313871
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: changing expiresAt after signing refuses with LOC-PROOF-BINDING-MISMATCH
+    ok 27 - RV-S4-T2: changing expiresAt after signing refuses with LOC-PROOF-BINDING-MISMATCH
+      ---
+      duration_ms: 0.333562
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: changing archiveDestination after signing refuses with LOC-PROOF-BINDING-MISMATCH
+    ok 28 - RV-S4-T2: changing archiveDestination after signing refuses with LOC-PROOF-BINDING-MISMATCH
+      ---
+      duration_ms: 0.278291
+      type: 'test'
+      ...
+    1..28
+ok 5 - RV-S4-T2: the verifier re-checks the package shape before the proof and enforces expiry (ruling 25, RV-F1, RV-F3)
+  ---
+  duration_ms: 7.410842
+  type: 'suite'
+  ...
+# Subtest: RV-S4-T2: classifyLegacyReceipt never reads an unsafe or oversized target (ruling 26, RV-F2)
+    # Subtest: RV-S4-T2: a directory named <sessionId>.json is typed unavailable LOC-TARGET-UNSAFE
+    ok 1 - RV-S4-T2: a directory named <sessionId>.json is typed unavailable LOC-TARGET-UNSAFE
+      ---
+      duration_ms: 0.259951
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a symlink named <sessionId>.json to a matching receipt is typed unavailable LOC-TARGET-UNSAFE
+    ok 2 - RV-S4-T2: a symlink named <sessionId>.json to a matching receipt is typed unavailable LOC-TARGET-UNSAFE
+      ---
+      duration_ms: 0.340241
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a valid receipt one byte above 1 MiB is typed unavailable LOC-RECEIPT-OVERSIZE and is not classified
+    ok 3 - RV-S4-T2: a valid receipt one byte above 1 MiB is typed unavailable LOC-RECEIPT-OVERSIZE and is not classified
+      ---
+      duration_ms: 3.047083
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: a 2 MiB file that is not JSON is typed unavailable LOC-RECEIPT-OVERSIZE (size is judged before any parse)
+    ok 4 - RV-S4-T2: a 2 MiB file that is not JSON is typed unavailable LOC-RECEIPT-OVERSIZE (size is judged before any parse)
+      ---
+      duration_ms: 3.931107
+      type: 'test'
+      ...
+    # Subtest: RV-S4-T2: control - a valid receipt of exactly 1 MiB is within the bound and classifies as matching
+    ok 5 - RV-S4-T2: control - a valid receipt of exactly 1 MiB is within the bound and classifies as matching
+      ---
+      duration_ms: 6.475008
+      type: 'test'
+      ...
+    1..5
+ok 6 - RV-S4-T2: classifyLegacyReceipt never reads an unsafe or oversized target (ruling 26, RV-F2)
+  ---
+  duration_ms: 14.949714
+  type: 'suite'
+  ...
+1..6
+# tests 172
+# suites 6
+# pass 172
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 133.659733
+{"exitCode":0,"signal":null,"fd3Bytes":0,"fd3":"","sourceSha256After":"4eb37b09cd3a5dffc02075802882a9ecda534394452ce012db14bea79b9dd385","testsUnchanged":true,"stateProofHistory":"unchanged suites pin fixture bytes/size/mtime; actual private artifacts not read or edited"}
+
+--- stderr ---

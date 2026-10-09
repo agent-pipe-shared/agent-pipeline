@@ -2302,7 +2302,7 @@ function freshRepoIn(parentDir, name) {
   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
   gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
-  check("PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, ALLOW, { stderrEmpty: true });
+  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --checkpoint"] });
   check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
   check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
   check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
@@ -2317,16 +2317,58 @@ function freshRepoIn(parentDir, name) {
   const branch = "feat/checkpoint-bound";
   gitAt(dir, "checkout", "-q", "-b", branch);
   writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  const key = pushKeypair();
+  writeProofPolicy(dir, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+  const threatModelBody = "# fixture threat model\n";
+  writeEvidence(dir, THREAT_MODEL_REL, threatModelBody);
   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
-  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "project/critical-human-proof.json", THREAT_MODEL_REL, "checkpoint.txt");
   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
 
   const source = join(dir, "clean-bound-source");
   gitAt(dir, "worktree", "add", "--force", "-q", source, branch);
+  // Approval is read from the explicit -C source. Keep that source strictly clean:
+  // the local ignored record is not part of the commit whose signature it carries.
+  const excludePath = gitAt(source, "rev-parse", "--git-path", "info/exclude").stdout.trim();
+  writeFileSync(excludePath, `${readFileSync(excludePath, "utf8")}\n.claude/pipeline-state.json\n`);
+  const head = gitAt(source, "rev-parse", "HEAD").stdout.trim();
+  const candidate = { commit: head, tree: gitAt(source, "rev-parse", `${head}^{tree}`).stdout.trim() };
+  const destination = `refs/heads/${branch}`;
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: head, remote: "origin", destination, threatModel } }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA,
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: intent.sha256, keyReference: "po-key-1", publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+  writeState(source, {
+    schema: "pipeline.state.v0", activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head, remote: "origin", destination, threatModel,
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+    } },
+    criticalProofConsumption: [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }],
+  });
   writeFileSync(join(dir, "primary-is-dirty.txt"), "dirty primary\n");
+  if (gitAt(source, "status", "--porcelain").stdout !== "" || gitAt(dir, "status", "--porcelain").stdout === "") {
+    throw new Error("checkpoint worktree fixture must retain a clean explicit source and dirty primary");
+  }
   const refspec = `refs/heads/${branch}:refs/heads/${branch}`;
   check(
-    "PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary",
+    "PG-CHECKPOINT-WORKTREE allow signed explicit clean attached -C source over dirty primary",
     `git -C ${source} push origin ${refspec}`,
     dir,
     ALLOW,
@@ -2367,12 +2409,10 @@ function freshRepoIn(parentDir, name) {
 
 // ---- TR-C: push classifier scoping (toil-resolution rows T38, T42, T80, T82, T85) -----------------
 // Added by the tranche-2 post-image of dispatch TR-C-T-20261009. Contract: toil-resolution design section 2
-// rows T38, T42, T80, T82 and T85, read together with Ruling 81 (GREP-PUSH, a PO decision): option B of the
-// fail-closed marker rule is KEPT. A command that names git and holds one of the markers ( ) { $ backtick or a
-// nested shell -c is a push CANDIDATE and the gate refuses it, because command substitution can hide a push. That
-// refusal is an accepted false positive, so those cases pin "keeps refusing" (GREEN today and after the F slice).
-// The relief is procedural: commit with git commit -F <file>, search with rg. The F slice owes the refusal text
-// naming both shapes, which the PGC-*c / *b text cases pin RED. The text needles are deliberate literals, not
+// rows T38, T42, T80, T82 and T85, read together with Rulings 81 and 157 (GREP-PUSH): the exact plain,
+// single-line grep/commit shapes with quoted parentheses are admitted by GREP-PUSH-F. BRE backslashes,
+// heredocs and nested shell receivers remain refused; nested push/alias denials below remain mandatory.
+// Refused shapes name the relief: commit with git commit -F <file>, search with rg. The text needles are deliberate literals, not
 // prose: "git commit -F" and "use rg" (the bare letters rg also occur in the word target, which today's text
 // holds, so a looser needle would pass vacuously). Rows with no marker involved pin the row's own contract:
 // T85a (git --version is not a push) is the one RED contract pin of this block.
@@ -2389,10 +2429,10 @@ function freshRepoIn(parentDir, name) {
   check("PGC-T38a allow  a plain git grep (no marker) never reaches the push gate",
     "git grep -n needle -- README.md", dir, ALLOW, { stderrEmpty: true });
   const GREP_PAREN = 'git grep -n "(alpha|beta)" -- README.md';
-  check("PGC-T38b block  a git grep whose pattern holds a parenthesis stays refused (Ruling 81 option B, accepted false positive)",
-    GREP_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
-  check("PGC-T38c text   the refusal of a marker git grep names the relief shapes (git commit -F, use rg)",
-    GREP_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+  check("PGC-T38b allow  a plain git grep with quoted parentheses is admitted (Ruling 157 GREP-PUSH-F)",
+    GREP_PAREN, dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T38c text   admitted plain quoted-parentheses git grep emits no refusal or relief text",
+    GREP_PAREN, dir, ALLOW, { stderrEmpty: true });
 
   // T80 -- a git grep with a quoted BRE alternation.
   const GREP_BRE = 'git grep -n -e "\\(alpha\\|beta\\)" -- README.md';
@@ -2416,10 +2456,10 @@ function freshRepoIn(parentDir, name) {
   check("PGC-T82a allow  the printed commit form is admitted when its trailer values hold no marker",
     'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 goldfish" -- docs/a.md', dir, ALLOW, { stderrEmpty: true });
   const TRAILER_PAREN = 'git commit -m "chore: tidy" --trailer "AI-Assisted: true" --trailer "Dispatch: TR-C-T-20261009 (goldfish)" -- docs/a.md';
-  check("PGC-T82b block  the printed form whose Dispatch trailer holds a parenthesis stays refused (Ruling 81 option B)",
-    TRAILER_PAREN, dir, BLOCK, { stderrIncludes: [REFUSAL] });
-  check("PGC-T82c text   the refusal of the parenthesised trailer form names the relief shapes (git commit -F, use rg)",
-    TRAILER_PAREN, dir, BLOCK, { stderrIncludes: RELIEF_NEEDLES });
+  check("PGC-T82b allow  the plain printed commit form with a quoted parenthesised Dispatch trailer is admitted (Ruling 157 GREP-PUSH-F)",
+    TRAILER_PAREN, dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T82c text   admitted plain quoted-parentheses trailer form emits no refusal or relief text",
+    TRAILER_PAREN, dir, ALLOW, { stderrEmpty: true });
 
   // T85 -- git --version and nested shell text that merely mentions git.
   check("PGC-T85a allow  git --version is not a push and never reaches the push gate",
@@ -2465,8 +2505,8 @@ function freshRepoIn(parentDir, name) {
   // alias form) that carries a marker, stay refused.
   // PGM-A* (admitted) are RED today: each is a push candidate on the marker rule alone, so guard-push refuses it (exit 2
   // where 0 is expected). PGM-R* (refused) are GREEN today and are the condition of the trade: GREP-PUSH-F may not make
-  // them pass by loosening the rule. T38b/c, T80a/b, T42b/c, T82b/c and the HEREDOC_PAREN control of T5F3a pin the CURRENT
-  // refusal ("Ruling 81 option B"); GREP-PUSH-F must flip or re-aim them (TR-C-MANIFEST.md / GREP-PUSH-MANIFEST.md).
+  // them pass by loosening the rule. T38b/c and T82b/c now pin the permitted plain shapes. T80a/b, T42b/c and the
+  // HEREDOC_PAREN control of T5F3a retain their refusals (TR-C-MANIFEST.md / GREP-PUSH-MANIFEST.md).
   const PGM_PUSH = "git push origin main:refs/heads/feature-test";
   const PGM_ADMITTED = [
     ["A01", "commit: ( ) in a Dispatch trailer beside -F (the T91 shape)", 'git commit -F scratch/commit-msg/slice.txt --trailer "Dispatch: GREP-PUSH-T-20261009 (goldfish)" --trailer "AI-Assisted: true" -- docs/a.md'],
