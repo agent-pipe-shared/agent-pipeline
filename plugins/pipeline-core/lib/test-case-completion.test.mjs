@@ -256,8 +256,9 @@ if (fixture !== "") {
   // run does not: under WSL descriptor 3 is one Node itself owns (a write fails EINVAL, TCC-FD-WRITE),
   // and under any runner it can be a writable channel nobody announced. Without the Verify signal the
   // recorder has no claim on descriptor 3, so the next two pins give the child a real, writable one.
-  // The assumption, named here because Ruling 107 allows both a pipe and a temp file: a regular file
-  // is used as the channel so the parent can read back exactly what arrived.
+  // The assumption, named here because Ruling 107 as widened by Ruling 123 allows a present, writable
+  // fd 3 (pipe or regular file): a regular file stands in for the pipe so the parent can read back
+  // exactly what arrived, and fd3Probe proves the descriptor arrived.
   test("outside Verify a descriptor 3 nobody announced receives no completion bytes", () => {
     const run = runPlainFixtureSuite({ verifySignal: false, fd3: true });
     assert.equal(run.fd3Probe, "file", `descriptor 3 must reach the child as a regular file, or a zero-byte result proves nothing: ${run.stderr}`);
