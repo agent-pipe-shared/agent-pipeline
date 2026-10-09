@@ -381,10 +381,14 @@ export function scanShell(cmd, reading = READING_POSIX, keepQuotedPaths = false)
 const GIT_GLOBAL_OPT_SPACE_ARG = "-C|-c"; // mandatory space-separated arg only (no `=` form)
 const GIT_GLOBAL_OPT_EQ_OR_SPACE_ARG = "--git-dir|--work-tree|--namespace"; // `--opt=<arg>` or `--opt <arg>`
 const GIT_GLOBAL_OPT_EQ_ONLY_ARG = "--exec-path"; // `--opt` or `--opt=<arg>`, no space form
+// TR-C-F (toil T85): `--version` and `--help` are the top-level information flags. Collapsing them like any other global
+// option leaves `git --version` as a bare git word (fail-closed check #2 no longer routes it to the push gate), while
+// `git --version push origin main` still collapses to `git push origin main` and stays a candidate. `--exec-path` without
+// a value is already recognised by GIT_GLOBAL_OPT_EQ_ONLY_ARG above.
 const GIT_GLOBAL_OPT_FLAG =
   "--no-pager|--paginate|-p|-P|--literal-pathspecs|--no-optional-locks|" +
   "--icase-pathspecs|--glob-pathspecs|--noglob-pathspecs|--bare|--no-replace-objects|" +
-  "--no-lazy-fetch|--no-advice";
+  "--no-lazy-fetch|--no-advice|--version|--help";
 // A single global-option VALUE token: ordinarily a run of non-whitespace characters
 // (`\S+`), but a backslash immediately followed by whitespace is now consumed as part
 // of the SAME token instead of ending it -- in an unquoted shell argument `\ ` is an
