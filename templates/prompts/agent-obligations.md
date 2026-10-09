@@ -32,11 +32,12 @@ diagnostic pipelines are the only admitted piping.
 
 The two workarounds that cost the most time before they were written down:
 
-- **A provenance-bearing commit.** Prefer one copy-safe command: use `-m` for
-  a one-line subject/body and Git's own repeated `--trailer` switches for
-  `AI-Assisted: true` and the one required `Dispatch:` value. This avoids
-  newline-sensitive shell quoting on Bash, PowerShell and Antigravity. Use
-  `-F <msgfile>` only when the body genuinely needs multiple paragraphs.
+- **A provenance-bearing commit.** Write the message (subject, blank line,
+  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a
+  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own
+  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with
+  `--trailer` and a parenthesised trailer value such as
+  `Dispatch: <ID> (goldfish)` is refused by guard-push.
 - **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.
   Write the file from Node instead.
 

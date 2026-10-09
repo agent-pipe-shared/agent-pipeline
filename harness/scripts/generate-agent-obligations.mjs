@@ -139,11 +139,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put();
   put("The two workarounds that cost the most time before they were written down:");
   put();
-  put("- **A provenance-bearing commit.** Prefer one copy-safe command: use `-m` for");
-  put("  a one-line subject/body and Git's own repeated `--trailer` switches for");
-  put("  `AI-Assisted: true` and the one required `Dispatch:` value. This avoids");
-  put("  newline-sensitive shell quoting on Bash, PowerShell and Antigravity. Use");
-  put("  `-F <msgfile>` only when the body genuinely needs multiple paragraphs.");
+  put("- **A provenance-bearing commit.** Write the message (subject, blank line,");
+  put("  body, blank line, then the `AI-Assisted: true` and `Dispatch:` trailers) to a");
+  put("  file under `scratch/commit-msg/`. Stage with `git add -- <paths>` as its own");
+  put("  call, then commit with `git commit -F <msgfile> -- <paths>`. `-m` with");
+  put("  `--trailer` and a parenthesised trailer value such as");
+  put("  `Dispatch: <ID> (goldfish)` is refused by guard-push.");
   put("- **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.");
   put("  Write the file from Node instead.");
   put();
