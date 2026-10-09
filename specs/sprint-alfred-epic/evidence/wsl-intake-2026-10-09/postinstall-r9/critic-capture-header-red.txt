@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: RED reader accepts an actual failed identity-bearing capture with matching candidate and digest
+not ok 1 - RED reader accepts an actual failed identity-bearing capture with matching candidate and digest
+  ---
+  duration_ms: 50.677241
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:40:1'
+  failureType: 'testCodeFailure'
+  error: 'CDI-DIGEST'
+  code: 'CDI-DIGEST'
+  stack: |-
+    fail (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+    validateCriticDiagnostic (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:42:18)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: RED producer returns honest diagnostic evidence after executing a failed process
+not ok 2 - RED producer returns honest diagnostic evidence after executing a failed process
+  ---
+  duration_ms: 58.587729
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:47:1'
+  failureType: 'testCodeFailure'
+  error: 'CDI-DIGEST'
+  code: 'CDI-DIGEST'
+  stack: |-
+    fail (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+    validateCriticDiagnostic (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:85:252)
+    produceCriticDiagnostic (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:49:17)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: CONTROL digest, label, exit and candidate/source bindings remain closed
+ok 3 - CONTROL digest, label, exit and candidate/source bindings remain closed
+  ---
+  duration_ms: 61.878776
+  type: 'test'
+  ...
+# Subtest: CONTROL malformed or extra capture identity headers remain rejected even with recomputed digest
+ok 4 - CONTROL malformed or extra capture identity headers remain rejected even with recomputed digest
+  ---
+  duration_ms: 68.305104
+  type: 'test'
+  ...
+# Subtest: CONTROL selection signature/digest and diagnostic-only boundary remain checked
+ok 5 - CONTROL selection signature/digest and diagnostic-only boundary remain checked
+  ---
+  duration_ms: 18.436164
+  type: 'test'
+  ...
+# Subtest: CONTROL real producer rejects absent execution, dirty candidate, and existing output without replacing bytes
+ok 6 - CONTROL real producer rejects absent execution, dirty candidate, and existing output without replacing bytes
+  ---
+  duration_ms: 115.052305
+  type: 'test'
+  ...
+# Subtest: RED real CLI emits output and repeat invocation preserves both output artifacts
+not ok 7 - RED real CLI emits output and repeat invocation preserves both output artifacts
+  ---
+  duration_ms: 85.75942
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:116:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    CDI-DIGEST
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs:121:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: CONTROL CLI refuses preexisting JSON output before process or log creation
+ok 8 - CONTROL CLI refuses preexisting JSON output before process or log creation
+  ---
+  duration_ms: 43.339415
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 5
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 544.801046

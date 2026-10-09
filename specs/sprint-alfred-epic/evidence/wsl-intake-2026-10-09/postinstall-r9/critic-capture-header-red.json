@@ -1,0 +1,336 @@
+{
+  "schema": "isolated.capture-header-red.v1",
+  "command": "node --test --test-reporter=tap scratch/alfred-critic-capture-header-red-r1-20261009/capture-header.test.mjs",
+  "exitCode": 1,
+  "testSource": {
+    "path": "capture-header.test.mjs",
+    "sha256": "ced44d42682d304f3c15acd750082cf4e709e681102c8a2934346f25483a153e"
+  },
+  "candidate": {
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+    "tree": "013330771fd44316db8e9b0702a5c93f33e0f903"
+  },
+  "graphManifestSha256": "a36a294c2b04b5d800c52cb857b5f606352472fe81280dce7b8f745a8c244e7a",
+  "cases": [
+    {
+      "number": 1,
+      "status": "failed",
+      "name": "RED reader accepts an actual failed identity-bearing capture with matching candidate and digest"
+    },
+    {
+      "number": 2,
+      "status": "failed",
+      "name": "RED producer returns honest diagnostic evidence after executing a failed process"
+    },
+    {
+      "number": 3,
+      "status": "passed",
+      "name": "CONTROL digest, label, exit and candidate/source bindings remain closed"
+    },
+    {
+      "number": 4,
+      "status": "passed",
+      "name": "CONTROL malformed or extra capture identity headers remain rejected even with recomputed digest"
+    },
+    {
+      "number": 5,
+      "status": "passed",
+      "name": "CONTROL selection signature/digest and diagnostic-only boundary remain checked"
+    },
+    {
+      "number": 6,
+      "status": "passed",
+      "name": "CONTROL real producer rejects absent execution, dirty candidate, and existing output without replacing bytes"
+    },
+    {
+      "number": 7,
+      "status": "failed",
+      "name": "RED real CLI emits output and repeat invocation preserves both output artifacts"
+    },
+    {
+      "number": 8,
+      "status": "passed",
+      "name": "CONTROL CLI refuses preexisting JSON output before process or log creation"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "fixtures/case-3tzl5k/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-3tzl5k/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-3tzl5k/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-3wgIY7/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-3wgIY7/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-3wgIY7/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-6oxOef/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-6oxOef/evidence/cli-process.json",
+      "sha256": "95fc3e7971ee121c34ad7ac05123dbb5c683880d4abf5ef68a6c5cd85324a4fd"
+    },
+    {
+      "path": "fixtures/case-6oxOef/evidence/cli.log",
+      "sha256": "af7acaff96beff50a6da608ee02a5a8998a56412c82e260b67b633d8626b50db"
+    },
+    {
+      "path": "fixtures/case-6oxOef/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-6oxOef/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-EIsiPU/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-EIsiPU/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-EIsiPU/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-FfXZ1U/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-FfXZ1U/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-FfXZ1U/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-I5Mxab/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-I5Mxab/evidence/cli.json",
+      "sha256": "f5a0e910a566938926cb493811a069c8795acc1ebde4c6b101c39b2f0cc51882"
+    },
+    {
+      "path": "fixtures/case-I5Mxab/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-I5Mxab/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-IUWiuS/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-IUWiuS/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-IUWiuS/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-JmB9A6/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-JmB9A6/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-JmB9A6/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-KMA2Mm/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-KMA2Mm/evidence/captured.log",
+      "sha256": "af7acaff96beff50a6da608ee02a5a8998a56412c82e260b67b633d8626b50db"
+    },
+    {
+      "path": "fixtures/case-KMA2Mm/evidence/reader-input.json",
+      "sha256": "9da901677b920376b9556c17899794bfa26af0b8ef7d97df5af968e5b7b342f5"
+    },
+    {
+      "path": "fixtures/case-KMA2Mm/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-KMA2Mm/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-R9WqtN/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-R9WqtN/evidence/targeted.log",
+      "sha256": "f72739f98f54f185d4db8e0cb1b77ce703b92b0a9eae70d93ffbdb9c1ff9f239"
+    },
+    {
+      "path": "fixtures/case-R9WqtN/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-R9WqtN/spec.md",
+      "sha256": "d0c92c764c5647d43d7166efc3e7d350751de063c1388bd2e113fab4865529d3"
+    },
+    {
+      "path": "fixtures/case-U0H7oA/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-U0H7oA/evidence/cli.json",
+      "sha256": "f5a0e910a566938926cb493811a069c8795acc1ebde4c6b101c39b2f0cc51882"
+    },
+    {
+      "path": "fixtures/case-U0H7oA/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-U0H7oA/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-VcW4bO/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-VcW4bO/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-VcW4bO/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/captured.log",
+      "sha256": "af7acaff96beff50a6da608ee02a5a8998a56412c82e260b67b633d8626b50db"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/duplicate-head.log",
+      "sha256": "a3200d563a943a8f1f13dc8c347dce3bde13ff7a9402347e6137c6f1f03ec4a9"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/extra-header.log",
+      "sha256": "606a020a8964848b482dd90373af6a560cca0e2f4e6e34de2765c57300d65252"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/malformed-dirty.log",
+      "sha256": "e7247a49a0ad412bc73aae5dd39a0cc42c050e31274bc5771763b40447188fcb"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/malformed-head.log",
+      "sha256": "f48710e251aefb47ae806a116377dfcd279da61da7dcae333618c8142004504a"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/missing-stderr.log",
+      "sha256": "409f788e4d9e2eedca9b5b1359fd8d592940e9e56aaadd948ab767008950e7d1"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/reader-input.json",
+      "sha256": "9da901677b920376b9556c17899794bfa26af0b8ef7d97df5af968e5b7b342f5"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/wrong-header-head.log",
+      "sha256": "797c2f4f1b7c6d465048eb9eade72ec5574f07c1d267fe7e2f6f6dedfc5f5358"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/evidence/wrong-header-tree.log",
+      "sha256": "427db525429888d52ed5b619b40809b8fffe803de8991ed5fbc98ec7ebd43a7a"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-WocQ9q/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/evidence/captured.log",
+      "sha256": "af7acaff96beff50a6da608ee02a5a8998a56412c82e260b67b633d8626b50db"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/evidence/control-results.json",
+      "sha256": "c0ece30986a952c44e6d04fa9d9e255d31715bfdf796ff461146ae2401b6b1a7"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/evidence/reader-input.json",
+      "sha256": "9da901677b920376b9556c17899794bfa26af0b8ef7d97df5af968e5b7b342f5"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-e7d51Y/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-jpJiKs/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-jpJiKs/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-jpJiKs/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    },
+    {
+      "path": "fixtures/case-oroVL1/.gitignore",
+      "sha256": "fece5e911fee0763510b0e59e9e2f22c724ce923e49f05b3f45713d9eba7f408"
+    },
+    {
+      "path": "fixtures/case-oroVL1/evidence/targeted.log",
+      "sha256": "af7acaff96beff50a6da608ee02a5a8998a56412c82e260b67b633d8626b50db"
+    },
+    {
+      "path": "fixtures/case-oroVL1/guard.md",
+      "sha256": "756be3a90a502fa36ed0fa5c8b42a8c0e8e946d2fdc329e426fec2cecd04248f"
+    },
+    {
+      "path": "fixtures/case-oroVL1/spec.md",
+      "sha256": "6fab50512bd1d4225ac10d287609070b35ae69e92edd451a13257335e22d25ba"
+    }
+  ],
+  "setupFailure": false,
+  "limitations": [
+    "Malformed/header-negative controls reject before header grammar is repaired; passing these does not prove every rejection has an independent cause.",
+    "Successful CLI output and repeat preservation assertions remain downstream of expected RED admission. Separate preexisting-output control runs independently.",
+    "No cryptographic signature exists in the diagnostic schema; selectionSha256 integrity and closed selection shape are exercised."
+  ]
+}
