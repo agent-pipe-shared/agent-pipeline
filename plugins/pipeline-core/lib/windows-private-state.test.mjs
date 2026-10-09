@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
@@ -10,6 +11,7 @@ import {
   evaluateWindowsPrivatePathBatch,
   evaluateWindowsPrivateState,
   hardenWindowsPrivateDirectory,
+  observeWindowsPrivatePath,
   sanitizeChildEnvironment,
 } from "./windows-private-state.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
@@ -191,7 +193,54 @@ check(`hardenWindowsPrivateDirectory stays secure on repeat calls with a child f
   }
 });
 
-if (completionCases.length !== 15) throw new Error("case completion count drift: expected 15, got " + completionCases.length);
+// WIN-HARDEN-T2 (WIN-AP-S5-D slice 1, QG-04 test-only pin; red until WIN-HARDEN-F2): the pins above place their fixtures
+// under os.tmpdir(), whose inherited DACL carries an explicit FullControl ACE for the current user. A directory on a
+// data volume (this repository's checkout) inherits only a group grant of Modify, which lacks WRITE_OWNER. The shipped
+// script persists the Owner section through SetOwner unconditionally, so on that ACL the Owner write is refused with an
+// UnauthorizedAccessException (0x80070005; the hardener surfaces the exception TYPE name only, never the HRESULT) and the
+// hardener returns unavailable. The premise is built by ACL, not by placement, so it holds on any win32 host: the parent
+// is rebuilt with inheritance removed and Authenticated Users (well-known SID, no localized name) granted Modify only,
+// and the child created below it inherits exactly that. The premise is confirmed from the child's own observed ACL (the
+// current principal is the owner and no ACE names it); the pin never asserts that the hardener FAILS, so it turns green
+// when the production fix lands. A premise the host cannot build is a typed skip, never a silent pass.
+const INHERITED_MODIFY_ONLY_GRANT = "*S-1-5-11:(OI)(CI)M";
+check(`hardenWindowsPrivateDirectory stays secure, twice in a row, under an inherited Modify-only ACL with no per-user ACE (${WINDOWS_ONLY_SKIP})`, (context) => {
+  if (process.platform !== "win32") { context.skip(WINDOWS_ONLY_SKIP); return; }
+  const systemRoot = process.env.SystemRoot;
+  if (typeof systemRoot !== "string" || systemRoot.length === 0) { context.skip("premise unbuildable: SystemRoot is not set, so the fixed icacls cannot be located"); return; }
+  const icacls = join(systemRoot, "System32", "icacls.exe");
+  const runIcacls = (args) => spawnSync(icacls, args, { encoding: "utf8", shell: false, windowsHide: true, timeout: 20_000 });
+  const scratchBase = join(import.meta.dirname, "..", "..", "..", "scratch");
+  mkdirSync(scratchBase, { recursive: true });
+  const parent = mkdtempSync(join(scratchBase, "wps-harden-t2-"));
+  try {
+    const rebuilt = runIcacls([parent, "/inheritance:r", "/grant", INHERITED_MODIFY_ONLY_GRANT]);
+    if (rebuilt.status !== 0) { context.skip(`premise unbuildable: icacls could not rebuild the fixture parent ACL (exit ${rebuilt.status})`); return; }
+    const target = join(parent, "private");
+    mkdirSync(target, { mode: 0o700 });
+    const observed = observeWindowsPrivatePath(target);
+    if (observed.status !== null || observed.observation === null) { context.skip(`premise unobservable: the fixture directory ACL could not be read (${observed.status})`); return; }
+    const { currentOwner, owner, principals } = observed.observation;
+    if (owner !== currentOwner) { context.skip("premise unbuildable: the fresh fixture directory is not owned by the current principal"); return; }
+    if (principals.length === 0 || principals.includes(currentOwner)) { context.skip("premise unbuildable: the fixture directory ACL is empty or names the current principal"); return; }
+    for (let call = 1; call <= 2; call += 1) {
+      const hardened = hardenWindowsPrivateDirectory(target);
+      assert.equal(hardened.status, "secure", `hardenWindowsPrivateDirectory call ${call} of 2 under an inherited Modify-only ACL returned ${JSON.stringify(hardened)}`);
+    }
+    const assessed = assessWindowsPrivatePath(target);
+    assert.equal(assessed.status, "secure", `assessWindowsPrivatePath after two hardener calls under an inherited Modify-only ACL returned ${JSON.stringify(assessed)}`);
+  } finally {
+    try {
+      rmSync(parent, { recursive: true, force: true });
+    } catch {
+      // A hardened child or a rebuilt parent can refuse deletion; hand the whole tree back to inheritance, then remove it.
+      runIcacls([parent, "/reset", "/T", "/C", "/Q"]);
+      rmSync(parent, { recursive: true, force: true });
+    }
+  }
+});
+
+if (completionCases.length !== 16) throw new Error("case completion count drift: expected 16, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
