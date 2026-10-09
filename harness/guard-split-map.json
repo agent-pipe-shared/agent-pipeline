@@ -8,7 +8,7 @@
     "/** Codex implementation-write guard for already Pipeline-governed roots. */"
   ],
   "decisions": [
-    "R-14 settled by graph: shell-grammar <-> read-only-commands form a real cycle (5 names one way, 7 the other), so the plan's fallback is applied: one shell-grammar.mjs (L1) holds the whole of C14; read-only-commands is not a module (22 modules plus facade, not 23).",
+    "R-14 settled by graph: shell-grammar <-> read-only-commands form a real cycle (5 names one way, 7 the other), so the plan's fallback is applied: one shell-grammar.mjs (L1) holds the whole of C14; read-only-commands is not a module (23 modules plus facade; env-dump-lane added, Ruling 102).",
     "MAX_AND_CHAIN_SEGMENTS lives in grammar-denials (L0), its base cluster: the denial text there consumes it, so placing it in shell-grammar (plan section 1.2 resolution) would be an L0 -> L1 back-edge.",
     "Layer labels follow the measured edges (plan section 2: 'dependency layers from the measured edges'): sanctioned-args-onboarding calls resolveSanctionedScriptInvocation (sanctioned-args-scripts), so it is L3; command-catalogue L4; devplan-shell-lane, denial-telemetry, powershell-dialect L5. No declaration was moved for this."
   ],

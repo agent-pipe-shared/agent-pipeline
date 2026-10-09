@@ -154,3 +154,16 @@ bytes.
 - Evidence (machine-written capture of a scratch run copy that differs from the post-image only in the 14 import lines
   and the `GUARD` line): `evidence/ADR0085-T0c-b-20261009/red-run4.txt`. The two earlier failing states of the same
   fixture are in `red.txt` (`DWP2-CURRENT-CANDIDATE`, then the declined enrollment) and `enroll-diagnostic.txt`.
+
+### guard-split-contract.test.mjs (KERNEL-DOCS-c/d; Ruling 105)
+
+- Target path: `plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs`
+- Post-image: `specs/sprint-alfred-epic/signed-package/tranche-2/lib/guard/guard-split-contract.test.mjs`
+- sha256: `db53e308443a24becd1f7ba3fe07bcd92e7e240a22915ba1fe37038d89ede5d2`
+- Base blob: `609eb759d5c21339ddb220ad84d6723787962bcf` (`HEAD:plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs`)
+- Diff (line 142, one insertion and one deletion):
+  - `-  assert.equal(moduleNames.length, 22, "the map names 22 modules besides the facade");`
+  - `+  assert.equal(moduleNames.length, 23, "the map names 23 modules besides the facade");`
+- Install: copy the post-image to the target path unchanged.
+- GSC05 additionally needs the KERNEL-LIST-R86a patch (adds `lib/guard/env-dump-lane.mjs`). GSC01 is green only with this
+  post-image placed; map entry landed in `0e7c39b65`.
