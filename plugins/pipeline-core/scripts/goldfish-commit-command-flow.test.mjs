@@ -205,3 +205,125 @@ for (const { id, title, input: scenario } of COMMITFLOW_SCENARIOS) {
     assert.deepEqual(multiLine, [], "T29: the closed grammar denies any newline, so a multi-line copy command is refused");
   });
 }
+
+// PRODUCER-T -- Ruling 150 (specs/sprint-alfred-epic/plans/0.7-execution-order.md): the producer emits the
+// message-file route. Today its commit step is `git commit -m <subject> -m <body>... --trailer "Dispatch: <ID> (goldfish)"
+// --trailer "AI-Assisted: true" -- <paths>`, which guard-push refuses (the parenthesised trailer value), so the route
+// the template mandates has never been executable. Every case below is RED BY DESIGN until PRODUCER-F
+// (lib/goldfish-commit-command-flow.mjs) changes the route. Do not weaken or skip them to make the suite green.
+//
+// Assumptions, named so the fix may revisit a FIELD NAME but not the route:
+//   - the result carries the top-level string fields `message` and `messagePath`;
+//   - `messagePath` is the repo-relative, forward-slash path `scratch/commit-msg/<taskId>.txt`;
+//   - `message` is the subject, a blank line, the body paragraphs joined by blank lines, a blank line, the two trailers
+//     (`Dispatch: <taskId> (goldfish)`, `AI-Assisted: true`) and one trailing newline (the text the legacy flow
+//     already assembles internally);
+//   - the commit step argv is exactly ["commit", "-F", messagePath, "--", ...paths], with no -m and no --trailer;
+//   - the stage step (["add", "--", ...paths]) and both step `kind` labels are unchanged;
+//   - the producer stays read-only: it names the message file and never writes it (the agent writes it).
+// The input-refusal codes (GF-COMMAND-INPUT, -PATH, -PATH-ORDER, -MESSAGE) are already pinned by the second test of
+// this file and are unchanged by Ruling 150, so no duplicate (green-today) refusal case is added here.
+//
+// After PRODUCER-F these older cases pin the retired -m/--trailer form and need a TEST-ONLY update (not edited here):
+//   - "legacy Goldfish command flow renders separate exact-path argv without shell composition" (it expects the body
+//     text inside the commit command, via `'Keep the user'`);
+//   - "generated commands create one exact-path Git commit with the required trailer block" (it runs the commit step
+//     without writing a message file first).
+const PRODUCER_T_PATH = "scratch/commit-msg/GF-42.txt";
+const PRODUCER_T_MESSAGE = "fix(core): handle a quoted value\n\nKeep the user's literal $VALUE and don't expand it.\n\n"
+  + "A second reason stays separate.\n\nDispatch: GF-42 (goldfish)\nAI-Assisted: true\n";
+const PRODUCER_T_COMMIT_ARGV = ["commit", "-F", PRODUCER_T_PATH, "--", ...input.paths];
+const PRODUCER_T_CLI_ARGS = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,
+  "--summary", input.summary, ...input.bodyParagraphs.flatMap((body) => ["--body", body]),
+  ...input.paths.flatMap((path) => ["--path", path])];
+const PRODUCER_T_REASON = "Ruling 150 / PRODUCER-F: the commit step must be `git commit -F <messagePath> -- <paths>` "
+  + "(guard-push refuses -m with a parenthesised --trailer)";
+
+function assertMessageFileRoute(result) {
+  assert.equal(result.ok, true);
+  const commit = result.steps[1];
+  assert.deepEqual(commit.argv.filter((word) => word === "-m" || word === "--trailer"), [], PRODUCER_T_REASON);
+  assert.deepEqual(commit.argv, PRODUCER_T_COMMIT_ARGV, PRODUCER_T_REASON);
+  assert.deepEqual(result.steps.map((step) => step.kind), ["stage-exact-paths", "commit-exact-paths"]);
+  assert.deepEqual(result.steps[0].argv, ["add", "--", ...input.paths]);
+  assert.equal(result.messagePath, PRODUCER_T_PATH, PRODUCER_T_REASON);
+  assert.equal(result.message, PRODUCER_T_MESSAGE, PRODUCER_T_REASON);
+}
+
+test("PRODUCER-T (a) RED by design: the library commit step is the message-file route and carries message and path", () => {
+  assertMessageFileRoute(createGoldfishCommitCommandFlow(input));
+});
+
+test("PRODUCER-T (b) RED by design: the in-process CLI returns the same message-file route as the library", () => {
+  const viaCli = runGoldfishCommitCommandFlow(PRODUCER_T_CLI_ARGS);
+  assertMessageFileRoute(viaCli);
+  assert.deepEqual(viaCli, createGoldfishCommitCommandFlow(input));
+});
+
+test("PRODUCER-T (c) RED by design: messagePath and message follow the task id and the input text", () => {
+  const second = createGoldfishCommitCommandFlow({ taskId: "GF-PRODUCER-T-9", type: "test", scope: "core",
+    summary: "pin one existing path", bodyParagraphs: ["A plain reason."], paths: ["src/regular.js"] });
+  assert.equal(second.ok, true);
+  assert.deepEqual(second.steps[1].argv, ["commit", "-F", "scratch/commit-msg/GF-PRODUCER-T-9.txt", "--", "src/regular.js"],
+    PRODUCER_T_REASON);
+  assert.equal(second.messagePath, "scratch/commit-msg/GF-PRODUCER-T-9.txt", PRODUCER_T_REASON);
+  assert.equal(second.message,
+    "test(core): pin one existing path\n\nA plain reason.\n\nDispatch: GF-PRODUCER-T-9 (goldfish)\nAI-Assisted: true\n",
+    PRODUCER_T_REASON);
+});
+
+test("PRODUCER-T (d) RED by design: the producer names the message file but writes nothing", () => {
+  const runs = [["library", () => createGoldfishCommitCommandFlow(input)],
+    ["CLI", () => runGoldfishCommitCommandFlow(PRODUCER_T_CLI_ARGS)]];
+  for (const [label, produce] of runs) {
+    assert.throws(() => readFileSync(PRODUCER_T_PATH), { code: "ENOENT" }, `${label}: no file at the message path before the call`);
+    const result = produce();
+    assert.equal(result.messagePath, PRODUCER_T_PATH, `${label}: ${PRODUCER_T_REASON}`);
+    assert.throws(() => readFileSync(PRODUCER_T_PATH), { code: "ENOENT" },
+      `${label}: the producer is read-only; the agent writes the message file`);
+  }
+});
+
+test("PRODUCER-T (e) RED by design: every commit command rendering parses to exactly the message-file argv", () => {
+  const commit = createGoldfishCommitCommandFlow(input).steps[1];
+  assert.deepEqual(commit.argv, PRODUCER_T_COMMIT_ARGV, PRODUCER_T_REASON);
+  for (const platform of [CLAUDE_BASH_SHELL_DIALECT_PLATFORM, "win32"]) {
+    for (const [field, text] of [["command", commit.command], ["copyCommand.posix", commit.copyCommand.posix]]) {
+      const label = `${field}@${platform}: ${JSON.stringify(text)}`;
+      const parsed = parseGuardCommand(text, "/fixture/repository", { platform });
+      assert.equal(parsed.parseStatus, "accepted", label);
+      assert.deepEqual(parsed.segments[0].argv, PRODUCER_T_COMMIT_ARGV, label);
+      assert.deepEqual(parsed.operators, [], label);
+      assert.deepEqual(parsed.redirects, [], label);
+    }
+  }
+  assert.ok(commit.copyCommand.powershell.startsWith(
+    "& git 'commit' '-F' 'scratch/commit-msg/GF-42.txt' '--' 'src/odd value.txt' 'src/regular.js'"),
+  commit.copyCommand.powershell);
+});
+
+test("PRODUCER-T (f) RED by design: with the returned message written to messagePath, the two steps create the exact-path commit", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "goldfish-command-flow-f-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const run = (program, argv) => {
+    const result = spawnSync(program, argv, { cwd: root, encoding: "utf8", shell: false,
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+    assert.equal(result.status, 0, `${program} ${argv[0]}: ${result.stderr ?? result.error?.message}`);
+    return result.stdout;
+  };
+  run("git", ["init", "-q"]);
+  run("git", ["config", "user.name", "Fixture"]);
+  run("git", ["config", "user.email", "fixture@example.invalid"]);
+  mkdirSync(join(root, "src"));
+  writeFileSync(join(root, "src", "odd value.txt"), "exact content\n");
+  const plan = createGoldfishCommitCommandFlow({ ...input, paths: ["src/odd value.txt"] });
+  assert.equal(plan.ok, true);
+  assert.equal(typeof plan.messagePath, "string", PRODUCER_T_REASON);
+  assert.equal(typeof plan.message, "string", PRODUCER_T_REASON);
+  mkdirSync(join(root, "scratch", "commit-msg"), { recursive: true });
+  writeFileSync(join(root, plan.messagePath), plan.message);
+  for (const step of plan.steps) run("bash", ["-c", step.command]);
+  assert.equal(run("git", ["show", "--format=", "--name-only", "HEAD"]).trim(), "src/odd value.txt");
+  assert.equal(run("git", ["show", "-s", "--format=%B", "HEAD"]).trimEnd(), PRODUCER_T_MESSAGE.trimEnd());
+  assert.equal(readFileSync(join(root, "src", "odd value.txt"), "utf8"), "exact content\n");
+});
