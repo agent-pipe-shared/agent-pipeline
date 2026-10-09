@@ -104,6 +104,35 @@ function fixture(source, { omitCodex = false, omitRuntime = [] } = {}) {
   return root;
 }
 
+// Exact capability probes: each returns a typed "host limitation: ..." reason when this host cannot do the thing, else null.
+function symlinkHostLimitation() {
+  const dir = mkdtempSync(join(tmpdir(), "host-probe-"));
+  try {
+    writeFileSync(join(dir, "file"), "x");
+    symlinkSync(join(dir, "file"), join(dir, "link"));
+    return null;
+  } catch (error) {
+    return `host limitation: file symlink creation is refused on this host (${error && error.code})`;
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+function readOnlyDirHostLimitation() {
+  const dir = mkdtempSync(join(tmpdir(), "host-probe-"));
+  const ro = join(dir, "ro");
+  try {
+    mkdirSync(ro);
+    chmodSync(ro, 0o555);
+    try {
+      writeFileSync(join(ro, "probe"), "x");
+    } catch {
+      return null;
+    }
+    return "host limitation: a 0o555 directory still accepts writes on this host (mode bits not enforced)";
+  } finally {
+    chmodSync(ro, 0o755);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 const cases = [];
 function record(name, run) {
   const id = `RPM${String(cases.length + 1).padStart(2, "0")}`;
@@ -1017,7 +1046,9 @@ record("slim valid V3 runtime initialization is explicit, read-only at plan, and
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-record("a host-managed-Codex fresh-project apply satisfies its own target boundary invariant", () => {
+record("a host-managed-Codex fresh-project apply satisfies its own target boundary invariant", (t) => {
+  const hostLimit = readOnlyDirHostLimitation();
+  if (hostLimit) { t.skip(hostLimit); return; }
   // Reproduces the host-managed-Codex fresh-project branch: `.codex` is a
   // read-only, empty, host-owned mount (hasCodexRuntimeControlMount), and
   // `.claude/*` runtime targets are absent. `validateTargetBoundary()` must
@@ -1277,7 +1308,9 @@ record("existing neutral authority mirrors join the authenticated migration tran
   }
 });
 
-record("an unsafe existing neutral authority mirror fails planning without a transaction", () => {
+record("an unsafe existing neutral authority mirror fails planning without a transaction", (t) => {
+  const hostLimit = symlinkHostLimitation();
+  if (hostLimit) { t.skip(hostLimit); return; }
   const root = fixture(yaml(v3Intent()));
   try {
     mkdirSync(join(root, "project"));
