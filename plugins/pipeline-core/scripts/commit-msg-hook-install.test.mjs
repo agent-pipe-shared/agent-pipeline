@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
-import { dirname, join } from "node:path";
+import { after } from "node:test";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 
@@ -30,8 +31,25 @@ function test(name, optionsOrRun, possibleRun) {
 }
 
 
-const PLUGIN_LIB_DIR = process.env.PIPELINE_CORE_TEST_PLUGIN_LIB_DIR
-  ?? join(fileURLToPath(new URL("..", import.meta.url)), "lib");
+// TR-J-T3 (TOILRES T44/T58): applyInstall inventories the plugin root twice (publishGitHookRuntimeSnapshot), so a
+// parallel writer into the LIVE tree fails these cases with GHS-SOURCE-DRIFT. Without an explicit lib-dir override
+// the suite therefore snapshots a frozen copy of the plugin root, made once at load and removed in after().
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const FROZEN_PLUGIN_ROOT = process.env.PIPELINE_CORE_TEST_PLUGIN_LIB_DIR === undefined
+  ? mkdtempSync(join(tmpdir(), "commit-msg-hook-plugin-"))
+  : null;
+if (FROZEN_PLUGIN_ROOT !== null) {
+  cpSync(LIVE_PLUGIN_ROOT, FROZEN_PLUGIN_ROOT, { recursive: true });
+  after(() => { rmSync(FROZEN_PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
+}
+const PLUGIN_LIB_DIR = process.env.PIPELINE_CORE_TEST_PLUGIN_LIB_DIR ?? join(FROZEN_PLUGIN_ROOT, "lib");
+if (FROZEN_PLUGIN_ROOT !== null) {
+  // Proof that the copy, not the live tree, is what the install cases snapshot.
+  assert.ok(PLUGIN_LIB_DIR.startsWith(FROZEN_PLUGIN_ROOT), "PLUGIN_LIB_DIR must lie under the frozen plugin copy");
+  assert.notEqual(PLUGIN_LIB_DIR, join(LIVE_PLUGIN_ROOT, "lib"), "PLUGIN_LIB_DIR must not be the live lib dir");
+  assert.ok(existsSync(join(PLUGIN_LIB_DIR, "git-hook-runtime-snapshot.mjs")), "the frozen copy must carry the snapshot module");
+  process.stderr.write(`# frozen plugin copy in use: ${basename(FROZEN_PLUGIN_ROOT)}\n`);
+}
 
 function enrollFixture(dir) {
   const controller = createGovernanceScopeController({hostStateRoot:join(dir, '.git', 'fixture-host-state')});
@@ -206,10 +224,11 @@ test("applyInstall refuses a foreign commit-msg hook without changing it", () =>
 
 test("install, managed upgrade and removal preserve ownership checks", () => {
   const { dir } = freshRepo("lifecycle");
-  assert.equal(planInstall({ rootDir: dir }).status, "ready");
+  assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "ready");
   const first = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
   assert.equal(first.status, "installed");
-  assert.equal(planInstall({ rootDir: dir }).status, "ready-to-upgrade");
+  // TR-J-T3: the currentness check of an installed marker reads the source tree, so it must read the same frozen copy.
+  assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "ready-to-upgrade");
   const second = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
   assert.equal(second.status, "upgraded");
   assert.equal(planRemoval({ rootDir: dir }).status, "ready");
@@ -385,6 +404,9 @@ test("--install CLI: a typed refusal thrown by the install path is reported as i
       'import { register } from "node:module";',
       `register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(hooksSource)}`)});`,
     ].join("\n"), "utf8");
+    // TR-J-T3: deliberately the LIVE installer. The injected stub throws inside ensureHardenedPrivateDirectory, which
+    // runs before publishGitHookRuntimeSnapshot, and a fresh repository has no marker to inspect, so this case never
+    // inventories the live tree and its assertion is about the CLI's typed-refusal JSON, not about a lib path.
     const installer = fileURLToPath(new URL("./commit-msg-hook-install.mjs", import.meta.url));
     const result = spawnSync(process.execPath, ["--import", pathToFileURL(preloadPath).href, installer, "--install"], {
       cwd: repoDir,
