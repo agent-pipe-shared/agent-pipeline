@@ -1,0 +1,168 @@
+command: node --test --test-name-pattern "^(FINAL-READER|S[0-9]+ stored verifier)" plugins/pipeline-core/lib/design-approval-route.test.mjs
+label: ALFRED-FINAL-READER-T-20261009
+exitCode: 1
+head: a4be4bff644fe5f43db77a0c0a1050fa74cd3f00
+tree: 883a0ba07d6276371d7680e5975dd33cf9a4d9c5
+dirty: true
+--- stdout ---
+✔ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (32.805623ms)
+✔ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (1.903545ms)
+✔ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (2.405949ms)
+✔ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (5.597985ms)
+✔ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (4.376785ms)
+✔ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (1.997587ms)
+✔ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (2.284558ms)
+✔ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (3.82655ms)
+✔ S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today) (0.998638ms)
+✔ S10 stored verifier: a signature made with another key over the same intent is refused (2.816532ms)
+✔ S11 stored verifier: a proof whose key is not in the configured anchors is refused (3.473128ms)
+✖ FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state (5.881978ms)
+✖ FINAL-READER accepts the explicit rebind path with readiness execution disabled (1.100159ms)
+✖ FINAL-READER refuses a forged stored signature after its valid positive control (0.836577ms)
+✖ FINAL-READER refuses changed source bytes after its valid positive control (0.813126ms)
+✖ FINAL-READER refuses package and presentation digest drift after valid positive controls (0.954268ms)
+✖ FINAL-READER refuses Advisor-exception attribution drift after its valid positive control (0.757476ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 11
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 120.964998
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:906:1
+✖ FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state (5.881978ms)
+  AssertionError [ERR_ASSERTION]: RED: default final verification after transfer: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:911:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:907:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:916:1
+✖ FINAL-READER accepts the explicit rebind path with readiness execution disabled (1.100159ms)
+  AssertionError [ERR_ASSERTION]: RED: explicit rebind without readiness execution: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:918:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:917:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:923:1
+✖ FINAL-READER refuses a forged stored signature after its valid positive control (0.836577ms)
+  AssertionError [ERR_ASSERTION]: RED: positive control before forged-signature denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:925:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:924:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:938:1
+✖ FINAL-READER refuses changed source bytes after its valid positive control (0.813126ms)
+  AssertionError [ERR_ASSERTION]: RED: positive control before source-drift denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:940:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:939:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:947:1
+✖ FINAL-READER refuses package and presentation digest drift after valid positive controls (0.954268ms)
+  AssertionError [ERR_ASSERTION]: RED: positive control before package-digest denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:949:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:948:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/design-approval-route.test.mjs:963:1
+✖ FINAL-READER refuses Advisor-exception attribution drift after its valid positive control (0.757476ms)
+  AssertionError [ERR_ASSERTION]: RED: positive control before Advisor-exception denial: expected the portable signed approval to verify, got {"ok":false,"code":"the portable final reader must not sample a live candidate"}
+  
+  false !== true
+  
+      at assertAccepted (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:899:14)
+      at file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:965:5
+      at async file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:902:5
+      at async withRepo (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:244:5)
+      at async withFinalReaderApproval (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:863:3)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/design-approval-route.test.mjs:964:3)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

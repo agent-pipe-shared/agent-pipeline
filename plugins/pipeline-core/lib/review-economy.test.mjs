@@ -360,14 +360,20 @@ ok("RE41 heartbeat/running fields have no progress channel", evaluateProgress({ 
 ok("RE42 tail above 4096 bytes is rejected", evaluateProgress(progress0, progress0, { nowMs: 60, lastProgressAtMs: 10, stagnationIntervalMs: 50 }, { ...diagnostic, capturedTailBytes: 4097 }).ok === false);
 
 const capacity = { candidateFrozen: false, sandboxedWork: true, availableSlots: 2, criticSlotReserved: true, recoverySlotReserved: true, reviewRouteAvailable: true, unavailabilityPolicy: "defer", preauthorizedFallbackAvailable: false, preauthorizedFallbackEvidenceSha256: null };
-ok("RE43 reserved Critic and recovery slots admit work", admitCapacity(capacity).action === "continue");
-ok("RE44 missing Critic slot blocks before freeze", admitCapacity({ ...capacity, criticSlotReserved: false }).action === "capacity-blocker");
-ok("RE45 missing recovery slot blocks sandboxed work", admitCapacity({ ...capacity, recoverySlotReserved: false }).action === "capacity-blocker");
-ok("RE45a Critic and recovery reservations require distinct slots", admitCapacity({ ...capacity, availableSlots: 1 }).code === "RE-DISTINCT-RESERVED-SLOTS-UNAVAILABLE");
+ok("RE43 one free slot admits non-frozen sandboxed work without role reservations", admitCapacity({ ...capacity, availableSlots: 1, criticSlotReserved: false, recoverySlotReserved: false }).action === "continue");
+ok("RE44 one free slot admits work with only the legacy Critic reservation", admitCapacity({ ...capacity, availableSlots: 1, criticSlotReserved: true, recoverySlotReserved: false }).action === "continue");
+ok("RE45 one free slot admits work with only the legacy recovery reservation", admitCapacity({ ...capacity, availableSlots: 1, criticSlotReserved: false, recoverySlotReserved: true }).action === "continue");
+ok("RE45a one free slot admits work with both legacy reservations", admitCapacity({ ...capacity, availableSlots: 1, criticSlotReserved: true, recoverySlotReserved: true }).action === "continue");
+const noCapacity = admitCapacity({ ...capacity, availableSlots: 0, criticSlotReserved: false, recoverySlotReserved: false });
+ok("RE45b non-frozen work without an available slot is refused with typed capacity blocker", noCapacity.action === "capacity-blocker" && noCapacity.code === "RE-CAPACITY-NO-AVAILABLE-SLOT");
+const noSandboxCapacity = admitCapacity({ ...capacity, candidateFrozen: true, availableSlots: 0, criticSlotReserved: false, recoverySlotReserved: false });
+ok("RE45c sandboxed work without an available slot is refused with typed capacity blocker", noSandboxCapacity.action === "capacity-blocker" && noSandboxCapacity.code === "RE-CAPACITY-NO-AVAILABLE-SLOT");
+ok("RE45d frozen non-sandboxed work stays admissible with zero available slots", admitCapacity({ ...capacity, candidateFrozen: true, sandboxedWork: false, availableSlots: 0, criticSlotReserved: false, recoverySlotReserved: false }).action === "continue");
 ok("RE46 unavailable route defaults to defer", admitCapacity({ ...capacity, reviewRouteAvailable: false }).action === "defer");
 ok("RE47 only evidence-bound preauthorized route may substitute", admitCapacity({ ...capacity, reviewRouteAvailable: false, unavailabilityPolicy: "preauthorized-fallback", preauthorizedFallbackAvailable: true, preauthorizedFallbackEvidenceSha256: A }).action === "preauthorized-fallback");
 ok("RE47a unbound fallback availability still defers", admitCapacity({ ...capacity, reviewRouteAvailable: false, unavailabilityPolicy: "preauthorized-fallback", preauthorizedFallbackAvailable: true }).action === "defer");
 ok("RE48 unavailable mapped fallback still defers", admitCapacity({ ...capacity, reviewRouteAvailable: false, unavailabilityPolicy: "preauthorized-fallback", preauthorizedFallbackAvailable: false }).action === "defer");
+ok("RE48a malformed fallback evidence is refused as invalid capacity input", admitCapacity({ ...capacity, reviewRouteAvailable: false, unavailabilityPolicy: "preauthorized-fallback", preauthorizedFallbackAvailable: true, preauthorizedFallbackEvidenceSha256: "invalid" }).code === "RE-CAPACITY-SHAPE");
 
 function option(kind, index) {
   return {

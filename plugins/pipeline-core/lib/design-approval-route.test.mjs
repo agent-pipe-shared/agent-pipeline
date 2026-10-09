@@ -854,3 +854,118 @@ test("S11 stored verifier: a proof whose key is not in the configured anchors is
     assertRefused(await call({ anchors: otherAnchors }), "PO-APPROVAL-PROOF-INVALID", "the signer's key reference is not anchored");
   });
 });
+
+// ---------------------------------------------------------------------------
+// FINAL-READER: portable pre-v8 final approval acceptance and denial pins.
+// ---------------------------------------------------------------------------
+
+async function withFinalReaderApproval(body) {
+  await withRepo({}, async (fixture) => {
+    const verify = await loadExport("./architecture-design.mjs", "verifyFinalDesignWorkflowApproval", "final-reader");
+    const signed = await signedApproval(fixture);
+    fixture.write("project/critical-human-proof.json", `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["push"],
+      trustAnchor: signed.anchors[0],
+    }, null, 2)}\n`);
+    let candidateReads = 0;
+    const deps = {
+      gitCandidate() {
+        candidateReads += 1;
+        throw new Error("the portable final reader must not sample a live candidate");
+      },
+    };
+    const args = fixture.args();
+    const state = {
+      planApproved: true,
+      planSubmission: { profile: "epic", featureId: FEATURE },
+      activeFeature: { id: FEATURE },
+      planPresentation: {
+        designWorkflowPackagePath: PACKAGE_PATH,
+        designWorkflowPackageSha256: fixture.packageSha256,
+      },
+      planApproval: {
+        designWorkflowPackagePath: PACKAGE_PATH,
+        designWorkflowPackageSha256: fixture.packageSha256,
+        designWorkflowApproval: signed.approval,
+      },
+    };
+    const authority = { planPath: PRD_PATH, specPath: SPEC_PATH };
+    const observation = { planSha256: args.planSha256, specSha256: args.specSha256 };
+    const call = ({ nextState = state, requireReadinessExecution } = {}) => verify(
+      fixture.repoRoot, nextState, authority, observation, deps, requireReadinessExecution,
+    );
+    const assertAccepted = (result, why) => {
+      assert.equal(result?.ok, true, `RED: ${why}: expected the portable signed approval to verify, got ${JSON.stringify(result)}`);
+    };
+    const assertNoCandidateReads = () => assert.equal(candidateReads, 0, "the portable final reader sampled a live candidate");
+    await body({ fixture, signed, state, call, assertAccepted, assertNoCandidateReads });
+  });
+}
+
+test("FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state", async () => {
+  await withFinalReaderApproval(async ({ fixture, call, assertAccepted, assertNoCandidateReads }) => {
+    assert.equal(existsSync(join(fixture.repoRoot, ".git")), false, "fixture precondition: transferred repo has no .git");
+    assert.equal(existsSync(join(fixture.repoRoot, "evidence", "design-course", FEATURE, "r1.readiness.json")), false,
+      "fixture precondition: no readiness file");
+    assertAccepted(await call(), "default final verification after transfer");
+    assertNoCandidateReads();
+  });
+});
+
+test("FINAL-READER accepts the explicit rebind path with readiness execution disabled", async () => {
+  await withFinalReaderApproval(async ({ call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call({ requireReadinessExecution: false }), "explicit rebind without readiness execution");
+    assertNoCandidateReads();
+  });
+});
+
+test("FINAL-READER refuses a forged stored signature after its valid positive control", async () => {
+  await withFinalReaderApproval(async ({ signed, state, call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call(), "positive control before forged-signature denial");
+    const other = generateKeyPairSync("ed25519");
+    const forgedProof = {
+      ...signed.approval.proof,
+      signatureBase64: sign(null, Buffer.from(signed.intent.sha256), other.privateKey).toString("base64"),
+    };
+    const tamperedState = structuredClone(state);
+    tamperedState.planApproval.designWorkflowApproval.proof = forgedProof;
+    assertRefused(await call({ nextState: tamperedState }), null, "forged signature");
+    assertNoCandidateReads();
+  });
+});
+
+test("FINAL-READER refuses changed source bytes after its valid positive control", async () => {
+  await withFinalReaderApproval(async ({ fixture, call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call(), "positive control before source-drift denial");
+    fixture.write(SPEC_PATH, `${SPEC_TEXT}Changed after approval.\n`);
+    assertRefused(await call(), null, "changed Spec source bytes");
+    assertNoCandidateReads();
+  });
+});
+
+test("FINAL-READER refuses package and presentation digest drift after valid positive controls", async () => {
+  await withFinalReaderApproval(async ({ fixture, state, call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call(), "positive control before package-digest denial");
+    fixture.write(PACKAGE_PATH, `${canon({ ...fixture.workflowPackage, createdAt: "2026-10-02T00:00:00.000Z" })}\n`);
+    assertRefused(await call(), null, "changed package bytes under the approved package digest");
+    assertNoCandidateReads();
+  });
+  await withFinalReaderApproval(async ({ state, call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call(), "positive control before presentation-digest denial");
+    const driftedState = structuredClone(state);
+    driftedState.planPresentation.designWorkflowPackageSha256 = digest("presentation-drift");
+    assertRefused(await call({ nextState: driftedState }), "DWP-FINAL-APPROVAL-PRESENTATION", "presentation digest differs");
+    assertNoCandidateReads();
+  });
+});
+
+test("FINAL-READER refuses Advisor-exception attribution drift after its valid positive control", async () => {
+  await withFinalReaderApproval(async ({ state, call, assertAccepted, assertNoCandidateReads }) => {
+    assertAccepted(await call(), "positive control before Advisor-exception denial");
+    const driftedState = structuredClone(state);
+    driftedState.planApproval.designWorkflowApproval.advisorException.rationale = "A different attribution.";
+    assertRefused(await call({ nextState: driftedState }), null, "Advisor-exception rationale differs from package attribution");
+    assertNoCandidateReads();
+  });
+});
