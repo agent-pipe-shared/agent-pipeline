@@ -442,3 +442,48 @@ describe("Adoption authority anti-forgery and durable readback", () => {
     assert.notEqual(missingSchema.status, 0);
   });
 });
+
+// ADOPT-SIGN-T: the request file the PO signs is written by `prepare` itself, not by a shell
+// redirect (the closed shell grammar admits none), so the signing ceremony can read it back.
+// `--out` is pinned with an absolute path under the fixture root so the pin holds whether a
+// later implementation resolves a relative value against --root or against the working directory.
+describe("ADOPT-SIGN-T: adoption request file for the signing ceremony", () => {
+  const script = path.resolve("plugins/pipeline-core/scripts/architecture-adoption.mjs");
+  let root, escapeTarget;
+  const prepareArgs = () => ["--root", root, "--decision", "approved-scoped", "--scope", "src/", "--rationale", "Request file fixture", "--decision-ref", "ADOPT-SIGN-FIXTURE-1", "--decided-at", "2026-01-01T00:00:00.000Z", "--json"];
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-request-file-"));
+    escapeTarget = path.join(os.tmpdir(), `adoption-request-escape-${process.pid}.json`);
+    setupAdoptionFixture(root);
+    fs.mkdirSync(path.join(root, "scratch"), { recursive: true });
+  });
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(escapeTarget, { force: true });
+  });
+
+  it("ADOPT-SIGN-T: prepare --out writes the request JSON byte-identical to its stdout form", () => {
+    const printed = spawnSync(process.execPath, [script, "prepare", ...prepareArgs()], { encoding: "utf8" });
+    assert.equal(printed.status, 0, printed.stderr);
+    const target = path.join(root, "scratch", "adoption-request.json");
+    const written = spawnSync(process.execPath, [script, "prepare", ...prepareArgs(), "--out", target], { encoding: "utf8" });
+    assert.equal(written.status, 0, `prepare must accept --out <scratch path>: ${written.stderr}`);
+    const bytes = fs.readFileSync(target, "utf8");
+    assert.equal(bytes, printed.stdout, "the request file must be byte-identical to the stdout form of the same prepare");
+    assert.equal(JSON.parse(bytes).schema, "pipeline.adoption-approval-request.v1");
+  });
+
+  it("ADOPT-SIGN-T: prepare --out refuses a path outside scratch/, names the boundary and writes nothing", () => {
+    for (const target of [
+      path.join(root, "adoption-request.json"),
+      path.join(root, "scratch", "..", "adoption-request-dotdot.json"),
+      escapeTarget,
+    ]) {
+      const refused = spawnSync(process.execPath, [script, "prepare", ...prepareArgs(), "--out", target], { encoding: "utf8" });
+      assert.notEqual(refused.status, 0, `${target} is outside scratch/ and must be refused`);
+      assert.doesNotMatch(refused.stderr, /Unknown or incomplete option/u, "the refusal must be about the path, not an unrecognised --out flag");
+      assert.match(refused.stderr, /scratch/u, "the refusal must name the scratch/ boundary");
+      assert.equal(fs.existsSync(path.resolve(target)), false, "a refused --out must write nothing");
+    }
+  });
+});

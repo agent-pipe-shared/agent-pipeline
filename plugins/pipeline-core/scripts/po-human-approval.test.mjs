@@ -433,6 +433,109 @@ test("terminal-template PO setup producer preserves argv and independently reads
   } finally { cleanup(dirs); }
 });
 
+/* ------------------------------------------------------------------ *
+ * ADOPT-SIGN-T: `sign-intent --request` signs an adoption request file.
+ * Encrypted PKCS#8 fixture key throughout (Ruling 78); signing goes through
+ * fakeSignSpawn exactly as in NVA-SIGNONCE-1 below.
+ * ------------------------------------------------------------------ */
+import { setupAdoptionFixture as adoptSignSetupFixture } from "./architecture-adoption-test-fixture.mjs";
+import { prepareAdoptionAuthority as adoptSignPrepare } from "../lib/architecture-adoption-authority.mjs";
+
+/** A genuine pipeline.adoption-approval-request.v1, prepared in its own throwaway git-backed root. */
+function adoptSignRequest() {
+  const adoptionRoot = mkdtempSync(join(tmpdir(), "po-adopt-sign-root-"));
+  try {
+    adoptSignSetupFixture(adoptionRoot);
+    return adoptSignPrepare({ rootDir: adoptionRoot, decision: "approved-scoped", scope: ["src/", "docs/adr/"], rationale: "Adoption signing fixture decision", decidedAt: "2026-01-01T00:00:00.000Z", expiresAt: null, reviewDate: null, decisionRef: "ADOPT-SIGN-FIXTURE-1" });
+  } finally { rmSync(adoptionRoot, { recursive: true, force: true }); }
+}
+
+test("ADOPT-SIGN-T: sign-intent --request signs an adoption request by its intent.sha256, discloses the adoption and writes the --intent-sha256 proof shape", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "adopt-sign-fixture-passphrase";
+    const { privateKeyPem, authority } = encryptedKeyFixture(dirs.directory, passphrase);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const request = adoptSignRequest();
+    const intentSha256 = request.intent.sha256;
+    assert.equal(request.schema, "pipeline.adoption-approval-request.v1");
+    assert.match(intentSha256, /^[a-f0-9]{64}$/u);
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    writeFileSync(join(scratchDir, "adoption-request-1.json"), `${JSON.stringify(request, null, 2)}\n`);
+    const dependencies = {
+      spawn: fakeSignSpawn(privateKeyPem, passphrase),
+      readConfirmation: () => { throw new Error("readConfirmation must not be called for a passphrase-protected key"); },
+      isTTY: true,
+    };
+    let result;
+    const output = captureStdout(() => {
+      result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/adoption-request-1.json"], dependencies);
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(result.intentSha256, intentSha256, "the signed digest is the request's intent.sha256");
+
+    // The adoption itself is disclosed, read out of the request: not the generic opaque-digest fallback.
+    assert.match(output, new RegExp(intentSha256, "u"), "the digest being signed must be disclosed");
+    assert.ok(output.includes(request.subject.decisionRef), "the decision ref must be disclosed");
+    assert.ok(output.includes(request.subject.decision), "the decision state must be disclosed");
+    for (const entry of [].concat(request.subject.scope)) assert.ok(output.includes(entry), `scope entry ${entry} must be disclosed`);
+    assert.doesNotMatch(output, /no recorded request resolves/u, "an adoption request must not fall back to the opaque-digest disclosure");
+
+    // Same proof shape as the --intent-sha256 route, mirrored next to the request.
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
+    assert.deepEqual(Object.keys(proof).sort(), ["intentSha256", "keyReference", "publicKey", "schema", "signatureBase64"]);
+    assert.equal(proof.schema, "pipeline.po-approval-proof.v1");
+    assert.equal(proof.intentSha256, intentSha256);
+    assert.equal(proof.keyReference, authority.keyReference);
+    assert.ok(String(result.scratchProofPath).endsWith("adoption-proof-1.json"), "the proof must be mirrored next to the request");
+    assert.deepEqual(JSON.parse(readFileSync(result.scratchProofPath, "utf8")), proof);
+    const verified = verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof });
+    assert.equal(verified.verified, true);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("ADOPT-SIGN-T: sign-intent --request refuses an adoption request whose intent.sha256 does not match, before any confirmation or signing", () => {
+  const dirs = fixtureDirs();
+  try {
+    const passphrase = "adopt-sign-fixture-passphrase";
+    const { privateKeyPem } = encryptedKeyFixture(dirs.directory, passphrase);
+    anchorFixtureKey(dirs.repoRoot, dirs.directory);
+    const tampered = structuredClone(adoptSignRequest());
+    tampered.intent.sha256 = "a".repeat(64);
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    writeFileSync(join(scratchDir, "adoption-request-tampered.json"), `${JSON.stringify(tampered, null, 2)}\n`);
+    const inner = fakeSignSpawn(privateKeyPem, passphrase);
+    let signs = 0; let confirmations = 0;
+    const dependencies = {
+      spawn: (executable, args) => {
+        if (executable === "openssl" && args[0] === "pkeyutl" && args.some((entry) => /po-private\.pem/u.test(String(entry)))) signs += 1;
+        return inner(executable, args);
+      },
+      readConfirmation: () => { confirmations += 1; return "approve"; },
+      isTTY: true,
+    };
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/adoption-request-tampered.json"], dependencies),
+      (error) => {
+        assert.match(error.message, /adoption.*request does not bind/u, "the refusal must be adoption-specific, not the generic missing-field refusal");
+        assert.doesNotMatch(error.message, /must carry an intentSha256 field/u);
+        return true;
+      },
+    );
+    assert.equal(signs, 0, "a mismatched request must never reach the signing spawn");
+    assert.equal(confirmations, 0, "a mismatched request must be refused before any confirmation");
+    assert.equal(existsSync(join(scratchDir, "adoption-proof-tampered.json")), false);
+    assert.equal(existsSync(join(dirs.directory, `proof-${"a".repeat(64)}.json`)), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 
 // SETUP-2b: this repository's own gitignored scratch/ tree, never system tmpdir and
