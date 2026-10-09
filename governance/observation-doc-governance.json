@@ -330,6 +330,8 @@
           "docs/adr/draft-scanner-diagnostic-sidecar.json",
           "docs/adr/draft-scanner-diagnostic-sidecar.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
+          "docs/adr/draft-shared-agent-capacity.json",
+          "docs/adr/draft-shared-agent-capacity.md",
           "docs/adr/draft-three-main-update-channels.json",
           "docs/adr/draft-three-main-update-channels.md",
           "docs/codex-isolated-critic-foundation.md",
