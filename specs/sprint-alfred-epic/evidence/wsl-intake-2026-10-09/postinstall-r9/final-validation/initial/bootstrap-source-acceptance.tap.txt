@@ -1,0 +1,102 @@
+TAP version 13
+# Subtest: PX0-AC-09: a Codex-only consumer with no .claude/settings.json resolves its source from the native Codex registry
+ok 1 - PX0-AC-09: a Codex-only consumer with no .claude/settings.json resolves its source from the native Codex registry
+  ---
+  duration_ms: 1.531213
+  type: 'test'
+  ...
+# Subtest: PX0-AC-09: an unavailable Codex registry fails closed to null instead of falling back to another source
+ok 2 - PX0-AC-09: an unavailable Codex registry fails closed to null instead of falling back to another source
+  ---
+  duration_ms: 0.11219
+  type: 'test'
+  ...
+# Subtest: PX0-AC-10: a noGit unenrolled observer is inactive without source attestation
+ok 3 - PX0-AC-10: a noGit unenrolled observer is inactive without source attestation
+  ---
+  duration_ms: 4.945627
+  type: 'test'
+  ...
+# Subtest: PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity
+ok 4 - PX0-AC-10: a pre-HEAD consumer repository is never consulted -- readiness compares the loaded plugin identity
+  ---
+  duration_ms: 435.070717
+  type: 'test'
+  ...
+# Subtest: PX0-AC-10: a missing loaded or installed identity yields its own typed status, never an inferred equality
+ok 5 - PX0-AC-10: a missing loaded or installed identity yields its own typed status, never an inferred equality
+  ---
+  duration_ms: 0.312998
+  type: 'test'
+  ...
+# Subtest: PX0-AC-11: Claude, Codex, self-application and local-development observations pass the same closed contract
+ok 6 - PX0-AC-11: Claude, Codex, self-application and local-development observations pass the same closed contract
+  ---
+  duration_ms: 0.432508
+  type: 'test'
+  ...
+# Subtest: PX0-AC-11: the attestation gate routes every runner through that one contract, with one identical outcome
+ok 7 - PX0-AC-11: the attestation gate routes every runner through that one contract, with one identical outcome
+  ---
+  duration_ms: 0.446128
+  type: 'test'
+  ...
+# Subtest: PX0-AC-16: only the two exact reviewed origins attest; every near miss is refused
+ok 8 - PX0-AC-16: only the two exact reviewed origins attest; every near miss is refused
+  ---
+  duration_ms: 0.681067
+  type: 'test'
+  ...
+# Subtest: PX0-AC-16: a dirty or otherwise rejected working tree claims no equality, even at an allowlisted origin
+ok 9 - PX0-AC-16: a dirty or otherwise rejected working tree claims no equality, even at an allowlisted origin
+  ---
+  duration_ms: 0.317088
+  type: 'test'
+  ...
+# Subtest: PX0-AC-16: an equality claim binds the exact loaded identity to the exact observed remote identity
+ok 10 - PX0-AC-16: an equality claim binds the exact loaded identity to the exact observed remote identity
+  ---
+  duration_ms: 0.275599
+  type: 'test'
+  ...
+# Subtest: PX0-AC-17 (unknown keys): an adapter field outside the closed contract fails closed without echoing it
+ok 11 - PX0-AC-17 (unknown keys): an adapter field outside the closed contract fails closed without echoing it
+  ---
+  duration_ms: 0.255679
+  type: 'test'
+  ...
+# Subtest: PX0-AC-17 (unknown keys): a host record carrying an unexpected field is not accepted as a selection
+ok 12 - PX0-AC-17 (unknown keys): a host record carrying an unexpected field is not accepted as a selection
+  ---
+  duration_ms: 0.12
+  type: 'test'
+  ...
+# Subtest: PX0-AC-17 (ambiguous selector): a selector that does not exactly name the plugin's own root is refused
+ok 13 - PX0-AC-17 (ambiguous selector): a selector that does not exactly name the plugin's own root is refused
+  ---
+  duration_ms: 0.289479
+  type: 'test'
+  ...
+# Subtest: PX0-AC-17 (more than one selected plugin): two enabled registrations fail closed on both runners
+ok 14 - PX0-AC-17 (more than one selected plugin): two enabled registrations fail closed on both runners
+  ---
+  duration_ms: 0.346369
+  type: 'test'
+  ...
+# Subtest: PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and stays distinct from absence
+ok 15 - PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and stays distinct from absence
+  ---
+  duration_ms: 629.363524
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1087.986152
+
+--- stderr ---

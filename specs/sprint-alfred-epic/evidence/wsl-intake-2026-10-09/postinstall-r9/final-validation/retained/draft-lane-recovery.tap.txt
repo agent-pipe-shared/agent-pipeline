@@ -1,0 +1,90 @@
+TAP version 13
+# Subtest: DLR001 currently offered exact read-only rebind planner crosses draft shell lane
+ok 1 - DLR001 currently offered exact read-only rebind planner crosses draft shell lane
+  ---
+  duration_ms: 2.804327
+  type: 'test'
+  ...
+# Subtest: DLR002 draft shell refuses changed executable
+ok 2 - DLR002 draft shell refuses changed executable
+  ---
+  duration_ms: 0.488948
+  type: 'test'
+  ...
+# Subtest: DLR003 draft shell refuses changed argv
+ok 3 - DLR003 draft shell refuses changed argv
+  ---
+  duration_ms: 0.300408
+  type: 'test'
+  ...
+# Subtest: DLR004 draft shell refuses unoffered mutation
+ok 4 - DLR004 draft shell refuses unoffered mutation
+  ---
+  duration_ms: 0.260949
+  type: 'test'
+  ...
+# Subtest: DLR005 draft shell refuses hostile published script
+ok 5 - DLR005 draft shell refuses hostile published script
+  ---
+  duration_ms: 0.455588
+  type: 'test'
+  ...
+# Subtest: DLR006 draft shell refuses rejected planner
+ok 6 - DLR006 draft shell refuses rejected planner
+  ---
+  duration_ms: 0.346528
+  type: 'test'
+  ...
+# Subtest: DLR007 draft shell refuses stale action after ready readback
+ok 7 - DLR007 draft shell refuses stale action after ready readback
+  ---
+  duration_ms: 0.343368
+  type: 'test'
+  ...
+# Subtest: DLR008 draft shell refuses foreign-root readback
+ok 8 - DLR008 draft shell refuses foreign-root readback
+  ---
+  duration_ms: 0.327299
+  type: 'test'
+  ...
+# Subtest: DLR009 draft shell refuses wrong-intent readback
+ok 9 - DLR009 draft shell refuses wrong-intent readback
+  ---
+  duration_ms: 0.518697
+  type: 'test'
+  ...
+# Subtest: DLR010 draft shell refuses malformed readback
+ok 10 - DLR010 draft shell refuses malformed readback
+  ---
+  duration_ms: 0.342618
+  type: 'test'
+  ...
+# Subtest: DLR011 draft shell refuses inspection fault
+ok 11 - DLR011 draft shell refuses inspection fault
+  ---
+  duration_ms: 0.271089
+  type: 'test'
+  ...
+# Subtest: DLR012 draft shell refuses matching planner marked mutating
+ok 12 - DLR012 draft shell refuses matching planner marked mutating
+  ---
+  duration_ms: 0.315288
+  type: 'test'
+  ...
+# Subtest: DLR013 draft shell refuses matching planner requiring confirmation
+ok 13 - DLR013 draft shell refuses matching planner requiring confirmation
+  ---
+  duration_ms: 0.442338
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21.568031
+
+--- stderr ---

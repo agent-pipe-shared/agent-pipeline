@@ -1,0 +1,95 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { homedir } from 'node:os';
+import { redactText, redactResidualHostPaths, findResidualHostPath } from '../plugins/pipeline-core/scripts/capture-evidence.mjs';
+const root=process.cwd(),mirror=path.resolve('scratch/alfred-postinstall-assembly-r9-final-20261009/b');
+const previous='scratch/alfred-combined-r9-focused-resumed-20261009';
+const out='scratch/alfred-combined-r9-final-focused-20261009';
+fs.mkdirSync(out,{recursive:false});
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const members=JSON.parse(fs.readFileSync('scratch/alfred-r9-members-final-r2.json')).members;
+for(const m of members)if(sha(fs.readFileSync(path.join(mirror,m.target)))!==m.sha256)throw Error('combined postimage drift');
+const cases=[
+ ['materializer','lib/signed-quality-package.test.mjs'],
+ ['materializer-scratch','lib/signed-quality-package-scratch.test.mjs',{ids:13}],
+ ['critic-capture-header','lib/critic-capture-header.test.mjs',{ids:9}],
+ ['draft-lane-recovery','lib/guard/devplan-shell-lane-recovery.test.mjs',{ids:13}],
+ ['onboarding-argv','scripts/project-onboarding-v3-argv-closure.test.mjs'],
+ ['critic-diagnostic','lib/critic-diagnostic-evidence.test.mjs'],
+ ['critic-packet','lib/critic-diagnostic-packet.test.mjs'],
+ ['critic-preflight','scripts/critic-dispatch-preflight.test.mjs'],
+ ['critic-finalizer','scripts/session-critic-finalizer.test.mjs'],
+ ['claude-critic-host','scripts/critic-claude-host.test.mjs'],
+ ['isolated-contract','scripts/codex-isolated-critic-contract.test.mjs'],
+ ['legacy-descendant','lib/design-workflow-evidence-descendant.test.mjs'],
+ ['retired-course-admission','hooks/design-course-command-admission.test.mjs'],
+ ['current-design-admission','hooks/design-approval-command-admission.test.mjs'],
+ ['architecture-debt','lib/architecture-entry-readiness.test.mjs'],
+ ['prepush','scripts/pipeline-start-preflight-pre-push-observation.test.mjs'],
+ ['hard-enforcement','scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs'],
+ ['bootstrap-source-acceptance','lib/bootstrap-source-attestation-acceptance.test.mjs'],
+ ['installed-host','scripts/installed-plugin-attestation-host.test.mjs'],
+ ['registry','harness/scripts/check-verify-suite-registration.mjs',{rootPath:true}],
+];
+const registry=JSON.parse(fs.readFileSync(path.join(mirror,'harness/verify-suites.json')));
+const results=[];
+const rerun=new Set(['critic-capture-header','critic-diagnostic','critic-packet','critic-preflight','critic-finalizer','claude-critic-host','hard-enforcement','registry']);
+const reused=new Set(cases.map(([name])=>name).filter(name=>!rerun.has(name)));
+const prior=JSON.parse(fs.readFileSync(previous+'/results.json'));
+for(const [name,relative,opts={}] of cases){
+ const file=opts.rootPath?relative:`plugins/pipeline-core/${relative}`;
+ if(!fs.existsSync(path.join(mirror,file)))throw Error(`selection path absent: ${file}`);
+ if(!reused.has(name))continue;
+ const old=prior.results.find(r=>r.name===name);
+ if(!old?.passed || old.sourceSha256!==sha(fs.readFileSync(path.join(mirror,file))))throw Error('reuse requires unchanged passing source');
+ const logPath=old.reuse?.logPath??`${previous}/${name}.tap.txt`;
+ const completionPath=old.reuse?.completionPath??`${previous}/${name}.fd3.jsonl`;
+ const log=fs.readFileSync(logPath,'utf8');
+ const completion=fs.existsSync(completionPath)?fs.readFileSync(completionPath,'utf8'):'';
+ if(sha(log)!==old.logSha256 || sha(completion)!==old.completionSha256)throw Error('prior capture drift');
+ const counts=Object.fromEntries([...log.matchAll(/^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/gmu)].map(x=>[x[1],Number(x[2])]));
+ if(!counts.tests || counts.pass!==counts.tests || counts.fail!==0 || counts.cancelled!==0 || counts.skipped!==0 || counts.todo!==0)throw Error('prior completed green capture invalid');
+ let fd3=null;
+ if(completion.trim()){
+  const records=completion.trim().split('\n').map(x=>JSON.parse(x)),terminal=records.at(-1);
+  fd3={events:records.length,terminal:terminal.event==='TERMINAL',declared:records[0].caseCount,disposed:records.filter(x=>x.event==='DISPOSED').length,caseIds:terminal.caseIds,counts:terminal.counts};
+ }
+ const policy=registry.suites.find(x=>x.file===file)?.caseCompletion;
+ if(opts.ids && (!fd3?.terminal || fd3.declared!==opts.ids || fd3.disposed!==opts.ids || fd3.counts.pass!==opts.ids || JSON.stringify(fd3.caseIds)!==JSON.stringify(policy.caseIds)))throw Error('prior completion invalid');
+ results.push({...old,reuse:{reason:'unchanged source and unaffected implementation dependencies; completed captured green suite retained',logPath,completionPath}});
+}
+const pending=cases.filter(([name])=>!reused.has(name));let next=0;
+async function execute([name,relative,opts={}]){
+ const file=opts.rootPath?relative:`plugins/pipeline-core/${relative}`;
+ const args=opts.rootPath?[file]:['--test-reporter=tap',file];
+ const env={...process.env,TMPDIR:'/tmp',GIT_CEILING_DIRECTORIES:'/tmp',PIPELINE_VERIFY_CASE_COMPLETION_FD:'3'};
+ delete env.NODE_TEST_CONTEXT;
+ const child=spawn(process.execPath,args,{cwd:mirror,env,detached:true,stdio:['ignore','pipe','pipe','pipe']});
+ const chunks=[[],[],[]];child.stdout.on('data',b=>chunks[0].push(b));child.stderr.on('data',b=>chunks[1].push(b));child.stdio[3].on('data',b=>chunks[2].push(b));
+ let timedOut=false;
+ const timer=setTimeout(()=>{timedOut=true;try{process.kill(-child.pid,'SIGTERM');}catch{}},150000);
+ const outcome=await new Promise(resolve=>{child.once('error',e=>resolve({exitCode:null,error:e.message}));child.once('close',(exitCode,signal)=>resolve({exitCode,signal}));});clearTimeout(timer);
+ const text=chunks.slice(0,2).map(a=>Buffer.concat(a).toString('utf8')).join('\n--- stderr ---\n');
+ const safe=redactResidualHostPaths(redactText(text,root,homedir()));if(findResidualHostPath(safe))throw Error('residual host path');
+ const completion=Buffer.concat(chunks[2]).toString('utf8');
+ fs.writeFileSync(`${out}/${name}.tap.txt`,safe,{flag:'wx'});
+ fs.writeFileSync(`${out}/${name}.fd3.jsonl`,completion,{flag:'wx'});
+ let fd3=null;
+ if(completion.trim()){
+  const records=completion.trim().split('\n').map(x=>JSON.parse(x));const terminal=records.at(-1);
+  fd3={events:records.length,terminal:terminal.event==='TERMINAL',declared:records[0].caseCount,disposed:records.filter(r=>r.event==='DISPOSED').length,caseIds:terminal.caseIds,counts:terminal.counts};
+ }
+ const policy=registry.suites.find(s=>s.file===file)?.caseCompletion;
+ const completionValid=!opts.ids || (!!fd3 && fd3.terminal && fd3.declared===opts.ids && fd3.disposed===opts.ids && JSON.stringify(fd3.caseIds)===JSON.stringify(policy.caseIds) && fd3.counts.pass===opts.ids && fd3.counts.fail===0);
+ const counts=Object.fromEntries([...text.matchAll(/^# (tests|pass|fail|cancelled|skipped|todo) (\d+)$/gmu)].map(x=>[x[1],Number(x[2])]));
+ const record={name,file,command:['node',...args],...outcome,timedOut,counts,caseCompletion:fd3,completionValid,passed:outcome.exitCode===0 && !timedOut && completionValid,sourceSha256:sha(fs.readFileSync(path.join(mirror,file))),logSha256:sha(safe),completionSha256:sha(completion)};
+ results.push(record);console.log(JSON.stringify({name,exitCode:record.exitCode,timedOut,counts,completionValid,passed:record.passed}));
+}
+await Promise.all(Array.from({length:4},async()=>{while(next<pending.length){const item=pending[next++];await execute(item);}}));
+for(const m of members)if(sha(fs.readFileSync(path.join(mirror,m.target)))!==m.sha256)throw Error('member changed during validation');
+const record={schema:'alfred.combined-focused-validation.v1',assurance:'captured-process-output-in-isolated-proposal-clone; no-native-attestation',members:members.map(({target,sha256})=>({target,sha256})),sourceIntegration:false,fullVerify:'not repeated; R8 sealed baseline failed with two interrupted suites',results:results.sort((a,b)=>a.name.localeCompare(b.name)),passed:results.every(r=>r.passed)};
+fs.writeFileSync(`${out}/results.json`,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({suites:results.length,passed:results.filter(r=>r.passed).length,failed:results.filter(r=>!r.passed).map(r=>r.name),sourceIntegration:false}));
+if(!record.passed)process.exitCode=1;

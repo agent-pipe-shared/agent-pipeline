@@ -1,0 +1,48 @@
+{
+  "baseCount": 181,
+  "twoRowCount": 183,
+  "threeRowCount": 184,
+  "finalCount": 184,
+  "all181BaselineRowsPreserved": true,
+  "priorQPSAndDLRRowsPreserved": true,
+  "onlyChangedRow": {
+    "name": "critic-capture-header-tests",
+    "file": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+    "caseCompletion": {
+      "schema": "pipeline.verify-case-completion-policy.v1",
+      "caseIds": [
+        "CDH001",
+        "CDH002",
+        "CDH003",
+        "CDH004",
+        "CDH005",
+        "CDH006",
+        "CDH007",
+        "CDH008",
+        "CDH009"
+      ],
+      "maxBytes": 8192
+    }
+  },
+  "metadataPath": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/registration-metadata.json",
+  "metadata": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "CDH001",
+      "CDH002",
+      "CDH003",
+      "CDH004",
+      "CDH005",
+      "CDH006",
+      "CDH007",
+      "CDH008",
+      "CDH009"
+    ],
+    "maxBytes": 8192
+  },
+  "sourcePath": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/postimage/plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+  "sourceSha256": "58acbee88d20b30a665a268ed1fce9d422232c4a0e28d0526222c304f633aaee",
+  "loaderSchemaAccepted": true,
+  "finalPath": "scratch/alfred-r9-regression-registry-r1-20261009/verify-suites-final.json",
+  "finalSha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8"
+}

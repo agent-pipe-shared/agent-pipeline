@@ -1,0 +1,191 @@
+{
+  "schema": "isolated.critic-header-permanent-regression-r2.v1",
+  "postimageSha256": "58acbee88d20b30a665a268ed1fce9d422232c4a0e28d0526222c304f633aaee",
+  "registrationMetadataSha256": "a75dd0120fd680b79709698450682c87935a1daf7829b794e287737d66894372",
+  "readerSha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+  "originalEightAssertionsIdentical": true,
+  "originalEightResults": "../run-summary.json",
+  "command": {
+    "executable": "<home>/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "argv": [
+      "--test-reporter=tap",
+      "plugins/pipeline-core/lib/critic-capture-header.test.mjs"
+    ],
+    "cwd": "current-reader-host/graph",
+    "directNode": true,
+    "completionFd": 3
+  },
+  "exitCode": 1,
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "skip": 0,
+    "todo": 0
+  },
+  "events": [
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DECLARED",
+      "caseIds": [
+        "CDH001",
+        "CDH002",
+        "CDH003",
+        "CDH004",
+        "CDH005",
+        "CDH006",
+        "CDH007",
+        "CDH008",
+        "CDH009"
+      ],
+      "caseCount": 9,
+      "caseSetSha256": "2ec882498ba22f92c830580663771ed1b76b909e61e01a213524c4e61f2f74cc"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH001",
+      "ordinal": 0,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH002",
+      "ordinal": 1,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH003",
+      "ordinal": 2,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH004",
+      "ordinal": 3,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH005",
+      "ordinal": 4,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH006",
+      "ordinal": 5,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH007",
+      "ordinal": 6,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH008",
+      "ordinal": 7,
+      "disposition": "pass"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "DISPOSED",
+      "id": "CDH009",
+      "ordinal": 8,
+      "disposition": "fail"
+    },
+    {
+      "schema": "pipeline.test-case-completion.v1",
+      "event": "TERMINAL",
+      "declaredCount": 9,
+      "disposedCount": 9,
+      "caseIds": [
+        "CDH001",
+        "CDH002",
+        "CDH003",
+        "CDH004",
+        "CDH005",
+        "CDH006",
+        "CDH007",
+        "CDH008",
+        "CDH009"
+      ],
+      "caseSetSha256": "2ec882498ba22f92c830580663771ed1b76b909e61e01a213524c4e61f2f74cc",
+      "dispositionsSha256": "e832e51d838d01bea0dd29f7d137e57ea61b602d81cc22fceae0e1288ab84d91",
+      "counts": {
+        "pass": 8,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "captures": {
+    "current-reader-host/tap.txt": {
+      "bytes": 4076,
+      "sha256": "d9a47bf38353e50337dfd76b6615b16cecf9b9d053eca17dd266ef591458f630"
+    },
+    "current-reader-host/stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "current-reader-host/fd3.jsonl": {
+      "bytes": 1675,
+      "sha256": "559434671bd79265d27d87b645737abda6cf22353371f078824ccea3f9ba2ec8"
+    }
+  },
+  "before": {
+    "hashes": {
+      "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "b5fb09bddb55d7772d5b7dd24fae0cf25cc28926a30f049191fbc94415f0a32f",
+      "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs": "8705a10a774b6195be786f330633ca1f102ee20cbafde1c1a8884c0f593d0198",
+      "plugins/pipeline-core/lib/entrypoint.mjs": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8",
+      "plugins/pipeline-core/lib/verify-selection.mjs": "a7fa8b684a3c8e3a36bc01c759109bacb3ffa1d73927a90a248e4eab1b543064",
+      "plugins/pipeline-core/scripts/capture-evidence.mjs": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+      "plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs": "557b33ff8ed97666f2f28bc8b1b7d3b91d9d0416e8ec8b43b71722f7fc93bd5e",
+      "plugins/pipeline-core/lib/test-case-completion.mjs": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "plugins/pipeline-core/scripts/critic-claude-host.test.mjs": "9b9a498ae8973c1f0ba345709ae17d5a47fc49a7051dfddc1381ee99984cf786",
+      "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237",
+      "scratch/alfred-critic-capture-header-fix-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "scratch/alfred-combined-r9-focused-resumed-20261009/claude-critic-host.tap.txt": "8e3da3e521827dd3775ac3025c6f7fbca2e590f62d73d650b9958504419b6657",
+      "scratch/alfred-combined-r9-focused-resumed-20261009/critic-preflight.tap.txt": "6e0cc5e7ed65d2b817ba38f75316b7d5e82eeb78db26d25edab7ffc5a68b3d81"
+    },
+    "index": "110af471df3f5d998941f819f22ea96286383812a8aa95bf2cf4256af094ad5f",
+    "status": "",
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955"
+  },
+  "after": {
+    "hashes": {
+      "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "b5fb09bddb55d7772d5b7dd24fae0cf25cc28926a30f049191fbc94415f0a32f",
+      "plugins/pipeline-core/lib/critic-diagnostic-producer.mjs": "8705a10a774b6195be786f330633ca1f102ee20cbafde1c1a8884c0f593d0198",
+      "plugins/pipeline-core/lib/entrypoint.mjs": "ea43c7d71788eed911369d07707b6f2e9adf711a21229613cf7faa8c897438e8",
+      "plugins/pipeline-core/lib/verify-selection.mjs": "a7fa8b684a3c8e3a36bc01c759109bacb3ffa1d73927a90a248e4eab1b543064",
+      "plugins/pipeline-core/scripts/capture-evidence.mjs": "b44f0c1f6114f664e3033981dfafd8c6391f10a65cfff0d2441d54e86184a33e",
+      "plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs": "557b33ff8ed97666f2f28bc8b1b7d3b91d9d0416e8ec8b43b71722f7fc93bd5e",
+      "plugins/pipeline-core/lib/test-case-completion.mjs": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "plugins/pipeline-core/scripts/critic-claude-host.test.mjs": "9b9a498ae8973c1f0ba345709ae17d5a47fc49a7051dfddc1381ee99984cf786",
+      "harness/verify-suites.json": "86c87056bc108793daa70c52967c6f54e363316594b8e917b3485dc29a9db237",
+      "scratch/alfred-critic-capture-header-fix-r1-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f",
+      "scratch/alfred-combined-r9-focused-resumed-20261009/claude-critic-host.tap.txt": "8e3da3e521827dd3775ac3025c6f7fbca2e590f62d73d650b9958504419b6657",
+      "scratch/alfred-combined-r9-focused-resumed-20261009/critic-preflight.tap.txt": "6e0cc5e7ed65d2b817ba38f75316b7d5e82eeb78db26d25edab7ffc5a68b3d81"
+    },
+    "index": "110af471df3f5d998941f819f22ea96286383812a8aa95bf2cf4256af094ad5f",
+    "status": "",
+    "commit": "e87ac5f1d7071570636719a60b1649004c6e7955"
+  },
+  "sourceIndexUnchanged": true,
+  "fixturesCleaned": true,
+  "greenRun": "not performed; awaits separate implementation",
+  "limitations": [
+    "Focused isolated test; no native provenance, whole Verify, or acceptance claim.",
+    "CDH009 tracked-before and tracked-during controls precede the RED untracked-evidence admission assertion; downstream assertions await GREEN."
+  ]
+}

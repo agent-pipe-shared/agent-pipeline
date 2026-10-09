@@ -1,0 +1,96 @@
+TAP version 13
+# Subtest: EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control)
+ok 1 - EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control)
+  ---
+  duration_ms: 481.324469
+  type: 'test'
+  ...
+# Subtest: EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted
+ok 2 - EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted
+  ---
+  duration_ms: 471.237605
+  type: 'test'
+  ...
+# Subtest: EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived
+ok 3 - EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-candidate requirement is waived
+  ---
+  duration_ms: 343.233935
+  type: 'test'
+  ...
+# Subtest: EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control)
+ok 4 - EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control)
+  ---
+  duration_ms: 296.627586
+  type: 'test'
+  ...
+# Subtest: EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control)
+ok 5 - EVDESC-c2 an otherwise evidence-only commit that also touches an unrelated path is refused (green control)
+  ---
+  duration_ms: 288.212735
+  type: 'test'
+  ...
+# Subtest: EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control)
+ok 6 - EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control)
+  ---
+  duration_ms: 289.359188
+  type: 'test'
+  ...
+# Subtest: EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control)
+ok 7 - EVDESC-e an evidence commit that also modifies a digest-bound SOURCE is refused (green control)
+  ---
+  duration_ms: 285.788136
+  type: 'test'
+  ...
+# Subtest: EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain)
+ok 8 - EVDESC-f HEAD = candidate + TWO commits that together add exactly the bound set is accepted (evidence-only chain)
+  ---
+  duration_ms: 480.081531
+  type: 'test'
+  ...
+# Subtest: EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream)
+ok 9 - EVDESC-g a chain that adds the bound set and then deletes a bound artifact is refused (net diff has no D entry; refused downstream)
+  ---
+  duration_ms: 377.892592
+  type: 'test'
+  ...
+# Subtest: EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule
+ok 10 - EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule
+  ---
+  duration_ms: 299.085424
+  type: 'test'
+  ...
+# Subtest: EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control)
+ok 11 - EVDESC-i a bound artifact tracked AT the candidate and deleted in a descendant (true D entry) is refused (green control)
+  ---
+  duration_ms: 549.836589
+  type: 'test'
+  ...
+# Subtest: EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader
+ok 12 - EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader
+  ---
+  duration_ms: 73.129823
+  type: 'test'
+  ...
+# Subtest: EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control)
+ok 13 - EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control)
+  ---
+  duration_ms: 52.113572
+  type: 'test'
+  ...
+# Subtest: EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control)
+ok 14 - EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control)
+  ---
+  duration_ms: 57.256996
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4353.630211
+
+--- stderr ---

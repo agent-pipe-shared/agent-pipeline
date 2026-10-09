@@ -1,0 +1,19 @@
+{
+  "name": "critic-capture-header-tests",
+  "path": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+  "caseCompletion": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "CDH001",
+      "CDH002",
+      "CDH003",
+      "CDH004",
+      "CDH005",
+      "CDH006",
+      "CDH007",
+      "CDH008",
+      "CDH009"
+    ],
+    "maxBytes": 8192
+  }
+}

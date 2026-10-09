@@ -1,0 +1,33 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const manifest=JSON.parse(fs.readFileSync('scratch/alfred-r9-members-final.json'));
+const archive='scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members';
+const output='scratch/alfred-r9-members-final-r2.json';
+const updates=[
+ ['plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs','scratch/alfred-critic-capture-header-fix-r2-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs','5ad101a0c34526e1d2c0a5727620026408e35b99f8f0231ca767ddccf0c8b30d'],
+ ['plugins/pipeline-core/lib/critic-capture-header.test.mjs','scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/postimage/plugins/pipeline-core/lib/critic-capture-header.test.mjs','58acbee88d20b30a665a268ed1fce9d422232c4a0e28d0526222c304f633aaee'],
+ ['plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs','scratch/alfred-bootstrap-remaining-fixtures-r2-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs','2b8f664c7176fc31b2d42cd32b87f1426f393ac95dcec66c0d9841e19bb44e88'],
+ ['harness/verify-suites.json','scratch/alfred-r9-regression-registry-r1-20261009/verify-suites-final.json','95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8'],
+ ['docs/product-capability-inventory.json','scratch/alfred-r9-capability-inventory-r1-20261009/product-capability-inventory.json','74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e']
+];
+if(fs.existsSync(archive)||fs.existsSync(output))throw Error('fresh evidence destinations required');
+const checked=updates.map(([target,input,sha256],i)=>{
+ const stat=fs.lstatSync(input);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw Error('regular input required');
+ const bytes=fs.readFileSync(input);if(hash(bytes)!==sha256)throw Error('pinned postimage drift');
+ if(bytes.includes(Buffer.from(process.cwd()))||bytes.includes(Buffer.from('<home>')))throw Error('private path in postimage');
+ const old=manifest.members.find(m=>m.target===target);
+ return {member:{...old,target,input:archive+'/member-'+(i+1)+path.extname(target),originalInput:input,sha256,bytes:bytes.length,author:old?.author??'r9_regression_registry_append_r1'},bytes};
+});
+fs.mkdirSync(archive,{recursive:true});
+for(const {member,bytes} of checked){
+ fs.writeFileSync(member.input,bytes,{flag:'wx'});
+ const index=manifest.members.findIndex(m=>m.target===member.target);
+ if(index<0)manifest.members.push(member);else manifest.members[index]=member;
+}
+if(manifest.members.length!==18)throw Error('18 member package required');
+const serialized=JSON.stringify(manifest,null,2)+'\n';
+fs.writeFileSync(output,serialized,{flag:'wx'});
+fs.writeFileSync(archive+'/manifest.json',serialized,{flag:'wx'});
+console.log(JSON.stringify({members:18,updatedEvidenceMembers:5,manifest:output,sourceIntegration:false}));

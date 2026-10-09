@@ -1,0 +1,6 @@
+
+--- stderr ---
+UNCATEGORIZED-VERIFY-SURFACE "signed-quality-package-scratch-tests": add "verify-phase:harness/scripts/verify.mjs:signed-quality-package-scratch-tests" to exactly one capability in docs/product-capability-inventory.json
+UNCATEGORIZED-VERIFY-SURFACE "critic-capture-header-tests": add "verify-phase:harness/scripts/verify.mjs:critic-capture-header-tests" to exactly one capability in docs/product-capability-inventory.json
+UNCATEGORIZED-VERIFY-SURFACE "devplan-shell-lane-recovery-tests": add "verify-phase:harness/scripts/verify.mjs:devplan-shell-lane-recovery-tests" to exactly one capability in docs/product-capability-inventory.json
+Verify suite registration check failed: 3 finding(s) (0 unregistered, 0 honoured exclusion(s), 3 uncategorized and 0 duplicate inventory surface(s), 0 malformed, 0 expired).

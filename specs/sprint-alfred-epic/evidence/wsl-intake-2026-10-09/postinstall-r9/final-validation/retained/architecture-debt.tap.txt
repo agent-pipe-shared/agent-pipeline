@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: missing physical map blocks before any readiness claim and offers only the read-only proposal
+ok 1 - missing physical map blocks before any readiness claim and offers only the read-only proposal
+  ---
+  duration_ms: 2.510728
+  type: 'test'
+  ...
+# Subtest: malformed physical map blocks even with an authorized adoption disposition
+ok 2 - malformed physical map blocks even with an authorized adoption disposition
+  ---
+  duration_ms: 1.052545
+  type: 'test'
+  ...
+# Subtest: approved design materialization action wins before an invalid scaffold-map diagnostic
+ok 3 - approved design materialization action wins before an invalid scaffold-map diagnostic
+  ---
+  duration_ms: 0.695787
+  type: 'test'
+  ...
+# Subtest: missing design block preserves its exact PRD action before scaffold-map validation
+ok 4 - missing design block preserves its exact PRD action before scaffold-map validation
+  ---
+  duration_ms: 0.483498
+  type: 'test'
+  ...
+# Subtest: a materialized map without a project-owned AGENTS pointer has an actionable typed refusal
+ok 5 - a materialized map without a project-owned AGENTS pointer has an actionable typed refusal
+  ---
+  duration_ms: 15.38473
+  type: 'test'
+  ...
+# Subtest: a PO-deferred adoption reports complete fitness observations without enforcing them
+ok 6 - a PO-deferred adoption reports complete fitness observations without enforcing them
+  ---
+  duration_ms: 93.38189
+  type: 'test'
+  ...
+# Subtest: checkpoint map debt blocks the next planning boundary even during adoption deferral
+ok 7 - checkpoint map debt blocks the next planning boundary even during adoption deferral
+  ---
+  duration_ms: 37.531587
+  type: 'test'
+  ...
+# Subtest: a descendant map repair consumes checkpoint debt only after class-7 passes
+ok 8 - a descendant map repair consumes checkpoint debt only after class-7 passes
+  ---
+  duration_ms: 104.359569
+  type: 'test'
+  ...
+# Subtest: unreadable checkpoint debt fails closed with a typed repair route
+ok 9 - unreadable checkpoint debt fails closed with a typed repair route
+  ---
+  duration_ms: 34.123484
+  type: 'test'
+  ...
+# Subtest: approved greenfield design defers missing physical surfaces without fabricating fitness pass
+ok 10 - approved greenfield design defers missing physical surfaces without fabricating fitness pass
+  ---
+  duration_ms: 74.095579
+  type: 'test'
+  ...
+# Subtest: calibration-unavailable class 10 is preserved as report-only while other classes decide entry
+ok 11 - calibration-unavailable class 10 is preserved as report-only while other classes decide entry
+  ---
+  duration_ms: 38.159453
+  type: 'test'
+  ...
+# Subtest: malformed or incomplete fitness outcomes fail closed
+ok 12 - malformed or incomplete fitness outcomes fail closed
+  ---
+  duration_ms: 61.260819
+  type: 'test'
+  ...
+# Subtest: real signed approved-scoped adoption reaches the physical readiness gate
+ok 13 - real signed approved-scoped adoption reaches the physical readiness gate
+  ---
+  duration_ms: 1106.661437
+  type: 'test'
+  ...
+# Subtest: symlinked physical fitness artifacts fail closed
+ok 14 - symlinked physical fitness artifacts fail closed
+  ---
+  duration_ms: 13.859936
+  type: 'test'
+  ...
+# Subtest: unresolved adoption authority remains blocked even when the physical bundle is current
+ok 15 - unresolved adoption authority remains blocked even when the physical bundle is current
+  ---
+  duration_ms: 64.266275
+  type: 'test'
+  ...
+# Subtest: planning decisions are projected only for owned task modules
+ok 16 - planning decisions are projected only for owned task modules
+  ---
+  duration_ms: 0.767206
+  type: 'test'
+  ...
+# Subtest: a deferred architecture decision remains visible without changing lifecycle readiness
+ok 17 - a deferred architecture decision remains visible without changing lifecycle readiness
+  ---
+  duration_ms: 71.061812
+  type: 'test'
+  ...
+# Subtest: an unavailable optional decision clock remains diagnostic
+ok 18 - an unavailable optional decision clock remains diagnostic
+  ---
+  duration_ms: 0.171569
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1733.589972
+
+--- stderr ---

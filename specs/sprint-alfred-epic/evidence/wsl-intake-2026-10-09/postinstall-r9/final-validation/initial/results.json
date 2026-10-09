@@ -1,0 +1,723 @@
+{
+  "schema": "alfred.combined-focused-validation.v1",
+  "assurance": "captured-process-output-in-isolated-proposal-clone; no-native-attestation",
+  "members": [
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "sha256": "19c1e02142ebd9d19f282ec5c426393b7557f1815a7c0964263597990289631f"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "sha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "sha256": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989"
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "sha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "sha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "sha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "sha256": "1e94747e89becd06a089198e8feaed1d26c3057325660965d77c290f5cf03c51"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "sha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "sha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "sha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "sha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "sha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "sha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5"
+    },
+    {
+      "target": "harness/verify-suites.json",
+      "sha256": "f77bf78a90eb71b09974307234fcd05d56b5c6217b37b2bd84520919290a1dd0"
+    }
+  ],
+  "sourceIntegration": false,
+  "fullVerify": "not repeated; R8 sealed baseline failed with two interrupted suites",
+  "results": [
+    {
+      "name": "architecture-debt",
+      "file": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "logSha256": "554d4ff59112bd22092cabe17bc1268e027d625248ff6ea0e0cac0fafbc6056e",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "bootstrap-source-acceptance",
+      "file": "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17",
+      "logSha256": "08918e1e4fa56c4e5c57ef7f7cc59870f44ce7e39f5cbc95efde30cd179b3f73",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "claude-critic-host",
+      "file": "plugins/pipeline-core/scripts/critic-claude-host.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/critic-claude-host.test.mjs"
+      ],
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "counts": {},
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": false,
+      "sourceSha256": "9b9a498ae8973c1f0ba345709ae17d5a47fc49a7051dfddc1381ee99984cf786",
+      "logSha256": "8e3da3e521827dd3775ac3025c6f7fbca2e590f62d73d650b9958504419b6657",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "critic-capture-header",
+      "file": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 10,
+        "terminal": true,
+        "declared": 8,
+        "disposed": 8,
+        "caseIds": [
+          "CDH001",
+          "CDH002",
+          "CDH003",
+          "CDH004",
+          "CDH005",
+          "CDH006",
+          "CDH007",
+          "CDH008"
+        ],
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "sourceSha256": "119ffef99fbc950f5002066cd293b7cafe9fcd0259ef96fb7d4414733ff852c4",
+      "logSha256": "2863098afcedbea1d2d77677bf9e369545778216e5325dc4a1604a40ad3cd728",
+      "completionSha256": "c5fc119e0a0162c37afa6ac8d0a4a54eca6d726ac27cc18f5e6e563099e758ee",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/critic-capture-header.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/critic-capture-header.fd3.jsonl"
+      }
+    },
+    {
+      "name": "critic-diagnostic",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "sourceSha256": "8e4096c738d2e1f21dfe5a8d99dd7745aad259990120fc9f45c211370154b3ad",
+      "logSha256": "28c7caa6aff040358d45fb0cc94471572e3fa0c96d7510f88d39f0d677115051",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/critic-diagnostic.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/critic-diagnostic.fd3.jsonl"
+      }
+    },
+    {
+      "name": "critic-finalizer",
+      "file": "plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "ade810409b5177e31e3668064e657139885a4f62cf2a0a304cfa41c2ba18bb7e",
+      "logSha256": "419f1160e89a1f72b6f408ed8979cacf8849ba905827e19f7ff42809d29bb624",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "critic-packet",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "sourceSha256": "21945dec43153f9d0191cd713835fcc9571c2194f3f7f2925703152e129732ef",
+      "logSha256": "ef71abba85971d080ad1fb2ce83012603dbc70cf32d072d96151864df056ff0a",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/critic-packet.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/critic-packet.fd3.jsonl"
+      }
+    },
+    {
+      "name": "critic-preflight",
+      "file": "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs"
+      ],
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 39,
+        "pass": 38,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": false,
+      "sourceSha256": "e19f4dbea32d4c9d65ad7f855248b5fbf036088b70ebd5bc1bdfab1620dd5faa",
+      "logSha256": "6e0cc5e7ed65d2b817ba38f75316b7d5e82eeb78db26d25edab7ffc5a68b3d81",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "current-design-admission",
+      "file": "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 15,
+        "terminal": true,
+        "declared": 13,
+        "disposed": 13,
+        "caseIds": [
+          "DAGA001",
+          "DAGA002",
+          "DAGA003",
+          "DAGA004",
+          "DAGA005",
+          "DAGA006",
+          "DAGA007",
+          "DAGA008",
+          "DAGA009",
+          "DAGA010",
+          "DAGA011",
+          "DAGA012",
+          "DAGA013"
+        ],
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "e21b33f9b28e521088048571d5094acf34108b19a6032fef26892c6c8c5d27c0",
+      "logSha256": "81dbe88bd6ee55d9e163946fb03a17b6bebe696d0cda7ce1557ad85a7f1665de",
+      "completionSha256": "4f77400a4dbe74e908850eb417a265cb7fd461fde7b9b7c0d71ce2f7b284ea6a"
+    },
+    {
+      "name": "draft-lane-recovery",
+      "file": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 15,
+        "terminal": true,
+        "declared": 13,
+        "disposed": 13,
+        "caseIds": [
+          "DLR001",
+          "DLR002",
+          "DLR003",
+          "DLR004",
+          "DLR005",
+          "DLR006",
+          "DLR007",
+          "DLR008",
+          "DLR009",
+          "DLR010",
+          "DLR011",
+          "DLR012",
+          "DLR013"
+        ],
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "sourceSha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "logSha256": "0c5bfcb4d568da2c9e44a03445870207dbec89e37dabe82b86d2c4240cbe31fe",
+      "completionSha256": "d4eeaec52c6ebf2f38e65fb16f20ae3247872f2634a897e3a6e2491814f53f9a",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/draft-lane-recovery.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/draft-lane-recovery.fd3.jsonl"
+      }
+    },
+    {
+      "name": "hard-enforcement",
+      "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs"
+      ],
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 23,
+        "pass": 21,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": false,
+      "sourceSha256": "1e94747e89becd06a089198e8feaed1d26c3057325660965d77c290f5cf03c51",
+      "logSha256": "93c703153ca719407dc0449d0bcfa8cbb898d0bb11b2af691c7067561dfd6379",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "installed-host",
+      "file": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 9,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 11,
+        "terminal": true,
+        "declared": 9,
+        "disposed": 9,
+        "caseIds": [
+          "IPH01",
+          "IPH02",
+          "IPH03",
+          "IPH04",
+          "IPH05",
+          "IPH06",
+          "IPH07",
+          "IPH08",
+          "IPH09"
+        ],
+        "counts": {
+          "pass": 9,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60",
+      "logSha256": "f8399990b510f229811dadff9db279f8de8f7eaefffde12a8cbfdd416f407b60",
+      "completionSha256": "e2830014c9629b9685628b572bfa9e43d46dd38dc19881b560834f5c47a41e6e"
+    },
+    {
+      "name": "isolated-contract",
+      "file": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "9a4aabda6c73ca85bc94119942a671b81a02ac94c93fe5fb319bba77c5cbe823",
+      "logSha256": "1e05317188653cc674b3d158db95fbf79e83ebf0247f8a691405cbf6fb4b5cf9",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "legacy-descendant",
+      "file": "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "4b268b6c66e61c50ac3b5ad20312f73fddd836a21dd934097ebe85f5f060c8f6",
+      "logSha256": "1fd6ea67aea659f2254e8a2048db8500c77f907f516714e6af4b0b1ae52a9aca",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "materializer",
+      "file": "plugins/pipeline-core/lib/signed-quality-package.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 43,
+        "pass": 43,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "sourceSha256": "b4d6a11694f026e470dcb5782c3b27e284cb54602b0c2c42f44f51ecaced75e6",
+      "logSha256": "068859037b785929cf18f2468d4a9c4556e3aac60363e387b21e22a0e4ceea15",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/materializer.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/materializer.fd3.jsonl"
+      }
+    },
+    {
+      "name": "materializer-scratch",
+      "file": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "exitCode": 0,
+      "passed": true,
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 15,
+        "terminal": true,
+        "declared": 13,
+        "disposed": 13,
+        "caseIds": [
+          "QPS001",
+          "QPS002",
+          "QPS003",
+          "QPS004",
+          "QPS005",
+          "QPS006",
+          "QPS007",
+          "QPS008",
+          "QPS009",
+          "QPS010",
+          "QPS011",
+          "QPS012",
+          "QPS013"
+        ],
+        "counts": {
+          "pass": 13,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "sourceSha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "logSha256": "17d2fd83bd18c7a67d3f8754479fdfeba89177076cfcf795f35f22cac061f8d4",
+      "completionSha256": "9221014888afb93a711a5ab5589c84fc7b767d10a161e654c0eae097bcfa115a",
+      "reuse": {
+        "reason": "completed prior focused suite retained; later coordinator launch-path error was unrelated",
+        "logPath": "scratch/alfred-combined-r9-focused-20261009/materializer-scratch.tap.txt",
+        "completionPath": "scratch/alfred-combined-r9-focused-20261009/materializer-scratch.fd3.jsonl"
+      }
+    },
+    {
+      "name": "onboarding-argv",
+      "file": "plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 42,
+        "pass": 42,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "8ada5a798431e583111b9f650f74c6a81d2e4a47ad8093bb2cb731763b8392fd",
+      "logSha256": "3ae3e9d36fa351f2c4dfdd293d1bd7fbea8a5606d763e43b56790a642c3a0167",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "prepush",
+      "file": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "logSha256": "47bcb3342b477c409f7d9e09ece321545ce11c7591063a399d20255e67578db8",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "registry",
+      "file": "harness/scripts/check-verify-suite-registration.mjs",
+      "command": [
+        "node",
+        "harness/scripts/check-verify-suite-registration.mjs"
+      ],
+      "exitCode": 2,
+      "signal": null,
+      "timedOut": false,
+      "counts": {},
+      "caseCompletion": null,
+      "completionValid": true,
+      "passed": false,
+      "sourceSha256": "4101e9ba56c908f31f31784d4ee41ad061b49e1b2fdc03d663e075d0d59d3084",
+      "logSha256": "74ed4735b9fe555d8f561d4b0bd2696e9e17340a196083949354a2aa4707b290",
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "retired-course-admission",
+      "file": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "caseCompletion": {
+        "events": 19,
+        "terminal": true,
+        "declared": 17,
+        "disposed": 17,
+        "caseIds": [
+          "K3G001",
+          "K3G002",
+          "K3G003",
+          "K3G004",
+          "K3G005",
+          "K3G006",
+          "K3G007",
+          "K3G008",
+          "K3G009",
+          "K3G010",
+          "K3G011",
+          "K3G012",
+          "K3G013",
+          "K3G014",
+          "K3G015",
+          "K3G016",
+          "K3G017"
+        ],
+        "counts": {
+          "pass": 17,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionValid": true,
+      "passed": true,
+      "sourceSha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "logSha256": "a1c413b790c10fe0b6ae395a54697910cf57536ff72b93e7575a56e4bb2090d1",
+      "completionSha256": "393a346981424dd68331602136d1fcc3e68ae452c95598858c9b63516a76920d"
+    }
+  ],
+  "passed": false
+}

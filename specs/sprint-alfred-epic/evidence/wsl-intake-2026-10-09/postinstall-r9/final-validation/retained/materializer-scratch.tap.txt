@@ -1,0 +1,90 @@
+TAP version 13
+# Subtest: QPS001 control: verify retains signature/byte behavior and cleans actual worktree
+ok 1 - QPS001 control: verify retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 62.86916
+  type: 'test'
+  ...
+# Subtest: QPS002 target Scratch placement: verify
+ok 2 - QPS002 target Scratch placement: verify
+  ---
+  duration_ms: 54.932667
+  type: 'test'
+  ...
+# Subtest: QPS003 cached version-container siblings unchanged: verify
+ok 3 - QPS003 cached version-container siblings unchanged: verify
+  ---
+  duration_ms: 54.944966
+  type: 'test'
+  ...
+# Subtest: QPS004 control: apply retains signature/byte behavior and cleans actual worktree
+ok 4 - QPS004 control: apply retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 64.621873
+  type: 'test'
+  ...
+# Subtest: QPS005 target Scratch placement: apply
+ok 5 - QPS005 target Scratch placement: apply
+  ---
+  duration_ms: 59.311687
+  type: 'test'
+  ...
+# Subtest: QPS006 cached version-container siblings unchanged: apply
+ok 6 - QPS006 cached version-container siblings unchanged: apply
+  ---
+  duration_ms: 61.369208
+  type: 'test'
+  ...
+# Subtest: QPS007 control: failure retains signature/byte behavior and cleans actual worktree
+ok 7 - QPS007 control: failure retains signature/byte behavior and cleans actual worktree
+  ---
+  duration_ms: 54.32388
+  type: 'test'
+  ...
+# Subtest: QPS008 target Scratch placement: failure
+ok 8 - QPS008 target Scratch placement: failure
+  ---
+  duration_ms: 55.233116
+  type: 'test'
+  ...
+# Subtest: QPS009 cached version-container siblings unchanged: failure
+ok 9 - QPS009 cached version-container siblings unchanged: failure
+  ---
+  duration_ms: 57.673785
+  type: 'test'
+  ...
+# Subtest: QPS010 control: invalid signature, exact source binding and no overwrite
+ok 10 - QPS010 control: invalid signature, exact source binding and no overwrite
+  ---
+  duration_ms: 35.890035
+  type: 'test'
+  ...
+# Subtest: QPS011 unsafe Scratch safely rejects signed apply: regular-file
+ok 11 - QPS011 unsafe Scratch safely rejects signed apply: regular-file
+  ---
+  duration_ms: 46.880545
+  type: 'test'
+  ...
+# Subtest: QPS012 unsafe Scratch safely rejects signed apply: sibling-symlink
+ok 12 - QPS012 unsafe Scratch safely rejects signed apply: sibling-symlink
+  ---
+  duration_ms: 48.026148
+  type: 'test'
+  ...
+# Subtest: QPS013 unsafe Scratch safely rejects signed apply: dangling-symlink
+ok 13 - QPS013 unsafe Scratch safely rejects signed apply: dangling-symlink
+  ---
+  duration_ms: 50.166931
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 719.40978
+
+--- stderr ---

@@ -1,0 +1,23 @@
+PASS CLH01 builds exact native argv with bare, CLI schema, fixed read-only tools and shell-free execution
+PASS CLH02 Claude packet execution accepts an admitted session model only with the same sealed session readback
+PASS CLH03 rejects an unbound selected Claude route before any model probe or export
+PASS CLH04 optional Claude selector failure uses only the exact validated V3 route
+PASS CLH05 refuses a stale Claude packet instead of guessing after V3 fallback
+PASS CLH06 preflights and reuses one exact executable identity without PATH or shell
+PASS CLH07 does not turn timeout or verdict bytes into a fallback
+PASS CLH08 rejects a packet without dispatch references before claim, export or native probe
+PASS CLH09 rejects an occupied result destination before claim, export or native probe
+PASS CLH10 binds the real preflight packet and launched native prompt to the exact candidate inputs
+PASS CLH11 rechecks the result destination immediately before the real native review launch
+PASS CLH12 uses exactly one explicitly weak fresh fallback for an allowlisted pre-verdict failure
+PASS CLH13 keeps a successful native result in the stronger native class
+PASS CLH14 reauthorizes a late native pre-verdict failure before exposing the weak fallback
+PASS CLH15 rejects a result whose export digest is not the persisted authorization
+PASS CLH16 blocks an expired packet immediately before native provider handoff
+PASS CLH17 blocks prepared prompt drift immediately before native provider handoff
+PASS CLH18 blocks candidate snapshot drift immediately before native provider handoff
+PASS CLH19 blocks persisted export-authorization drift immediately before native provider handoff
+PASS CLH20 closes the late fallback dispatch over runner, references and reason
+20/20 checks passed.
+
+--- stderr ---

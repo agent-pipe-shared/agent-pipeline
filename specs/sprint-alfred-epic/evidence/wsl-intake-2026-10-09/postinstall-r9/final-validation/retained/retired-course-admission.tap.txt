@@ -1,0 +1,114 @@
+TAP version 13
+# Subtest: K3G001 awaiting-approval inspect requests explicit review receipt for feature and epic
+ok 1 - K3G001 awaiting-approval inspect requests explicit review receipt for feature and epic
+  ---
+  duration_ms: 83.646941
+  type: 'test'
+  ...
+# Subtest: K3G002 course inspect returns exact retirement without authority or state access
+ok 2 - K3G002 course inspect returns exact retirement without authority or state access
+  ---
+  duration_ms: 37.279061
+  type: 'test'
+  ...
+# Subtest: K3G003 retained readiness argv stays narrow for every runner and execution is retired
+ok 3 - K3G003 retained readiness argv stays narrow for every runner and execution is retired
+  ---
+  duration_ms: 1352.118437
+  type: 'test'
+  ...
+# Subtest: K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv
+ok 4 - K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv
+  ---
+  duration_ms: 10009.465627
+  type: 'test'
+  ...
+# Subtest: K3G005 inspect rejects extra flags and every agent signing shape including run-v2
+ok 5 - K3G005 inspect rejects extra flags and every agent signing shape including run-v2
+  ---
+  duration_ms: 3357.047155
+  type: 'test'
+  ...
+# Subtest: K3G006 mini keeps present-plan while feature package and runner hints cannot restore the course
+ok 6 - K3G006 mini keeps present-plan while feature package and runner hints cannot restore the course
+  ---
+  duration_ms: 71.782141
+  type: 'test'
+  ...
+# Subtest: K3G007 retained v2 argv stays narrow with curation and resume while execution is retired
+ok 7 - K3G007 retained v2 argv stays narrow with curation and resume while execution is retired
+  ---
+  duration_ms: 2493.313182
+  type: 'test'
+  ...
+# Subtest: K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor
+ok 8 - K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor
+  ---
+  duration_ms: 6150.61168
+  type: 'test'
+  ...
+# Subtest: K3G009 run-v2 rejects extra signing collision and stale or foreign curation references
+ok 9 - K3G009 run-v2 rejects extra signing collision and stale or foreign curation references
+  ---
+  duration_ms: 7011.109534
+  type: 'test'
+  ...
+# Subtest: K3G010 physical source and preparation aliases never gain admission
+ok 10 - K3G010 physical source and preparation aliases never gain admission
+  ---
+  duration_ms: 1253.872258
+  type: 'test'
+  ...
+# Subtest: K3G011 source and current submission changes invalidate previously emitted commands
+ok 11 - K3G011 source and current submission changes invalidate previously emitted commands
+  ---
+  duration_ms: 1662.038651
+  type: 'test'
+  ...
+# Subtest: K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair
+ok 12 - K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair
+  ---
+  duration_ms: 4614.955683
+  type: 'test'
+  ...
+# Subtest: K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags
+ok 13 - K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags
+  ---
+  duration_ms: 897.116925
+  type: 'test'
+  ...
+# Subtest: K3G014 actual inspect advisor and resumed v2 CLI refuse before dispatch signing or publication
+ok 14 - K3G014 actual inspect advisor and resumed v2 CLI refuse before dispatch signing or publication
+  ---
+  duration_ms: 857.378115
+  type: 'test'
+  ...
+# Subtest: K3G015 trusted approve-push chat argv reaches the real guard under committed global policy
+ok 15 - K3G015 trusted approve-push chat argv reaches the real guard under committed global policy
+  ---
+  duration_ms: 508.941591
+  type: 'test'
+  ...
+# Subtest: K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv
+ok 16 - K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv
+  ---
+  duration_ms: 9232.34217
+  type: 'test'
+  ...
+# Subtest: K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval
+ok 17 - K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval
+  ---
+  duration_ms: 2738.297986
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 52340.863605
+
+--- stderr ---

@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: private task snapshot binds uppercase delivered-v3 bytes without exporting record prose
+ok 1 - private task snapshot binds uppercase delivered-v3 bytes without exporting record prose
+  ---
+  duration_ms: 245.961512
+  type: 'test'
+  ...
+# Subtest: uppercase task ID is safe and wrong or traversal IDs cannot select a different record
+ok 2 - uppercase task ID is safe and wrong or traversal IDs cannot select a different record
+  ---
+  duration_ms: 138.218625
+  type: 'test'
+  ...
+# Subtest: empty-tree packet base rejects a non-root authored candidate
+ok 3 - empty-tree packet base rejects a non-root authored candidate
+  ---
+  duration_ms: 133.874867
+  type: 'test'
+  ...
+# Subtest: prelaunch admission creates one claimed, digest-bound packet before the verdict exists
+ok 4 - prelaunch admission creates one claimed, digest-bound packet before the verdict exists
+  ---
+  duration_ms: 291.561901
+  type: 'test'
+  ...
+# Subtest: invalid optional Critic selection retains V3, while valid selection binds before packet creation
+ok 5 - invalid optional Critic selection retains V3, while valid selection binds before packet creation
+  ---
+  duration_ms: 424.116984
+  type: 'test'
+  ...
+# Subtest: an admitted exact session model survives finalization without reselecting the V3 model
+ok 6 - an admitted exact session model survives finalization without reselecting the V3 model
+  ---
+  duration_ms: 899.028856
+  type: 'test'
+  ...
+# Subtest: missing optional model selection retains the independently admitted V3 Critic route
+ok 7 - missing optional model selection retains the independently admitted V3 Critic route
+  ---
+  duration_ms: 424.045914
+  type: 'test'
+  ...
+# Subtest: high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable
+ok 8 - high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable
+  ---
+  duration_ms: 479.221931
+  type: 'test'
+  ...
+# Subtest: normal fresh-session finalization consumes the prelaunch packet, reads back, and emits
+ok 9 - normal fresh-session finalization consumes the prelaunch packet, reads back, and emits
+  ---
+  duration_ms: 372.324532
+  type: 'test'
+  ...
+# Subtest: a schema-invalid or contradictory verdict fails before packet or event publication
+ok 10 - a schema-invalid or contradictory verdict fails before packet or event publication
+  ---
+  duration_ms: 124.868376
+  type: 'test'
+  ...
+# Subtest: an event write failure reports source-complete and a closed identical-only retry
+ok 11 - an event write failure reports source-complete and a closed identical-only retry
+  ---
+  duration_ms: 388.954107
+  type: 'test'
+  ...
+# Subtest: review action construction cannot occur before identical consume readback
+ok 12 - review action construction cannot occur before identical consume readback
+  ---
+  duration_ms: 351.997044
+  type: 'test'
+  ...
+# Subtest: findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range
+ok 13 - findings emit REVIEW_FINDINGS and a root-authored record keeps its real empty-tree range
+  ---
+  duration_ms: 349.130447
+  type: 'test'
+  ...
+# Subtest: dispatch record drift after admission blocks finalization
+ok 14 - dispatch record drift after admission blocks finalization
+  ---
+  duration_ms: 284.423876
+  type: 'test'
+  ...
+# Subtest: receipt validation is closed and refuses provider metadata
+ok 15 - receipt validation is closed and refuses provider metadata
+  ---
+  duration_ms: 314.752886
+  type: 'test'
+  ...
+# Subtest: closed CLI admits before verdict and finalizes only that durable packet
+ok 16 - closed CLI admits before verdict and finalizes only that durable packet
+  ---
+  duration_ms: 319.374165
+  type: 'test'
+  ...
+# Subtest: CLI refuses a valid returned verdict when no prelaunch admission exists
+ok 17 - CLI refuses a valid returned verdict when no prelaunch admission exists
+  ---
+  duration_ms: 101.531913
+  type: 'test'
+  ...
+# Subtest: CLI closes argv/request vocabulary and reports typed exit-2 errors
+ok 18 - CLI closes argv/request vocabulary and reports typed exit-2 errors
+  ---
+  duration_ms: 81.756846
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5735.127038
+
+--- stderr ---

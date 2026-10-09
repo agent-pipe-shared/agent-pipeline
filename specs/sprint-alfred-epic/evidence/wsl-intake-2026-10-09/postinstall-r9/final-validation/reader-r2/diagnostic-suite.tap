@@ -1,0 +1,20 @@
+command: <home>/.local/opt/node-v24.15.0-linux-x64/bin/node --test plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+label: critic-diagnostic-evidence-suite
+exitCode: 0
+head: e87ac5f1d7071570636719a60b1649004c6e7955
+tree: 013330771fd44316db8e9b0702a5c93f33e0f903
+dirty: false
+--- stdout ---
+✔ producer captures real failed targeted result while full Verify remains explicitly not-run (90.753011ms)
+✔ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (55.588662ms)
+✔ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (194.347142ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 385.037811
+
+--- stderr ---

@@ -1,0 +1,144 @@
+TAP version 13
+# Subtest: Critic policy permits autonomous review after its plan and Critic-boundary gates
+ok 1 - Critic policy permits autonomous review after its plan and Critic-boundary gates
+  ---
+  duration_ms: 0.888326
+  type: 'test'
+  ...
+# Subtest: all four owned schemas parse and close their root vocabulary
+ok 2 - all four owned schemas parse and close their root vocabulary
+  ---
+  duration_ms: 0.834627
+  type: 'test'
+  ...
+# Subtest: request binds exact ordered physical inputs and rejects closed-schema drift
+ok 3 - request binds exact ordered physical inputs and rejects closed-schema drift
+  ---
+  duration_ms: 7.276417
+  type: 'test'
+  ...
+# Subtest: request materialization rejects symlinks
+ok 4 - request materialization rejects symlinks
+  ---
+  duration_ms: 0.922285
+  type: 'test'
+  ...
+# Subtest: request materialization rejects hard links without requiring symlink capability
+ok 5 - request materialization rejects hard links without requiring symlink capability
+  ---
+  duration_ms: 0.816007
+  type: 'test'
+  ...
+# Subtest: journal begins before model start and enforces the lifecycle vocabulary
+ok 6 - journal begins before model start and enforces the lifecycle vocabulary
+  ---
+  duration_ms: 8.491202
+  type: 'test'
+  ...
+# Subtest: heartbeat, PID liveness and noisy output are not semantic progress
+ok 7 - heartbeat, PID liveness and noisy output are not semantic progress
+  ---
+  duration_ms: 7.393257
+  type: 'test'
+  ...
+# Subtest: stream budgets are fixed at one MiB per stream
+ok 8 - stream budgets are fixed at one MiB per stream
+  ---
+  duration_ms: 2.29791
+  type: 'test'
+  ...
+# Subtest: verdict bytes make retries impossible and success requires validated binding
+ok 9 - verdict bytes make retries impossible and success requires validated binding
+  ---
+  duration_ms: 11.282218
+  type: 'test'
+  ...
+# Subtest: invalid or misbound verdict can terminate only as verdict-schema-error
+ok 10 - invalid or misbound verdict can terminate only as verdict-schema-error
+  ---
+  duration_ms: 6.736379
+  type: 'test'
+  ...
+# Subtest: verdict schema-error is forbidden before verdict-received
+ok 11 - verdict schema-error is forbidden before verdict-received
+  ---
+  duration_ms: 2.052301
+  type: 'test'
+  ...
+# Subtest: cleanup decisions rebind boot, PID, start identity and process group
+ok 12 - cleanup decisions rebind boot, PID, start identity and process group
+  ---
+  duration_ms: 1.258495
+  type: 'test'
+  ...
+# Subtest: cleanup ownership refusal dominates the requested terminal
+ok 13 - cleanup ownership refusal dominates the requested terminal
+  ---
+  duration_ms: 2.229619
+  type: 'test'
+  ...
+# Subtest: journal replay is idempotent, hash-chained and CAS guarded
+ok 14 - journal replay is idempotent, hash-chained and CAS guarded
+  ---
+  duration_ms: 2.876427
+  type: 'test'
+  ...
+# Subtest: an injected CAS race is detected before replacement
+ok 15 - an injected CAS race is detected before replacement
+  ---
+  duration_ms: 1.514763
+  type: 'test'
+  ...
+# Subtest: unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication
+ok 16 - unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication
+  ---
+  duration_ms: 4.50693
+  type: 'test'
+  ...
+# Subtest: crash after verdict-file write still forbids a second model run
+ok 17 - crash after verdict-file write still forbids a second model run
+  ---
+  duration_ms: 1.301074
+  type: 'test'
+  ...
+# Subtest: unconfirmed directory durability fails closed when the receipt artifact is published
+ok 18 - unconfirmed directory durability fails closed when the receipt artifact is published
+  ---
+  duration_ms: 2.11956
+  type: 'test'
+  ...
+# Subtest: claims require evidence exactly for proven or disproven states
+ok 19 - claims require evidence exactly for proven or disproven states
+  ---
+  duration_ms: 0.223849
+  type: 'test'
+  ...
+# Subtest: receipt sanitizer rejects private paths, accounts and remotes
+ok 20 - receipt sanitizer rejects private paths, accounts and remotes
+  ---
+  duration_ms: 2.558439
+  type: 'test'
+  ...
+# Subtest: file persistence uses mode 0600 and refuses a torn postimage
+ok 21 - file persistence uses mode 0600 and refuses a torn postimage
+  ---
+  duration_ms: 4.901428
+  type: 'test'
+  ...
+# Subtest: verdict validator closes nested vocabulary and exact request bindings
+ok 22 - verdict validator closes nested vocabulary and exact request bindings
+  ---
+  duration_ms: 0.474568
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 84.328568
+
+--- stderr ---

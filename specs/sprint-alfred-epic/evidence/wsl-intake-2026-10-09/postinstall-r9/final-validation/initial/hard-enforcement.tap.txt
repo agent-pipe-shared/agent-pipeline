@@ -1,0 +1,194 @@
+TAP version 13
+# Subtest: a freshly written lock naming the current version is observed, with no warning
+ok 1 - a freshly written lock naming the current version is observed, with no warning
+  ---
+  duration_ms: 1.813032
+  type: 'test'
+  ...
+# Subtest: no lock file at all is not observed, with a clear warning naming GEMINI.md
+ok 2 - no lock file at all is not observed, with a clear warning naming GEMINI.md
+  ---
+  duration_ms: 0.280369
+  type: 'test'
+  ...
+# Subtest: no .git directory at all is not observed and never throws
+ok 3 - no .git directory at all is not observed and never throws
+  ---
+  duration_ms: 0.18797
+  type: 'test'
+  ...
+# Subtest: a lock older than the freshness window is not observed, same as absent
+ok 4 - a lock older than the freshness window is not observed, same as absent
+  ---
+  duration_ms: 0.546298
+  type: 'test'
+  ...
+# Subtest: a lock exactly at the freshness window boundary still counts as observed (inclusive)
+ok 5 - a lock exactly at the freshness window boundary still counts as observed (inclusive)
+  ---
+  duration_ms: 0.573237
+  type: 'test'
+  ...
+# Subtest: the freshest of several session locks decides observed, even when older ones are stale
+ok 6 - the freshest of several session locks decides observed, even when older ones are stale
+  ---
+  duration_ms: 0.703907
+  type: 'test'
+  ...
+# Subtest: a future mtime is never trusted as evidence of freshness
+ok 7 - a future mtime is never trusted as evidence of freshness
+  ---
+  duration_ms: 0.342838
+  type: 'test'
+  ...
+# Subtest: a directory entry under run/ that is not a session-* name is ignored
+ok 8 - a directory entry under run/ that is not a session-* name is ignored
+  ---
+  duration_ms: 0.295169
+  type: 'test'
+  ...
+# Subtest: scanning a session directory that turns out to hold no lock file at all does not throw
+ok 9 - scanning a session directory that turns out to hold no lock file at all does not throw
+  ---
+  duration_ms: 0.361989
+  type: 'test'
+  ...
+# Subtest: an injected scan failure folds into not-observed rather than throwing (fail-open)
+ok 10 - an injected scan failure folds into not-observed rather than throwing (fail-open)
+  ---
+  duration_ms: 0.234789
+  type: 'test'
+  ...
+# Subtest: a fresh lock naming a DIFFERENT version is not observed, exactly like an absent lock
+ok 11 - a fresh lock naming a DIFFERENT version is not observed, exactly like an absent lock
+  ---
+  duration_ms: 0.671657
+  type: 'test'
+  ...
+# Subtest: a fresh lock with NO version field at all (an older-build body) is not observed
+ok 12 - a fresh lock with NO version field at all (an older-build body) is not observed
+  ---
+  duration_ms: 0.469318
+  type: 'test'
+  ...
+# Subtest: a fresh, version-matching lock alongside an older-build unversioned one still resolves observed via the matching entry
+ok 13 - a fresh, version-matching lock alongside an older-build unversioned one still resolves observed via the matching entry
+  ---
+  duration_ms: 0.715777
+  type: 'test'
+  ...
+# Subtest: no currentVersion supplied at all means nothing can ever match, even a fresh version-carrying lock
+ok 14 - no currentVersion supplied at all means nothing can ever match, even a fresh version-carrying lock
+  ---
+  duration_ms: 0.456178
+  type: 'test'
+  ...
+# Subtest: an unparseable lock body (corrupted, not JSON) is not observed rather than throwing
+ok 15 - an unparseable lock body (corrupted, not JSON) is not observed rather than throwing
+  ---
+  duration_ms: 0.466567
+  type: 'test'
+  ...
+# Subtest: the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready
+ok 16 - the Antigravity runner surfaces the observation field end to end, wired through cwd, and status stays ready
+  ---
+  duration_ms: 82.946438
+  type: 'test'
+  ...
+# Subtest: the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready
+ok 17 - the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exists, and status is fail-closed, not ready
+  ---
+  duration_ms: 6.54634
+  type: 'test'
+  ...
+# Subtest: the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed
+ok 18 - the Antigravity runner surfaces not-observed for a stale prior-session lock, and status is fail-closed
+  ---
+  duration_ms: 6.790248
+  type: 'test'
+  ...
+# Subtest: the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed
+ok 19 - the Antigravity runner surfaces not-observed for a fresh lock bound to an uninstalled/older version, and status is fail-closed
+  ---
+  duration_ms: 6.725579
+  type: 'test'
+  ...
+# Subtest: wiring passes the preflight's own resolved version as currentVersion, not a second independently-derived one
+ok 20 - wiring passes the preflight's own resolved version as currentVersion, not a second independently-derived one
+  ---
+  duration_ms: 475.453092
+  type: 'test'
+  ...
+# Subtest: a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready
+not ok 21 - a Claude session never invokes the Antigravity detector, carries no such field, and status stays ready
+  ---
+  duration_ms: 661.022809
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:450:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:460:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready
+not ok 22 - a Codex session never invokes the Antigravity detector, carries no such field, and status stays ready
+  ---
+  duration_ms: 321.948419
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:463:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'hook-provisioning-required'
+    - 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'hook-provisioning-required'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs:473:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: Codex preflight output keys and status are unchanged by this addition (byte-identical surface)
+ok 23 - Codex preflight output keys and status are unchanged by this addition (byte-identical surface)
+  ---
+  duration_ms: 6.215232
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 21
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1588.686829
+
+--- stderr ---

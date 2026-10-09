@@ -1,0 +1,543 @@
+{
+  "schema": "alfred.final-focused-archive.v1",
+  "files": [
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/architecture-debt.fd3.jsonl",
+      "output": "initial/architecture-debt.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/architecture-debt.tap.txt",
+      "output": "initial/architecture-debt.tap.txt",
+      "inputSha256": "554d4ff59112bd22092cabe17bc1268e027d625248ff6ea0e0cac0fafbc6056e",
+      "archivedSha256": "554d4ff59112bd22092cabe17bc1268e027d625248ff6ea0e0cac0fafbc6056e"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/bootstrap-source-acceptance.fd3.jsonl",
+      "output": "initial/bootstrap-source-acceptance.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/bootstrap-source-acceptance.tap.txt",
+      "output": "initial/bootstrap-source-acceptance.tap.txt",
+      "inputSha256": "08918e1e4fa56c4e5c57ef7f7cc59870f44ce7e39f5cbc95efde30cd179b3f73",
+      "archivedSha256": "08918e1e4fa56c4e5c57ef7f7cc59870f44ce7e39f5cbc95efde30cd179b3f73"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/claude-critic-host.fd3.jsonl",
+      "output": "initial/claude-critic-host.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/claude-critic-host.tap.txt",
+      "output": "initial/claude-critic-host.tap.txt",
+      "inputSha256": "8e3da3e521827dd3775ac3025c6f7fbca2e590f62d73d650b9958504419b6657",
+      "archivedSha256": "8e3da3e521827dd3775ac3025c6f7fbca2e590f62d73d650b9958504419b6657"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/critic-finalizer.fd3.jsonl",
+      "output": "initial/critic-finalizer.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/critic-finalizer.tap.txt",
+      "output": "initial/critic-finalizer.tap.txt",
+      "inputSha256": "419f1160e89a1f72b6f408ed8979cacf8849ba905827e19f7ff42809d29bb624",
+      "archivedSha256": "419f1160e89a1f72b6f408ed8979cacf8849ba905827e19f7ff42809d29bb624"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/critic-preflight.fd3.jsonl",
+      "output": "initial/critic-preflight.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/critic-preflight.tap.txt",
+      "output": "initial/critic-preflight.tap.txt",
+      "inputSha256": "6e0cc5e7ed65d2b817ba38f75316b7d5e82eeb78db26d25edab7ffc5a68b3d81",
+      "archivedSha256": "6e0cc5e7ed65d2b817ba38f75316b7d5e82eeb78db26d25edab7ffc5a68b3d81"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/current-design-admission.fd3.jsonl",
+      "output": "initial/current-design-admission.fd3.jsonl",
+      "inputSha256": "4f77400a4dbe74e908850eb417a265cb7fd461fde7b9b7c0d71ce2f7b284ea6a",
+      "archivedSha256": "4f77400a4dbe74e908850eb417a265cb7fd461fde7b9b7c0d71ce2f7b284ea6a"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/current-design-admission.tap.txt",
+      "output": "initial/current-design-admission.tap.txt",
+      "inputSha256": "81dbe88bd6ee55d9e163946fb03a17b6bebe696d0cda7ce1557ad85a7f1665de",
+      "archivedSha256": "81dbe88bd6ee55d9e163946fb03a17b6bebe696d0cda7ce1557ad85a7f1665de"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/hard-enforcement.fd3.jsonl",
+      "output": "initial/hard-enforcement.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/hard-enforcement.tap.txt",
+      "output": "initial/hard-enforcement.tap.txt",
+      "inputSha256": "93c703153ca719407dc0449d0bcfa8cbb898d0bb11b2af691c7067561dfd6379",
+      "archivedSha256": "93c703153ca719407dc0449d0bcfa8cbb898d0bb11b2af691c7067561dfd6379"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/installed-host.fd3.jsonl",
+      "output": "initial/installed-host.fd3.jsonl",
+      "inputSha256": "e2830014c9629b9685628b572bfa9e43d46dd38dc19881b560834f5c47a41e6e",
+      "archivedSha256": "e2830014c9629b9685628b572bfa9e43d46dd38dc19881b560834f5c47a41e6e"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/installed-host.tap.txt",
+      "output": "initial/installed-host.tap.txt",
+      "inputSha256": "f8399990b510f229811dadff9db279f8de8f7eaefffde12a8cbfdd416f407b60",
+      "archivedSha256": "f8399990b510f229811dadff9db279f8de8f7eaefffde12a8cbfdd416f407b60"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/isolated-contract.fd3.jsonl",
+      "output": "initial/isolated-contract.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/isolated-contract.tap.txt",
+      "output": "initial/isolated-contract.tap.txt",
+      "inputSha256": "1e05317188653cc674b3d158db95fbf79e83ebf0247f8a691405cbf6fb4b5cf9",
+      "archivedSha256": "1e05317188653cc674b3d158db95fbf79e83ebf0247f8a691405cbf6fb4b5cf9"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/legacy-descendant.fd3.jsonl",
+      "output": "initial/legacy-descendant.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/legacy-descendant.tap.txt",
+      "output": "initial/legacy-descendant.tap.txt",
+      "inputSha256": "1fd6ea67aea659f2254e8a2048db8500c77f907f516714e6af4b0b1ae52a9aca",
+      "archivedSha256": "1fd6ea67aea659f2254e8a2048db8500c77f907f516714e6af4b0b1ae52a9aca"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/onboarding-argv.fd3.jsonl",
+      "output": "initial/onboarding-argv.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/onboarding-argv.tap.txt",
+      "output": "initial/onboarding-argv.tap.txt",
+      "inputSha256": "3ae3e9d36fa351f2c4dfdd293d1bd7fbea8a5606d763e43b56790a642c3a0167",
+      "archivedSha256": "3ae3e9d36fa351f2c4dfdd293d1bd7fbea8a5606d763e43b56790a642c3a0167"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/prepush.fd3.jsonl",
+      "output": "initial/prepush.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/prepush.tap.txt",
+      "output": "initial/prepush.tap.txt",
+      "inputSha256": "47bcb3342b477c409f7d9e09ece321545ce11c7591063a399d20255e67578db8",
+      "archivedSha256": "47bcb3342b477c409f7d9e09ece321545ce11c7591063a399d20255e67578db8"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/registry.fd3.jsonl",
+      "output": "initial/registry.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/registry.tap.txt",
+      "output": "initial/registry.tap.txt",
+      "inputSha256": "74ed4735b9fe555d8f561d4b0bd2696e9e17340a196083949354a2aa4707b290",
+      "archivedSha256": "74ed4735b9fe555d8f561d4b0bd2696e9e17340a196083949354a2aa4707b290"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/results.json",
+      "output": "initial/results.json",
+      "inputSha256": "90e21bd509ae6533a9275fe676f726ad56118d564717e793d9f364de2888f37a",
+      "archivedSha256": "90e21bd509ae6533a9275fe676f726ad56118d564717e793d9f364de2888f37a"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/retired-course-admission.fd3.jsonl",
+      "output": "initial/retired-course-admission.fd3.jsonl",
+      "inputSha256": "393a346981424dd68331602136d1fcc3e68ae452c95598858c9b63516a76920d",
+      "archivedSha256": "393a346981424dd68331602136d1fcc3e68ae452c95598858c9b63516a76920d"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/retired-course-admission.tap.txt",
+      "output": "initial/retired-course-admission.tap.txt",
+      "inputSha256": "a1c413b790c10fe0b6ae395a54697910cf57536ff72b93e7575a56e4bb2090d1",
+      "archivedSha256": "a1c413b790c10fe0b6ae395a54697910cf57536ff72b93e7575a56e4bb2090d1"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/claude-critic-host.fd3.jsonl",
+      "output": "final/claude-critic-host.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/claude-critic-host.tap.txt",
+      "output": "final/claude-critic-host.tap.txt",
+      "inputSha256": "df760604659cdb37637a10d6f60b68d192a4d1eb341df11f6a64a68663dd836d",
+      "archivedSha256": "df760604659cdb37637a10d6f60b68d192a4d1eb341df11f6a64a68663dd836d"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-capture-header.fd3.jsonl",
+      "output": "final/critic-capture-header.fd3.jsonl",
+      "inputSha256": "a1314a24ad4a32843179585caaba134bc0f6025793a59847159caa186fc03552",
+      "archivedSha256": "a1314a24ad4a32843179585caaba134bc0f6025793a59847159caa186fc03552"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-capture-header.tap.txt",
+      "output": "final/critic-capture-header.tap.txt",
+      "inputSha256": "38a8c98165b17b3794836662ef544e5d023a9c090d744659683ec81f8ca67eb0",
+      "archivedSha256": "38a8c98165b17b3794836662ef544e5d023a9c090d744659683ec81f8ca67eb0"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-diagnostic.fd3.jsonl",
+      "output": "final/critic-diagnostic.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-diagnostic.tap.txt",
+      "output": "final/critic-diagnostic.tap.txt",
+      "inputSha256": "aa6a380d987b9043135ca96b38afb078bbd7812285584820bbf18d3624e344f0",
+      "archivedSha256": "aa6a380d987b9043135ca96b38afb078bbd7812285584820bbf18d3624e344f0"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-finalizer.fd3.jsonl",
+      "output": "final/critic-finalizer.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-finalizer.tap.txt",
+      "output": "final/critic-finalizer.tap.txt",
+      "inputSha256": "8512041be22f9e3daade5d8e24fc9eaf80a9492fa8ccd4b007ce018fefb7b5d1",
+      "archivedSha256": "8512041be22f9e3daade5d8e24fc9eaf80a9492fa8ccd4b007ce018fefb7b5d1"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-packet.fd3.jsonl",
+      "output": "final/critic-packet.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-packet.tap.txt",
+      "output": "final/critic-packet.tap.txt",
+      "inputSha256": "ec7507b19069c3a22a1e6f7d372c531caf6c732feca177979bd89ebc23d17aab",
+      "archivedSha256": "ec7507b19069c3a22a1e6f7d372c531caf6c732feca177979bd89ebc23d17aab"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-preflight.fd3.jsonl",
+      "output": "final/critic-preflight.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/critic-preflight.tap.txt",
+      "output": "final/critic-preflight.tap.txt",
+      "inputSha256": "9e50dd552dee1332b49cbb1553e30ba6be0bd68b3d0da78f8a5e93c374fdc57f",
+      "archivedSha256": "9e50dd552dee1332b49cbb1553e30ba6be0bd68b3d0da78f8a5e93c374fdc57f"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/hard-enforcement.fd3.jsonl",
+      "output": "final/hard-enforcement.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/hard-enforcement.tap.txt",
+      "output": "final/hard-enforcement.tap.txt",
+      "inputSha256": "2c2175f18975342cf23554af6ef3842a72048e7f2e43f905c70685ff560c065f",
+      "archivedSha256": "2c2175f18975342cf23554af6ef3842a72048e7f2e43f905c70685ff560c065f"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/registry.fd3.jsonl",
+      "output": "final/registry.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/registry.tap.txt",
+      "output": "final/registry.tap.txt",
+      "inputSha256": "60620e3dbe5955310e32984b2078e3d6199339e9d4168f3229d5826ce4bba669",
+      "archivedSha256": "60620e3dbe5955310e32984b2078e3d6199339e9d4168f3229d5826ce4bba669"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-final-focused-20261009/results.json",
+      "output": "final/results.json",
+      "inputSha256": "e722d7f29cfc1a97b7edb952251784f2680377790092672c856e1eec0d107a4c",
+      "archivedSha256": "e722d7f29cfc1a97b7edb952251784f2680377790092672c856e1eec0d107a4c"
+    },
+    {
+      "input": "scratch/alfred-critic-capture-header-fix-r2-20261009/diagnostic-suite.tap",
+      "output": "reader-r2/diagnostic-suite.tap",
+      "inputSha256": "cd71153112dffbeba2edbec3398d27e8b6bba3e1c3520c0c75765280a2c905ac",
+      "archivedSha256": "cd71153112dffbeba2edbec3398d27e8b6bba3e1c3520c0c75765280a2c905ac"
+    },
+    {
+      "input": "scratch/alfred-critic-capture-header-fix-r2-20261009/verify.fd3.jsonl",
+      "output": "reader-r2/verify.fd3.jsonl",
+      "inputSha256": "a1314a24ad4a32843179585caaba134bc0f6025793a59847159caa186fc03552",
+      "archivedSha256": "a1314a24ad4a32843179585caaba134bc0f6025793a59847159caa186fc03552"
+    },
+    {
+      "input": "scratch/alfred-critic-capture-header-fix-r2-20261009/verify.stderr",
+      "output": "reader-r2/verify.stderr",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-critic-capture-header-fix-r2-20261009/verify.tap",
+      "output": "reader-r2/verify.tap",
+      "inputSha256": "192cce1cdbbaf9b77de4b38c9213e387472f33a2046d616e8c32688162dfd7a2",
+      "archivedSha256": "192cce1cdbbaf9b77de4b38c9213e387472f33a2046d616e8c32688162dfd7a2"
+    },
+    {
+      "input": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/registration-metadata.json",
+      "output": "independent-r2/registration-metadata.json",
+      "inputSha256": "a75dd0120fd680b79709698450682c87935a1daf7829b794e287737d66894372",
+      "archivedSha256": "a75dd0120fd680b79709698450682c87935a1daf7829b794e287737d66894372"
+    },
+    {
+      "input": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/report.md",
+      "output": "independent-r2/report.md",
+      "inputSha256": "78fa4256fbf19d0647f68063382499457b61688f1a33a976e7b5bf6d5514090c",
+      "archivedSha256": "78fa4256fbf19d0647f68063382499457b61688f1a33a976e7b5bf6d5514090c"
+    },
+    {
+      "input": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/run-summary.json",
+      "output": "independent-r2/run-summary.json",
+      "inputSha256": "281accfa597d3c195822b2c75ad70d269703145923301eaff8c1c3f6fa10d8bf",
+      "archivedSha256": "74779398da9edd8933ed4188f6c297751306f542b32029c12eefa5bd6ff56118"
+    },
+    {
+      "input": "scratch/alfred-bootstrap-remaining-fixtures-r2-20261009/hard-enforcement-r2.green.log",
+      "output": "hard-r2/hard-enforcement-r2.green.log",
+      "inputSha256": "3f177c9c7b2bc4f46950a492bb904dd42e04e0a11dde8a9aa98b6efd09b848dc",
+      "archivedSha256": "3f177c9c7b2bc4f46950a492bb904dd42e04e0a11dde8a9aa98b6efd09b848dc"
+    },
+    {
+      "input": "scratch/alfred-bootstrap-remaining-fixtures-r2-20261009/report.md",
+      "output": "hard-r2/report.md",
+      "inputSha256": "ac5b5f6401d245a1380e81a7c7a551783757507fc53c35e1002f0aa614f9bd65",
+      "archivedSha256": "ac5b5f6401d245a1380e81a7c7a551783757507fc53c35e1002f0aa614f9bd65"
+    },
+    {
+      "input": "scratch/alfred-r9-capability-inventory-r1-20261009/postimage-capture.json",
+      "output": "inventory/postimage-capture.json",
+      "inputSha256": "e545ac91d6dc73ca145da8d89aff417c846c4eb391ad1e2f4325babcacf5b3d4",
+      "archivedSha256": "e545ac91d6dc73ca145da8d89aff417c846c4eb391ad1e2f4325babcacf5b3d4"
+    },
+    {
+      "input": "scratch/alfred-r9-capability-inventory-r1-20261009/product-capability-inventory.json",
+      "output": "inventory/product-capability-inventory.json",
+      "inputSha256": "74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e",
+      "archivedSha256": "74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e"
+    },
+    {
+      "input": "scratch/alfred-r9-capability-inventory-r1-20261009/source-relative-check.json",
+      "output": "inventory/source-relative-check.json",
+      "inputSha256": "f0d2f7b8b81ad56b9889562b627b08f48c117f0f857510dcc2053245923110f7",
+      "archivedSha256": "f0d2f7b8b81ad56b9889562b627b08f48c117f0f857510dcc2053245923110f7"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/architecture-debt.tap.txt",
+      "output": "retained/architecture-debt.tap.txt",
+      "inputSha256": "554d4ff59112bd22092cabe17bc1268e027d625248ff6ea0e0cac0fafbc6056e",
+      "archivedSha256": "554d4ff59112bd22092cabe17bc1268e027d625248ff6ea0e0cac0fafbc6056e"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/architecture-debt.fd3.jsonl",
+      "output": "retained/architecture-debt.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/bootstrap-source-acceptance.tap.txt",
+      "output": "retained/bootstrap-source-acceptance.tap.txt",
+      "inputSha256": "08918e1e4fa56c4e5c57ef7f7cc59870f44ce7e39f5cbc95efde30cd179b3f73",
+      "archivedSha256": "08918e1e4fa56c4e5c57ef7f7cc59870f44ce7e39f5cbc95efde30cd179b3f73"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/bootstrap-source-acceptance.fd3.jsonl",
+      "output": "retained/bootstrap-source-acceptance.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/current-design-admission.tap.txt",
+      "output": "retained/current-design-admission.tap.txt",
+      "inputSha256": "81dbe88bd6ee55d9e163946fb03a17b6bebe696d0cda7ce1557ad85a7f1665de",
+      "archivedSha256": "81dbe88bd6ee55d9e163946fb03a17b6bebe696d0cda7ce1557ad85a7f1665de"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/current-design-admission.fd3.jsonl",
+      "output": "retained/current-design-admission.fd3.jsonl",
+      "inputSha256": "4f77400a4dbe74e908850eb417a265cb7fd461fde7b9b7c0d71ce2f7b284ea6a",
+      "archivedSha256": "4f77400a4dbe74e908850eb417a265cb7fd461fde7b9b7c0d71ce2f7b284ea6a"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/draft-lane-recovery.tap.txt",
+      "output": "retained/draft-lane-recovery.tap.txt",
+      "inputSha256": "0c5bfcb4d568da2c9e44a03445870207dbec89e37dabe82b86d2c4240cbe31fe",
+      "archivedSha256": "0c5bfcb4d568da2c9e44a03445870207dbec89e37dabe82b86d2c4240cbe31fe"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/draft-lane-recovery.fd3.jsonl",
+      "output": "retained/draft-lane-recovery.fd3.jsonl",
+      "inputSha256": "d4eeaec52c6ebf2f38e65fb16f20ae3247872f2634a897e3a6e2491814f53f9a",
+      "archivedSha256": "d4eeaec52c6ebf2f38e65fb16f20ae3247872f2634a897e3a6e2491814f53f9a"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/installed-host.tap.txt",
+      "output": "retained/installed-host.tap.txt",
+      "inputSha256": "f8399990b510f229811dadff9db279f8de8f7eaefffde12a8cbfdd416f407b60",
+      "archivedSha256": "f8399990b510f229811dadff9db279f8de8f7eaefffde12a8cbfdd416f407b60"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/installed-host.fd3.jsonl",
+      "output": "retained/installed-host.fd3.jsonl",
+      "inputSha256": "e2830014c9629b9685628b572bfa9e43d46dd38dc19881b560834f5c47a41e6e",
+      "archivedSha256": "e2830014c9629b9685628b572bfa9e43d46dd38dc19881b560834f5c47a41e6e"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/isolated-contract.tap.txt",
+      "output": "retained/isolated-contract.tap.txt",
+      "inputSha256": "1e05317188653cc674b3d158db95fbf79e83ebf0247f8a691405cbf6fb4b5cf9",
+      "archivedSha256": "1e05317188653cc674b3d158db95fbf79e83ebf0247f8a691405cbf6fb4b5cf9"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/isolated-contract.fd3.jsonl",
+      "output": "retained/isolated-contract.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/legacy-descendant.tap.txt",
+      "output": "retained/legacy-descendant.tap.txt",
+      "inputSha256": "1fd6ea67aea659f2254e8a2048db8500c77f907f516714e6af4b0b1ae52a9aca",
+      "archivedSha256": "1fd6ea67aea659f2254e8a2048db8500c77f907f516714e6af4b0b1ae52a9aca"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/legacy-descendant.fd3.jsonl",
+      "output": "retained/legacy-descendant.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/materializer.tap.txt",
+      "output": "retained/materializer.tap.txt",
+      "inputSha256": "068859037b785929cf18f2468d4a9c4556e3aac60363e387b21e22a0e4ceea15",
+      "archivedSha256": "068859037b785929cf18f2468d4a9c4556e3aac60363e387b21e22a0e4ceea15"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/materializer.fd3.jsonl",
+      "output": "retained/materializer.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/materializer-scratch.tap.txt",
+      "output": "retained/materializer-scratch.tap.txt",
+      "inputSha256": "17d2fd83bd18c7a67d3f8754479fdfeba89177076cfcf795f35f22cac061f8d4",
+      "archivedSha256": "17d2fd83bd18c7a67d3f8754479fdfeba89177076cfcf795f35f22cac061f8d4"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-20261009/materializer-scratch.fd3.jsonl",
+      "output": "retained/materializer-scratch.fd3.jsonl",
+      "inputSha256": "9221014888afb93a711a5ab5589c84fc7b767d10a161e654c0eae097bcfa115a",
+      "archivedSha256": "9221014888afb93a711a5ab5589c84fc7b767d10a161e654c0eae097bcfa115a"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/onboarding-argv.tap.txt",
+      "output": "retained/onboarding-argv.tap.txt",
+      "inputSha256": "3ae3e9d36fa351f2c4dfdd293d1bd7fbea8a5606d763e43b56790a642c3a0167",
+      "archivedSha256": "3ae3e9d36fa351f2c4dfdd293d1bd7fbea8a5606d763e43b56790a642c3a0167"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/onboarding-argv.fd3.jsonl",
+      "output": "retained/onboarding-argv.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/prepush.tap.txt",
+      "output": "retained/prepush.tap.txt",
+      "inputSha256": "47bcb3342b477c409f7d9e09ece321545ce11c7591063a399d20255e67578db8",
+      "archivedSha256": "47bcb3342b477c409f7d9e09ece321545ce11c7591063a399d20255e67578db8"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/prepush.fd3.jsonl",
+      "output": "retained/prepush.fd3.jsonl",
+      "inputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archivedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/retired-course-admission.tap.txt",
+      "output": "retained/retired-course-admission.tap.txt",
+      "inputSha256": "a1c413b790c10fe0b6ae395a54697910cf57536ff72b93e7575a56e4bb2090d1",
+      "archivedSha256": "a1c413b790c10fe0b6ae395a54697910cf57536ff72b93e7575a56e4bb2090d1"
+    },
+    {
+      "input": "scratch/alfred-combined-r9-focused-resumed-20261009/retired-course-admission.fd3.jsonl",
+      "output": "retained/retired-course-admission.fd3.jsonl",
+      "inputSha256": "393a346981424dd68331602136d1fcc3e68ae452c95598858c9b63516a76920d",
+      "archivedSha256": "393a346981424dd68331602136d1fcc3e68ae452c95598858c9b63516a76920d"
+    },
+    {
+      "input": "scratch/alfred-r9-regression-registry-r1-20261009/validation-final-registry.json",
+      "output": "registry-validation.json",
+      "inputSha256": "7c88a588aa6b4e6ea0933f708ce767f191a81d9e2b81999373c8b8c6ef5ae958",
+      "archivedSha256": "7c88a588aa6b4e6ea0933f708ce767f191a81d9e2b81999373c8b8c6ef5ae958"
+    },
+    {
+      "input": "scratch/archive-alfred-r9-final-postimages.mjs",
+      "output": "operations/archive-alfred-r9-final-postimages.txt",
+      "inputSha256": "c4c5b2dca96c9587e0fbb2724ee4c27940a60a7d1fb0a9f8aa2abe1335c2ca61",
+      "archivedSha256": "d058153b8b8625ebfa944c7035835a06be329712dc0e92f8ddaf418825d42a9f"
+    },
+    {
+      "input": "scratch/assemble-alfred-postinstall-r9.mjs",
+      "output": "operations/assemble-alfred-postinstall-r9.txt",
+      "inputSha256": "221773384b8f02acd1d7324abef3d9e78bf2beb8fb7e7b08db8b982af80508f8",
+      "archivedSha256": "226112bdbedbdcca7a48fa6915e356b412b048ebddda32fe4e89f06ccf7c8ac9"
+    },
+    {
+      "input": "scratch/check-alfred-combined-r9-final.mjs",
+      "output": "operations/check-alfred-combined-r9-final.txt",
+      "inputSha256": "41cc74d4970a7e00955e21ee545feeabc807634bfe20f987b19da2225a60b433",
+      "archivedSha256": "41cc74d4970a7e00955e21ee545feeabc807634bfe20f987b19da2225a60b433"
+    }
+  ],
+  "focusedSuites": {
+    "passed": 20,
+    "total": 20
+  },
+  "manualClaudeHostChecks": {
+    "passed": 20,
+    "total": 20
+  },
+  "fullVerify": {
+    "candidate": "R8",
+    "passed": 736,
+    "failed": 86,
+    "interruptedSuites": 2,
+    "releaseQualification": false
+  },
+  "capabilityInventory": {
+    "sourceBaselinePromotion": "pending",
+    "findings": 104
+  },
+  "sourceIntegration": false,
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}

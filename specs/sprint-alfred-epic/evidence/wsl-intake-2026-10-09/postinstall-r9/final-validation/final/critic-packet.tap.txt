@@ -1,0 +1,24 @@
+TAP version 13
+# Subtest: native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose
+ok 1 - native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose
+  ---
+  duration_ms: 151.293846
+  type: 'test'
+  ...
+# Subtest: packet refuses malformed source/digest before creation and snapshot mutation before claim
+ok 2 - packet refuses malformed source/digest before creation and snapshot mutation before claim
+  ---
+  duration_ms: 133.338309
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 290.00374
+
+--- stderr ---

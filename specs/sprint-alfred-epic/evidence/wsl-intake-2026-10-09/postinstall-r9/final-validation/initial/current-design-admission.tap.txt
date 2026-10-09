@@ -1,0 +1,90 @@
+TAP version 13
+# Subtest: DAGA001 present admits one explicit existing review receipt
+ok 1 - DAGA001 present admits one explicit existing review receipt
+  ---
+  duration_ms: 4.417369
+  type: 'test'
+  ...
+# Subtest: DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+ok 2 - DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+  ---
+  duration_ms: 3.041616
+  type: 'test'
+  ...
+# Subtest: DAGA003 mini presentation admits plain bounded attribution
+ok 3 - DAGA003 mini presentation admits plain bounded attribution
+  ---
+  duration_ms: 2.433138
+  type: 'test'
+  ...
+# Subtest: DAGA004 approve admits the exact physically contained regular Scratch request
+ok 4 - DAGA004 approve admits the exact physically contained regular Scratch request
+  ---
+  duration_ms: 2.752618
+  type: 'test'
+  ...
+# Subtest: DAGA005 preserve existing inspect submit phase and approval branches
+ok 5 - DAGA005 preserve existing inspect submit phase and approval branches
+  ---
+  duration_ms: 2.839287
+  type: 'test'
+  ...
+# Subtest: DAGA006 reject third and duplicate review receipt paths
+ok 6 - DAGA006 reject third and duplicate review receipt paths
+  ---
+  duration_ms: 2.542188
+  type: 'test'
+  ...
+# Subtest: DAGA007 reject missing duplicate blank oversize and flag-form attribution
+ok 7 - DAGA007 reject missing duplicate blank oversize and flag-form attribution
+  ---
+  duration_ms: 2.758067
+  type: 'test'
+  ...
+# Subtest: DAGA008 reject unknown duplicate request and spliced flag forms
+ok 8 - DAGA008 reject unknown duplicate request and spliced flag forms
+  ---
+  duration_ms: 4.497139
+  type: 'test'
+  ...
+# Subtest: DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+ok 9 - DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+  ---
+  duration_ms: 2.751907
+  type: 'test'
+  ...
+# Subtest: DAGA010 reject unsafe request paths and invalid digest basenames
+ok 10 - DAGA010 reject unsafe request paths and invalid digest basenames
+  ---
+  duration_ms: 2.599348
+  type: 'test'
+  ...
+# Subtest: DAGA011 reject receipt symlinks and physical parent escapes
+ok 11 - DAGA011 reject receipt symlinks and physical parent escapes
+  ---
+  duration_ms: 3.879852
+  type: 'test'
+  ...
+# Subtest: DAGA012 reject request symlinks parent escape directory and multiple links
+ok 12 - DAGA012 reject request symlinks parent escape directory and multiple links
+  ---
+  duration_ms: 4.821758
+  type: 'test'
+  ...
+# Subtest: DAGA013 new flags do not widen unrelated commands or foreign script admission
+ok 13 - DAGA013 new flags do not widen unrelated commands or foreign script admission
+  ---
+  duration_ms: 2.489349
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 49.989001
+
+--- stderr ---

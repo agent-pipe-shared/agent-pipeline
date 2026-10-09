@@ -1,0 +1,3 @@
+Verify suite registration is complete: 823 registered, 0 declared exclusion(s), 0 unregistered.
+
+--- stderr ---

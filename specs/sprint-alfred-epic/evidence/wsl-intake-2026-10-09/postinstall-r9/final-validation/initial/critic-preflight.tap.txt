@@ -1,0 +1,261 @@
+TAP version 13
+# Subtest: a fifth feature-package review is refused before packet-ready from retained Git lineage
+ok 1 - a fifth feature-package review is refused before packet-ready from retained Git lineage
+  ---
+  duration_ms: 377.72053
+  type: 'test'
+  ...
+# Subtest: an exact evidence-only registration does not consume the fourth review's correction budget
+ok 2 - an exact evidence-only registration does not consume the fourth review's correction budget
+  ---
+  duration_ms: 168.337677
+  type: 'test'
+  ...
+# Subtest: a first versioned feature-package review remains admissible without a fabricated parent
+ok 3 - a first versioned feature-package review remains admissible without a fabricated parent
+  ---
+  duration_ms: 78.657534
+  type: 'test'
+  ...
+# Subtest: read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence
+ok 4 - read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence
+  ---
+  duration_ms: 43.106964
+  type: 'test'
+  ...
+# Subtest: reviewer input uses an empty governance-directory list when the manifest declares no governance block
+ok 5 - reviewer input uses an empty governance-directory list when the manifest declares no governance block
+  ---
+  duration_ms: 52.357993
+  type: 'test'
+  ...
+# Subtest: opt-in requirement map is candidate-bound, evaluated, and passed to the Critic as a constraint
+ok 6 - opt-in requirement map is candidate-bound, evaluated, and passed to the Critic as a constraint
+  ---
+  duration_ms: 64.200699
+  type: 'test'
+  ...
+# Subtest: preflight rejects a specifically named absent requirement before packet-ready
+ok 7 - preflight rejects a specifically named absent requirement before packet-ready
+  ---
+  duration_ms: 54.048615
+  type: 'test'
+  ...
+# Subtest: preflight rejects prose/command predicates instead of executing or inferring them
+ok 8 - preflight rejects prose/command predicates instead of executing or inferring them
+  ---
+  duration_ms: 50.393511
+  type: 'test'
+  ...
+# Subtest: preflight rejects a stale requirement map after the candidate Spec changes
+ok 9 - preflight rejects a stale requirement map after the candidate Spec changes
+  ---
+  duration_ms: 51.402217
+  type: 'test'
+  ...
+# Subtest: current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range
+ok 10 - current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range
+  ---
+  duration_ms: 54.334614
+  type: 'test'
+  ...
+# Subtest: current-artifact preflight keeps evidence small while admitting bounded large candidate sources
+ok 11 - current-artifact preflight keeps evidence small while admitting bounded large candidate sources
+  ---
+  duration_ms: 75.472727
+  type: 'test'
+  ...
+# Subtest: rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing
+ok 12 - rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing
+  ---
+  duration_ms: 79.38107
+  type: 'test'
+  ...
+# Subtest: accepts the root candidate binding used by canonical Verify evidence
+ok 13 - accepts the root candidate binding used by canonical Verify evidence
+  ---
+  duration_ms: 44.003531
+  type: 'test'
+  ...
+# Subtest: accepts canonical Verify evidence whose candidate field is only a run-status wrapper
+ok 14 - accepts canonical Verify evidence whose candidate field is only a run-status wrapper
+  ---
+  duration_ms: 42.709496
+  type: 'test'
+  ...
+# Subtest: first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail
+not ok 15 - first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail
+  ---
+  duration_ms: 79.747149
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs:382:1'
+  failureType: 'testCodeFailure'
+  error: 'CDI-DIGEST'
+  code: 'CDI-DIGEST'
+  stack: |-
+    fail (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:13:37)
+    validateCriticDiagnostic (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs:100:114)
+    produceCriticDiagnostic (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs:53:3)
+    TestContext.<anonymous> (file://<repo-root>/scratch/alfred-postinstall-assembly-r9-20261009/b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs:385:19)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: failed canonical Verify admits review without satisfying final qualification
+ok 16 - failed canonical Verify admits review without satisfying final qualification
+  ---
+  duration_ms: 64.806766
+  type: 'test'
+  ...
+# Subtest: a repository with exactly one commit resolves the root commit as an ordinary base, not a refusal
+ok 17 - a repository with exactly one commit resolves the root commit as an ordinary base, not a refusal
+  ---
+  duration_ms: 37.193772
+  type: 'test'
+  ...
+# Subtest: a base ref that fails commit-peeling and is not the empty tree is still refused (unchanged behavior)
+ok 18 - a base ref that fails commit-peeling and is not the empty tree is still refused (unchanged behavior)
+  ---
+  duration_ms: 27.700994
+  type: 'test'
+  ...
+# Subtest: evidence sweep finds the misplaced regression artifact by case-insensitive substring match, across a date prefix and a role suffix
+ok 19 - evidence sweep finds the misplaced regression artifact by case-insensitive substring match, across a date prefix and a role suffix
+  ---
+  duration_ms: 4.090992
+  type: 'test'
+  ...
+# Subtest: evidence sweep names each result's location class, distinguishing the ignored root directory from a tracked one
+ok 20 - evidence sweep names each result's location class, distinguishing the ignored root directory from a tracked one
+  ---
+  duration_ms: 3.597995
+  type: 'test'
+  ...
+# Subtest: evidence sweep is advisory and non-failing: a task id with no artifacts yields an empty result, never an error
+ok 21 - evidence sweep is advisory and non-failing: a task id with no artifacts yields an empty result, never an error
+  ---
+  duration_ms: 3.227465
+  type: 'test'
+  ...
+# Subtest: evidence sweep never touches preflightCriticDispatch()'s own binding checks or failure modes
+ok 22 - evidence sweep never touches preflightCriticDispatch()'s own binding checks or failure modes
+  ---
+  duration_ms: 43.566022
+  type: 'test'
+  ...
+# Subtest: source callback emits exactly one closed detached packet-ready observation
+ok 23 - source callback emits exactly one closed detached packet-ready observation
+  ---
+  duration_ms: 63.837661
+  type: 'test'
+  ...
+# Subtest: actual direct CLI preserves complete packet-ready and representative rejection protocols
+ok 24 - actual direct CLI preserves complete packet-ready and representative rejection protocols
+  ---
+  duration_ms: 387.550726
+  type: 'test'
+  ...
+# Subtest: shared argument parser preserves defaults scalar overwrites arrays and exact flag errors
+ok 25 - shared argument parser preserves defaults scalar overwrites arrays and exact flag errors
+  ---
+  duration_ms: 0.455328
+  type: 'test'
+  ...
+# Subtest: request destructuring retains original getter order and exceptions before body entry
+ok 26 - request destructuring retains original getter order and exceptions before body entry
+  ---
+  duration_ms: 0.659397
+  type: 'test'
+  ...
+# Subtest: early request and base failures have no captured candidate or spec
+ok 27 - early request and base failures have no captured candidate or spec
+  ---
+  duration_ms: 34.166025
+  type: 'test'
+  ...
+# Subtest: range and path rejections retain the validated candidate before any spec readback
+ok 28 - range and path rejections retain the validated candidate before any spec readback
+  ---
+  duration_ms: 66.804377
+  type: 'test'
+  ...
+# Subtest: spec binding becomes visible only after successful actual spec readback
+ok 29 - spec binding becomes visible only after successful actual spec readback
+  ---
+  duration_ms: 61.034023
+  type: 'test'
+  ...
+# Subtest: actual evidence and prior-evidence failures retain their owning stages and spec binding
+ok 30 - actual evidence and prior-evidence failures retain their owning stages and spec binding
+  ---
+  duration_ms: 162.774164
+  type: 'test'
+  ...
+# Subtest: an actual missing candidate manifest is observed before governance or spec reads
+ok 31 - an actual missing candidate manifest is observed before governance or spec reads
+  ---
+  duration_ms: 44.010889
+  type: 'test'
+  ...
+# Subtest: injected Git failures cover partial candidate inventory manifest governance and candidate-read branches
+ok 32 - injected Git failures cover partial candidate inventory manifest governance and candidate-read branches
+  ---
+  duration_ms: 92.969909
+  type: 'test'
+  ...
+# Subtest: a successful Git exit remains admissible when a contained host adds an EPERM diagnostic
+ok 33 - a successful Git exit remains admissible when a contained host adds an EPERM diagnostic
+  ---
+  duration_ms: 44.373999
+  type: 'test'
+  ...
+# Subtest: a successful EPERM Git observation remains admissible for the empty-tree read
+ok 34 - a successful EPERM Git observation remains admissible for the empty-tree read
+  ---
+  duration_ms: 42.260659
+  type: 'test'
+  ...
+# Subtest: a successful EPERM Git observation remains admissible for a byte candidate read
+ok 35 - a successful EPERM Git observation remains admissible for a byte candidate read
+  ---
+  duration_ms: 42.377127
+  type: 'test'
+  ...
+# Subtest: injected evidence containment refusal is captured without rerunning any guard
+ok 36 - injected evidence containment refusal is captured without rerunning any guard
+  ---
+  duration_ms: 44.889768
+  type: 'test'
+  ...
+# Subtest: foreign thrown objects are rethrown identically without reading hostile properties
+ok 37 - foreign thrown objects are rethrown identically without reading hostile properties
+  ---
+  duration_ms: 107.282354
+  type: 'test'
+  ...
+# Subtest: invalid synchronous observer returns and exceptions cannot change admission or read return getters
+ok 38 - invalid synchronous observer returns and exceptions cannot change admission or read return getters
+  ---
+  duration_ms: 243.686106
+  type: 'test'
+  ...
+# Subtest: callback capture adds no Git operations and candidate never follows later ref or HEAD changes
+ok 39 - callback capture adds no Git operations and candidate never follows later ref or HEAD changes
+  ---
+  duration_ms: 89.059176
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 38
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3042.641824
+
+--- stderr ---

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: CDH001 reader accepts an actual failed identity-bearing capture with matching candidate and digest
+ok 1 - CDH001 reader accepts an actual failed identity-bearing capture with matching candidate and digest
+  ---
+  duration_ms: 54.186201
+  type: 'test'
+  ...
+# Subtest: CDH002 producer returns honest diagnostic evidence after executing a failed process
+ok 2 - CDH002 producer returns honest diagnostic evidence after executing a failed process
+  ---
+  duration_ms: 68.852133
+  type: 'test'
+  ...
+# Subtest: CDH003 digest, label, exit and candidate/source bindings remain closed
+ok 3 - CDH003 digest, label, exit and candidate/source bindings remain closed
+  ---
+  duration_ms: 70.836914
+  type: 'test'
+  ...
+# Subtest: CDH004 malformed or extra capture identity headers remain rejected even with recomputed digest
+ok 4 - CDH004 malformed or extra capture identity headers remain rejected even with recomputed digest
+  ---
+  duration_ms: 75.081575
+  type: 'test'
+  ...
+# Subtest: CDH005 selection integrity and diagnostic-only boundary remain checked
+ok 5 - CDH005 selection integrity and diagnostic-only boundary remain checked
+  ---
+  duration_ms: 22.301157
+  type: 'test'
+  ...
+# Subtest: CDH006 real producer rejects absent execution, dirty candidate, and existing output without replacing bytes
+ok 6 - CDH006 real producer rejects absent execution, dirty candidate, and existing output without replacing bytes
+  ---
+  duration_ms: 123.817541
+  type: 'test'
+  ...
+# Subtest: CDH007 real CLI emits output and repeat invocation preserves both output artifacts
+ok 7 - CDH007 real CLI emits output and repeat invocation preserves both output artifacts
+  ---
+  duration_ms: 131.119197
+  type: 'test'
+  ...
+# Subtest: CDH008 CLI refuses preexisting JSON output before process or log creation
+ok 8 - CDH008 CLI refuses preexisting JSON output before process or log creation
+  ---
+  duration_ms: 45.938689
+  type: 'test'
+  ...
+# Subtest: CDH009 real producer permits untracked evidence while refusing tracked mutations before and during capture
+ok 9 - CDH009 real producer permits untracked evidence while refusing tracked mutations before and during capture
+  ---
+  duration_ms: 172.217107
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 773.781939

@@ -1,0 +1,149 @@
+{
+  "baseCommit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "members": [
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-01.mjs",
+      "sha256": "760676ceffa3f5ba9f7fad75661884cafbf1df09912058afe62cf3a994982f00",
+      "author": "materializer_scratch_fix_r1",
+      "originalInput": "scratch/alfred-materializer-scratch-fix-r1-20261009/signed-quality-package.mjs",
+      "bytes": 25013
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-02.mjs",
+      "sha256": "3049cc36358be29fe6ab8012b4f8fbb159745a92f05203a7a7fb1190ac9d125c",
+      "author": "onboarding_answer_validators_fix_r1",
+      "originalInput": "scratch/alfred-onboarding-answer-validators-fix-r1-20261009/repo/plugins/pipeline-core/lib/guard/sanctioned-args-onboarding.mjs",
+      "bytes": 26630
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members/member-1.mjs",
+      "sha256": "5ad101a0c34526e1d2c0a5727620026408e35b99f8f0231ca767ddccf0c8b30d",
+      "author": "critic_capture_header_fix_r1",
+      "originalInput": "scratch/alfred-critic-capture-header-fix-r2-20261009/graph/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+      "bytes": 7703
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-04.mjs",
+      "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "author": "legacy_candidate_tree_fix_r1",
+      "originalInput": "scratch/alfred-legacy-candidate-tree-fix-r1-20261009/design-workflow-package-v2.mjs",
+      "bytes": 31090
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-05.mjs",
+      "sha256": "0f3faf2ee6326e4f9d8ee59b723b73ac7a9cbd8b6971fc20a4ba9f3922c010a4",
+      "author": "recovery_draft_lane_fix_r1",
+      "originalInput": "scratch/alfred-recovery-draft-lane-fix-r1-20261009/graph/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs",
+      "bytes": 13825
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-06.mjs",
+      "sha256": "472476878af428984ecdf761d0724c7938b25bf8075ea3c643278a766af55989",
+      "author": "isolated_journal_schema_fix_r1",
+      "originalInput": "scratch/alfred-isolated-journal-schema-fix-r1-20261009/isolated/plugins/pipeline-core/scripts/codex-isolated-critic-contract.mjs",
+      "bytes": 53547
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-07.mjs",
+      "sha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "author": "retired_design_fixture_reconcile_r2",
+      "originalInput": "scratch/alfred-retired-design-fixture-r2-20261009/design-course-command-admission.test.mjs",
+      "bytes": 32252
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-08.mjs",
+      "sha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+      "author": "architecture_debt_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-architecture-debt-fixture-r1-20261009/architecture-entry-readiness.test.mjs",
+      "bytes": 18190
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-09.mjs",
+      "sha256": "123a911e9561c9dc36708232925ebef0bcb25aab4ed45d92b2ec92eb553b221d",
+      "author": "bootstrap_prepush_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-prepush-fixture-r1-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-pre-push-observation.test.mjs",
+      "bytes": 28870
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members/member-3.mjs",
+      "sha256": "2b8f664c7176fc31b2d42cd32b87f1426f393ac95dcec66c0d9841e19bb44e88",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r2-20261009/postimage/plugins/pipeline-core/scripts/pipeline-start-preflight-antigravity-hard-enforcement.test.mjs",
+      "bytes": 23607
+    },
+    {
+      "target": "plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-11.mjs",
+      "sha256": "5bd3120655e3485b9daafe2bd07da9634d05ac0a59b536c49852d255dd274d17",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r1-20261009/postimage/plugins/pipeline-core/lib/bootstrap-source-attestation-acceptance.test.mjs",
+      "bytes": 25850
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-12.mjs",
+      "sha256": "db7265d0e76caa64216ef1a5466a619aa7ae323d4b34bc9c315416a1abd8bc60",
+      "author": "bootstrap_remaining_fixtures_reconcile_r1",
+      "originalInput": "scratch/alfred-bootstrap-remaining-fixtures-r1-20261009/postimage/plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "bytes": 32882
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/onboarding-init.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-13.mjs",
+      "sha256": "75a91d6fb1d6739e58fdfe1ea59507a39753c03405aea1336176df0afe006a71",
+      "author": "onboarding_encrypted_fixture_reconcile_r1",
+      "originalInput": "scratch/alfred-onboarding-encrypted-fixture-r1-20261009/onboarding-init.test.postimage.mjs",
+      "bytes": 121692
+    },
+    {
+      "target": "plugins/pipeline-core/lib/signed-quality-package-scratch.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-14.mjs",
+      "sha256": "5b01d9f337c0c737124c4e87595120525da67634dff86e93ceda44c69336aad3",
+      "author": "materializer_permanent_regression_r1",
+      "originalInput": "scratch/alfred-materializer-permanent-regression-r1-20261009/signed-quality-package-scratch.test.mjs",
+      "bytes": 13600
+    },
+    {
+      "target": "plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members/member-2.mjs",
+      "sha256": "58acbee88d20b30a665a268ed1fce9d422232c4a0e28d0526222c304f633aaee",
+      "author": "critic_header_permanent_regression_r1",
+      "originalInput": "scratch/alfred-critic-header-permanent-regression-r1-20261009/r2/postimage/plugins/pipeline-core/lib/critic-capture-header.test.mjs",
+      "bytes": 14531
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/members/member-16.mjs",
+      "sha256": "8ca1965d35085427b03c50381eec4312c643103065ec977201a524efc87abad5",
+      "author": "recovery_draft_lane_red_r1",
+      "originalInput": "scratch/alfred-recovery-draft-lane-red-r1-20261009/canonical-postimage.mjs",
+      "bytes": 5017
+    },
+    {
+      "target": "harness/verify-suites.json",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members/member-4.json",
+      "sha256": "95440724d7093282a2b87db10c14ca973d8d3bbc9c900c5a95b3b63d99686ed8",
+      "author": "r9_regression_registry_append_r1",
+      "originalInput": "scratch/alfred-r9-regression-registry-r1-20261009/verify-suites-final.json",
+      "bytes": 100172
+    },
+    {
+      "target": "docs/product-capability-inventory.json",
+      "input": "scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/postinstall-r9/final-members/member-5.json",
+      "originalInput": "scratch/alfred-r9-capability-inventory-r1-20261009/product-capability-inventory.json",
+      "sha256": "74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e",
+      "bytes": 145316,
+      "author": "r9_regression_registry_append_r1"
+    }
+  ]
+}

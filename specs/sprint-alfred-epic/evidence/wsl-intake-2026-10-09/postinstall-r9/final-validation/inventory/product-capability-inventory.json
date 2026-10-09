@@ -1,0 +1,3033 @@
+{
+  "schema": "pipeline.product-capability-inventory.v3",
+  "sourceBaseline": {
+    "commit": "d214726e664733a5c0cda68f808f79bb8eee313c",
+    "tree": "67b17af9796dde78724d4389a6fcbf32460e63dd"
+  },
+  "criticReview": {
+    "status": "required-before-publication",
+    "receiptSha256": null,
+    "reason": "Two bounded Critic rounds found and drove four corrections. The final commit-path binding correction is self-verified under QG-13 and awaits a later bundled candidate review before publication."
+  },
+  "capabilities": [
+    {
+      "id": "claude-hook-safety",
+      "publicName": "Command and write-path guardrails",
+      "problem": "Dangerous commands and unverified changes need deterministic local policy checks.",
+      "benefit": "Configured hook families enforce command, write-path, plan, test-path, push, and lifecycle-readiness safeguards.",
+      "status": "shipped",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-advisor-prohibition.mjs:guard-advisor-prohibition",
+        "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
+        "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+        "guard:plugins/pipeline-core/hooks/guard-dispatch-budget.mjs:guard-dispatch-budget",
+        "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
+        "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
+        "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
+        "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
+        "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
+        "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
+        "guard:plugins/pipeline-core/hooks/guard-slicing.mjs:guard-slicing",
+        "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
+        "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-task-output-scope-posttool.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell|Read|Grep|Glob:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow|TodoWrite:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:advisor:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:UserPromptSubmit::node \"${CLAUDE_PLUGIN_ROOT}/hooks/claude-intake-prompt-capture.mjs\"",
+        "verify-phase:harness/scripts/verify.mjs:claude-native-capture-entry-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-task-output-read-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-task-output-scope-posttool-tests",
+        "verify-phase:harness/scripts/verify.mjs:gh-cmd-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "claude-host-hook-contract"
+        },
+        "antigravity": {
+          "status": "host-dependent",
+          "reasonCode": "native-hook-measurement-pending"
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-advisor-prohibition.mjs",
+        "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+        "plugins/pipeline-core/hooks/guard-devplan.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+        "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
+        "plugins/pipeline-core/hooks/guard-git.mjs",
+        "plugins/pipeline-core/hooks/guard-handover-size.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs",
+        "plugins/pipeline-core/hooks/guard-push.mjs",
+        "plugins/pipeline-core/hooks/guard-testpath.mjs",
+        "plugins/pipeline-core/hooks/guard-worktree-isolation.mjs",
+        "plugins/pipeline-core/hooks/hooks.json",
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
+        "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-claude-hook-safety",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "codex-host-hook-bridge",
+      "publicName": "Codex host safety bridge",
+      "problem": "Codex host behavior and available safety controls vary by host and platform.",
+      "benefit": "A Codex-native hook bridge applies the available command and write-path policy without promising controls the host cannot provide.",
+      "status": "host-dependent",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-command-grammar.mjs:guard-command-grammar",
+        "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent:node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
+        "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
+      ],
+      "runners": [
+        "codex",
+        "host-only"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "codex-host-hook-only"
+        },
+        "codex": {
+          "status": "host-dependent",
+          "reasonCode": "host-hook-lifecycle"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "pending-integration"
+        }
+      },
+      "platforms": [
+        "all",
+        "linux",
+        "macos",
+        "windows",
+        "wsl"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "Codex plugin host"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/.codex-plugin/plugin.json",
+        "plugins/pipeline-core/hooks/codex-hooks.json",
+        "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+        "plugins/pipeline-core/hooks/native-slicing.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-codex-host-hook-bridge",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/.codex-plugin/plugin.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "deterministic-verification",
+      "publicName": "Deterministic verification",
+      "problem": "A delivery needs reproducible evidence instead of an informal test claim.",
+      "benefit": "Registered Verify runs declared checks with progress and candidate-bound journal evidence. Consumer projects combine pipeline baseline checks with their real configured product command; missing product verification cannot pass. The macOS-acceptance suite remains a synthetic, non-native contract check and never substitutes for Apple Silicon evidence.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-decision-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-route-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
+        "verify-phase:harness/scripts/verify.mjs:agent-pipeline-root-creation-tests",
+        "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
+        "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-final-return-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-host-commit-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-host-commit-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-session-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-pretool-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-orientation-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-decision-continuity-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-decision-waiver-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-design-test-fixture-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-design-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-effective-decisions-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-entry-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-inherited-sources-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-map-scaffold-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-push-currency-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests",
+        "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+        "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+        "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
+        "verify-phase:harness/scripts/verify.mjs:async-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
+        "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
+        "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
+        "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-dispatch-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-check",
+        "verify-phase:harness/scripts/verify.mjs:backlog-done-predicate-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-item-strip-for-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-sprint-assignment-check",
+        "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
+        "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-acknowledgement-mode-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-measure-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-source-attestation-acceptance-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-trust-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:browser-evidence-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-adr-consistency-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-audit-evidence-overview-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-backlog-sprint-assignment-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-clone-provisioning-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-close-security-completeness-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-commit-type-range",
+        "verify-phase:harness/scripts/verify.mjs:check-commit-type-range-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-completeness-vocabulary-doclint-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-critic-skip-coverage-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-evidence-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-private-identifiers-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-protected-path-integrity-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-release-state-consistency-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-review-retry-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-session-bootstrap-directory-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-state-phase-consistency-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-suite-registration-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-vendored-template-sync-tests",
+        "verify-phase:harness/scripts/verify.mjs:checkpoint-push-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:checkpoint-push-audit-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:clean-candidate-run-tests",
+        "verify-phase:harness/scripts/verify.mjs:cli-help-tests",
+        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-advisor-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-compact-session-output-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-packet-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-probe-split-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-session-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-shadow-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-design-advisor-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-host-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-goal-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-output-custody-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-process-journal-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-claims-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-protected-preimage-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolation-control-decomposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-native-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-pretool-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-readiness-finalization-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-readiness-shared-parent-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-host-control-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-plugin-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-tool-free-design-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-capacity-shared-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-placement-tests",
+        "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
+        "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-capture-header-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-course-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
+        "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-lifecycle-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-review-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-route-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-route-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-skip-coverage-check",
+        "verify-phase:harness/scripts/verify.mjs:critic-skip-decision-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-t1-po-override-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-verify-lifecycle-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-verify-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
+        "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
+        "verify-phase:harness/scripts/verify.mjs:deferred-backlog-check",
+        "verify-phase:harness/scripts/verify.mjs:deferred-backlog-tests",
+        "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisor-course-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisor-course-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisor-provenance-flap3-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisor-provenance-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-admission-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-coordinator-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-advisory-transaction-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-approval-command-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-approval-route-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-approval-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-command-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-candidate-binding-codex-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-candidate-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-evidence-descendant-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-package-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-package-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-package-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-signing-default-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
+        "verify-phase:harness/scripts/verify.mjs:doc-reader-terminal-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:elephant-agy-implementation-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:elephant-implementation-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:enforcement-conformance-tests",
+        "verify-phase:harness/scripts/verify.mjs:enrollment-retirement-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:enrollment-retirement-git-creation-tests",
+        "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
+        "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:evidence-view-renderer-tests",
+        "verify-phase:harness/scripts/verify.mjs:execution-lane-credential-tests",
+        "verify-phase:harness/scripts/verify.mjs:execution-plane-launch-tests",
+        "verify-phase:harness/scripts/verify.mjs:external-command-offer-tests",
+        "verify-phase:harness/scripts/verify.mjs:external-push-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:fanout-governor-tests",
+        "verify-phase:harness/scripts/verify.mjs:fanout-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:feature-close-audit-executor-tests",
+        "verify-phase:harness/scripts/verify.mjs:feature-close-audit-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:feature-close-audit-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+        "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+        "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
+        "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+        "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+        "verify-phase:harness/scripts/verify.mjs:generate-vendored-canon-tests",
+        "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+        "verify-phase:harness/scripts/verify.mjs:git-hook-runtime-snapshot-fast-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
+        "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
+        "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-value-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-windows-suppression-tests",
+        "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-live-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:goldfish-commit-command-flow-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-onboarding-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-scope-retirement-retry-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-devplan-design-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-devplan-design-approval-v7-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-devplan-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-checkpoint-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-fanout-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-native-worker-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-architecture-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-attestation-diagnostics-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-checkpoint-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-gitleaks-prefix-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-promotion-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-release-tag-ancestry-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-scratch-advisory-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-slicing-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-split-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-split-map-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-testpath-gmw-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+        "verify-phase:harness/scripts/verify.mjs:handover-rotation-tests",
+        "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-tests",
+        "verify-phase:harness/scripts/verify.mjs:harness-lib-plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:hook-governance-scope-tests",
+        "verify-phase:harness/scripts/verify.mjs:hook-refresh-detection-tests",
+        "verify-phase:harness/scripts/verify.mjs:hooks-manifest-shape-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-guard-override-capability-scan-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+        "verify-phase:harness/scripts/verify.mjs:initial-answers-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:initial-answers-transaction-tests",
+        "verify-phase:harness/scripts/verify.mjs:intake-material-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:interruption-receipts-tests",
+        "verify-phase:harness/scripts/verify.mjs:language-canon-check",
+        "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
+        "verify-phase:harness/scripts/verify.mjs:lib-plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:license-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:license-contract-check",
+        "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-denial-loop-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-denial-loop-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-recovery-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:live-runner-certification-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-worker-pool-tests",
+        "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
+        "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
+        "verify-phase:harness/scripts/verify.mjs:measure-tofu-push-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-acceptance-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-antigravity-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-claude-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-codex-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-host-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-invocation-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-latest-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-main-prelaunch-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-route-source-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-runtime-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-approved-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-bootstrap-readonly-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-dispatch-select-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-host-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-host-observations-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-host-session-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-host-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-session-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-v3-baseline-tests",
+        "verify-phase:harness/scripts/verify.mjs:module-cluster-reachability-tests",
+        "verify-phase:harness/scripts/verify.mjs:module-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-commit-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-regression-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-finalizer-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-return-regression-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-return-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-regression-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-goldfish-host-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
+        "verify-phase:harness/scripts/verify.mjs:network-lockdown-tests",
+        "verify-phase:harness/scripts/verify.mjs:neutral-range-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+        "verify-phase:harness/scripts/verify.mjs:notebook-write-coverage-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-candidate-freeze-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-critic-packet-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-real-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-increment-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-invocation-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-invocation-reliability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-macos-acceptance-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-sandbox-launch-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-drvfs-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
+        "verify-phase:harness/scripts/verify.mjs:observation-governance-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:observe-critic-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-architecture-source-tests",
+        "verify-phase:harness/scripts/verify.mjs:osv-scanner-tests",
+        "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
+        "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:passive-read-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
+        "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
+        "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
+        "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-authority-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:physical-scratch-boundary-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-commit-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-antigravity-hard-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-path-spelling-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-pre-push-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-session-intent-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-scratch-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-announce-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-argv-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-close-audit-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-discard-feature-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-external-push-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspect-continuity-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspect-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspection-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-late-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-lifecycle-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-observer-conformance-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-mutable-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-reopen-design-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-user-v3-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-authority-staging-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-spec-state-retirement-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:plugins-pipeline-core-scripts-pipeline-commit-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-guarded-push-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+        "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-critic-export-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-critic-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:post-compact-reground-fanout-tests",
+        "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+        "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-trust-anchor-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:pre-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:pre-push-hook-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:print-verify-failures-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-foreign-residue-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-foreign-residue-unit-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-answers-file-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-argv-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-flap-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-pre-push-hook-offer-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-unborn-head-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-reset-git-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-uninstall-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-uninstall-tests",
+        "verify-phase:harness/scripts/verify.mjs:protected-baseline-tests",
+        "verify-phase:harness/scripts/verify.mjs:protected-delta-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
+        "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
+        "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:public-core-origin-allowlist-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-bundle-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-bundle-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-capability-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-close-audit-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-close-journal-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-executor-productive-flow-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-destination-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-gate-satisfiability-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-init-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-release-flow-docs-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
+        "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",
+        "verify-phase:harness/scripts/verify.mjs:reference-catalog-views-tests",
+        "verify-phase:harness/scripts/verify.mjs:reference-path-check",
+        "verify-phase:harness/scripts/verify.mjs:reference-path-tests",
+        "verify-phase:harness/scripts/verify.mjs:refresh-mandatory-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:release-promotion-envelope-tests",
+        "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:report-interruptions-tests",
+        "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:requirement-traceability-tests",
+        "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
+        "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
+        "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:rigor-floor-tests",
+        "verify-phase:harness/scripts/verify.mjs:role-route-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
+        "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
+        "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:ruleset-source-tests",
+        "verify-phase:harness/scripts/verify.mjs:ruleset-update-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:run-codex-critic-isolation-tests",
+        "verify-phase:harness/scripts/verify.mjs:run-codex-critic-probe-split-tests",
+        "verify-phase:harness/scripts/verify.mjs:run-codex-isolation-control-decomposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-contracts.schema-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profiles-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profiles-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-transcript-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-usage-v1-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-projection-removal-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-projection-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-projection-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-duty-tests",
+        "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:schema-lite-alternatives-tests",
+        "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
+        "verify-phase:harness/scripts/verify.mjs:scripts-pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
+        "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+        "verify-phase:harness/scripts/verify.mjs:section-citation-check",
+        "verify-phase:harness/scripts/verify.mjs:section-citation-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-capability-plan-builder-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-completeness-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-evidence-evaluator-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-evidence-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-evidence-v1-migration-fixture-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-readiness-harness-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-scan",
+        "verify-phase:harness/scripts/verify.mjs:security-scan-snapshot-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-scan-v2-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-scanner-diagnostics-tests",
+        "verify-phase:harness/scripts/verify.mjs:self-application-attestation-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:self-verify-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
+        "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-critic-finalizer-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:settings-allowlist-merge-tests",
+        "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:setup-tests",
+        "verify-phase:harness/scripts/verify.mjs:shared-pool-bounds-tests",
+        "verify-phase:harness/scripts/verify.mjs:shared-pool-occupancy-tests",
+        "verify-phase:harness/scripts/verify.mjs:signing-ceremony-tests",
+        "verify-phase:harness/scripts/verify.mjs:slice-queue-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:slice-queue-tests",
+        "verify-phase:harness/scripts/verify.mjs:source-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+        "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-capability-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
+        "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:state-budget-check",
+        "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",
+        "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
+        "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
+        "verify-phase:harness/scripts/verify.mjs:stop-fanout-tests",
+        "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
+        "verify-phase:harness/scripts/verify.mjs:suite-registration-check",
+        "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-case-completion-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-private-tmp-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-tmpdir-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-tmpdir-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:tmp-leak-enumerate-tests",
+        "verify-phase:harness/scripts/verify.mjs:tmp-leak-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:transfer-classification-tests",
+        "verify-phase:harness/scripts/verify.mjs:trust-anchor-bootstrap-circularity-repro-tests",
+        "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:validate-manifest",
+        "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-augmentation-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-check",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-registry-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-evidence-producer-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-evidence-root-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-evidence-writer-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-run-record-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-selection-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-check",
+        "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-suite-append-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
+        "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
+        "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:wire-dispatch-budget-hook-tests",
+        "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
+        "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-count-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-process-start-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-target-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
+        "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "harness/scripts/self-verify-selection.mjs",
+        "harness/scripts/verify.mjs",
+        "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
+        "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "plugins/pipeline-core/lib/verify-selection.mjs",
+        "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "harness/scripts/self-verify-selection.test.mjs",
+        "plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+        "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
+        "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
+        "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+        "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
+        "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
+        "plugins/pipeline-core/lib/provenance-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/provenance-local-builder.test.mjs",
+        "plugins/pipeline-core/lib/sbom-discovery.test.mjs",
+        "plugins/pipeline-core/lib/sbom-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/sbom-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/sbom-manifest.test.mjs",
+        "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs",
+        "plugins/pipeline-core/lib/sbom-release-binding.test.mjs",
+        "plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs",
+        "plugins/pipeline-core/lib/security-evidence-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/security-readiness.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/threat-model.test.mjs",
+        "plugins/pipeline-core/lib/verify-selection.test.mjs",
+        "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-deterministic-verification",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/pipeline.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "governance-example-extensions",
+      "publicName": "Governance extension examples",
+      "problem": "Adopters need a bounded starting point for project governance without treating examples as universal policy.",
+      "benefit": "Guideline and policy examples show where an adopting repository can supply its own governed extensions.",
+      "status": "optional",
+      "surfaceIds": [
+        "governance-extension:governance/examples/guidelines:guidelines",
+        "governance-extension:governance/examples/policies:policies"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "governance/examples/guidelines",
+        "governance/examples/policies"
+      ],
+      "testEvidence": [
+        "harness/scripts/validate-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-governance-example-extensions",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/pipeline.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "human-accountability-roles",
+      "publicName": "Human accountability roles",
+      "problem": "Agent delivery needs clear human decision and review accountability.",
+      "benefit": "The operating model names orchestration, implementation, and independent-review responsibilities.",
+      "status": "shipped",
+      "surfaceIds": [
+        "human-role:roles/critic.md:critic",
+        "human-role:roles/elephant.md:elephant",
+        "human-role:roles/goldfish.md:goldfish"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "roles/critic.md",
+        "roles/elephant.md",
+        "roles/goldfish.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-human-accountability-roles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "parallel-sprint-promotion-gates",
+      "publicName": "Parallel Sprint promotion gates",
+      "problem": "Long-lived parallel Sprints must not be forced to rebase continuously or promote an unsafe candidate.",
+      "benefit": "The integration contract rebases only the explicitly selected first merge-ready Sprint and requires bounded impact review for protected or overlapping baseline advances.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check",
+        "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:parallel-sprint-integration-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/parallel-sprint-integration.mjs",
+        "plugins/pipeline-core/scripts/check-epic-ac02-publication.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs",
+        "plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-parallel-sprint-promotion-gates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "pipeline-update-channels",
+      "publicName": "Pipeline update channels",
+      "problem": "Self-application and consuming repositories need explicit update selection without conflating repository freshness, host source switching, or release promotion.",
+      "benefit": "A closed alpha, beta, or stable channel contract provides trusted defaults and a sanctioned repository-local override while keeping update availability read-only.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:pipeline-update-channel-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+        "plugins/pipeline-core/scripts/ruleset-freshness.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/pipeline-update-channel.test.mjs",
+        "plugins/pipeline-core/scripts/ruleset-freshness.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-pipeline-update-channels",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "project/pipeline.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "plugin-distribution-and-publication",
+      "publicName": "Plugin distribution and publication controls",
+      "problem": "Projects need a versioned installation path and bounded publication operations.",
+      "benefit": "Marketplace and plugin manifests bind the distributable plugin while publication commands retain explicit evidence boundaries.",
+      "status": "optional",
+      "surfaceIds": [
+        "publication:.claude-plugin/marketplace.json:marketplace",
+        "publication:plugins/pipeline-core/.claude-plugin/plugin.json:plugin-manifest",
+        "publication:plugins/pipeline-core/scripts/public-baseline-diagnose.mjs:public-baseline-diagnose",
+        "publication:plugins/pipeline-core/scripts/publication-close-journal.mjs:publication-close-journal",
+        "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity",
+        "verify-phase:harness/scripts/verify.mjs:check-runner-manifest-parity",
+        "verify-phase:harness/scripts/verify.mjs:install-agy-tests",
+        "verify-phase:harness/scripts/verify.mjs:install-snapshot-progress-tests",
+        "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "host-dependent",
+          "reasonCode": "validator-parity-pending"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        ".claude-plugin/marketplace.json",
+        "plugins/pipeline-core/.claude-plugin/plugin.json",
+        "plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs",
+        "plugins/pipeline-core/scripts/public-baseline-diagnose.mjs",
+        "plugins/pipeline-core/scripts/publication-close-journal.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/codex-plugin-validator-parity.test.mjs",
+        "plugins/pipeline-core/scripts/publication-close-journal.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "SETUP",
+          "anchorId": "capability-plugin-distribution-and-publication",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/settings.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "release-planning-controls",
+      "publicName": "Release planning controls",
+      "problem": "A public export or release needs a bounded plan before references are changed.",
+      "benefit": "Release planning utilities compute and validate the candidate boundary before publication.",
+      "status": "optional",
+      "surfaceIds": [
+        "release:plugins/pipeline-core/scripts/native-plugin-readback.mjs:native-plugin-readback",
+        "release:plugins/pipeline-core/scripts/neutral-range-plan.mjs:neutral-range-plan"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/native-plugin-readback.mjs",
+        "plugins/pipeline-core/scripts/neutral-range-plan.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/neutral-range-plan.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-release-planning-controls",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "session-and-delivery-skills",
+      "publicName": "Session and delivery skills",
+      "problem": "Recurring delivery rituals are easy to omit or apply inconsistently.",
+      "benefit": "Installable skills provide bounded bootstrap, advisory, observation intake, technical and reader-facing review, close, and commit-message workflows.",
+      "status": "shipped",
+      "surfaceIds": [
+        "skill:plugins/pipeline-core/skills/advisor-consult/SKILL.md:advisor-consult",
+        "skill:plugins/pipeline-core/skills/architecture-decision/SKILL.md:architecture-decision",
+        "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
+        "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
+        "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
+        "skill:plugins/pipeline-core/skills/conventional-commit/SKILL.md:conventional-commit",
+        "skill:plugins/pipeline-core/skills/critic-review/SKILL.md:critic-review",
+        "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
+        "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start",
+        "skill:plugins/pipeline-core/skills/reader-review/SKILL.md:reader-review",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-prompt-capture-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-prompt-hook-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-intake-reference-admission-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/capture-observation/SKILL.md",
+        "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "plugins/pipeline-core/skills/close-feature/SKILL.md",
+        "plugins/pipeline-core/skills/conventional-commit/SKILL.md",
+        "plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "plugins/pipeline-core/skills/github-issue-operations/SKILL.md",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "plugins/pipeline-core/skills/reader-review/SKILL.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/scripts/github-issue-operations.test.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-session-and-delivery-skills",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "setup-and-runtime-projection",
+      "publicName": "Setup and runtime projection",
+      "problem": "A project needs one checked source for configuration and generated runtime projections.",
+      "benefit": "Setup validates and projects supported configuration into host-facing files.",
+      "status": "shipped",
+      "surfaceIds": [
+        "setup:setup.mjs:setup",
+        "verify-phase:harness/scripts/verify.mjs:agy-central-snapshot-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:bound-design-line-endings-tests",
+        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-rollback-tests",
+        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-tests",
+        "verify-phase:harness/scripts/verify.mjs:hardened-private-directory-install-tests",
+        "verify-phase:harness/scripts/verify.mjs:hook-currentness-digest-once-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/private-overlay-activation.mjs",
+        "plugins/pipeline-core/lib/private-overlay-bootstrap-status.mjs",
+        "plugins/pipeline-core/lib/private-overlay-runtime-projection.mjs",
+        "plugins/pipeline-core/lib/public-core-observation.mjs",
+        "plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs",
+        "plugins/pipeline-core/scripts/private-overlay-activation.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "setup.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/private-overlay-activation.e2e.test.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+        "setup.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "SETUP",
+          "anchorId": "capability-setup-and-runtime-projection",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "specialist-agent-roles",
+      "publicName": "Specialist delivery agents",
+      "problem": "Teams need bounded specialist contexts for execution, planning, readiness, and review work.",
+      "benefit": "The plugin supplies named specialist roles with explicit task boundaries.",
+      "status": "shipped",
+      "surfaceIds": [
+        "agent-role:plugins/pipeline-core/agents/consult-advisor.md:consult-advisor",
+        "agent-role:plugins/pipeline-core/agents/critic.md:critic",
+        "agent-role:plugins/pipeline-core/agents/goldfish-deep.md:goldfish-deep",
+        "agent-role:plugins/pipeline-core/agents/goldfish-implementor.md:goldfish-implementor",
+        "agent-role:plugins/pipeline-core/agents/goldfish-mechanic.md:goldfish-mechanic",
+        "agent-role:plugins/pipeline-core/agents/plan-verifier.md:plan-verifier",
+        "agent-role:plugins/pipeline-core/agents/readiness-reviewer.md:readiness-reviewer"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/agents/afk-claude-worker.md",
+        "plugins/pipeline-core/agents/consult-advisor.md",
+        "plugins/pipeline-core/agents/critic.md",
+        "plugins/pipeline-core/agents/goldfish-deep.md",
+        "plugins/pipeline-core/agents/goldfish-implementor.md",
+        "plugins/pipeline-core/agents/goldfish-mechanic.md",
+        "plugins/pipeline-core/agents/plan-verifier.md",
+        "plugins/pipeline-core/agents/readiness-reviewer.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/critic-bare.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-specialist-agent-roles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "starter-templates",
+      "publicName": "Project starter templates",
+      "problem": "New projects need consistent starting files without inheriting hidden behavior.",
+      "benefit": "Templates provide visible starting points for configuration, plans, reviews, and delivery records.",
+      "status": "optional",
+      "surfaceIds": [
+        "template-extension:templates/CLAUDE.project.md:CLAUDE.project.md",
+        "template-extension:templates/adr.md:adr.md",
+        "template-extension:templates/architecture-doc.md:architecture-doc.md",
+        "template-extension:templates/costs.md:costs.md",
+        "template-extension:templates/cutover-checklist.md:cutover-checklist.md",
+        "template-extension:templates/deploy-adapter.md:deploy-adapter.md",
+        "template-extension:templates/dev-plan.md:dev-plan.md",
+        "template-extension:templates/guard-config.json.example:guard-config.json.example",
+        "template-extension:templates/handover.md:handover.md",
+        "template-extension:templates/pipeline.json.example:pipeline.json.example",
+        "template-extension:templates/pipeline.yaml.example:pipeline.yaml.example",
+        "template-extension:templates/prd.md:prd.md",
+        "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
+        "template-extension:templates/prompts/elephant-kickoff.md:prompts/elephant-kickoff.md",
+        "template-extension:templates/prompts/goldfish-task.md:prompts/goldfish-task.md",
+        "template-extension:templates/prompts/kickoff-new-project.md:prompts/kickoff-new-project.md",
+        "template-extension:templates/prompts/session-bootstrap-check.md:prompts/session-bootstrap-check.md",
+        "template-extension:templates/release-manifest.md:release-manifest.md",
+        "template-extension:templates/retro.md:retro.md",
+        "template-extension:templates/risks.md:risks.md",
+        "template-extension:templates/roadmap.md:roadmap.md",
+        "template-extension:templates/spec.md:spec.md",
+        "template-extension:templates/three-scope-fixtures.md:three-scope-fixtures.md"
+      ],
+      "runners": [
+        "antigravity",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "templates/CLAUDE.project.md",
+        "templates/adr.md",
+        "templates/architecture-doc.md",
+        "templates/costs.md",
+        "templates/cutover-checklist.md",
+        "templates/deploy-adapter.md",
+        "templates/dev-plan.md",
+        "templates/guard-config.json.example",
+        "templates/handover.md",
+        "templates/pipeline.json.example",
+        "templates/pipeline.yaml.example",
+        "templates/prd.md",
+        "templates/prompts/critic-review.md",
+        "templates/prompts/elephant-kickoff.md",
+        "templates/prompts/goldfish-task.md",
+        "templates/prompts/kickoff-new-project.md",
+        "templates/prompts/session-bootstrap-check.md",
+        "templates/release-manifest.md",
+        "templates/retro.md",
+        "templates/risks.md",
+        "templates/roadmap.md",
+        "templates/spec.md",
+        "templates/three-scope-fixtures.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/validate-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "SETUP",
+          "anchorId": "capability-starter-templates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "generated-agent-obligations",
+      "publicName": "Generated agent obligations",
+      "problem": "Dispatched agents need an obligations template that tracks the current guard contracts without a hand-maintained second copy.",
+      "benefit": "An operator can explicitly generate the obligations template from current guard sources; the registered contract suite rejects byte drift and source-to-output drift.",
+      "status": "optional",
+      "surfaceIds": [
+        "template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md",
+        "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit generator invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "harness/scripts/generate-agent-obligations.mjs",
+        "templates/prompts/agent-obligations.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/generate-agent-obligations.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "SETUP",
+          "anchorId": "capability-generated-agent-obligations",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "v3-routed-duties",
+      "publicName": "V3 routed duties",
+      "problem": "Different delivery duties require explicit runner, evidence, and fallback decisions.",
+      "benefit": "V3 configuration records the supported advisory, review, delivery, and readiness duties.",
+      "status": "shipped",
+      "surfaceIds": [
+        "duty:pipeline.user.yaml:advisory",
+        "duty:pipeline.user.yaml:critic_high_risk",
+        "duty:pipeline.user.yaml:critic_normal",
+        "duty:pipeline.user.yaml:deep",
+        "duty:pipeline.user.yaml:implement",
+        "duty:pipeline.user.yaml:mechanic",
+        "duty:pipeline.user.yaml:read",
+        "duty:pipeline.user.yaml:readiness",
+        "duty:pipeline.user.yaml:test_author",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-selected-host-fallback-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-readiness-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-lane-fallback-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-readiness-course-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-readiness-host-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-readiness-runner-host-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-design-readiness-bootstrap-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "pipeline.user.yaml",
+        "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+        "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+        "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+        "plugins/pipeline-core/scripts/codex-design-readiness-host.mjs",
+        "plugins/pipeline-core/scripts/codex-readiness-app-server-child.mjs",
+        "plugins/pipeline-core/scripts/codex-readiness-app-server.mjs",
+        "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/design-readiness-host-evidence.test.mjs",
+        "plugins/pipeline-core/lib/design-readiness-runner-host-store.test.mjs",
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+        "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs",
+        "plugins/pipeline-core/scripts/codex-design-readiness-host.test.mjs",
+        "plugins/pipeline-core/scripts/codex-readiness-app-server.test.mjs",
+        "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-v3-routed-duties",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "v3-work-profiles",
+      "publicName": "V3 work profiles",
+      "problem": "Teams need a declared process shape for epic, feature, and small bounded work.",
+      "benefit": "The supported V3 profiles select documented routes and process expectations.",
+      "status": "shipped",
+      "surfaceIds": [
+        "profile:pipeline.user.yaml:epic",
+        "profile:pipeline.user.yaml:feature",
+        "profile:pipeline.user.yaml:mini"
+      ],
+      "runners": [
+        "antigravity",
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "pipeline.user.yaml"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-v3-work-profiles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "handover-hard-size-gate",
+      "publicName": "Handover hard size gate",
+      "problem": "A handover that grows beyond its configured cap can make the next session unusable.",
+      "benefit": "The registered guard evaluates proposed handover writes and refuses growth at or above the configured cap while allowing decreases.",
+      "status": "shipped",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
+        "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests"
+      ],
+      "runners": [
+        "antigravity",
+        "claude"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "claude-host-hook-contract"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.mjs",
+        "plugins/pipeline-core/hooks/hooks.json"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-handover-hard-size-gate",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "governance-event-ledger",
+      "publicName": "Governance event ledger",
+      "problem": "Governance decisions need tamper-evident event structure and candidate-bound validation.",
+      "benefit": "A caller can seal and validate RFC 8785 governance-event envelopes with SHA-256 binding; the library is not itself an automatically active runner integration.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:governance-action-artifact-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-action-events-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-event-store-win-fsync-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-gate-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-recovery-reconciliation-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-review-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-verification-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-schema-parity-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-gate-action-event-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        }
+      },
+      "prerequisites": [
+        "a caller that seals governance events",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/governance-action-artifact.mjs",
+        "plugins/pipeline-core/lib/governance-event.mjs",
+        "plugins/pipeline-core/lib/governance-gate-action.mjs",
+        "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
+        "plugins/pipeline-core/lib/governance-verification-action.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/governance-action-artifact.test.mjs",
+        "plugins/pipeline-core/lib/governance-event.test.mjs",
+        "plugins/pipeline-core/lib/governance-gate-action.test.mjs",
+        "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.test.mjs",
+        "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs",
+        "plugins/pipeline-core/scripts/reconcile-backlog-ledger.test.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-governance-event-ledger",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "agent-decision-journal",
+      "publicName": "Agent decision journal",
+      "problem": "High-consequence agent decisions need a constrained record without retaining free-form reasoning.",
+      "benefit": "A caller can validate bounded decision-event classes and unavailable-journaling dispositions; this library alone does not activate a journal for every runner.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:agent-decision-journal-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "contract-only-api"
+        }
+      },
+      "prerequisites": [
+        "a caller that records decision events",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/agent-decision-journal.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/agent-decision-journal.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-agent-decision-journal",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "audit-and-evidence-cli",
+      "publicName": "Audit and evidence command-line tools",
+      "problem": "Evidence needs portable capture, inspection, replay, and bundle tooling with explicit command contracts.",
+      "benefit": "An operator can explicitly run audit-bundle, capture-evidence, evidence-viewer, governance-export, and governance-replay commands against local inputs; none starts automatically or proves publication.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:audit-pack-tests",
+        "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
+        "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-delivery-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-view-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/audit-bundle.mjs",
+        "plugins/pipeline-core/scripts/capture-evidence.mjs",
+        "plugins/pipeline-core/scripts/evidence-viewer.mjs",
+        "plugins/pipeline-core/scripts/governance-export.mjs",
+        "plugins/pipeline-core/scripts/governance-replay.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/audit-bundle.test.mjs",
+        "plugins/pipeline-core/scripts/capture-evidence.test.mjs",
+        "plugins/pipeline-core/scripts/evidence-viewer.test.mjs",
+        "plugins/pipeline-core/scripts/governance-export.test.mjs",
+        "plugins/pipeline-core/scripts/governance-replay.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-audit-and-evidence-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "change-control-cli",
+      "publicName": "Change-control command-line tooling",
+      "problem": "A change-control workflow needs candidate-bound local validation before any external process is considered.",
+      "benefit": "An operator can explicitly evaluate a local, provider-neutral change-control request; any external authorization remains a separate prerequisite.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:change-control-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-authoring-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-session-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/change-control.mjs",
+        "plugins/pipeline-core/scripts/change-control.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/change-control.test.mjs",
+        "plugins/pipeline-core/scripts/change-control.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-change-control-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "security-control-catalog",
+      "publicName": "Security control catalog and waivers",
+      "problem": "Security controls and waivers need structured applicability, evaluation, and expiry rules.",
+      "benefit": "A caller can resolve the checked catalog, evaluation receipts, and waiver lifecycle; the catalog is not an automatically active security scanner or runner control.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-cli-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "catalog-contract-only"
+        }
+      },
+      "prerequisites": [
+        "a caller that evaluates the catalog",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "governance/security-controls/catalog.json",
+        "plugins/pipeline-core/lib/control-waiver-lifecycle.mjs",
+        "plugins/pipeline-core/lib/finding-lifecycle.mjs",
+        "plugins/pipeline-core/lib/security-policy-resolver.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/control-waiver-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/finding-lifecycle.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-security-control-catalog",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "supply-chain-provenance",
+      "publicName": "SBOM and provenance contracts",
+      "problem": "Release artifacts need machine-checked component and provenance contracts before a supply-chain claim is made.",
+      "benefit": "An operator can explicitly discover SBOM inputs and validate provenance contracts; it neither installs scanners nor creates an external attestation.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:dispatch-provenance-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-release-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "SBOM or provenance input",
+        "explicit CLI invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/provenance-attestation.mjs",
+        "plugins/pipeline-core/lib/sbom-manifest.mjs",
+        "plugins/pipeline-core/scripts/sbom-discovery.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
+        "plugins/pipeline-core/lib/sbom-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-supply-chain-provenance",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "ai-assisted-hardening",
+      "publicName": "AI-assisted change hardening",
+      "problem": "Untrusted inputs need explicit handling rules when they influence a guarded change.",
+      "benefit": "An operator can explicitly evaluate AI-assisted change inputs through the hardening gate; library and test presence does not make a runner hook active.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "declared change inputs",
+        "explicit gate invocation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/ai-assisted-hardening.mjs",
+        "plugins/pipeline-core/scripts/ai-assisted-hardening-gate.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
+        "plugins/pipeline-core/scripts/ai-assisted-hardening-gate.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-ai-assisted-hardening",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "critical-human-authorization",
+      "publicName": "Critical human authorization ceremonies",
+      "problem": "Critical actions need explicit human proof rather than an agent inference.",
+      "benefit": "An attended human can explicitly run the critical-authorization ceremony with a configured local key; an agent or local test cannot mint that proof.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:chat-gate-ceremony-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-signed-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-approval-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-consistency-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-course-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-review-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:design-workflow-package-builder-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-signed-integration-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-family-approval-request-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-push-anchor-tests",
+        "verify-phase:harness/scripts/verify.mjs:quality-package-windows-path-tests",
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-scratch-tests",
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "human-terminal-required"
+        }
+      },
+      "prerequisites": [
+        "OpenSSL",
+        "attended human terminal",
+        "configured local approval key",
+        "explicit authorization command"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-critical-human-authorization",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "repair-guidance-cli",
+      "publicName": "Refusal repair guidance",
+      "problem": "A denied tool call needs a precise recovery route instead of an improvised bypass.",
+      "benefit": "An operator can explicitly ask the live repair planner which declared refusal route, if any, applies; the command itself grants no override.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:attended-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:devplan-shell-lane-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-archive-tests",
+        "verify-phase:harness/scripts/verify.mjs:legacy-owner-custody-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-refusal-registry-tests",
+        "verify-phase:harness/scripts/verify.mjs:repair-map-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "explicit repair-map invocation",
+        "local repository checkout",
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/repair-map.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/repair-map.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-repair-guidance-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "continuity-and-handover",
+      "publicName": "Continuity and handover tools",
+      "problem": "A session transition needs durable, bounded context without treating stale or missing state as success.",
+      "benefit": "Installed runner integrations can inspect continuity state and an operator can explicitly inspect or rotate a configured handover; rotation is never automatic.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:check-resume-consumption-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-consumption-check",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-scripts-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-projection-win-path-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-handover-writer-tests",
+        "verify-phase:harness/scripts/verify.mjs:scratch-retention-tests",
+        "verify-phase:harness/scripts/verify.mjs:scratch-sweep-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "prerequisites": [
+        "configured project handover path",
+        "pipeline-core plugin",
+        "runner-specific runtime integration"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/continuity-state.mjs",
+        "plugins/pipeline-core/scripts/continuity-status.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/continuity-state.test.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-continuity-and-handover",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "afk-capability-workers",
+      "publicName": "Capability-bounded AFK workers",
+      "problem": "Background work needs a bounded worker and reviewable lifecycle rather than unrestricted delegation.",
+      "benefit": "The Claude-only AFK worker returns one bounded analysis proposal from allowlisted repository inputs; it cannot execute commands, apply changes, approve, commit, or dispatch.",
+      "status": "shipped",
+      "surfaceIds": [
+        "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
+        "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-capability-worker-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-claude-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-git-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-review-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-transaction-host-tests"
+      ],
+      "runners": [
+        "claude"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "provider-claude-only"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "provider-claude-only"
+        }
+      },
+      "prerequisites": [
+        "AFK activation receipt",
+        "Claude provider",
+        "allowlisted repository inputs"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/agents/afk-claude-worker.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/afk-ledger.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-afk-capability-workers",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "local-worker-supervision",
+      "publicName": "Local worker supervision",
+      "problem": "Local worker orchestration needs explicit leases, identities, cancellation, and cleanup rules.",
+      "benefit": "An operator can explicitly plan, inspect, cancel, clean up, or activate local-worker supervision; provider execution needs the separate allow-provider-execution flag and no OS isolation is claimed.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "local-host-activation-required"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit --activate",
+        "explicit --allow-provider-execution for run",
+        "local worker workspace"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "plugins/pipeline-core/scripts/local-worker-supervisor.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+        "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-local-worker-supervision",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "cost-and-benchmark-cli",
+      "publicName": "Cost and benchmark command-line tools",
+      "problem": "Usage and benchmark claims need an explicit local measurement command and declared inputs.",
+      "benefit": "An operator can explicitly inspect local usage-ledger inputs or run the fixed benchmark harness; results require admitted inputs and do not establish cross-runner consumer overhead by themselves.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:nova-a8-benchmark-runner-tests",
+        "verify-phase:harness/scripts/verify.mjs:usage-ledger-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Claude CLI for native benchmark route",
+        "Node.js runtime",
+        "explicit local inputs",
+        "local transcripts for usage-ledger"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/multi-cli-benchmark.mjs",
+        "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.mjs",
+        "plugins/pipeline-core/scripts/usage-ledger.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs",
+        "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.test.mjs",
+        "plugins/pipeline-core/scripts/usage-ledger.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-cost-and-benchmark-cli",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "error-register-quality-gate",
+      "publicName": "Error-register quality gate",
+      "problem": "Recurring delivery failures need a checked mechanism, lesson, or deferral rather than unstructured chronology.",
+      "benefit": "An operator can explicitly check that the repository error register uses the required recurring-resolution vocabulary; it is a repository quality check, not a runner hook.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:error-register-check",
+        "verify-phase:harness/scripts/verify.mjs:error-register-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "backlog error register",
+        "explicit checker invocation"
+      ],
+      "productionEvidence": [
+        "backlog/error-register.md",
+        "harness/scripts/check-error-register.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-error-register.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-error-register-quality-gate",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "organization-policy-packs",
+      "publicName": "Organization policy packs",
+      "problem": "Organization policy selection and activation need a declared local contract before an organization-level control is claimed.",
+      "benefit": "An operator can explicitly evaluate or activate a policy pack through the local CLI; a pack does not activate itself for every runner.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:organization-policy-core-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit policy-pack invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/organization-policy.mjs",
+        "plugins/pipeline-core/scripts/organization-policy.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/organization-policy.test.mjs",
+        "plugins/pipeline-core/scripts/organization-policy.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-organization-policy-packs",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "external-traceability-adapters",
+      "publicName": "External traceability adapters",
+      "problem": "External references need a provider-neutral local representation before any provider action is considered.",
+      "benefit": "An operator can explicitly use local external-reference and forge-adapter commands; configured provider credentials and external writes remain separate concerns.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:external-reference-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:external-reference-tests",
+        "verify-phase:harness/scripts/verify.mjs:forge-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-cli"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit adapter invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/external-reference-adapter.mjs",
+        "plugins/pipeline-core/scripts/external-reference.mjs",
+        "plugins/pipeline-core/scripts/github-forge-adapter.mjs",
+        "plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/external-reference-adapter.test.mjs",
+        "plugins/pipeline-core/scripts/external-reference.test.mjs",
+        "plugins/pipeline-core/scripts/github-forge-adapter.test.mjs",
+        "plugins/pipeline-core/scripts/gitlab-forge-adapter.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-external-traceability-adapters",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "human-override-and-maintenance-window",
+      "publicName": "Human guard override and maintenance window",
+      "problem": "A guard exception needs a bounded human-controlled route rather than an agent bypass.",
+      "benefit": "An attended operator can explicitly prepare or evaluate the documented override and maintenance-window ceremonies; neither is an automatically available agent override.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-kernel-closure-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "human-authorization-required"
+        }
+      },
+      "prerequisites": [
+        "attended human authorization",
+        "configured approval route",
+        "explicit ceremony invocation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "plugins/pipeline-core/scripts/guard-maintenance-window.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+        "plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-human-override-and-maintenance-window",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "documentation-quality-gates",
+      "publicName": "Documentation quality gates",
+      "problem": "Documentation contracts and lifecycle metadata need repeatable repository checks rather than a prose-only assertion.",
+      "benefit": "An operator can explicitly run the registered documentation contract, reconciliation, hook-manifest, identifier, and lifecycle checks; these checks do not publish documentation by themselves.",
+      "status": "optional",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:check-doc-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests"
+      ],
+      "runners": [
+        "host-only"
+      ],
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "explicit-local-checker"
+        }
+      },
+      "prerequisites": [
+        "Node.js runtime",
+        "explicit checker invocation",
+        "local repository checkout"
+      ],
+      "productionEvidence": [
+        "harness/scripts/check-doc-contracts.mjs",
+        "plugins/pipeline-core/lib/document-hooks.mjs",
+        "plugins/pipeline-core/lib/document-identifiers.mjs",
+        "plugins/pipeline-core/lib/document-lifecycle.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/lib/document-hooks.test.mjs",
+        "plugins/pipeline-core/lib/document-identifiers.test.mjs",
+        "plugins/pipeline-core/lib/document-lifecycle.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-documentation-quality-gates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    }
+  ]
+}

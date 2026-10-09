@@ -1,0 +1,44 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+const repo=process.cwd();
+const [manifestPath,work,out]=process.argv.slice(2);
+if(!/^scratch\/alfred-r9-members-[a-z0-9-]+\.json$/u.test(manifestPath??'') || !/^scratch\/alfred-postinstall-assembly-r9-[a-z0-9-]+$/u.test(work??'') || !out?.startsWith('scratch/alfred-local-candidate-r8-audit/specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/'))throw Error('closed assembly paths required');
+if(fs.existsSync(work))throw Error('fresh work namespace required');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const manifest=JSON.parse(fs.readFileSync(manifestPath));
+const targetsSeen=new Set();
+const proposals=manifest.members.map(member=>{
+ if(!member.target.startsWith('plugins/pipeline-core/') && member.target!=='harness/verify-suites.json' && member.target!=='docs/product-capability-inventory.json')throw Error('target outside postinstall repair package');
+ if(member.target.includes('..') || targetsSeen.has(member.target) || !member.input.startsWith('scratch/alfred-') || member.input.includes('..'))throw Error('unsafe or duplicate member');
+ targetsSeen.add(member.target);
+ const stat=fs.lstatSync(member.input);if(!stat.isFile() || stat.isSymbolicLink() || stat.nlink!==1)throw Error('regular source postimage required');
+ const bytes=fs.readFileSync(member.input);if(sha(bytes)!==member.sha256)throw Error('postimage drift');
+ if(bytes.includes(Buffer.from(repo)) || bytes.includes(Buffer.from('<home>')))throw Error('private source path');
+ return {...member,bytes};
+});
+const run=(args,cwd=repo,input)=>{const r=spawnSync('git',args,{cwd,input,encoding:null,maxBuffer:32*1024*1024});if(r.error || r.status!==0)throw Error(`git ${args[0]} failed: ${r.stderr?.toString().replaceAll(repo,'<repository>')}`);return r.stdout;};
+const head=run(['rev-parse','HEAD']).toString().trim();
+if(head!==manifest.baseCommit || run(['status','--porcelain']).length)throw Error('clean exact source base required');
+fs.mkdirSync(work,{recursive:true});
+const mirror=path.join(work,'b');
+run(['clone','--quiet','--local','--shared','--no-checkout',repo,path.resolve(mirror)]);
+run(['checkout','--quiet','--detach',head],path.resolve(mirror));
+const targets=[];
+for(const member of proposals){
+ const dest=path.join(mirror,member.target);
+ const original=fs.existsSync(dest)?fs.readFileSync(dest):null;
+ fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,member.bytes);
+ if(member.target.endsWith('.mjs')){const check=spawnSync(process.execPath,['--check',dest],{encoding:'utf8'});if(check.status!==0)throw Error('postimage syntax failed');}
+ else if(member.target.endsWith('.json'))JSON.parse(member.bytes.toString());
+ targets.push({target:member.target,sourceSha256:original?sha(original):null,postimageSha256:member.sha256,changed:!original?.equals(member.bytes),operations:[{kind:'full-postimage',source:member.input,inputSha256:member.sha256,author:member.author}]});
+}
+run(['add','--',...targets.map(x=>x.target)],path.resolve(mirror));
+run(['diff','--cached','--check'],path.resolve(mirror));
+const patch=run(['diff','--cached','--binary','--no-ext-diff','--no-color'],path.resolve(mirror));
+run(['apply','--check','--whitespace=error','-'],repo,patch);
+fs.writeFileSync(path.join(work,'package.patch'),patch,{flag:'wx'});
+const record={schema:'alfred.candidate-assembly.v9',baseCommit:head,mirror,assembler:'scratch/assemble-alfred-postinstall-r9.mjs',targets,assertionBytesPreserved:true,patchApplicationVerified:true,recompositionNeeded:false,manifestPath,manifestSha256:sha(fs.readFileSync(manifestPath)),packagePatchSha256:sha(patch),status:'assembled-focused-validation-pending',sourceIntegration:false,independentReview:'pending',poAcceptance:'open'};
+fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({baseCommit:head,mirror,members:targets.length,exactPostimages:true,patchApplicationVerified:true,sourceIntegration:false,out},null,2));

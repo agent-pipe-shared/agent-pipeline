@@ -1,0 +1,66 @@
+TAP version 13
+# Subtest: IPH01 post-install readback is runner-neutral and writes path-free receipts that the core verifies
+ok 1 - IPH01 post-install readback is runner-neutral and writes path-free receipts that the core verifies
+  ---
+  duration_ms: 526.722707
+  type: 'test'
+  ...
+# Subtest: IPH02 terminal-template attestation producer preserves Codex setupAction argv and verifies its receipt
+ok 2 - IPH02 terminal-template attestation producer preserves Codex setupAction argv and verifies its receipt
+  ---
+  duration_ms: 140.257205
+  type: 'test'
+  ...
+# Subtest: IPH03 Codex accepts an exact real-directory marketplace copy bound to its clean Git source
+ok 3 - IPH03 Codex accepts an exact real-directory marketplace copy bound to its clean Git source
+  ---
+  duration_ms: 181.713282
+  type: 'test'
+  ...
+# Subtest: IPH04 readback is request-selected and a changed installed copy cannot reuse a receipt
+ok 4 - IPH04 readback is request-selected and a changed installed copy cannot reuse a receipt
+  ---
+  duration_ms: 112.947681
+  type: 'test'
+  ...
+# Subtest: IPH05 receipt storage inside source or installed trees is rejected
+ok 5 - IPH05 receipt storage inside source or installed trees is rejected
+  ---
+  duration_ms: 20.220656
+  type: 'test'
+  ...
+# Subtest: IPH06 dirty source, stale copy, and embedded credential origin fail before a receipt survives
+ok 6 - IPH06 dirty source, stale copy, and embedded credential origin fail before a receipt survives
+  ---
+  duration_ms: 119.169572
+  type: 'test'
+  ...
+# Subtest: IPH07 bootstrap fails closed when its bound host locator is missing or stale
+ok 7 - IPH07 bootstrap fails closed when its bound host locator is missing or stale
+  ---
+  duration_ms: 90.785753
+  type: 'test'
+  ...
+# Subtest: IPH08 unsupported provider and unsorted or escaping protected paths are refused
+ok 8 - IPH08 unsupported provider and unsorted or escaping protected paths are refused
+  ---
+  duration_ms: 19.206541
+  type: 'test'
+  ...
+# Subtest: IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed
+ok 9 - IPH09 an exact Codex local registry/cache binding needs no receipt and a divergent cache stays closed
+  ---
+  duration_ms: 4471.514014
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5710.208434
+
+--- stderr ---

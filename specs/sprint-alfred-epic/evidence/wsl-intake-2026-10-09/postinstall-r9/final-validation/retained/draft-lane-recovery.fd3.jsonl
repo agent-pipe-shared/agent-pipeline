@@ -1,0 +1,15 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["DLR001","DLR002","DLR003","DLR004","DLR005","DLR006","DLR007","DLR008","DLR009","DLR010","DLR011","DLR012","DLR013"],"caseCount":13,"caseSetSha256":"ac7501dc987a15db253c2fc25cc682c9c7247787b63b8818e2d862ad98b5a7b2"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR009","ordinal":8,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR010","ordinal":9,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR011","ordinal":10,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR012","ordinal":11,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"DLR013","ordinal":12,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":13,"disposedCount":13,"caseIds":["DLR001","DLR002","DLR003","DLR004","DLR005","DLR006","DLR007","DLR008","DLR009","DLR010","DLR011","DLR012","DLR013"],"caseSetSha256":"ac7501dc987a15db253c2fc25cc682c9c7247787b63b8818e2d862ad98b5a7b2","dispositionsSha256":"ad8529e8d0f4d15a794b5822cef4412bccd4b6a12ce317e5a8adadddf530531f","counts":{"pass":13,"fail":0,"skip":0,"todo":0}}

@@ -1,0 +1,32 @@
+{
+  "sourcePath": "docs/product-capability-inventory.json",
+  "sourceSha256": "eaba148096b7e25704eaeed50fce5a92bd88d10944ef8bc3a16ee5be07687f8d",
+  "postimagePath": "scratch/alfred-r9-capability-inventory-r1-20261009/product-capability-inventory.json",
+  "postimageSha256": "74b492fc2ece86df06b7a445079b31169c67cb212a99057880b6e35dd2281b3e",
+  "schema": "pipeline.product-capability-inventory.v3",
+  "capabilityCount": 35,
+  "surfaceCountBefore": 932,
+  "surfaceCountAfter": 935,
+  "targetCountBefore": 35,
+  "targetCountAfter": 35,
+  "assignments": [
+    {
+      "capabilityId": "critical-human-authorization",
+      "status": "shipped",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:signed-quality-package-scratch-tests"
+    },
+    {
+      "capabilityId": "deterministic-verification",
+      "status": "shipped",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-capture-header-tests"
+    },
+    {
+      "capabilityId": "repair-guidance-cli",
+      "status": "optional",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:devplan-shell-lane-recovery-tests"
+    }
+  ],
+  "allOtherInventoryDataUnchanged": true,
+  "eachNewSurfaceHasExactlyOneOwner": true,
+  "noStatusRunnerPlatformOrNativeClaimChanges": true
+}
