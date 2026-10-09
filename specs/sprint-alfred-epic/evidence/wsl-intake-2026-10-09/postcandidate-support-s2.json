@@ -1,0 +1,709 @@
+{
+  "schema": "alfred.postcandidate-support-check.v1",
+  "frozenCandidate": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "assemblyPath": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r7.json",
+  "assemblySha256": "00575e9fea7bba9a9500f7d5ed96ea9e6748176108df7bd28a18ae1baa73cd4c",
+  "mirror": "scratch/alfred-postcandidate-support-s2-20261009/b",
+  "addedSupport": [
+    {
+      "path": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design-input.md",
+      "sha256": "6d65cbbf323965537b7540b2a7b183d82721e14e434bdeacfe4a6a80fc85b7e7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design.md",
+      "sha256": "8ac80ba2336e47bd8ec7a9a6cb72970ecb9fc8238ec2a872740856bc75080a8b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/ac19-inherited-source-contract.md",
+      "sha256": "194ae446fc325fecc5ccfba080e618097b34d2a595badadbdf2726aa6fc021c5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/ac6-promotion-approval-2026-10-08.md",
+      "sha256": "43822e02935673cfa18dfbf3db383eac8a139eceea9961420b6a46f33bb5d1cc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/adr-0085-removal-2026-10-08.md",
+      "sha256": "1c6b55807c5e4b724661c03d1fb56740c92b4e580e7a6dfc1af2582e36de8baf"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/agent-first-architecture.md",
+      "sha256": "b1887832938860f9095e109822f8b04fc23eb54d75c92056cd3d38e74c73bcf6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/agy-session-dispatch-contract.md",
+      "sha256": "2b426126e232b999d4ba95f7c2d09c8fca36a0391d9aa01c0ebacaaaeacd0dbe"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/agy-snapshot-central-2026-10-08.md",
+      "sha256": "42eda9d024859708c4e67078fcadabd439d3f74ee924bc3537ccc4cba84836c6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/answers-file-2026-10-08.md",
+      "sha256": "d489d468f23a9a8f187cbb31e9775a7d41cbbf30b87c16a7607048f55e53d7a5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/architecture-review-input-2026-09-09.md",
+      "sha256": "c3d3731e7b9aa84d32fbefdd6ffa12d2076b7c4b2a039444d922c39222d76372"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/audit-index-r6-2026-10-08.md",
+      "sha256": "9a2b5647a9417087e7f3448530aad2977e8d13c75710cfd70f592f3fe7f4b542"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/backlog-intake.md",
+      "sha256": "d3e957eccbec0f8152c240858e97e99dffb3451896e7c800fa8d70f1ade2352f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/bootstrap-hook-refresh-design.md",
+      "sha256": "1d7ce3032dba85a42cc589a82e2f215623afc24aa168acae107fa4320589e60d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/codex-critic-lane-2026-10-08.md",
+      "sha256": "352a733fe939443a3332cec004612b4b9539da97f141e3b0bc136abf72c47c09"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/contract-freeze.json",
+      "sha256": "e67a812b6cd99caf7a05542cac65bba50f595605966e89c84f154131d1bd09cc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "eae25ed7eea6355c0d69f3f0b1a8d2a0c65cffa8617a4c3cc40ec682e22dd99b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow.md",
+      "sha256": "5c3d1462f78e3ac98d7c6b098189d6cde439652ada2fe57bef49dc6b172be1a6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/external-research.md",
+      "sha256": "49eac1ee223d80c16621fbf25dd4e9af76b494cbad7d1b01de6e5ad875af7d15"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fable-review-2026-10-04/module-inventory.json",
+      "sha256": "3a65156c37d54472023de515c029e06d1695c77a46eb2d7c015cf3672bee9111"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fable-review-2026-10-04/module-proposal.md",
+      "sha256": "da0ade622115dd74a69922efdf6815115c4b5fccc2aee84bcf01a62361ea3048"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fable-review-2026-10-04/process-findings.md",
+      "sha256": "7719364bee5d1d6056072aa113b3ca83b75d0630c415d862b7277837fa06d740"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fanout-enforcement-design.md",
+      "sha256": "0a39d547c75866f3c8da79ffcdb4e367c045e77e113894da68c51df81c00e656"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fanout-s10-canon-draft.md",
+      "sha256": "a5d582e1d45da2120b79c6e680ddaf29eff1db9fe731ad455a6a206a5f14028b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/feature-branch-push-signature-design.md",
+      "sha256": "bfeec16359d185a79d9e1a61c64ecc1a86570895830d10b8fe6107a75df797bb"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/flap-p1-session-intent.md",
+      "sha256": "d4b8cad7ae0847aec2738804ec1111039af820a649ef447c8b34bae3892640c7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fx5b-gitleaksignore/README.md",
+      "sha256": "cd28aa6db27de254fdb9585813c29acfae82890baf9fb000d378a55abdbafe6e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/fx5b-gitleaksignore/repair.patch",
+      "sha256": "7464b803e62ceac0ae25079e9d2fdf54d5b1a48175a16565d5c92d3243c2bd0a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/gap-analysis-2026-08-28.md",
+      "sha256": "98dbd443161320a7b29c4b86abcaea6663466c386f4979b7d8741ce98d2e7b0e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-additional-scope-2026-09-28.md",
+      "sha256": "272d6a88229d6de7c33cd3d7feed48963fbb740c4747317d2cfdb8d395ca61cd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-findings-round-2026-10-03.md",
+      "sha256": "19ae9e72578c946339d0af84faea388ac9c2eb6e30da04fe9821fd522faa9cb0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "9600fc675076ed192af7d91d496e13c56efa8249c11f2d84a8ce6a68ea789eb7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "726da796794e2656336854b3a81fadc508e0b5c548acc2ba98a9c7c3379192b0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/ic2-working-plan-2026-10-05.md",
+      "sha256": "cb5fb88e873fe11d3aee6ffbbeb3e890fb8a57af6158204e5d83691ba0f25898"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/issue-intake.md",
+      "sha256": "75874df41c305390199787880e7feb3f1dd48b066b7b250d3e25f8975bfc3c66"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/local-candidate-completion-plan.md",
+      "sha256": "73d5cee0deaf8111ff043a31f12007daa4f098a6efcea368368a17dc2201a40f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/orchestrator-write-lease-2026-10-08.md",
+      "sha256": "85ec34a24bdd399b989c997aa4907acba3f5da283ff64e5832d7109d07fd0869"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/po-input-2026-08-27.md",
+      "sha256": "93b4d5f190e534b6ffefaff262f0590322db0bbe30214e36d2899ee3deedb1f3"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/po-input-2026-08-28.md",
+      "sha256": "acbb30410b4148d77a59144a87a9821852d111b24520dd03f4fb92eaf3c8d0db"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/po-queue-2026-10-03.md",
+      "sha256": "50f7c99606c47f1a1a4c58ba6ffe8b10d45aa9fd3765fc6081d35f822d78737c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/pr-delivery-mode-2026-10-08.md",
+      "sha256": "e950b95173858d388bfffceb377fffe624e7472ad8563b66cf75a0ad1da832fa"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/pushsig-s5-guard-push-test.patch",
+      "sha256": "f9f760875c4832daf13292c87f6b14bb1d8866511bccc34b5f0db7957e7aed27"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/recovery-availability-2026-10-03.md",
+      "sha256": "afe1b6012e0fc349e12c969bf171fd3d4b4b04fd88b72ecbeb5b188049edf8bb"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/recovery-availability-rv-2026-10-08.md",
+      "sha256": "d30a95fdca1456b231c0b7dde64352f96ba06cc802ab7ebe72f4f185550301fc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/role-route-preflight-r4-2026-10-08.md",
+      "sha256": "833754ef6e3a1ceda930a4975d38029ef95d1d28ff809b0000438a9c3bae84ea"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-guard-split-plan.md",
+      "sha256": "beed511482d5d36dc52fa1514c40ae5b0bd7b1dfcd33493ee27eb3fc4163b266"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/README.md",
+      "sha256": "ecbd43da929c0fe8c833146f59ec3ae1bb04456082715cb81a97bdfedda3c73d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/guard-lifecycle-ready.facade.mjs",
+      "sha256": "9ce34acf85fa4f9b42a1609847cd70e5542fce7a71f09c76f71104201e38b552"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/inventory-surfaces.patch",
+      "sha256": "15f831d89667846a352fa1f5c4ce832922c2043cb0ead16d1b5e9313fa0cdfa4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/protected-baseline.patch",
+      "sha256": "06bbf416d14133af00ddfd77b297caaa9d91be355c58694a882bca3e8617e155"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-1/verify-registration.patch",
+      "sha256": "5b7cc51c918fe44886f26e441ab784db5027d6d3f6603d404bfd78013934f59f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-2/README.md",
+      "sha256": "30585371c53d98b5313af38a639ec5e3880bbb744f58472d40d3b497ce879c52"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s2-package-2/fslash-guard-module.patch",
+      "sha256": "96af9d2be95b3b4ba55720b33c3f90d0e654e38be670212b4b6380108f144a5c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/s3-state-split-plan.md",
+      "sha256": "aabfb6d2f96ce7af821b15359d9cb2b976255da0d5ed9e5caf2ca950430c685b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/script-mediated-writes-2026-10-07.md",
+      "sha256": "f0d17a54b3c4372467723e7eaef65d32a1cd3068a94a89b00407f55cf977e24e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/security-scan-snapshot-2026-10-09.md",
+      "sha256": "a090fa0fa33bdf09e37ee3a2abfb655d16a67ff314456ad86a8c693ce453c415"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md",
+      "sha256": "a4e06eaaf8f7fe8b88c1dd1451a0efdcca1ebefd1568cd17f0207028f15f897e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/README.md",
+      "sha256": "b1b10907a7fefb15ca9fb2eb816a2247f3dd5e80e2264b44abde0bc83c4d13b1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/case-completion-dispositions.patch",
+      "sha256": "549144501173077b2be0aa7c11f9ad7967c3a24eb504a51353fee15c8ff599ac"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/inventory-surfaces.patch",
+      "sha256": "23c3779e05a44dea5be3bbddaadb7ca0bbd193cfddcc18d75b656697e30708e1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/verify-registration-package-1/test-registrations.patch",
+      "sha256": "175dd77d99529957fe8e9f4bc3d74bab64bc25bfb21c7ae008636036fa5d3be9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/winverify-spawn-inventory.md",
+      "sha256": "f0f0fcfaedfb0163ee9c518fa1d4c665186a1e9ce6a0557e61cb73894d77af2f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/MORNING-RUNBOOK-2026-10-05.md",
+      "sha256": "5f32f7f940e84d0b2bb87a54dbd0d9a0cd5742eefdbe8cd9edc0ec1c9b0cfc66"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/NIGHT-PLAN-2026-10-04.md",
+      "sha256": "651850b904daeea42f7cf334d88c694bf1b716f3184f096957bc279fa7402502"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/PO-RUNBOOK-2026-10-04.md",
+      "sha256": "84badf000845b5e249b0134c15aab839c19b4cfff6deec8ed57427a8c657cac5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/PO-TASKS-2026-10-05.md",
+      "sha256": "0b9eed88e379c33e31f162e4ae68f699ef55b376a4bf0d8d49a8c15b1a47e2c2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/README.md",
+      "sha256": "576b66187463469a84207d7498a985c854925eec62186e48b806260959a6598c"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/RESUME-2026-10-04.md",
+      "sha256": "76903e3d09288527db74ca955259a601713d0d97fbdd7665f8b1f294ca97a80a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/external-repair-proposal--REPORT.md",
+      "sha256": "87567701a127a01cd9b79faa85185764f4bf52bb281a66c29169867d0762964e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/held-notes-2026-10-03.md",
+      "sha256": "9a3530a60f190152a2237b8e4f0cfcd4ad3908dfb2094d53e5ac0fce41deee8e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/held-notes-2026-10-04.md",
+      "sha256": "d0d73ec5ea5339c7931111c48df36b8051e003ff2b502624483d25fc498578e6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/incident-report.md",
+      "sha256": "27d1a90df8fe3ac1ca1666165d05b0e4f1978837634df878caef6baa5a0f30cd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--agy-chain-inventory.md",
+      "sha256": "e406d11aa67da4b9eb6aa5a5bbbca899214cc6029c3428745d5abf77dd0368d2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--agy-version-effort-contract-research-20261001.md",
+      "sha256": "f7ae75a9a142a76e3581cf82be68faa30875ca7d91461b3bcb308d13b075c35b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--claude-chain-inventory.md",
+      "sha256": "3c768651c543361fff846523d7f293ddd25b3180effa9615f61862850b139f8d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--claude-latest-contract-research-20261001.md",
+      "sha256": "43df08fe11137b49a0c8d1004be39a851f42a06eb01545cd27e325bf94be4427"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--codex-chain-inventory.md",
+      "sha256": "d7c8257d24a5e5575cf722a9e3ec476aa9087281d86be4b7f3a6f2b891012c09"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/model-family-upgrade-proposal--integration-inventory.md",
+      "sha256": "f418214d3d13a23a00d7f06bc86d00eb7a10289bc5a052956696ed7c956720b2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/recovery-availability-proposal--briefing.md",
+      "sha256": "9806d3c5c376f0d7ee91414bde21f3513f25ac0c92c68190b448faab5de33d92"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/recovery-availability-proposal--test-evidence.md",
+      "sha256": "7c312375d205d39f12b417141b12788d889418ad7036deed84d80a8b274b11b2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/residue-analysis--residue-findings-elephant-addendum.md",
+      "sha256": "170c66847787ccca43b679d402f4dedda8f19985c2a4661b8cc258fac7f04c40"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/residue-analysis--residue-findings.md",
+      "sha256": "fa4dd852a8876db87672e0467c8edb1a95ea2ea5ec254ef985d23b7b6d6c21f4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/rggram/INTERIM.md",
+      "sha256": "6d3c2b32662c1cce7f49c5d40c1b2b1095d536effcf742f4525203ae12aa5642"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/rggram/INTERIM2.md",
+      "sha256": "7fbde9d6f93d1288f03fa331016c6d13ccd60c229b1d90bdced9482670417d7e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/rggram/README.md",
+      "sha256": "149d6e251137900be77f46f661a13090798c8acbbf8fcc74271ba10d2a04070d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/rggram/rggram-post-vs-tree.patch",
+      "sha256": "5b3603c22f65ea92fd2ad26ac70988818f3eebc0bc8f3703eee75b848686772f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/stage-plan-v3-2026-10-04.md",
+      "sha256": "f3df9b627dc281862891c888db5d09bbab1a340b807fb8629965aa3fc60c234b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-crash-repair-proposal--INTEGRATION.md",
+      "sha256": "02806d9874806c2961948e741efcdef02066a3e5f1ebe6c5bad8ae669ed1cc73"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-crash-repair-proposal--REPORT.md",
+      "sha256": "ee1184c05a546a8525dcd8cfeea92cbbde799b389e737c5a3d0f627b22b8806f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-guard-repair-proposal--REPORT.md",
+      "sha256": "2e2eeee290aa1acb1a83894b54a6394f50cd80ee305e55252e48a155e2989484"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-guard-repair-proposal--capture-observation.baseline.SKILL.md",
+      "sha256": "61ffc607131f78e2ad13857ef572b73b30e32a95f8e6e70f341dc6d03cb47f39"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-guard-repair-proposal--capture-observation.postimage.SKILL.md",
+      "sha256": "fdedfb9e728d444cbd9401dff5701c072d6d9624b25828f6ac61c033934612c5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/working-notes-2026-10/toolbox-guard-repair-proposal--observation-intake.packaged.md",
+      "sha256": "02aa13471acef20b551e9a0e57af1ec46a31273c64d18111a222387d3098e5c1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/design/worktree-per-goldfish-2026-10-08.md",
+      "sha256": "ae29951bc34e0116ec89d1ac04fc44253daa82b3cb2b37fe6f51f97931626aa5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/fixtures/ac20-token-adr/README.md",
+      "sha256": "f5be2b1e6bb1b0e09f744d3dfb7f77aab2d512d368b81a694e5748141653949e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/fixtures/ac20-token-adr/decision.json",
+      "sha256": "3f65019b349d04d0fd835f8b1d0e2999dce9bcaa8256d30961998494dac5c93b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/fixtures/ac20-token-adr/decision.md",
+      "sha256": "c65dd86284ae05b0185ce0a4b54ef508b948f7826c9e132f29fa970f534c86e6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/fixtures/ac20-token-adr/implementation.mjs",
+      "sha256": "99fece604c469750f180ca60f005dfc49679a3bdef19f82d13b8a15ebb9db6fc"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/0.7-candidate-implementation-plan-2026-10-03.md",
+      "sha256": "d406a7c1792d6bd632ce7f8321eabc998471a8bfa2b31b88d8d01b95619d1677"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/0.7-execution-order.md",
+      "sha256": "196d6b9dc235f740faad6e4bb66d69d72bed8de1e7c6214cf87e45d3e670ef2d"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/a1-enforcement-conformance.md",
+      "sha256": "950a4c84b63506e309e6d89fc223a683645c19a4f24a1a53368cf659e5f8782a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/adr-0085-implementation-plan.md",
+      "sha256": "6f1bbcc0ecabb725769e5bdb14250eee3ece6bf1f50b6af51b231cbf4af563de"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/adr-0085-u1-u3-api-contract.md",
+      "sha256": "3bee3aa4352ff84166a1ebfbacf5c007d6c2c1c8b5e0d1191708d3b595ca1fe2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/backlog-d-dispositions-2026-10-08.md",
+      "sha256": "12aa0b6fce990b88ad30578bc195e7fbda8e267a46b7f2cabef6f2a631231047"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/backlog-reconciliation-2-2026-10-07.md",
+      "sha256": "ae14505d324bacb6a8fe8f5b053467fb08d81e3b60270213a8dc0bda968e21a7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/backlog-reconciliation-2026-10-07.md",
+      "sha256": "7601b6e895063a7ff87bec43c3152ebd236998a366912bb1df28f3677add0a50"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/backlog-survey-2026-10-08.md",
+      "sha256": "7ead5bb3f8f9c3229db13f974c4848599c41e397061e5c7cabeb33ccd28bd6a2"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/backlog-triage-2026-10-07.md",
+      "sha256": "560b432a942dcd69c87143a85c99a405c8d0558a490bcc494a110a7b8d7a38bd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-aggregation.md",
+      "sha256": "68a59ccfabf1011f74b40ed08f775b6682f84e8aaf5dd727af786bdf087df6a0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-core.md",
+      "sha256": "16f3192c91cd3634662c059fc5cdd06264a4e2c46d75b8db7f95bbb2fad4c1a1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-emission.md",
+      "sha256": "58d625479f56ab1ff466d57aa30944c1e6740a8070cc013082e6ce4fe3f73312"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-preflight-observation.md",
+      "sha256": "789545ae769dde79a8c3b05ed3fc078b85f3495d6afdd1f2986b41d2e06b1208"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-source-projection.md",
+      "sha256": "cf1ff28a67e6881c1f7f7ebda43986be47d36d380a279e5ce9a543349400f4d1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/c1-store-controller.md",
+      "sha256": "cdd9dc19f5d26fd4f1beb5a58b1dec19b0f899d58e3ef01fe59a7b97df468b65"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/candidate-host-checklist-2026-10-08.md",
+      "sha256": "d8e01ce9a65f5dca2001ffd3eca9c5bf2f6230a174d0536228824c0e4f47a168"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/candidate-status-2026-10-09.md",
+      "sha256": "2e3722807527ef540b7f912c5247db2550c84f4960208f16536557368f139fa1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/close-out-map-2026-10-08.md",
+      "sha256": "6653a5baf71c8dd2deffa326f497c7660779db8394fec7f06312e2e3655a199a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/design-flow-integration-contract-2026-10-09.md",
+      "sha256": "da610513d0a6f4ce2505927f0bdf2bcd9bdb728a0593ec393f266e233641198a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/e1-contract-freeze.md",
+      "sha256": "1e9647dacc70d55a55e31e1a255c485c01a7c18b80ea9636ae4937fe2145f8c0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md",
+      "sha256": "eee79511ceedde8c77aa155421cfc89ac772c5902245227d984cb991aee5d330"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-09-bootstrap-resume.md",
+      "sha256": "81320d99c992c4f350b08f7259d97889089378cd769ec174936ec41781c397a5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-09-fanout-pause.md",
+      "sha256": "d615c5f95c253b6e3e15a39f0e60d6d237659f9664a04366d5852c2a52f8a203"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-09-interim-wrapup.md",
+      "sha256": "372729b96654a48c69a6f6fc6e20682a8c9d787b9a8423e9221289e3d359e660"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/handover-2026-10-09-wsl-intake.md",
+      "sha256": "af46c78fb09211970a8de46923899bdf1610a162f98e60d2948b95df6fb6c853"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/local-test-candidate-contract-2026-10-09.json",
+      "sha256": "eac856e07dd1a91014f124c722be0389e688adeec6f5236dce732c0773b49fa5"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/local-test-candidate-contract-2026-10-09.md",
+      "sha256": "539a64118d8c5a2e1f35e869e848464a3296ff67cf20c93e600f5d4115de2cc4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/next-actions-2026-10-08.md",
+      "sha256": "86dbdd195332450ac6bb05e8f4f732b542a926ab77f68fa2045d89e888748612"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-06.md",
+      "sha256": "9bc50874070778739ad2862055e0e632c0b0a2487b79cd6adab100721188be50"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md",
+      "sha256": "f3a711c190cc878ee53bb23f57da6279ad58a2e2437324b84ce33891c55b1adf"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-list-2026-10-08.md",
+      "sha256": "8952a4a5039b5c81924e09112f151b129933d4000ecfb9017af6082bddd6945f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-open-questions-2026-10-06.md",
+      "sha256": "91dbe44888a955d36cf849ebb8679227f9f81cfc16b161d96acace35b7c81728"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-open-questions-2026-10-07-night.md",
+      "sha256": "ce0493972a5dca857a5b008a119213d6383f079667b2a4158ea045c9685daf3e"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/r7-6-multi-key-aa.md",
+      "sha256": "248ea031d2b10518279d9166a9f0fbf9d0945da3e0c6bf1cc15271b1c23ad2ad"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/slices-hookrefresh-temproot-scratch-2026-10-07.md",
+      "sha256": "72be6736372be1c0f2db6cb84abe8dd56191547f8f19bbb5e6b86058b83d2a7b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/spec-ac-confirmation-a-2026-10-07.md",
+      "sha256": "90dd25f8cf18164c7cef5a8ec927ea6f8851c3be80c11f89bd5acc6ff4ec1064"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/spec-ac-reconciliation-2026-10-07.md",
+      "sha256": "a18a63c4cab6b997e77f10d13dbc40b92ece8a2b551b5922e4d32a95d9e5fbf9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/spec-requirement-coverage-2026-10-07.md",
+      "sha256": "f7e81eed1f8c1f6673f60d021220b6655140075ccae4ce0a2ff4ebc537313e0f"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/sprint-alfred-execution-roadmap.md",
+      "sha256": "869e81ab271ef8a614299ee5d9520e918c2c75a21f0d3943d0f013928a90df1b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/triage-6-po-options-2026-10-07.md",
+      "sha256": "bf25c45fa72558b94d4253195395cebb9fa30f8ce029fc34aa65e7e85aa5e10b"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/unstarted-ac-contracts-2026-10-07.md",
+      "sha256": "cc91cb19fc8fbb9034921ecfe881d858f2ba6970a977d8620816e9534a3a9eec"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/release-lifecycle.json",
+      "sha256": "082dadecc5a9a48603be7eb15a834a589d88ba1f4b9c93e3bdc242b24278b740"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/result.md",
+      "sha256": "c5ea827698aee6e26a5f14b703528ee5b93d4ee9a44f0de9b46a5aa9a8787eb6"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/traceability.md",
+      "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d"
+    }
+  ],
+  "suites": [
+    {
+      "target": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "sourceSha256": "f57ebca750c3f39af8e6f66ef412fa247657f8b61527e520d813370be55f31f0",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/project-uninstall-contract.test.mjs",
+      "sourceSha256": "c55dbcf5ddcf3efa0a1576246f9f9845248919d503218e187f06654e54bf3241",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": "required",
+      "terminal": {
+        "schema": "pipeline.test-case-completion.v1",
+        "event": "TERMINAL",
+        "declaredCount": 8,
+        "disposedCount": 8,
+        "caseIds": [
+          "UC01C001",
+          "UC01C002",
+          "UC01C003",
+          "UC01C004",
+          "UC01C005",
+          "UC01C006",
+          "UC01C007",
+          "UC01C008"
+        ],
+        "caseSetSha256": "619f94629896539c0c30856550126bfbbbe614992ae6eadda219f70935442d1d",
+        "dispositionsSha256": "5ce9d2d47fe0a517d37a775bf8bf5b5ecfdf347851781286a0209cfbc07783ae",
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "fd3Bytes": 1593,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+      "sourceSha256": "8388e3bf1c8ce164a4a1d34900bc5e4f0ad598b232a74733e20cc3cf04cf4290",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+      "sourceSha256": "2b89e562dbbdd3933f6bc93e3fee866a30ae4319edc7677805f49d21d7817390",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+      "sourceSha256": "e182838152d57e5de6d1e5c24b93cb22fdb6a129add2428afdee4c0fe664b6ad",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/report-interruptions.test.mjs",
+      "sourceSha256": "838ea224f3b247ad97a51cb2e93238eea1736c4fdc3067dd8eb4ba1cf7314d02",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
+      "sourceSha256": "2e5c9469566416d15d770bfcc6b4af3e31be3d9e722d5e342225e73eddcf97fd",
+      "exitCode": 0,
+      "signal": null,
+      "failure": null,
+      "disposition": null,
+      "terminal": null,
+      "fd3Bytes": 0,
+      "fd3ParseError": null,
+      "sourceUnchanged": true,
+      "passed": true
+    }
+  ],
+  "frozenUnchanged": true,
+  "targetsUnchanged": true,
+  "passed": true,
+  "qualification": "isolated fixtures only; this is not native installation, full Verify, Critic or whole-AC acceptance"
+}

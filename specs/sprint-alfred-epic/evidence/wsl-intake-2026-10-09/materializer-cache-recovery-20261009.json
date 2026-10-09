@@ -1,0 +1,28 @@
+{
+  "schema": "alfred.local-cache-observation.v1",
+  "candidateCommit": "e87ac5f1d7071570636719a60b1649004c6e7955",
+  "candidateVersion": "0.7.0+codex.20261009161950.7f37cc91",
+  "installedCandidate": false,
+  "observedBefore": {
+    "cli": "codex-cli 0.162.0",
+    "plugin": "pipeline-core@agent-pipeline-local",
+    "version": "tmp",
+    "cacheVersionSibling": "tmp",
+    "directoryEmpty": true
+  },
+  "sourceCause": {
+    "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+    "line": 14,
+    "expression": "const FIXTURE_TMP = resolve(dirname(fileURLToPath(import.meta.url)), \"../../tmp\");",
+    "effect": "When invoked from an installed cache version, its temporary worktree parent is the version-container directory. The empty tmp sibling remains after verification/application."
+  },
+  "recovery": {
+    "operation": "rmdir of the exact empty tmp sibling only",
+    "exitCode": 0,
+    "pluginRegistryAfter": "0.7.0+codex.20261005173906.866be213",
+    "sourceCandidateUnchanged": true,
+    "candidateWorkingTreeClean": true
+  },
+  "followup": "Capture as tracked evidence and independently repair the temporary-worktree directory contract after local candidate installation. Do not mutate the frozen signed candidate or invent native enforcement evidence.",
+  "qualification": "Observed CLI/cache recovery only; new candidate installation and host readback remain pending."
+}
