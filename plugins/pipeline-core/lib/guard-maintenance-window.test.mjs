@@ -109,8 +109,8 @@ function capturePolicy() {
   ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
 }
 
-function repoFixture(prefix = "gmw-", { policy, humanApproval = null, includeCriticalPolicy = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), prefix));
+function repoFixture(prefix = "gmw-", { policy, humanApproval = null, includeCriticalPolicy = true, baseDir = tmpdir() } = {}) {
+  const root = mkdtempSync(join(baseDir, prefix));
   roots.push(root);
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
@@ -1734,6 +1734,84 @@ try {
 
     const status = currentGuardMaintenanceWindow({ rootDir: root });
     assert.equal(status.status, "active", "a window record carrying the pre-fix legacy repoFingerprintSha256 must still read back as active");
+  });
+
+  // ---- WIN-GMW-T-20261009 (Ruling 140, item 1): cross-volume scope escape of the path
+  // normaliser. `normalizeRepoRelativePath` rejects only a ".."-prefixed `relative()`
+  // result. On win32, `relative()` between two DIFFERENT volumes returns the ABSOLUTE
+  // target instead, so that test never fires and a file on another volume gets a
+  // non-null "relative" path, which `pathWithinScope`'s GS-6 branch then reads as "under
+  // the live plugin root". The only public route to it is install-time tolerance of an
+  // intervening commit (`installGuardMaintenanceWindow`), so the pin drives that: the
+  // live plugin root (the anchor) sits on the temp volume while the governed repository
+  // (where the intervening commit's file lives) sits on the checkout's own volume.
+  // Volumes are probed at run time through path.parse().root -- never by
+  // process.platform and never by a hard-coded drive letter -- so a host with one
+  // volume (including every POSIX host, which has one root) gets the typed skip.
+  const { dirname, parse, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const sameVolume = (a, b) => parse(resolve(a)).root.toLowerCase() === parse(resolve(b)).root.toLowerCase();
+  // `scratch/` at the repository root is the repo's git-ignored throwaway area, and it
+  // is on the checkout's own volume by construction.
+  const checkoutBaseDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "scratch");
+  const singleVolume = sameVolume(tmpdir(), checkoutBaseDir);
+
+  const crossVolumeName = "GMW49 (WIN-GMW-T) a GS-6-scoped window refuses an intervening commit whose only file is an ordinary out-of-scope repository file on a DIFFERENT volume from the live plugin root -- relative() across volumes returns the absolute target, which must not read as 'inside the anchor'";
+  if (singleVolume) {
+    console.log(`SKIP ${crossVolumeName} [SINGLE-VOLUME]`);
+  } else {
+    await check(crossVolumeName, () => {
+      mkdirSync(checkoutBaseDir, { recursive: true });
+      const root = repoFixture("gmw-xvol-", { baseDir: checkoutBaseDir });
+      const plugin = pluginRootFixture();
+      assert.equal(sameVolume(root, plugin), false, "fixture precondition: the repository and the live plugin root must be on different volumes");
+      const { planSha256, specSha256 } = planSpecShas(root);
+      const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
+        rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "cross-volume file must not read as inside the plugin root", featureId: "f",
+        planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+      });
+
+      // A genuine new commit lands touching ONLY README.md: an ordinary repository file
+      // that is NOT inside the live plugin root (it is not even on its volume).
+      writeFileSync(join(root, "README.md"), "# fixture, out-of-scope edit on another volume than the plugin root\n");
+      execFileSync("git", ["add", "-A"], { cwd: root });
+      execFileSync("git", ["commit", "-q", "-m", "out-of-scope edit on another volume"], { cwd: root });
+
+      let installed = null;
+      let error = null;
+      try {
+        installed = installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+      } catch (caught) { error = caught; }
+      assert.equal(installed, null, `an intervening commit touching only a file on a different volume than the live plugin root was ADMITTED as in-scope (install status: ${installed?.status})`);
+      assert.ok(error instanceof GuardMaintenanceWindowError, "the install must refuse with the window error, not succeed or fail some other way");
+      assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+      assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+    });
+  }
+
+  // Control for GMW49, GREEN today on every host: the live plugin root now sits INSIDE
+  // the repository, so anchor and target share a volume and a file inside the anchor
+  // must stay in scope. It mirrors the pin's repository placement wherever the pin runs;
+  // a single-volume host (every POSIX host, WSL included) uses the default temp location
+  // instead, because a checkout on a mounted Windows drive cannot hold the owner-private
+  // window directory the library requires, which would fail this control for a reason
+  // that has nothing to do with scope.
+  await check("GMW50 (WIN-GMW-T control) on ONE volume, an intervening commit whose only file is inside the live plugin root stays in scope and install tolerates it", () => {
+    const controlBaseDir = singleVolume ? tmpdir() : checkoutBaseDir;
+    mkdirSync(controlBaseDir, { recursive: true });
+    const root = repoFixture("gmw-xvol-control-", { baseDir: controlBaseDir });
+    const plugin = nestedPluginFixture(root);
+    assert.equal(sameVolume(root, plugin), true, "fixture precondition: the repository and the live plugin root must share a volume");
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({ authorshipMode: "goldfish-dispatch",
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "same-volume in-scope commit must not void the signature", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// example, updated on the same volume\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "in-scope plugin edit, same volume"], { cwd: root });
+    const installed = installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    assert.equal(installed.status, "active", "a file inside the live plugin root, on the same volume, must stay in scope");
   });
 
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
