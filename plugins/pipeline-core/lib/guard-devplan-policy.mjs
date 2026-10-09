@@ -50,9 +50,14 @@ import {
 import { readDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
 import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-approval.mjs";
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
-import { readApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
+import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+
+// The v7 approval record is verified through the re-read of its package. The lib
+// constant for this schema is not exported, so the literal is local; a v8 record
+// keeps falling through to the pre-v7 branch until its own branch lands.
+const V7_APPROVAL_SCHEMA = "pipeline.plan-approval.v7";
 
 // Validate before hashing: the final authority reader must never read a state-
 // selected path outside the physical package, or follow a symlink.
@@ -100,7 +105,7 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const planSha256 = advisorPackageSha256(root, planPath);
     const specSha256 = advisorPackageSha256(root, specPath);
     const approval = state?.planApproval;
-    if (approval?.schema === CURRENT_APPROVAL_SCHEMA && state?.planApproved === true) {
+    if (approval?.schema === V7_APPROVAL_SCHEMA && state?.planApproved === true) {
       if (state?.planSubmission?.profile === "mini"
         && approval.designWorkflowPackagePath === null
         && approval.designWorkflowPackageSha256 === null
@@ -111,7 +116,7 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
         return { ok: false, code: "DAA-WORKFLOW-PROFILE" };
       }
       const readCandidate = () => currentGitCandidate(root);
-      const workflow = readApprovedDesignWorkflowPackage({
+      const workflow = rereadApprovedDesignWorkflowPackage({
         repoRoot: root,
         packagePath: approval.designWorkflowPackagePath,
         packageSha256: approval.designWorkflowPackageSha256,
@@ -120,7 +125,6 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
         planSha256,
         specPath,
         specSha256,
-        readCandidate,
         advisorExceptionBinding: approval.designWorkflowApproval?.advisorException ?? null,
       });
       if (!workflow.ok) return { ok: false, code: workflow.code ?? "DWP-APPROVAL-INVALID" };
