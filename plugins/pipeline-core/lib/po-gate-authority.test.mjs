@@ -692,6 +692,8 @@ function submitFixturePlan(primary, authority, profile) {
   const designFixture = materializeTestDesignWorkflowPackage({
     root: primary, featureId: state.activeFeature.id,
     planPath: authority.value.planPath, specPath: authority.value.specPath,
+    // R7-3-T2d: the bound-path gate refuses to present a package that is not tracked and clean at HEAD.
+    commitPackage: true,
   });
   const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
     dir: primary,

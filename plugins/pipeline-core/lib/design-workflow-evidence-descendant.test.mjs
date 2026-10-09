@@ -26,6 +26,12 @@
 //      different, valid tree id -> refused with DWP2-CURRENT-CANDIDATE (see assumption 8)
 //   I  (R7-3-T3-20261009, ruling 68) a bound artifact already tracked AT the candidate is deleted in a descendant
 //      commit, so candidate..HEAD carries a true D entry for a bound path -> refused with DWP2-CURRENT-CANDIDATE
+//   J, K, L (R7-3-T2d-20261009, for R7-3-F1e) the v1 package reader, which today demands strict equality between the live
+//      candidate and package.candidate (design-workflow-package.mjs :502-503):
+//      J  HEAD = candidate + one commit adding exactly the v1 bound set -> admitted (RED today: DWP-CANDIDATE-DRIFT)
+//      K  the same commit also touches an unrelated path -> refused with DWP-CANDIDATE-DRIFT (green control)
+//      L  HEAD is a sibling of the candidate (amended; not a descendant) -> refused with DWP-CANDIDATE-DRIFT (green control)
+//      Cases a, c1, d and h changed shape under the R7-3a bound-path gate: see assumption 9.
 //
 // ASSUMPTIONS stated for dispatcher ratification (not silently decided):
 //   1. Entry points: every case drives BOTH createDesignWorkflowPackageApprovalRequest (the approval
@@ -68,6 +74,26 @@
 //      the course, the dispatch and the route all bind the amended commit. I first commits the bound set (the
 //      tracked artifact is then an M entry, asserted to be admitted so the fixture is proven sound) and then
 //      deletes that artifact in a second commit.
+//   9. (R7-3-T2d-20261009.) The R7-3a bound-path gate (design-workflow-approval.mjs, refuseUnsoundBoundPath) refuses an
+//      untracked, ignored or modified package path, so the approval half of every case needs the package committed first.
+//      Cases a, c1, d and h therefore commit the bound set, each in the order its subject needs:
+//        a   reader half at HEAD == candidate BEFORE the package commit, approval half AFTER it (that half is then case
+//            B's shape; the redundancy is accepted);
+//        c1  package commit, then the unrelated commit (the candidate is HEAD~2, no longer HEAD^);
+//        d   amend FIRST (same tree, not a descendant), then commit the bound set on the sibling; a package-commit-then-
+//            amend order would leave an evidence-only descendant, which is admitted, and would weaken the control;
+//        h   rewrite candidate.tree on disk FIRST, then commit (a rewrite after the commit is a different subject, a
+//            DWP-BOUND-PATH-MODIFIED gate case). After the commit HEAD is an evidence-only descendant, not the candidate.
+//            h stays RED for its own subject until R7-3-F1d: the v2 descendant check reads only package.candidate.commit.
+//            The code each entry point returns is the pair in its failure message, recorded in the T2d evidence.
+//  10. (R7-3-T2d-20261009.) J..L build a plain Git repository (no Advisor course, no host store, so they carry no Linux
+//      restriction), commit the PRD and Spec as the candidate, and materialize the shared v1 fixture
+//      (test-design-workflow-fixture.mjs) bound to that real candidate and a live HEAD reader. The v1 bound set is three
+//      paths -- package, readiness, Advisor receipt -- derived from the package object, never from a glob. The fixture's
+//      input/design/traceability sources stay uncommitted: they are digest-bound sources, not evidence. J first reads the
+//      package at HEAD == candidate (fixture sound) and with requireCurrentCandidate:false after the commit, so its red is
+//      provably the candidate rule. The briefing fixes no refusal code for L; DWP-CANDIDATE-DRIFT is what the v1 strict rule
+//      returns today and is pinned as the assumed code (ratify or relax).
 //
 // Every import below is a RELATIVE import of the repository SOURCE, never the installed plugin.
 // The fixture builder is a copy of the one in design-workflow-candidate-binding.test.mjs (a test file
@@ -75,13 +101,16 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import nodeTest from 'node:test';
 
 import { advisorHostFixture } from './codex-advisor-host.fixture.mjs';
 import { coordinateInitialDesignAdvisory } from './design-advisory-coordinator-v2.mjs';
 import { createDesignWorkflowPackageApprovalRequest } from './design-workflow-approval.mjs';
+import { readDesignWorkflowPackageFromRepository } from './design-workflow-package.mjs';
+import { materializeTestDesignWorkflowPackage } from './test-design-workflow-fixture.mjs';
 import { readDesignWorkflowPackageV2FromRepository, readDesignReadinessPreparationFromRepository } from './design-workflow-package-v2.mjs';
 import { designReadinessReportSha256, designReadinessRunnerSelectionSha256, verifyDesignReadinessHostExecution } from './design-readiness-host-evidence.mjs';
 import { createDesignReadinessRunnerHostStore } from './design-readiness-runner-host-store.mjs';
@@ -201,23 +230,36 @@ async function unavailableAdvisorPackage(t, { trackedAtCandidate = {} } = {}) {
   return { root, candidate, sources, input, boundPaths, sourcePath, commit, unrelatedFile };
 }
 
-/** Both approval-time entry points, default (strict-by-ruling) requireCurrentCandidate. */
-function attempt(fixture) {
-  const reader = readDesignWorkflowPackageV2FromRepository(fixture.input);
-  const approval = createDesignWorkflowPackageApprovalRequest({
+/** Reader half: the v2 reader with the default (strict-by-ruling) requireCurrentCandidate. */
+function attemptReader(fixture) {
+  return brief(readDesignWorkflowPackageV2FromRepository(fixture.input));
+}
+
+/** Approval half: the final-approval request builder, which also runs the R7-3a bound-path gate (the package must be tracked and clean). */
+function attemptApproval(fixture) {
+  return brief(createDesignWorkflowPackageApprovalRequest({
     repoRoot: fixture.root, packagePath: PACKAGE_PATH, featureId: FEATURE_ID,
     planPath: fixture.sources.prd.path, planSha256: fixture.sources.prd.sha256,
     specPath: fixture.sources.spec.path, specSha256: fixture.sources.spec.sha256,
     readCandidate: () => observeAdvisorCandidate(fixture.root),
     verifyReadinessExecution: fixture.input.verifyReadinessExecution, trustedAdvisorExecutablePath: process.execPath,
-  });
-  return { reader: brief(reader), approval: brief(approval) };
+  }));
+}
+
+/** Both approval-time entry points. */
+function attempt(fixture) {
+  const reader = attemptReader(fixture);
+  return { reader, approval: attemptApproval(fixture) };
 }
 
 test('EVDESC-a HEAD == package.candidate is accepted at both approval-time entry points (green control)', async (t) => {
   const fixture = await unavailableAdvisorPackage(t);
   assert.equal(observeAdvisorCandidate(fixture.root).commit, fixture.candidate.commit, 'precondition: HEAD is the candidate');
-  assert.deepEqual(attempt(fixture), { reader: 'ok', approval: 'ok' });
+  // Reader half at HEAD == candidate, BEFORE the package is committed: this is the subject of the control.
+  assert.equal(attemptReader(fixture), 'ok');
+  // Approval half (assumption 9): the bound-path gate needs the package committed, so HEAD moves to an evidence-only descendant here.
+  fixture.commit(fixture.boundPaths, 'commit the design package and the artifacts it digests');
+  assert.equal(attemptApproval(fixture), 'ok');
 });
 
 test('EVDESC-b HEAD = candidate + one commit adding ONLY the package file and the artifacts it digests is accepted', async (t) => {
@@ -242,8 +284,12 @@ test('EVDESC-b0 fixture sanity: the case-B fixture verifies when the current-can
 
 test('EVDESC-c1 HEAD = candidate + one commit touching only an unrelated path is refused (green control)', async (t) => {
   const fixture = await unavailableAdvisorPackage(t);
+  // Assumption 9: the package is committed first (the gate), then the unrelated commit, so the candidate is HEAD~2.
+  fixture.commit(fixture.boundPaths, 'commit the design package and the artifacts it digests');
   fixture.commit([fixture.unrelatedFile()], 'unrelated work after the design candidate');
-  assert.equal(git(fixture.root, ['rev-parse', 'HEAD^']), fixture.candidate.commit, 'precondition: exactly one commit past the candidate');
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD~2']), fixture.candidate.commit, 'precondition: exactly two commits past the candidate');
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD~1'), fixture.boundPaths, 'precondition: the first commit is the bound set');
+  assert.deepEqual(changedPaths(fixture.root, 'HEAD~1', 'HEAD'), ['unrelated-later-work.md'], 'precondition: the second commit touches only the unrelated path');
   assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED });
 });
 
@@ -261,6 +307,10 @@ test('EVDESC-d a HEAD that is a sibling of the candidate (same tree, not a desce
   assert.notEqual(head.commit, fixture.candidate.commit, 'precondition: HEAD is a different commit');
   assert.equal(head.tree, fixture.candidate.tree, 'precondition: the tree is identical, so only ancestry can tell them apart');
   assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), false, 'precondition: the candidate is not an ancestor of HEAD');
+  // Assumption 9: the bound set is committed AFTER the amend, on the sibling. The reverse order would be an evidence-only descendant.
+  fixture.commit(fixture.boundPaths, 'commit the design package and the artifacts it digests');
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD^']), head.commit, 'precondition: the package commit sits on the sibling');
+  assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), false, 'precondition: the candidate is still not an ancestor of HEAD');
   assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED });
 });
 
@@ -311,10 +361,13 @@ test('EVDESC-g a chain that adds the bound set and then deletes a bound artifact
     'rulings 66 and 68: a deleted bound artifact must never be accepted (observed refusal: the artifact is missing, not the candidate rule)');
 });
 
-// R7-3-T3-20261009 (Critic R7-3-CB minor F1; assumption 8). HEAD is the candidate COMMIT, but the package records a different,
-// valid tree id. The candidate..HEAD diff is empty, so the descendant check has nothing to object to and admits; only a
-// downstream binding refuses. Pinned: the candidate rule itself refuses, at both entry points. When this is red, the pair in
-// the failure message is the observation (the code each entry point actually returns today).
+// R7-3-T3-20261009 (Critic R7-3-CB minor F1; assumption 8) as reshaped by R7-3-T2d-20261009 (assumption 9). The package records the
+// real candidate COMMIT but a different, valid tree id. Before the R7-3a gate this ran at HEAD == candidate with an empty
+// candidate..HEAD diff; the gate needs the package committed, so the bound set is committed AFTER the rewrite and HEAD is then an
+// evidence-only descendant (the title's HEAD == package.candidate.commit describes the state before that commit). The descendant
+// check reads only package.candidate.commit, so it has nothing to object to and admits; only a downstream binding can refuse.
+// Pinned: the candidate rule itself refuses, at both entry points. RED for its own subject until R7-3-F1d; the pair in the
+// failure message is the observation (the code each entry point actually returns today).
 test('EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a different valid tree is refused at the candidate rule', async (t) => {
   const fixture = await unavailableAdvisorPackage(t);
   // A real second tree without moving HEAD: stage the bound set, write the tree, restore the index.
@@ -324,15 +377,19 @@ test('EVDESC-h HEAD == package.candidate.commit but package.candidate.tree is a 
   assert.equal(git(fixture.root, ['status', '--porcelain', '--untracked-files=no']), '', 'precondition: the index is restored, nothing is staged');
   assert.equal(git(fixture.root, ['cat-file', '-t', otherTree]), 'tree', 'precondition: the substitute tree id is a real tree object');
   assert.notEqual(otherTree, fixture.candidate.tree, 'precondition: the substitute differs from the candidate tree');
-  assert.deepEqual(observeAdvisorCandidate(fixture.root), fixture.candidate, 'precondition: HEAD did not move and is still the candidate');
+  assert.deepEqual(observeAdvisorCandidate(fixture.root), fixture.candidate, 'precondition: HEAD has not moved yet and is still the candidate');
   const packageFile = join(fixture.root, PACKAGE_PATH);
   const workflowPackage = JSON.parse(readFileSync(packageFile, 'utf8'));
   assert.deepEqual(workflowPackage.candidate, fixture.candidate, 'precondition: the package recorded the real candidate before the rewrite');
   writeFileSync(packageFile, canonicalJson({ ...workflowPackage, candidate: { ...workflowPackage.candidate, tree: otherTree } }));
-  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD'), [], 'precondition: candidate..HEAD is empty (the empty diff is the whole point)');
   assert.equal(JSON.parse(readFileSync(packageFile, 'utf8')).candidate.tree, otherTree, 'precondition: only candidate.tree was rewritten on disk');
+  // Assumption 9: rewrite FIRST, commit AFTER. A rewrite after the commit would be a DWP-BOUND-PATH-MODIFIED gate case, a different subject.
+  fixture.commit(fixture.boundPaths, 'commit the design package (with the rewritten candidate.tree) and the artifacts it digests');
+  assert.equal(git(fixture.root, ['rev-parse', 'HEAD^']), fixture.candidate.commit, 'precondition: exactly one commit past the candidate');
+  assert.deepEqual(changedPaths(fixture.root, fixture.candidate.commit, 'HEAD'), fixture.boundPaths, 'precondition: candidate..HEAD is exactly the bound set (an evidence-only descendant)');
+  assert.equal(JSON.parse(git(fixture.root, ['show', `HEAD:${PACKAGE_PATH}`])).candidate.tree, otherTree, 'precondition: the committed package still carries the substitute tree');
   assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED },
-    'ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the (empty) diff says');
+    'ruling 65: a package whose candidate.tree is not the tree of HEAD is not the candidate, whatever the evidence-only diff says');
 });
 
 // R7-3-T3-20261009 (ruling 68). The one shape that produces a TRUE D entry for a bound path: the artifact already exists at the
@@ -355,4 +412,73 @@ test('EVDESC-i a bound artifact tracked AT the candidate and deleted in a descen
   assert.equal(isAncestor(fixture.root, fixture.candidate.commit, 'HEAD'), true, 'precondition: HEAD descends from the candidate');
   assert.deepEqual(nameStatus(), expected('D'), 'precondition: candidate..HEAD carries a true D entry for the bound artifact, every other bound path an A entry');
   assert.deepEqual(attempt(fixture), { reader: REFUSED, approval: REFUSED }, 'rulings 66 and 68: a D entry for a bound path keeps DWP2-CURRENT-CANDIDATE');
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// J, K, L: the v1 package reader (R7-3-T2d-20261009; assumption 10). A plain Git repository and the shared v1 fixture; no Advisor
+// course and no host store, so no platform restriction (plain nodeTest, not the linux-gated `test` wrapper above).
+const V1_FEATURE = 'v1-feature';
+const V1_PLAN = 'specs/v1-feature/prd.md';
+const V1_SPEC = 'specs/v1-feature/spec.md';
+const V1_UNRELATED = 'unrelated-later-work.md';
+const V1_DRIFT = 'refused:DWP-CANDIDATE-DRIFT';
+
+const v1Git = (root, argv) => execFileSync('git', ['-C', root, '-c', 'user.name=evdesc-v1-test', '-c', 'user.email=evdesc-v1-test@example.invalid',
+  '-c', 'commit.gpgsign=false', ...argv], { encoding: 'utf8', timeout: 10000 }).trim();
+const v1Head = (root) => ({ commit: v1Git(root, ['rev-parse', 'HEAD']), tree: v1Git(root, ['rev-parse', 'HEAD^{tree}']) });
+
+/** A v1 package bound to a real candidate commit; nothing past the candidate is committed (the cases decide). */
+function v1Fixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'evdesc-v1-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  v1Git(root, ['init', '-q']);
+  mkdirSync(join(root, dirname(V1_PLAN)), { recursive: true });
+  writeFileSync(join(root, V1_PLAN), 'The v1 PRD.\n');
+  writeFileSync(join(root, V1_SPEC), 'The v1 Spec.\n');
+  v1Git(root, ['add', '--', V1_PLAN, V1_SPEC]);
+  v1Git(root, ['commit', '-q', '-m', 'v1 design candidate']);
+  const candidate = v1Head(root);
+  const pkg = materializeTestDesignWorkflowPackage({ root, featureId: V1_FEATURE, planPath: V1_PLAN, specPath: V1_SPEC, candidate });
+  const workflowPackage = JSON.parse(readFileSync(join(root, pkg.packagePath), 'utf8'));
+  // The v1 bound set (assumption 10), derived from the package object, never from a directory glob.
+  const boundPaths = [...new Set([pkg.packagePath, workflowPackage.readiness.path, workflowPackage.advisor.receipt.path])].sort();
+  const read = (extra = {}) => brief(readDesignWorkflowPackageFromRepository({ repoRoot: root, packagePath: pkg.packagePath,
+    readCandidate: () => v1Head(root), verifyReadinessExecution: pkg.deps.verifyDesignReadinessHostExecution, ...extra }));
+  const commit = (paths, message) => { v1Git(root, ['add', '--', ...paths]); v1Git(root, ['commit', '-q', '-m', message]); };
+  return { root, candidate, boundPaths, read, commit };
+}
+
+nodeTest('EVDESC-j v1: HEAD = candidate + one commit adding ONLY the v1 bound set (package, readiness, Advisor receipt) is admitted by the v1 reader', (t) => {
+  const f = v1Fixture(t);
+  assert.equal(f.read(), 'ok', 'precondition: at HEAD == candidate the v1 package is admitted, so the fixture is sound');
+  f.commit(f.boundPaths, 'commit the v1 design package and the artifacts it digests');
+  assert.equal(v1Git(f.root, ['rev-parse', 'HEAD^']), f.candidate.commit, 'precondition: exactly one commit past the candidate');
+  assert.equal(isAncestor(f.root, f.candidate.commit, 'HEAD'), true, 'precondition: HEAD descends from the candidate');
+  assert.deepEqual(changedPaths(f.root, f.candidate.commit, 'HEAD'), f.boundPaths, 'precondition: candidate..HEAD is exactly the v1 bound set');
+  assert.equal(f.read({ requireCurrentCandidate: false }), 'ok', 'sanity: the only thing standing between this fixture and acceptance is the candidate rule');
+  assert.equal(f.read(), 'ok', 'ruling 65 for the v1 reader: an evidence-only descendant of the candidate must be admitted');
+});
+
+nodeTest('EVDESC-k v1: an otherwise evidence-only commit that also touches an unrelated path is refused (green control)', (t) => {
+  const f = v1Fixture(t);
+  writeFileSync(join(f.root, V1_UNRELATED), 'Work committed after the design candidate.\n');
+  f.commit([...f.boundPaths, V1_UNRELATED], 'v1 design package plus unrelated work');
+  assert.equal(v1Git(f.root, ['rev-parse', 'HEAD^']), f.candidate.commit, 'precondition: exactly one commit past the candidate');
+  assert.deepEqual(changedPaths(f.root, f.candidate.commit, 'HEAD'), [...f.boundPaths, V1_UNRELATED].sort(), 'precondition: the bound set plus one unrelated path');
+  assert.equal(f.read({ requireCurrentCandidate: false }), 'ok', 'sanity: only the candidate rule stands between this fixture and acceptance');
+  assert.equal(f.read(), V1_DRIFT);
+});
+
+nodeTest('EVDESC-l v1: a HEAD that is a sibling of the candidate (same tree, not a descendant) is refused (green control)', (t) => {
+  const f = v1Fixture(t);
+  v1Git(f.root, ['commit', '-q', '--amend', '-m', 'sibling of the v1 design candidate']);
+  const head = v1Head(f.root);
+  assert.notEqual(head.commit, f.candidate.commit, 'precondition: HEAD is a different commit');
+  assert.equal(head.tree, f.candidate.tree, 'precondition: the tree is identical, so only ancestry can tell them apart');
+  // The bound set is committed AFTER the amend, on the sibling (case D's ordering).
+  f.commit(f.boundPaths, 'commit the v1 design package and the artifacts it digests');
+  assert.equal(v1Git(f.root, ['rev-parse', 'HEAD^']), head.commit, 'precondition: the package commit sits on the sibling');
+  assert.equal(isAncestor(f.root, f.candidate.commit, 'HEAD'), false, 'precondition: the candidate is not an ancestor of HEAD');
+  assert.equal(f.read({ requireCurrentCandidate: false }), 'ok', 'sanity: only the candidate rule stands between this fixture and acceptance');
+  assert.equal(f.read(), V1_DRIFT);
 });

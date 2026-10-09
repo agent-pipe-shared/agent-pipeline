@@ -278,7 +278,8 @@ test("inspect exposes one typed PO approval action after submit and presentation
     const f = generatorSubmitFixture(`approval-${runner}`, { exempt: true });
     const initial = JSON.parse(readFileSync(statePath(f.dir), "utf8"));
     const authority = f.deps.poGateAuthority({}).value;
-    const pkg = materializeTestDesignWorkflowPackage({ root: f.dir, featureId: initial.activeFeature.id, planPath: authority.planPath, specPath: authority.specPath });
+    // R7-3-T2d: commitPackage -- the bound-path gate refuses to present a package that is not tracked and clean at HEAD.
+    const pkg = materializeTestDesignWorkflowPackage({ root: f.dir, featureId: initial.activeFeature.id, planPath: authority.planPath, specPath: authority.specPath, commitPackage: true });
     const runnerDeps = { ...f.deps, ...pkg.deps, env: runnerEnv(runner), readHumanApprovalMode: () => null };
     // This is runner/action rendering coverage. The separate feature-package
     // suite owns the stronger epic/feature review and signature path.
