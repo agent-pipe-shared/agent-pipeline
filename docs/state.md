@@ -7,7 +7,7 @@
 
 **Register 2026-10-09:** Critic tier per the ADR-0014 amendment (Rulings 156, 158).
 
-**Current 2026-10-08 eve:** START HERE — [handover](../specs/sprint-alfred-epic/plans/handover-2026-10-08-machine-switch.md) §0 (signed tranche `da20519dd`, stamp), then [next actions](../specs/sprint-alfred-epic/plans/next-actions-2026-10-08.md) §0. Nothing PO-accepted.
+**Current 2026-10-09:** START HERE — [wrap-up handover](../specs/sprint-alfred-epic/plans/handover-2026-10-09-interim-wrapup.md) (WSL, Codex/agy; no stamp yet). Nothing PO-accepted.
 
 ## Archived history
 
