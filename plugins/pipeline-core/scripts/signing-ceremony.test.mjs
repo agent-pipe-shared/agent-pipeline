@@ -39,6 +39,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { run as realRunGuardMaintenanceWindow } from "./guard-maintenance-window.mjs";
 import { parseSigningCeremonyArgs, runSigningCeremony } from "./signing-ceremony.mjs";
@@ -317,7 +318,7 @@ test("maintenance-window ceremony aborts before install when the human declines 
 
   const status = spawnSync(
     process.execPath,
-    [join(new URL("./guard-maintenance-window.mjs", import.meta.url).pathname), "status", "--repo-root", repoRoot],
+    [fileURLToPath(new URL("./guard-maintenance-window.mjs", import.meta.url)), "status", "--repo-root", repoRoot],
     { encoding: "utf8" },
   );
   assert.equal(status.status, 0);
