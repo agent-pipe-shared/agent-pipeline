@@ -1879,6 +1879,7 @@ test("TR-G T49 (c): the producer cannot renew the closing allowance -- five post
 // never allowance exhaustion (the exhaustion text is asserted ABSENT).
 // ---------------------------------------------------------------------------
 const TRG_SKIP_ON_WIN32 = process.platform === "win32" ? "POSIX-host pin: on a win32 host the backslash is a path separator and that spelling stays admitted (the guard reads process.platform directly; no platform seam to inject)" : false;
+const TRG_SKIP_BARE_ON_WIN32 = process.platform === "win32" ? "POSIX-host pin: on a win32 host a bare token containing a backslash is refused by the bare-token rule (pins (p) and (q)), not by the POSIX refusal this case pins (the guard reads process.platform directly; no platform seam to inject)" : false;
 const TRG_TAIL = "--task TR-G-T3-20261009 -- evidence/x.json";
 const trgBackslashQuoted = () => `node "${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER}" ${TRG_TAIL}`;
 const trgBackslashBare = () => `node ${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER} ${TRG_TAIL}`;
@@ -1904,7 +1905,7 @@ test("TR-G T49 (d): after the working cap, a quoted producer path with a backsla
   trgAssertRefusedAfterCap(verdict, command);
 });
 
-test("TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_ON_WIN32 }, () => {
+test("TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_BARE_ON_WIN32 }, () => {
   assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
   const command = trgBackslashBare();
   const [verdict] = trgPostCap([command]);
@@ -1936,7 +1937,11 @@ test("TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commi
 
 test("TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today)", () => {
   assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
-  const commands = [trgProducerCommand(TRG_TAIL), trgForwardBare()];
+  const forwardRoot = FAKE_ROOT.replaceAll("\\", "/");
+  const commands = [
+    `node "${forwardRoot}/plugins/pipeline-core/scripts/${TRG_PRODUCER}" ${TRG_TAIL}`,
+    `node ${forwardRoot}/plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG_TAIL}`,
+  ];
   trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
 });
 

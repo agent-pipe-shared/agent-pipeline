@@ -167,3 +167,38 @@ cases to diff against, so "no pre-existing case changed" rests on the prefix-has
 Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0.
 
 Independent Critic review: pending.
+
+## TR-G-T5 T49 (j) and the (e) skip text
+
+Dispatch: TR-G-T5-20261009. Test post-image only (QG-04). Resolves the adjacency recorded under TR-G-T4 "Scope and limits".
+
+- Test post-image: `hooks/guard-dispatch-budget.test.mjs`, new sha256
+  `0bda864c5087f90de59216231522ae81529fe8ad8d7a44dd479092ad557e431e` (133519 bytes, LF, 2121 lines). Previous value (TR-G-T4)
+  `5dc3c2940ba7a0ed48e65b23711c2d37001b1e6cad200191a5b1c18ea80e8617` (133023 bytes).
+- Edited blocks: (1) `TR-G T49 (j)`: the commands are now built from `FAKE_ROOT.replaceAll("\\", "/")`, quoted and bare, so the script
+  token is forward-slash on every platform; the assertion (both admitted after the cap) is unchanged. (2) New constant
+  `TRG_SKIP_BARE_ON_WIN32` (skip text true once the bare-backslash refusal lands) used by `TR-G T49 (e)` only; `TRG_SKIP_ON_WIN32`
+  and (d) are unchanged. No other case, no pins (k) to (q).
+- Guard post-image, read only and unchanged: sha256 `2ec5a564dc05f47d188bd3486919ee05dc9d232ba232b277ad8f76756012d808` (86028 bytes).
+- Method: the TR-G-T4 load-hook redirect, scratch under `scratch/dispatch-wip/TR-G-T5/` (git-ignored); sidecar `TRG5-REDIRECT-FIRED`
+  in both captures; scratch body sha256 `c9907cbff1f98cea95594f6a878032430155b5163b7e9cf3a99434d881862cae`.
+
+Native, `TR-G T49` cases only (wrapped exit 1, 17 tests, 10 pass, 5 fail, 2 skipped; identical to `evidence/TR-G-T4-20261009/red-native.txt`
+except that (j) is now green by construction):
+
+```
+node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T5-20261009/native.txt --label TR-G-T5-native -- node --test --test-reporter=spec --test-name-pattern="TR-G T49" scratch/dispatch-wip/TR-G-T5/guard-dispatch-budget.trg5.test.mjs
+```
+
+WSL, whole file (wrapped exit 1, 106 tests, 98 pass, 6 fail, 2 skipped; identical to `evidence/TR-G-T4-20261009/red.txt`: the three accepted
+10 s timeouts plus (l), (m), (n)):
+
+```
+wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T5-20261009/wsl.txt --label TR-G-T5-wsl -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T5/guard-dispatch-budget.trg5.test.mjs"
+```
+
+Not shown by these captures: (j) red-then-green against the TR-G-F4 guard (not run here; expected green because no backslash remains in either token).
+
+Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0.
+
+Independent Critic review: pending.
