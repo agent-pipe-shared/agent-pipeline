@@ -108,7 +108,12 @@ if (fixture !== "") {
   test("one early failure stays red while later siblings dispose and terminal remains complete", () => {
     const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
       encoding: "utf8",
-      env: { ...process.env, PIPELINE_TCC_FIXTURE: "early-failure" },
+      env: {
+        ...process.env,
+        PIPELINE_TCC_FIXTURE: "early-failure",
+        // The announced shape: Verify names the completion descriptor this way (verify-journal.mjs).
+        PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      },
       stdio: ["ignore", "pipe", "pipe", "pipe"],
       timeout: 10_000,
     });
@@ -126,7 +131,12 @@ if (fixture !== "") {
   test("dual runtime skip and todo remains red and is disposed as fail", () => {
     const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
       encoding: "utf8",
-      env: { ...process.env, PIPELINE_TCC_FIXTURE: "dual-signal" },
+      env: {
+        ...process.env,
+        PIPELINE_TCC_FIXTURE: "dual-signal",
+        // The announced shape: Verify names the completion descriptor this way (verify-journal.mjs).
+        PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      },
       stdio: ["ignore", "pipe", "pipe", "pipe"],
       timeout: 10_000,
     });
