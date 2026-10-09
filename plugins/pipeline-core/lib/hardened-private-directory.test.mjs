@@ -669,4 +669,192 @@ describe("ensureAgentPipelineRoot (Ruling 141 D0 root entry point)", () => {
       assert.equal(assessWindowsPrivatePath(root).status, "insecure", "the refused root is never hardened");
     });
   });
+
+  // WIN-AP-T3 (Ruling 156; WIN-AP Critic F1 and F2, and the D1 default): RED pins for the entry point. Each fails today
+  // for the reason in its title and goes green with WIN-AP-F3 (production). The new codes are string literals and the new
+  // `emitWarning` option is passed as a plain option (the signature of `process.emitWarning(message, { code })`), so this
+  // file loads and every case above keeps its state before F3. POSIX cases that need recorded mode bits and owner ids
+  // are skipped through the probed `POSIX_MODE_HOST_SKIP` (typed `SKIP-HOST-CLASS` reason): they do not run on native
+  // Windows. The seam-driven mode-unrecorded cases need a directory that can be made to read 0o777 (probed through
+  // `OPEN_MODE_HOST_SKIP`; native Windows reads 0o666), so they skip there too. The one real-host case runs only on a
+  // POSIX host where a probe shows no mode bits are recorded, and otherwise skips with a typed reason.
+  const REPAIRED_ADVISORY = "PB-ROOT-REPAIRED";
+  const UNRECORDED_ADVISORY = "PB-ROOT-MODE-UNRECORDED";
+
+  function warningSpy() {
+    const calls = [];
+    return { calls, emitWarning: (message, options) => { calls.push({ message, code: options?.code }); } };
+  }
+
+  const warningCodes = (spy) => spy.calls.map((call) => call.code);
+
+  /** Exactly one typed warning with `code`, naming the segment and never a host path. */
+  function expectOneWarning(spy, code, common) {
+    assert.deepEqual(warningCodes(spy), [code], `expected exactly one ${code} warning through the emitWarning seam`);
+    const { message } = spy.calls[0];
+    assert.equal(typeof message, "string", "the warning message is a string");
+    assert.ok(message.includes(SEGMENT), message);
+    assert.equal(message.includes(common), false, "the warning names the segment, never a host path");
+  }
+
+  /** A directory reading 0o777 the way a filesystem that records no mode bits reports every directory; null when it cannot be built. */
+  function makeOpenRoot(root) {
+    mkdirSync(root);
+    chmodSync(root, 0o777);
+    return (lstatSync(root).mode & 0o777) === 0o777 ? null : "SKIP-HOST-CLASS open-mode-not-buildable";
+  }
+
+  /** Host class for the seam-driven D1 cases: a directory can be made to read 0o777 (native Windows reads 0o666, which the 0o777 premise of these cases does not cover). */
+  const OPEN_MODE_HOST_SKIP = (() => {
+    try {
+      return withTemp("apr-open-mode-probe-", (dir) => {
+        chmodSync(dir, 0o777);
+        return (lstatSync(dir).mode & 0o777) === 0o777 ? false : "SKIP-HOST-CLASS open-mode-not-buildable";
+      });
+    } catch (error) {
+      return `SKIP-HOST-CLASS open-mode-probe-failed (${error?.code ?? "unknown"})`;
+    }
+  })();
+
+  /** Host class for the real-host D1 case: owner ids exist and a probe (create a directory, chmod 0o700, mode unchanged) shows no mode bits are recorded. */
+  const HOST_RECORDS_MODE_BITS_SKIP = (() => {
+    if (typeof process.getuid !== "function") return "SKIP-HOST-CLASS no-posix-owner-ids";
+    try {
+      return withTemp("apr-mode-unrecorded-probe-", (dir) => {
+        chmodSync(dir, 0o700);
+        return (lstatSync(dir).mode & 0o077) === 0 ? "SKIP-HOST-CLASS host-records-mode-bits" : false;
+      });
+    } catch (error) {
+      return `SKIP-HOST-CLASS host-mode-probe-failed (${error?.code ?? "unknown"})`;
+    }
+  })();
+
+  test("F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven win32)", () => {
+    withCommon("apr-w-warn-", (common, root) => {
+      const spy = warningSpy();
+      const run = (over) => ensureAgentPipelineRoot(common, win32Seams({ observe: observed(over), emitWarning: spy.emitWarning }).options);
+      assert.deepEqual(run(), shape(root, { created: true }), "an absent root is created");
+      assert.deepEqual(warningCodes(spy), [], "a freshly created root emits no warning");
+      assert.deepEqual(run({ principals: [ME] }), shape(root), "a secure root is returned as found");
+      assert.deepEqual(warningCodes(spy), [], "an already-secure root emits no warning");
+      const repaired = run();
+      assert.deepEqual({ ...repaired, detail: typeof repaired.detail }, shape(root, { repaired: true, advisory: REPAIRED_ADVISORY, detail: "string" }));
+      expectOneWarning(spy, REPAIRED_ADVISORY, common);
+    });
+  });
+
+  test("F1: a repair emits PB-ROOT-REPAIRED once through the emitWarning seam; an absent and an already-secure root emit nothing (seam-driven POSIX)", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    withCommon("apr-p-warn-", (common, root) => {
+      const spy = warningSpy();
+      const posix = { platform: "linux", emitWarning: spy.emitWarning };
+      assert.deepEqual(ensureAgentPipelineRoot(common, posix), shape(root, { created: true }));
+      assert.deepEqual(warningCodes(spy), [], "a freshly created root emits no warning");
+      assert.deepEqual(ensureAgentPipelineRoot(common, posix), shape(root));
+      assert.deepEqual(warningCodes(spy), [], "an already-secure root emits no warning");
+      chmodSync(root, 0o755);
+      const before = lstatSync(root);
+      const applied = chmodSpy((path, mode) => chmodSync(path, mode));
+      const repaired = ensureAgentPipelineRoot(common, { ...posix, getuid: () => before.uid, chmod: applied.chmod });
+      assert.deepEqual(repaired, shape(root, { repaired: true, advisory: REPAIRED_ADVISORY, detail: "mode 0o755 reset to 0o700" }));
+      assert.equal(statSync(root).mode & 0o777, 0o700);
+      expectOneWarning(spy, REPAIRED_ADVISORY, common);
+    });
+  });
+
+  test("F1: without an emitWarning seam the repair surfaces as a typed process warning, so every caller sees it (seam-driven win32)", async () => {
+    const seen = [];
+    const listener = (warning) => { seen.push(warning); };
+    process.on("warning", listener);
+    try {
+      withCommon("apr-w-default-warn-", (common, root) => {
+        mkdirSync(root);
+        assert.equal(ensureAgentPipelineRoot(common, win32Seams({ observe: observed() }).options).repaired, true);
+      });
+      // process.emitWarning delivers its 'warning' event on the next tick.
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off("warning", listener);
+    }
+    const typed = seen.filter((warning) => warning?.code === REPAIRED_ADVISORY);
+    assert.equal(typed.length, 1, `expected one process warning with code ${REPAIRED_ADVISORY}, saw ${seen.length} warning(s)`);
+  });
+
+  test("F2: a PRIVATE root owned by someone else is refused with PB-ROOT-INSECURE under either posture, untouched and never chmodded (seam-driven POSIX over a real directory)", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    for (const posture of ["repair", "refuse"]) {
+      withCommon("apr-p-foreign-private-", (common, root) => {
+        mkdirSync(root);
+        chmodSync(root, 0o700);
+        const before = lstatSync(root);
+        const spy = chmodSpy();
+        const message = expectRefusal(() => ensureAgentPipelineRoot(common, { platform: "linux", posture, getuid: () => before.uid + 1, chmod: spy.chmod }), "PB-ROOT-INSECURE");
+        assert.ok(message.includes("not owned by the current user"), `${posture}: ${message}`);
+        assert.ok(message.includes("left untouched"), `${posture}: ${message}`);
+        assert.equal(message.includes(common), false, "the message names the segment, never a host path");
+        assert.deepEqual(spy.calls, [], `${posture}: a root that is not ours is never chmodded`);
+        assert.equal(lstatSync(root).mode, before.mode, `${posture}: the mode is untouched`);
+        assert.equal(existsSync(root), true);
+      });
+    }
+  });
+
+  test("F2 control: a private root owned by the current user is returned as found, with no chmod and no warning (seam-driven POSIX)", { skip: POSIX_MODE_HOST_SKIP }, () => {
+    withCommon("apr-p-own-private-", (common, root) => {
+      mkdirSync(root);
+      chmodSync(root, 0o700);
+      const before = lstatSync(root);
+      const spy = chmodSpy();
+      const warnings = warningSpy();
+      assert.deepEqual(ensureAgentPipelineRoot(common, { platform: "linux", getuid: () => before.uid, chmod: spy.chmod, emitWarning: warnings.emitWarning }), shape(root));
+      assert.deepEqual(spy.calls, []);
+      assert.deepEqual(warningCodes(warnings), []);
+      assert.equal(lstatSync(root).mode, before.mode);
+    });
+  });
+
+  test("D1: an existing 0o777 root of the current user whose chmod takes no effect is accepted with PB-ROOT-MODE-UNRECORDED, neither repaired nor refused (seam-driven POSIX)", (t) => {
+    withCommon("apr-p-unrecorded-", (common, root) => {
+      const skip = makeOpenRoot(root);
+      if (skip !== null) { t.skip(skip); return; }
+      const before = lstatSync(root);
+      const spy = chmodSpy();
+      const warnings = warningSpy();
+      const { detail, ...result } = ensureAgentPipelineRoot(common, { platform: "linux", getuid: () => before.uid, chmod: spy.chmod, emitWarning: warnings.emitWarning });
+      assert.deepEqual(result, { path: root, created: false, repaired: false, advisory: UNRECORDED_ADVISORY });
+      assert.ok(detail === null || typeof detail === "string");
+      assert.equal(lstatSync(root).mode, before.mode, "the mode stays as the filesystem reports it");
+      assert.equal(existsSync(root), true, "an existing root is never removed");
+      expectOneWarning(warnings, UNRECORDED_ADVISORY, common);
+    });
+  });
+
+  test("D1: a fresh root this call created that reads 0o777 only because the filesystem records no mode bits is accepted with PB-ROOT-MODE-UNRECORDED and kept (seam-driven POSIX)", { skip: OPEN_MODE_HOST_SKIP }, () => {
+    withCommon("apr-p-unrecorded-fresh-", (common, root) => {
+      const spy = chmodSpy();
+      const warnings = warningSpy();
+      // The existing mkdir seam stands in for a filesystem that ignores the 0o700 request: the new directory reads 0o777.
+      const mkdir = (path, options) => { mkdirSync(path, options); chmodSync(path, 0o777); };
+      const { detail, ...result } = ensureAgentPipelineRoot(common, { platform: "linux", mkdir, getuid: () => lstatSync(root).uid, chmod: spy.chmod, emitWarning: warnings.emitWarning });
+      assert.deepEqual(result, { path: root, created: true, repaired: false, advisory: UNRECORDED_ADVISORY });
+      assert.ok(detail === null || typeof detail === "string");
+      assert.equal(lstatSync(root).mode & 0o777, 0o777, "premise: the created root reads 0o777");
+      assert.equal(existsSync(root), true, "a root accepted as unrecorded is not taken back");
+      expectOneWarning(warnings, UNRECORDED_ADVISORY, common);
+    });
+  });
+
+  test("D1 real host that records no POSIX mode bits: a fresh and an existing root are accepted with PB-ROOT-MODE-UNRECORDED and left as found", { skip: HOST_RECORDS_MODE_BITS_SKIP }, () => {
+    // A POSIX host whose temporary directory sits on a filesystem that records no mode bits (a DrvFs mount without
+    // `metadata`, vfat): the production defaults run unchanged, only the warning is observed through its seam.
+    for (const existing of [false, true]) {
+      withCommon("apr-rp-unrecorded-", (common, root) => {
+        if (existing) mkdirSync(root);
+        const warnings = warningSpy();
+        const { detail, ...result } = ensureAgentPipelineRoot(common, { emitWarning: warnings.emitWarning });
+        assert.deepEqual(result, { path: root, created: !existing, repaired: false, advisory: UNRECORDED_ADVISORY }, existing ? "existing root" : "fresh root");
+        assert.ok(detail === null || typeof detail === "string");
+        assert.equal(statSync(root).isDirectory(), true);
+        expectOneWarning(warnings, UNRECORDED_ADVISORY, common);
+      });
+    }
+  });
 });
