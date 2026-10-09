@@ -1,0 +1,1491 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Pure validation and transition proposals for pipeline.continuity.v0. */
+import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
+import { decideFailureAction, sha256Canonical } from "./review-economy.mjs";
+import {
+  buildRunnerNativeContinuationRequest,
+  computeRunnerNativeContinuationDigest,
+  materializeRunnerNativeContinuation,
+  materializeRunnerNativeTerminal,
+  planNativeGoalTransition,
+  projectRunnerNativeProgress,
+  recordRunnerNativeAdditiveInput,
+  validateRunnerNativeContinuation,
+} from "./runner-native-continuation.mjs";
+
+const ROOT_KEYS = new Set([
+  "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
+  "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
+  "closeTransition",
+  "nativeContinuation",
+  "retryBudget",
+]);
+const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
+const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
+const ARTIFACT_KEYS = new Set(["path", "sha256"]);
+const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan"]);
+const QUEUE_KEYS = new Set([
+  "packageId", "actionId", "nextAction", "productRetryCount",
+  "environmentRerouteCount", "dispatch",
+]);
+const RETRY_BUDGET_KEYS = new Set(["productRetryCount", "environmentRerouteCount"]);
+const IDENTITY_KEYS = new Set([
+  "featureId", "queueRevision", "packageId", "actionId", "dispatchId",
+  "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate",
+]);
+const IDENTITY_AUTHORITY_KEYS = new Set(["prdSha256", "specSha256", "resultSha256"]);
+const BLOCKER_KEYS = new Set(["type", "signature", "resumeCondition", "decisionBrief"]);
+const RESUME_CONDITION_KEYS = new Set(["kind", "evidenceSha256"]);
+const BRIEF_KEYS = new Set(["decisionBriefId", "decisionBriefSha256", "resultPath"]);
+const ACK_KEYS = new Set(["identity", "resultDigest", "finalOutcome", "integratedRevision"]);
+const RESUME_KEYS = new Set(["mode", "sourceRevision", "reasonCode"]);
+const RECOVERY_KEYS = new Set([
+  "originLaneId", "originDispatchId", "originAttemptId", "environmentEvidenceSha256",
+  "sameLaneRetryProhibited", "fallbackStatus", "fallbackLaneId", "fallbackDispatchId",
+  "narrowingContractSha256", "originProductRetryCount", "resultDigest", "count",
+]);
+const DECISION_KEYS = new Set([
+  "idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId",
+  "preSelectionRevision", "selectedRevision", "dispatchableRevision", "phase",
+]);
+const LEGACY_CAPACITY_KEYS = new Set([
+  "concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy",
+]);
+const SHARED_CAPACITY_KEYS = new Set([
+  "concurrencyLimit", "allocation", "fallbackPolicy",
+]);
+const CLOSE_TRANSITION_KEYS = new Set([
+  "intentId", "expectedRevision", "authorityDigests", "graphSha256",
+  "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256",
+  "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery",
+]);
+const CLOSE_INTENT_KEYS = new Set([
+  "intentId", "expectedRevision", "authorityDigests", "graphSha256",
+  "packageBindingsSha256", "receiptId", "receiptSha256",
+  "candidateCommit", "candidateTree", "stage1Verify",
+]);
+const CLOSE_VERIFY_KEYS = new Set(["commandSha256", "resultSha256", "candidateCommit", "candidateTree"]);
+const CLOSE_DELIVERY_KEYS = new Set(["pushedOid", "fetchedOid"]);
+const CLOSE_BEGIN_REQUEST_KEYS = new Set(["expectedRevision", "intent", "result"]);
+const CLOSE_VERIFY_REQUEST_KEYS = new Set(["expectedRevision", "result", "verify"]);
+const CLOSE_MUTATION_REQUEST_KEYS = new Set(["expectedRevision", "result", "candidateCommit", "candidateTree"]);
+const CLOSE_DELIVERY_REQUEST_KEYS = new Set(["expectedRevision", "result", "pushedOid"]);
+const CLOSE_READBACK_REQUEST_KEYS = new Set(["expectedRevision", "result", "fetchedOid"]);
+const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
+const CAS_KEYS = new Set(["expectedRevision", "next"]);
+const FAILURE_DISPOSITION_REQUEST_KEYS = new Set(["expectedRevision", "evidence", "evidenceSha256"]);
+const FAILURE_EVIDENCE_KEYS = new Set([
+  "schema", "identity", "failure", "classificationEvidence", "priorFailureSignatures",
+  "failoverAdmission",
+]);
+const FAILURE_FAILOVER_ADMISSION_KEYS = new Set([
+  "recoverySlotAvailable", "narrowRouteAvailable", "frozenBindingsMatch", "permissionsNarrowed",
+  "mayDelegate", "originLaneId", "originDispatchId", "revision", "environmentEvidenceSha256",
+  "narrowingContractSha256",
+]);
+const SESSION_CLEANUP_BIND_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
+const SESSION_CLEANUP_RELEASE_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
+const RESULT_CLOSE_BIND_KEYS = new Set(["expectedRevision", "result"]);
+const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
+const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
+const DECISION_CLEAR_KEYS = new Set(["expectedRevision", "receipt"]);
+const COURSE_BRIEF_REQUEST_KEYS = new Set(["expectedRevision", "result", "blocker", "resume"]);
+const COURSE_DECISION_APPLY_KEYS = new Set(["expectedRevision", "result", "decisionTxn", "queueHead", "blocker", "resume"]);
+const COURSE_DECISION_CLEAR_KEYS = new Set(["expectedRevision", "result", "receipt"]);
+const DECISION_RECEIPT_KEYS = new Set([
+  "idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId",
+  "receiptSha256", "selectedRevision", "dispatchableRevision",
+]);
+
+const SHA256 = /^[a-f0-9]{64}$/;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const BLOCKER_TYPES = new Set(["authority", "security", "scope", "course", "capacity", "product", "environment", "unknown"]);
+const NEXT_ACTIONS = new Set(["dispatch", "poll", "retrieve-final", "integrate-final", "review", "correct", "verify", "push", "fetch-back", "advance-package", "close"]);
+const RESUME_KINDS = new Set(["po-decision", "evidence-change", "capacity-available", "authority-update", "manual"]);
+const RESUME_MODES = new Set(["immediate", "resume-on-next-turn"]);
+const RESUME_REASONS = new Set(["active-turn", "host-no-background-wakeup", "po-interrupt", "compact-reload", "blocker"]);
+const FALLBACK_STATUSES = new Set(["fallback-pending", "running", "completed", "failed"]);
+const FINAL_OUTCOMES = new Set(["succeeded", "failed"]);
+const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
+const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
+// Optional, additive: the hosted PRD/Spec document's own language, free of the
+// operator-facing {de, en} lock above. Wider by design -- any lowercase
+// two-letter code -- and validated independently so it can never widen
+// HUMAN_FACING_LANGUAGES or the humanFacingLanguage check itself.
+const DOCUMENT_LANGUAGE = /^[a-z]{2}$/;
+const CLOSE_PHASES = new Set(["state-cas", "verified", "delivered", "readback", "closed"]);
+const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
+export const CONTINUITY_STATE_MAX_BYTES = 8_192;
+const MAX_STATE_BYTES = CONTINUITY_STATE_MAX_BYTES;
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function exactKeys(value, keys) {
+  if (!isObject(value)) return false;
+  const actual = Object.keys(value);
+  return actual.length === keys.size && actual.every((key) => keys.has(key));
+}
+
+function allowedKeys(value, keys, requiredKeys) {
+  if (!isObject(value)) return false;
+  const actual = Object.keys(value);
+  return actual.every((key) => keys.has(key)) && requiredKeys.every((key) => Object.hasOwn(value, key));
+}
+
+function safeInteger(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+  return Number.isSafeInteger(value) && value >= min && value <= max;
+}
+
+function digest(value, nullable = false) {
+  return (nullable && value === null) || (typeof value === "string" && SHA256.test(value));
+}
+
+function safeId(value) {
+  return typeof value === "string" && SAFE_ID.test(value);
+}
+
+function gitOid(value) {
+  return typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+}
+
+function safePath(value) {
+  if (typeof value !== "string" || value.length < 1 || value.length > 240
+    || value.startsWith("/") || value.includes("\\") || value.includes("\0")) return false;
+  const parts = value.split("/");
+  return parts.every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function validArtifact(value) {
+  return exactKeys(value, ARTIFACT_KEYS) && safePath(value.path) && digest(value.sha256);
+}
+
+function validAuthority(value) {
+  return allowedKeys(value, AUTHORITY_KEYS, ["prd", "spec", "result"])
+    && validArtifact(value.prd)
+    && validArtifact(value.spec)
+    && (value.result === null || validArtifact(value.result))
+    && (value.plan === undefined || validArtifact(value.plan));
+}
+
+function validNativeContinuationBinding(value, state) {
+  if (value === undefined || value === null) return true;
+  return validateRunnerNativeContinuation(value).ok
+    && value.subject.featureId === state.featureId
+    && value.subject.planSha256 === state.authority.prd.sha256
+    && value.subject.specSha256 === state.authority.spec.sha256
+    && value.subject.queueRevision <= state.revision;
+}
+
+function validRuntime(value) {
+  return allowedKeys(value, RUNTIME_KEYS, ["humanFacingLanguage", "activeDuty"])
+    && HUMAN_FACING_LANGUAGES.has(value.humanFacingLanguage)
+    && safeId(value.activeDuty)
+    && (value.documentLanguage === undefined
+      || (typeof value.documentLanguage === "string" && DOCUMENT_LANGUAGE.test(value.documentLanguage)))
+    && (value.sessionCleanup === undefined || value.sessionCleanup === null || (exactKeys(value.sessionCleanup, SESSION_CLEANUP_KEYS)
+      && safeId(value.sessionCleanup.sessionId)
+      && digest(value.sessionCleanup.descriptorSha256)));
+}
+
+function validIdentity(value) {
+  return exactKeys(value, IDENTITY_KEYS)
+    && safeId(value.featureId)
+    && safeInteger(value.queueRevision)
+    && [value.packageId, value.actionId, value.dispatchId, value.attemptId].every(safeId)
+    && exactKeys(value.authorityDigests, IDENTITY_AUTHORITY_KEYS)
+    && digest(value.authorityDigests.prdSha256)
+    && digest(value.authorityDigests.specSha256)
+    && digest(value.authorityDigests.resultSha256, true)
+    && digest(value.routeRequestSha256)
+    && value.mayDelegate === false;
+}
+
+function sameIdentity(left, right) {
+  return left.featureId === right.featureId
+    && left.queueRevision === right.queueRevision
+    && left.packageId === right.packageId
+    && left.actionId === right.actionId
+    && left.dispatchId === right.dispatchId
+    && left.attemptId === right.attemptId
+    && left.authorityDigests.prdSha256 === right.authorityDigests.prdSha256
+    && left.authorityDigests.specSha256 === right.authorityDigests.specSha256
+    && left.authorityDigests.resultSha256 === right.authorityDigests.resultSha256
+    && left.routeRequestSha256 === right.routeRequestSha256
+    && left.mayDelegate === right.mayDelegate;
+}
+
+function validQueueHead(value, state) {
+  if (!exactKeys(value, QUEUE_KEYS)
+    || !safeId(value.packageId)
+    || !safeId(value.actionId)
+    || !NEXT_ACTIONS.has(value.nextAction)
+    || !safeInteger(value.productRetryCount, 0, 1)
+    || !safeInteger(value.environmentRerouteCount, 0, 1)
+    || (value.dispatch !== null && !validIdentity(value.dispatch))) return false;
+  if (value.dispatch === null) return true;
+  return value.dispatch.featureId === state.featureId
+    && value.dispatch.packageId === value.packageId
+    && value.dispatch.actionId === value.actionId
+    && value.dispatch.queueRevision === state.revision
+    && value.dispatch.authorityDigests.prdSha256 === state.authority.prd.sha256
+    && value.dispatch.authorityDigests.specSha256 === state.authority.spec.sha256
+    && value.dispatch.authorityDigests.resultSha256 === (state.authority.result?.sha256 ?? null);
+}
+
+function retryBudgetOf(state) {
+  if (state.retryBudget !== undefined) return state.retryBudget;
+  if (state.queueHead !== null) return {
+    productRetryCount: state.queueHead.productRetryCount,
+    environmentRerouteCount: state.queueHead.environmentRerouteCount,
+  };
+  return { productRetryCount: 0, environmentRerouteCount: 0 };
+}
+
+function validRetryBudget(value, state) {
+  if (value === undefined) return true;
+  if (!exactKeys(value, RETRY_BUDGET_KEYS)
+    || !safeInteger(value.productRetryCount, 0, 1)
+    || !safeInteger(value.environmentRerouteCount, 0, 1)) return false;
+  return state.queueHead === null
+    || (state.queueHead.productRetryCount === value.productRetryCount
+      && state.queueHead.environmentRerouteCount === value.environmentRerouteCount);
+}
+
+function validDecisionBrief(value) {
+  return value === null || (exactKeys(value, BRIEF_KEYS)
+    && safeId(value.decisionBriefId)
+    && digest(value.decisionBriefSha256)
+    && safePath(value.resultPath));
+}
+
+function validBlocker(value, state) {
+  return exactKeys(value, BLOCKER_KEYS)
+    && BLOCKER_TYPES.has(value.type)
+    && safeId(value.signature)
+    && exactKeys(value.resumeCondition, RESUME_CONDITION_KEYS)
+    && RESUME_KINDS.has(value.resumeCondition.kind)
+    && digest(value.resumeCondition.evidenceSha256, true)
+    && validDecisionBrief(value.decisionBrief)
+    && (value.decisionBrief === null || (value.type === "course"
+      && state.authority.result !== null
+      && value.decisionBrief.resultPath === state.authority.result.path));
+}
+
+function validAcknowledgedFinal(value, state) {
+  return value === null || (exactKeys(value, ACK_KEYS)
+    && validIdentity(value.identity)
+    && digest(value.resultDigest)
+    && FINAL_OUTCOMES.has(value.finalOutcome)
+    && safeInteger(value.integratedRevision)
+    && value.identity.featureId === state.featureId
+    && value.integratedRevision === value.identity.queueRevision + 1
+    && value.integratedRevision <= state.revision);
+}
+
+function validResume(value, revision) {
+  return exactKeys(value, RESUME_KEYS)
+    && RESUME_MODES.has(value.mode)
+    && safeInteger(value.sourceRevision)
+    && value.sourceRevision <= revision
+    && RESUME_REASONS.has(value.reasonCode)
+    && (value.mode !== "resume-on-next-turn" || value.reasonCode !== "active-turn");
+}
+
+function validRecovery(value, state) {
+  if (value === null) return true;
+  if (!exactKeys(value, RECOVERY_KEYS)
+    || ![value.originLaneId, value.originDispatchId, value.originAttemptId, value.fallbackLaneId, value.fallbackDispatchId].every(safeId)
+    || value.originLaneId === value.fallbackLaneId
+    || value.originDispatchId === value.fallbackDispatchId
+    || !digest(value.environmentEvidenceSha256)
+    || value.sameLaneRetryProhibited !== true
+    || !FALLBACK_STATUSES.has(value.fallbackStatus)
+    || !digest(value.narrowingContractSha256)
+    || !safeInteger(value.originProductRetryCount, 0, 1)
+    || !digest(value.resultDigest, true)
+    || value.count !== 1) return false;
+  if (state.queueHead !== null) {
+    return value.fallbackStatus !== "failed"
+      && state.queueHead.environmentRerouteCount === 1
+      && state.queueHead.productRetryCount === value.originProductRetryCount
+      && state.queueHead.dispatch !== null
+      && state.queueHead.dispatch.dispatchId === value.fallbackDispatchId;
+  }
+  return value.fallbackStatus === "failed"
+    && state.blocker !== null
+    && new Set(["course", "capacity", "product", "environment"]).has(state.blocker.type);
+}
+
+function validDecisionTxn(value, revision) {
+  return value === null || (exactKeys(value, DECISION_KEYS)
+    && [value.idempotencyKey, value.selectedOptionId].every(safeId)
+    && digest(value.briefSha256)
+    && digest(value.intentSha256)
+    && safeInteger(value.preSelectionRevision)
+    && safeInteger(value.selectedRevision)
+    && safeInteger(value.dispatchableRevision)
+    && value.selectedRevision === value.preSelectionRevision + 1
+    && value.dispatchableRevision === value.selectedRevision + 1
+    && revision === value.selectedRevision
+    && value.phase === "state-applied");
+}
+
+export function normalizeContinuityCapacity(value) {
+  const legacy = exactKeys(value, LEGACY_CAPACITY_KEYS)
+    && value.reservedCriticSlots === 1
+    && value.reservedRecoverySlots === 1;
+  const shared = exactKeys(value, SHARED_CAPACITY_KEYS)
+    && value.allocation === "shared";
+  if ((!legacy && !shared)
+    || !safeInteger(value.concurrencyLimit, 2, 64)
+    || !FALLBACK_POLICIES.has(value.fallbackPolicy)) {
+    return { ok: false, code: "CS-CAPACITY-SHAPE" };
+  }
+  return {
+    ok: true,
+    capacity: {
+      concurrencyLimit: value.concurrencyLimit,
+      allocation: "shared",
+      fallbackPolicy: value.fallbackPolicy,
+    },
+  };
+}
+
+function validCapacity(value) {
+  return normalizeContinuityCapacity(value).ok;
+}
+
+function validAuthorityDigests(value) {
+  return exactKeys(value, IDENTITY_AUTHORITY_KEYS)
+    && digest(value.prdSha256)
+    && digest(value.specSha256)
+    && digest(value.resultSha256, true);
+}
+
+function sameAuthorityDigests(left, right) {
+  return validAuthorityDigests(left) && validAuthorityDigests(right)
+    && left.prdSha256 === right.prdSha256
+    && left.specSha256 === right.specSha256
+    && left.resultSha256 === right.resultSha256;
+}
+
+function validCloseIntentFields(value) {
+  return isObject(value)
+    && safeId(value.intentId)
+    && safeInteger(value.expectedRevision)
+    && validAuthorityDigests(value.authorityDigests)
+    && digest(value.graphSha256)
+    && digest(value.packageBindingsSha256)
+    && safeId(value.receiptId)
+    && digest(value.receiptSha256)
+    && gitOid(value.candidateCommit)
+    && gitOid(value.candidateTree)
+    && validStageVerify(value.stage1Verify);
+}
+
+function validCloseIntent(value) {
+  return exactKeys(value, CLOSE_INTENT_KEYS) && validCloseIntentFields(value);
+}
+
+function validStageVerify(value) {
+  return exactKeys(value, CLOSE_VERIFY_KEYS)
+    && digest(value.commandSha256)
+    && digest(value.resultSha256)
+    && gitOid(value.candidateCommit)
+    && gitOid(value.candidateTree);
+}
+
+function validCloseVerify(value, transition) {
+  return exactKeys(value, CLOSE_VERIFY_KEYS)
+    && digest(value.commandSha256)
+    && digest(value.resultSha256)
+    && value.commandSha256 === transition.stage1Verify.commandSha256
+    && value.candidateCommit === transition.candidateCommit
+    && value.candidateTree === transition.candidateTree;
+}
+
+function validCloseDelivery(value) {
+  return exactKeys(value, CLOSE_DELIVERY_KEYS)
+    && gitOid(value.pushedOid)
+    && (value.fetchedOid === null || gitOid(value.fetchedOid));
+}
+
+function validCloseTransition(value, state) {
+  if (value === undefined || value === null) return true;
+  if (!exactKeys(value, CLOSE_TRANSITION_KEYS)
+    || !validCloseIntentFields(value)
+    || !CLOSE_PHASES.has(value.phase)
+    || value.authorityDigests.prdSha256 !== state.authority.prd.sha256
+    || value.authorityDigests.specSha256 !== state.authority.spec.sha256
+    || state.authority.result === null
+    || value.resultDigest !== state.authority.result.sha256
+    || value.expectedRevision >= state.revision) return false;
+  if (value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
+  if (!validCloseVerify(value.finalVerify, value)) return false;
+  if (value.phase === "verified") return value.delivery === null;
+  if (!validCloseDelivery(value.delivery)) return false;
+  if (value.delivery.pushedOid !== value.candidateCommit) return false;
+  if (value.phase === "delivered") return value.delivery.fetchedOid === null;
+  return value.delivery.fetchedOid === value.delivery.pushedOid;
+}
+
+function result(ok, code, state = null, mutated = false) {
+  return { ok, code, mutated, state };
+}
+
+/** Validate one bounded continuity object. */
+export function validateContinuityState(value, activeFeatureId = undefined) {
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget"].includes(key)))
+    || value.schema !== "pipeline.continuity.v0"
+    || !safeId(value.featureId)
+    || !safeInteger(value.revision)
+    || (activeFeatureId !== undefined && value.featureId !== activeFeatureId)
+    || !validRuntime(value.runtime)
+    || !validAuthority(value.authority)
+    || (value.queueHead === null) === (value.blocker === null)
+    || (value.queueHead !== null && !validQueueHead(value.queueHead, value))
+    || (value.blocker !== null && !validBlocker(value.blocker, value))
+    || !validRetryBudget(value.retryBudget, value)
+    || !validAcknowledgedFinal(value.acknowledgedFinal, value)
+    || !validResume(value.resume, value.revision)
+    || !validRecovery(value.recovery, value)
+    || !validDecisionTxn(value.decisionTxn, value.revision)
+    || !validCapacity(value.capacity)
+    || !validCloseTransition(value.closeTransition, value)
+    || !validNativeContinuationBinding(value.nativeContinuation, value)) {
+    return { ok: false, code: "CS-INVALID" };
+  }
+  let bytes;
+  try {
+    bytes = Buffer.byteLength(JSON.stringify(value), "utf8");
+  } catch {
+    return { ok: false, code: "CS-INVALID" };
+  }
+  if (bytes > MAX_STATE_BYTES) return { ok: false, code: "CS-STATE-BUDGET" };
+  return { ok: true, code: "CS-VALID" };
+}
+
+/** Return whether a validated state is currently eligible for dispatch. */
+export function continuityDispatchAllowed(value, activeFeatureId = undefined) {
+  const valid = validateContinuityState(value, activeFeatureId);
+  if (!valid.ok) return { ok: false, code: valid.code, allowed: false };
+  if (value.decisionTxn !== null) return { ok: true, code: "CS-DECISION-PENDING", allowed: false };
+  if (value.blocker !== null) return { ok: true, code: "CS-BLOCKED", allowed: false };
+  return value.queueHead.nextAction === "dispatch" && value.queueHead.dispatch === null
+    ? { ok: true, code: "CS-DISPATCHABLE", allowed: true }
+    : { ok: true, code: "CS-NOT-DISPATCH-ACTION", allowed: false };
+}
+
+function sameAcknowledgement(left, right) {
+  if (left === null || right === null) return left === right;
+  return sameIdentity(left.identity, right.identity)
+    && left.resultDigest === right.resultDigest
+    && left.finalOutcome === right.finalOutcome
+    && left.integratedRevision === right.integratedRevision;
+}
+
+function sameDecisionTxn(left, right) {
+  if (left === null || right === null) return left === right;
+  return exactKeys(left, DECISION_KEYS)
+    && exactKeys(right, DECISION_KEYS)
+    && [...DECISION_KEYS].every((key) => left[key] === right[key]);
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function interruptRetainsWork(current, next) {
+  if (next.resume.reasonCode !== "po-interrupt") return true;
+  const createsTypedBlocker = current.queueHead !== null
+    && current.blocker === null
+    && next.queueHead === null
+    && next.blocker !== null
+    && INTERRUPT_BLOCKER_TYPES.has(next.blocker.type);
+  const workRetained = createsTypedBlocker
+    || (sameJson(current.queueHead, next.queueHead) && sameJson(current.blocker, next.blocker));
+  return workRetained
+    && sameJson(current.acknowledgedFinal, next.acknowledgedFinal)
+    && sameJson(current.recovery, next.recovery)
+    && sameJson(current.decisionTxn, next.decisionTxn)
+    && sameJson(current.capacity, next.capacity);
+}
+
+/* A selected stop/defer is Result-owned, but State carries this bounded
+ * disposition projection so generic CAS cannot auto-resume it.  A separately
+ * authorized transition must use a dedicated command, never the generic writer. */
+function retainsCourseDisposition(current, next) {
+  const blocker = current.blocker;
+  if (blocker === null || blocker.type !== "course"
+    || !/^(?:stop|defer)-[a-f0-9]{32}$/.test(blocker.signature)) return true;
+  return next.queueHead === null && sameJson(next.blocker, blocker);
+}
+
+function compareAndSwap(current, request, activeFeatureId, {
+  allowAcknowledgementChange = false,
+  allowDecisionChange = false,
+  allowResultAuthorityChange = false,
+  allowCloseTransitionChange = false,
+  allowNativeContinuationChange = false,
+} = {}) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CAS_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.revision === Number.MAX_SAFE_INTEGER) return result(false, "CS-REVISION-OVERFLOW");
+  if (!isObject(request.next)
+    || request.next.featureId !== current.featureId
+    || request.next.revision !== current.revision + 1) return result(false, "CS-REVISION");
+  const after = validateContinuityState(request.next, activeFeatureId);
+  if (!after.ok) return result(false, after.code);
+  if (!allowCloseTransitionChange
+    && !sameJson(current.closeTransition ?? null, request.next.closeTransition ?? null)) {
+    return result(false, "CS-PROTECTED-CLOSE-TRANSITION");
+  }
+  if (!allowNativeContinuationChange && !sameJson(current.nativeContinuation ?? null, request.next.nativeContinuation ?? null)) {
+    return result(false, "CS-PROTECTED-NATIVE-CONTINUATION");
+  }
+  if (!sameJson(current.runtime, request.next.runtime)
+    || !sameJson(current.authority.prd, request.next.authority.prd)
+    || !sameJson(current.authority.spec, request.next.authority.spec)
+    || current.authority.result?.path !== request.next.authority.result?.path
+    || (!allowResultAuthorityChange && !sameJson(current.authority.result, request.next.authority.result))) {
+    return result(false, "CS-PROTECTED-AUTHORITY");
+  }
+  if (!interruptRetainsWork(current, request.next)) return result(false, "CS-INTERRUPT-DRIFT");
+  if (!retainsCourseDisposition(current, request.next)) return result(false, "CS-COURSE-DISPOSITION-PROTECTED");
+  if (!allowAcknowledgementChange
+    && !sameAcknowledgement(current.acknowledgedFinal, request.next.acknowledgedFinal)) {
+    return result(false, "CS-PROTECTED-ACK");
+  }
+  if (!allowDecisionChange && !sameDecisionTxn(current.decisionTxn, request.next.decisionTxn)) {
+    return result(false, "CS-PROTECTED-DECISION");
+  }
+  const currentRetryBudget = retryBudgetOf(current);
+  const nextRetryBudget = retryBudgetOf(request.next);
+  if (currentRetryBudget.productRetryCount !== nextRetryBudget.productRetryCount
+    || currentRetryBudget.environmentRerouteCount !== nextRetryBudget.environmentRerouteCount) {
+    return result(false, "CS-PROTECTED-RETRY-COUNTERS");
+  }
+  return result(true, "CS-CAS-APPLIED", structuredClone(request.next), true);
+}
+
+/** Validate a pure compare-and-swap proposal; performs no I/O. */
+export function compareAndSwapContinuity(current, request, activeFeatureId = undefined) {
+  return compareAndSwap(current, request, activeFeatureId);
+}
+
+/**
+ * Consume one digest-bound failure observation and derive the only permitted
+ * retry/reroute state transition through review-economy.  Callers provide no
+ * action, queue, counter, or blocker: accepting any of those would turn this
+ * writer into a second policy implementation.
+ */
+export function applyContinuityFailureDisposition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, FAILURE_DISPOSITION_REQUEST_KEYS)
+    || !safeInteger(request.expectedRevision) || !digest(request.evidenceSha256)
+    || !exactKeys(request.evidence, FAILURE_EVIDENCE_KEYS)) {
+    return result(false, before.ok ? "CS-FAILURE-DISPOSITION-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.revision === Number.MAX_SAFE_INTEGER) return result(false, "CS-REVISION-OVERFLOW");
+  if (current.queueHead === null || current.queueHead.dispatch === null || current.blocker !== null) {
+    return result(false, "CS-FAILURE-DISPOSITION-PREIMAGE");
+  }
+  const evidence = request.evidence;
+  let observedDigest;
+  try { observedDigest = sha256Canonical(evidence); } catch { return result(false, "CS-FAILURE-EVIDENCE"); }
+  if (observedDigest !== request.evidenceSha256
+    || evidence.schema !== "pipeline.continuity-failure-evidence.v1"
+    || !validIdentity(evidence.identity)
+    || !sameIdentity(evidence.identity, current.queueHead.dispatch)
+    || evidence.identity.queueRevision !== current.revision
+    || !Array.isArray(evidence.priorFailureSignatures)
+    || evidence.priorFailureSignatures.some((value) => !digest(value))
+    || new Set(evidence.priorFailureSignatures).size !== evidence.priorFailureSignatures.length
+    || (evidence.failoverAdmission !== null && !exactKeys(evidence.failoverAdmission, FAILURE_FAILOVER_ADMISSION_KEYS))) {
+    return result(false, "CS-FAILURE-EVIDENCE");
+  }
+
+  const queue = current.queueHead;
+  const decision = decideFailureAction({
+    failure: evidence.failure,
+    classificationEvidence: evidence.classificationEvidence,
+    counters: {
+      productRetryCount: queue.productRetryCount,
+      environmentRerouteCount: queue.environmentRerouteCount,
+    },
+    priorFailureSignatures: evidence.priorFailureSignatures,
+    recoveredOriginChain: current.recovery !== null,
+    failoverAdmission: evidence.failoverAdmission,
+  });
+  if (!decision.ok) return result(false, "CS-FAILURE-EVIDENCE");
+  if (decision.action === "product-retry" && queue.productRetryCount !== 0) {
+    return result(false, "CS-PRODUCT-RETRY-BUDGET");
+  }
+  if (decision.action === "environment-failover") {
+    // Review-economy is policy-only. Continuity has no trusted persisted host
+    // attestation reader or route consumer yet, so this cannot authorize work.
+    return result(false, "CS-ENVIRONMENT-REROUTE-UNAVAILABLE");
+  }
+  if (decision.action !== "product-retry") {
+    return result(false, decision.code === "RE-PRODUCT-BUDGET-EXHAUSTED"
+      ? "CS-PRODUCT-RETRY-BUDGET"
+      : queue.environmentRerouteCount === 1 && evidence.failure?.faultDomain === "execution-environment"
+        ? "CS-ENVIRONMENT-REROUTE-BUDGET"
+        : "CS-FAILURE-EVIDENCE-UNRECOGNIZED");
+  }
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.resume = { mode: "immediate", sourceRevision: next.revision, reasonCode: "active-turn" };
+  next.queueHead.dispatch = null;
+  next.queueHead.nextAction = "dispatch";
+  next.queueHead.productRetryCount = decision.nextProductRetryCount;
+  next.retryBudget = {
+    productRetryCount: decision.nextProductRetryCount,
+    environmentRerouteCount: queue.environmentRerouteCount,
+  };
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-PRODUCT-RETRY-ADMITTED", next, true)
+    : result(false, after.code);
+}
+
+/** Apply a controller-produced runner-native continuation projection. */
+export function applyRunnerNativeContinuation(current, request, activeFeatureId = undefined) {
+  const applied = compareAndSwap(current, request, activeFeatureId, { allowNativeContinuationChange: true });
+  if (!applied.ok) return applied;
+  return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
+}
+
+function refreshNativeContinuation(current, event, adapterResult, reasonCode = "active-goal-retained", reasonEvidenceSha256 = null, resolution = null) {
+  if (!validateRunnerNativeContinuation(current).ok) return { ok: false, code: "RNC-SCHEMA", continuation: null };
+  const request = {
+    ok: true,
+    request: {
+      continuationId: current.continuationId,
+      subject: structuredClone(current.subject),
+      objective: structuredClone(current.objective),
+      acceptance: structuredClone(current.acceptance),
+      evidence: structuredClone(current.evidence),
+      progress: structuredClone(current.progress),
+      runner: structuredClone(current.runner),
+    },
+  };
+  const retainedResolution = resolution ?? current.resolution;
+  const materialized = materializeRunnerNativeContinuation({
+    request,
+    generation: current.generation.number,
+    adapterResult,
+    observedAt: adapterResult?.readback?.observedAt,
+    reasonCode: retainedResolution !== null && resolution === null ? current.reason.code : reasonCode,
+    reasonEvidenceSha256: reasonEvidenceSha256 ?? current.reason.evidenceSha256,
+    resolution: retainedResolution,
+  });
+  if (!materialized.ok) return materialized;
+  const continuation = materialized.continuation;
+  if (continuation.status !== "active") {
+    continuation.terminal = { ...continuation.terminal, atRevision: event.atRevision };
+    continuation.recordSha256 = computeRunnerNativeContinuationDigest(continuation);
+  }
+  return validateRunnerNativeContinuation(continuation).ok
+    ? { ok: true, code: "RNC-REFRESH", continuation }
+    : { ok: false, code: "RNC-SCHEMA", continuation: null };
+}
+
+/** Runner-native continuation controller; adapter remains the caller's authority. */
+export async function reconcileRunnerNativeContinuation({ continuity, activeFeature, continuationId, runner, acceptance = [], evidence = [], event, additiveInput = null, adapter } = {}) {
+  if (typeof adapter !== "function" || !isObject(activeFeature) || !safeId(activeFeature.id) || !safeId(continuationId)
+    || !validateContinuityState(continuity, activeFeature.id).ok) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+  const current = continuity.nativeContinuation ?? null;
+  if (additiveInput !== null) {
+    if (current === null) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+    const added = recordRunnerNativeAdditiveInput({ continuation: current, input: additiveInput });
+    if (!added.ok) return { ok: false, code: added.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = added.continuation;
+    return { ok: true, code: added.code, action: "none", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  if (!isObject(event) || !safeId(event.kind) || !safeInteger(event.atRevision) || event.atRevision !== continuity.revision) return { ok: false, code: "RNC-CONTROLLER-EVENT" };
+  if (current === null) {
+    const progress = projectRunnerNativeProgress({ continuity, acceptance, evidence });
+    if (!progress.ok) return { ok: false, code: progress.code };
+    // `activeFeature` is the persisted State object and carries its planPath.
+    // The native-goal record intentionally exposes only its bounded identity.
+    const subjectFeature = { id: activeFeature.id, phase: activeFeature.phase };
+    const request = buildRunnerNativeContinuationRequest({ continuationId, activeFeature: subjectFeature, continuity, runner, acceptance, evidence, progress: progress.progress });
+    if (!request.ok) return { ok: false, code: request.code };
+    const adapterResult = await adapter({ action: "set", generation: 0, subject: request.request.subject, objective: request.request.objective });
+    const materialized = materializeRunnerNativeContinuation({ request, generation: 0, adapterResult, observedAt: adapterResult?.readback?.observedAt, reasonCode: event.kind });
+    if (!materialized.ok) return { ok: false, code: materialized.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = materialized.continuation;
+    return { ok: true, code: "RNC-SET", action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const transition = planNativeGoalTransition({ continuation: current, event });
+  if (!transition.ok) return { ok: false, code: transition.code };
+  if (transition.action === "none") {
+    // A retained generation is not a licence to trust a historical readback.
+    // The adapter performs a matching get, does not duplicate a matching set,
+    // and refuses to overwrite a different active user-controlled goal.
+    if (current.status === "active" && ["activate", "resume", "compact-reentry"].includes(event.kind)) {
+      const adapterResult = await adapter({ action: "set", generation: current.generation.number, subject: current.subject, objective: current.objective });
+      const refreshed = refreshNativeContinuation(current, event, adapterResult);
+      if (!refreshed.ok) return { ok: false, code: refreshed.code };
+      const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = refreshed.continuation;
+      return { ok: true, code: refreshed.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+    }
+    return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
+  }
+  if (transition.action === "set") {
+    const adapterResult = await adapter({ action: "set", generation: transition.generation, subject: current.subject, objective: current.objective });
+    const resumed = refreshNativeContinuation(current, event, adapterResult, transition.reasonCode, event.evidenceSha256, event.poDecisionReceipt);
+    if (!resumed.ok) return { ok: false, code: resumed.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = resumed.continuation;
+    return { ok: true, code: transition.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const adapterResult = await adapter({ action: transition.action, generation: current.generation.number, subject: current.subject, objective: current.objective });
+  const terminal = materializeRunnerNativeTerminal({ continuation: current, transition, event, adapterResult });
+  if (!terminal.ok) return { ok: false, code: terminal.code };
+  const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = terminal.continuation;
+  return { ok: true, code: terminal.code, action: transition.action, expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+}
+
+/**
+ * Bind the one private cleanup descriptor used by this continuity lifecycle.
+ *
+ * This is deliberately narrower than generic CAS: only an absent/null cleanup
+ * tuple may become one exact descriptor binding. Existing bindings are never
+ * replaced, and a state with an admitted dispatch cannot have its revision
+ * changed underneath that dispatch identity.
+ */
+export function bindContinuitySessionCleanup(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, SESSION_CLEANUP_BIND_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.sessionCleanup, SESSION_CLEANUP_KEYS)
+    || !safeId(request.sessionCleanup.sessionId)
+    || !digest(request.sessionCleanup.descriptorSha256)) {
+    return result(false, before.ok ? "CS-SESSION-CLEANUP-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.runtime.sessionCleanup !== undefined && current.runtime.sessionCleanup !== null) {
+    return sameJson(current.runtime.sessionCleanup, request.sessionCleanup)
+      ? result(true, "CS-SESSION-CLEANUP-ALREADY-BOUND", structuredClone(current), false)
+      : result(false, "CS-SESSION-CLEANUP-PROTECTED");
+  }
+  if (current.queueHead?.dispatch !== null || current.decisionTxn !== null || current.closeTransition != null) {
+    return result(false, "CS-SESSION-CLEANUP-TOO-LATE");
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.runtime.sessionCleanup = structuredClone(request.sessionCleanup);
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-SESSION-CLEANUP-BOUND", next, true)
+    : result(false, after.code);
+}
+
+/**
+ * Release the exact cleanup binding after the I/O layer has proved closure.
+ * This pure transition deliberately accepts no boolean "force" flag and never
+ * clears a different descriptor or changes an admitted dispatch identity.
+ */
+export function releaseContinuitySessionCleanup(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, SESSION_CLEANUP_RELEASE_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.sessionCleanup, SESSION_CLEANUP_KEYS)
+    || !safeId(request.sessionCleanup.sessionId)
+    || !digest(request.sessionCleanup.descriptorSha256)) {
+    return result(false, before.ok ? "CS-SESSION-CLEANUP-RELEASE-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.runtime.sessionCleanup === undefined || current.runtime.sessionCleanup === null) {
+    return result(true, "CS-SESSION-CLEANUP-ALREADY-RELEASED", structuredClone(current), false);
+  }
+  if (!sameJson(current.runtime.sessionCleanup, request.sessionCleanup)) {
+    return result(false, "CS-SESSION-CLEANUP-PROTECTED");
+  }
+  if (current.queueHead?.dispatch !== null || current.decisionTxn !== null || current.closeTransition != null) {
+    return result(false, "CS-SESSION-CLEANUP-RELEASE-TOO-LATE");
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.runtime.sessionCleanup = null;
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-SESSION-CLEANUP-RELEASED", next, true)
+    : result(false, after.code);
+}
+
+/**
+ * Bind one already-written Result and make an idle review head close-ready.
+ *
+ * Result bytes and the project approval are I/O-layer concerns.  This pure
+ * transition owns only the closed continuity mutation surface: one revision,
+ * a Result authority (newly bound or already bootstrap-bound), review -> close,
+ * and the immediate resume marker. Exact committed replay is a zero-write
+ * success.
+ */
+export function bindContinuityResultForClose(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, RESULT_CLOSE_BIND_KEYS)
+    || !safeInteger(request.expectedRevision) || !validArtifact(request.result)) {
+    return result(false, before.ok ? "CS-RESULT-CLOSE-REQUEST" : before.code);
+  }
+  const idle = current.queueHead !== null
+    && current.queueHead.dispatch === null
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.blocker === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && current.closeTransition == null;
+  if (!idle) return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const replayResume = {
+    mode: "immediate",
+    sourceRevision: request.expectedRevision + 1,
+    reasonCode: "active-turn",
+  };
+  if (current.authority.result !== null) {
+    if (!sameJson(current.authority.result, request.result)) {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
+    if (current.revision === request.expectedRevision + 1
+      && current.queueHead.nextAction === "close"
+      && sameJson(current.resume, replayResume)) {
+      return result(true, "CS-RESULT-CLOSE-REPLAY", structuredClone(current), false);
+    }
+    if (request.expectedRevision !== current.revision || current.queueHead.nextAction !== "review") {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.queueHead.nextAction !== "review") return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  if (next.authority.result === null) next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  next.resume = {
+    mode: "immediate",
+    sourceRevision: next.revision,
+    reasonCode: "active-turn",
+  };
+  const after = validateContinuityState(next, activeFeatureId);
+  if (!after.ok) return result(false, after.code);
+  const scoped = next.revision === current.revision + 1
+    && sameJson(next.runtime, current.runtime)
+    && sameJson(next.authority.prd, current.authority.prd)
+    && sameJson(next.authority.spec, current.authority.spec)
+    && sameJson(next.acknowledgedFinal, current.acknowledgedFinal)
+    && next.queueHead.packageId === current.queueHead.packageId
+    && next.queueHead.actionId === current.queueHead.actionId
+    && next.queueHead.productRetryCount === current.queueHead.productRetryCount
+    && next.queueHead.environmentRerouteCount === current.queueHead.environmentRerouteCount
+    && sameJson(next.queueHead.dispatch, current.queueHead.dispatch)
+    && sameJson(next.blocker, current.blocker)
+    && sameJson(next.recovery, current.recovery)
+    && sameJson(next.decisionTxn, current.decisionTxn)
+    && sameJson(next.capacity, current.capacity)
+    && sameJson(next.closeTransition, current.closeTransition);
+  return scoped
+    ? result(true, "CS-RESULT-CLOSE-APPLIED", next, true)
+    : result(false, "CS-RESULT-CLOSE-SCOPE");
+}
+
+function adapterAck(acknowledgedFinal) {
+  if (acknowledgedFinal === null) return null;
+  return {
+    identity: acknowledgedFinal.identity,
+    resultDigest: acknowledgedFinal.resultDigest,
+    finalOutcome: acknowledgedFinal.finalOutcome,
+  };
+}
+
+function observationIsSupersededOrigin(current, observation) {
+  return current.recovery !== null
+    && isObject(observation)
+    && isObject(observation.identity)
+    && observation.identity.dispatchId === current.recovery.originDispatchId
+    && observation.identity.attemptId === current.recovery.originAttemptId;
+}
+
+/**
+ * Validate a raw host final through the adapter and atomically propose its
+ * acknowledgement plus next head/blocker. Result/state persistence is later
+ * writer work; every rejection returns state:null and mutated:false.
+ */
+export function integrateContinuityFinal(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, FINAL_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.acknowledgedFinal !== null
+    && isObject(request.observation?.identity)
+    && sameIdentity(current.acknowledgedFinal.identity, request.observation.identity)) {
+    const replay = normalizeContinuityHostObservation({
+      expected: current.acknowledgedFinal.identity,
+      observation: request.observation,
+      priorAcknowledgement: adapterAck(current.acknowledgedFinal),
+    });
+    return replay.code === "CHA-DUPLICATE-FINAL"
+      ? result(true, "CS-DUPLICATE-FINAL")
+      : result(false, "CS-FINAL-REJECTED");
+  }
+  if (current.queueHead === null || current.queueHead.dispatch === null) return result(false, "CS-NO-DISPATCH");
+  if (observationIsSupersededOrigin(current, request.observation)) {
+    return result(true, "CS-SUPERSEDED-ORIGIN-FINAL");
+  }
+  const normalized = normalizeContinuityHostObservation({
+    expected: current.queueHead.dispatch,
+    observation: request.observation,
+    // A prior acknowledgement belongs to the preceding dispatch. Exact replay
+    // of that identity is handled above; carrying it into the active dispatch
+    // would make every legitimate sequential final look like an identity clash.
+    priorAcknowledgement: null,
+  });
+  const passiveCodes = new Map([
+    ["CHA-RUNNING", "CS-RUNNING"],
+    ["CHA-COMPLETED-UNDELIVERED", "CS-COMPLETED-UNDELIVERED"],
+    ["CHA-HOST-FAILED", "CS-HOST-FAILED"],
+    ["CHA-DUPLICATE-FINAL", "CS-DUPLICATE-FINAL"],
+  ]);
+  if (passiveCodes.has(normalized.code)) return result(true, passiveCodes.get(normalized.code));
+  if (normalized.code !== "CHA-FINAL-READY") return result(false, "CS-FINAL-REJECTED");
+
+  if (!isObject(request.next)) return result(false, "CS-REQUEST");
+  // Final integration owns only the acknowledgement, Result digest and the six
+  // semantic next-transition fields.  The caller must not smuggle mutations of
+  // feature/runtime/PRD/Spec or authority paths through the otherwise-valid CAS.
+  if (request.next.featureId !== current.featureId
+    || !sameJson(request.next.runtime, current.runtime)
+    || !sameJson(request.next.authority?.prd, current.authority.prd)
+    || !sameJson(request.next.authority?.spec, current.authority.spec)
+    || request.next.authority?.result?.path !== current.authority.result?.path) {
+    return result(false, "CS-PROTECTED-FINAL-FIELDS");
+  }
+  const expectedAck = request.next.acknowledgedFinal;
+  if (!exactKeys(expectedAck, ACK_KEYS)
+    || !validIdentity(expectedAck.identity)
+    || !sameIdentity(expectedAck.identity, request.observation.identity)
+    || expectedAck.resultDigest !== normalized.resultDigest
+    || expectedAck.finalOutcome !== normalized.finalOutcome
+    || expectedAck.integratedRevision !== current.revision + 1
+    || (normalized.finalOutcome === "failed" && request.next.blocker === null)) {
+    return result(false, "CS-ACK-MISMATCH");
+  }
+  const cas = compareAndSwap(current, {
+    expectedRevision: request.expectedRevision,
+    next: request.next,
+  }, activeFeatureId, { allowAcknowledgementChange: true, allowResultAuthorityChange: true });
+  return cas.ok ? result(true, "CS-FINAL-INTEGRATED", cas.state, true) : cas;
+}
+
+/** Install the dispatch-blocking state-applied decision marker exactly once. */
+export function applyDecisionSelection(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, DECISION_APPLY_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn !== null) {
+    const sameTxn = exactKeys(request.decisionTxn, DECISION_KEYS)
+      && [...DECISION_KEYS].every((key) => current.decisionTxn[key] === request.decisionTxn[key]);
+    return request.expectedRevision === current.revision && sameTxn
+      ? result(true, "CS-DECISION-REPLAY")
+      : result(false, "CS-DECISION-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision || current.blocker === null) return result(false, "CS-STALE");
+  if (!validDecisionTxn(request.decisionTxn, current.revision + 1)
+    || request.decisionTxn.preSelectionRevision !== current.revision
+    || current.blocker.decisionBrief === null
+    || current.blocker.decisionBrief.decisionBriefSha256 !== request.decisionTxn.briefSha256
+    || (request.queueHead === null) === (request.blocker === null)
+    || !validResume(request.resume, current.revision + 1)) return result(false, "CS-DECISION-INVALID");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.queueHead = request.queueHead;
+  next.blocker = request.blocker;
+  next.resume = request.resume;
+  next.decisionTxn = request.decisionTxn;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+  });
+}
+
+function validResultReplacement(current, result) {
+  return current.authority.result !== null
+    && validArtifact(result)
+    && result.path === current.authority.result.path
+    && result.sha256 !== current.authority.result.sha256;
+}
+
+function closeIntentMatches(transition, intent, resultArtifact) {
+  return transition !== null
+    && validCloseIntent(intent)
+    && transition.intentId === intent.intentId
+    && transition.expectedRevision === intent.expectedRevision
+    && sameAuthorityDigests(transition.authorityDigests, intent.authorityDigests)
+    && transition.graphSha256 === intent.graphSha256
+    && transition.packageBindingsSha256 === intent.packageBindingsSha256
+    && transition.receiptId === intent.receiptId
+    && transition.receiptSha256 === intent.receiptSha256
+    && transition.candidateCommit === intent.candidateCommit
+    && transition.candidateTree === intent.candidateTree
+    && sameJson(transition.stage1Verify, intent.stage1Verify)
+    && transition.resultDigest === resultArtifact?.sha256;
+}
+
+function closeReplay(current, expectedRevision, phase, matches) {
+  return matches && current.closeTransition?.phase === phase
+    && (expectedRevision === current.revision || expectedRevision === current.closeTransition.expectedRevision)
+    ? result(true, "CS-CLOSE-REPLAY", structuredClone(current))
+    : null;
+}
+
+function replaceCloseResult(current, resultArtifact) {
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = resultArtifact;
+  next.closeTransition.resultDigest = resultArtifact.sha256;
+  return next;
+}
+
+/**
+ * Apply the State half of a Result-first close intent. The caller persists the
+ * deterministic Result intent before invoking this pure CAS proposal. Replays
+ * are accepted both before and after State acknowledgement; no cross-file
+ * atomicity is claimed.
+ */
+export function beginCloseTransition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_BEGIN_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.closeTransition !== undefined && current.closeTransition !== null) {
+    return closeIntentMatches(current.closeTransition, request.intent, request.result)
+      ? result(true, "CS-CLOSE-REPLAY", structuredClone(current))
+      : result(false, "CS-CLOSE-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision || !validCloseIntent(request.intent)
+    || !validResultReplacement(current, request.result)
+    || current.queueHead === null || current.queueHead.nextAction !== "close"
+    || request.intent.expectedRevision !== current.revision
+    || !sameAuthorityDigests(request.intent.authorityDigests, {
+      prdSha256: current.authority.prd.sha256,
+      specSha256: current.authority.spec.sha256,
+      resultSha256: current.authority.result?.sha256 ?? null,
+    })
+  ) return result(false, "CS-CLOSE-INTENT-INVALID");
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = request.result;
+  next.closeTransition = {
+    ...request.intent,
+    resultDigest: request.result.sha256,
+    phase: "state-cas",
+    finalVerify: null,
+    delivery: null,
+  };
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-CAS-APPLIED", cas.state, true) : cas;
+}
+
+/** Record a full verify that ran on the exact post-CAS candidate. */
+export function recordCloseFinalVerify(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_VERIFY_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "verified",
+    transition !== null && sameJson(transition.finalVerify, request.verify) && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "state-cas"
+    || !validResultReplacement(current, request.result) || !validCloseVerify(request.verify, transition)) {
+    return result(false, "CS-CLOSE-VERIFY-INVALID");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "verified";
+  next.closeTransition.finalVerify = structuredClone(request.verify);
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-VERIFY-RECORDED", cas.state, true) : cas;
+}
+
+/** A tracked candidate mutation invalidates final-verify evidence before delivery. */
+export function recordCloseCandidateMutation(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_MUTATION_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  if (request.expectedRevision !== current.revision || transition === null
+    || !new Set(["state-cas", "verified"]).has(transition.phase)
+    || !validResultReplacement(current, request.result)
+    || !gitOid(request.candidateCommit) || !gitOid(request.candidateTree)
+    || (request.candidateCommit === transition.candidateCommit && request.candidateTree === transition.candidateTree)) {
+    return result(false, "CS-CLOSE-MUTATION-INVALID");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.candidateCommit = request.candidateCommit;
+  next.closeTransition.candidateTree = request.candidateTree;
+  next.closeTransition.phase = "state-cas";
+  next.closeTransition.finalVerify = null;
+  next.closeTransition.delivery = null;
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-VERIFY-STALE", cas.state, true) : cas;
+}
+
+/** Delivery is permitted only after a still-exact final verify. */
+export function recordCloseDelivery(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_DELIVERY_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "delivered",
+    transition !== null && transition.delivery?.pushedOid === request.pushedOid && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "verified"
+    || !validResultReplacement(current, request.result) || request.pushedOid !== transition.candidateCommit) {
+    return result(false, "CS-CLOSE-DELIVERY-BLOCKED");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "delivered";
+  next.closeTransition.delivery = { pushedOid: request.pushedOid, fetchedOid: null };
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-DELIVERY-RECORDED", cas.state, true) : cas;
+}
+
+/** Record an exact OID fetch-back; the delivery tail cannot change candidate bytes. */
+export function recordCloseReadback(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_READBACK_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "readback",
+    transition !== null && transition.delivery?.fetchedOid === request.fetchedOid && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "delivered"
+    || !validResultReplacement(current, request.result) || request.fetchedOid !== transition.delivery?.pushedOid) {
+    return result(false, "CS-CLOSE-READBACK-BLOCKED");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "readback";
+  next.closeTransition.delivery.fetchedOid = request.fetchedOid;
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-READBACK-RECORDED", cas.state, true) : cas;
+}
+
+/** Mark a read-back-confirmed transition closed without permitting a delivery-tail mutation. */
+export function completeCloseTransition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_COMPLETE_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "closed",
+    transition !== null && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "readback"
+    || !validResultReplacement(current, request.result)) return result(false, "CS-CLOSE-COMPLETE-BLOCKED");
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "closed";
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-CLOSED", cas.state, true) : cas;
+}
+
+/** Bind a Result-persisted course brief before presenting the course blocker. */
+export function recordCourseDecisionBrief(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_BRIEF_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision || current.queueHead === null || current.queueHead.dispatch !== null || current.blocker !== null
+    || current.decisionTxn !== null || !validResultReplacement(current, request.result)) {
+    return result(false, "CS-COURSE-BRIEF-STALE");
+  }
+  const synthetic = structuredClone(current);
+  synthetic.authority.result = request.result;
+  const budget = retryBudgetOf(current);
+  if (current.retryBudget !== undefined || budget.productRetryCount !== 0 || budget.environmentRerouteCount !== 0) {
+    synthetic.retryBudget = structuredClone(budget);
+  }
+  synthetic.queueHead = null;
+  synthetic.blocker = request.blocker;
+  synthetic.resume = request.resume;
+  synthetic.revision += 1;
+  if (!validBlocker(request.blocker, synthetic) || request.blocker.type !== "course"
+    || request.blocker.decisionBrief === null || !validResume(request.resume, synthetic.revision)) {
+    return result(false, "CS-COURSE-BRIEF-INVALID");
+  }
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next: synthetic }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+}
+
+/** Apply the write-ahead intent's selected state while advancing the Result digest. */
+export function applyCourseDecisionIntent(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_DECISION_APPLY_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn !== null) {
+    const sameTxn = exactKeys(request.decisionTxn, DECISION_KEYS)
+      && [...DECISION_KEYS].every((key) => current.decisionTxn[key] === request.decisionTxn[key]);
+    return request.expectedRevision === current.revision && sameTxn
+      && sameJson(current.authority.result, request.result)
+      ? result(true, "CS-DECISION-REPLAY")
+      : result(false, "CS-DECISION-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision || current.blocker === null || !validResultReplacement(current, request.result)
+    || !validDecisionTxn(request.decisionTxn, current.revision + 1)
+    || request.decisionTxn.preSelectionRevision !== current.revision
+    || current.blocker.decisionBrief === null
+    || current.blocker.decisionBrief.decisionBriefSha256 !== request.decisionTxn.briefSha256
+    || (request.queueHead === null) === (request.blocker === null)
+    || !validResume(request.resume, current.revision + 1)) return result(false, "CS-DECISION-INVALID");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = request.result;
+  next.queueHead = request.queueHead;
+  next.blocker = request.blocker;
+  next.resume = request.resume;
+  next.decisionTxn = request.decisionTxn;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+    allowResultAuthorityChange: true,
+  });
+}
+
+/** Clear a matching durable decision receipt and make the selected state dispatchable. */
+export function clearDecisionSelection(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, DECISION_CLEAR_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.receipt, DECISION_RECEIPT_KEYS)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn === null) return result(false, "CS-NO-DECISION-TXN");
+  const txn = current.decisionTxn;
+  const receipt = request.receipt;
+  if (request.expectedRevision !== current.revision
+    || !digest(receipt.receiptSha256)
+    || receipt.idempotencyKey !== txn.idempotencyKey
+    || receipt.briefSha256 !== txn.briefSha256
+    || receipt.intentSha256 !== txn.intentSha256
+    || receipt.selectedOptionId !== txn.selectedOptionId
+    || receipt.selectedRevision !== txn.selectedRevision
+    || receipt.dispatchableRevision !== txn.dispatchableRevision) return result(false, "CS-DECISION-RECEIPT-MISMATCH");
+
+  const next = structuredClone(current);
+  next.revision = txn.dispatchableRevision;
+  next.decisionTxn = null;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+  });
+}
+
+/** Clear a receipt-backed marker while binding the Result that contains that receipt. */
+export function clearCourseDecisionReceipt(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_DECISION_CLEAR_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.receipt, DECISION_RECEIPT_KEYS)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn === null || !validResultReplacement(current, request.result)) return result(false, "CS-NO-DECISION-TXN");
+  const txn = current.decisionTxn;
+  const receipt = request.receipt;
+  if (request.expectedRevision !== current.revision
+    || !digest(receipt.receiptSha256)
+    || receipt.idempotencyKey !== txn.idempotencyKey
+    || receipt.briefSha256 !== txn.briefSha256
+    || receipt.intentSha256 !== txn.intentSha256
+    || receipt.selectedOptionId !== txn.selectedOptionId
+    || receipt.selectedRevision !== txn.selectedRevision
+    || receipt.dispatchableRevision !== txn.dispatchableRevision) return result(false, "CS-DECISION-RECEIPT-MISMATCH");
+  const next = structuredClone(current);
+  next.revision = txn.dispatchableRevision;
+  next.authority.result = request.result;
+  next.decisionTxn = null;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+    allowResultAuthorityChange: true,
+  });
+}
+
+// AC-047-27: the sole legacy continuity adoption transition.  This is
+// intentionally separate from the generic CAS path so ordinary callers cannot
+// widen authority or adopt an arbitrary Result.
+const LEGACY_ADOPTION = Object.freeze({
+  featureId: "codex-onboarding-0.4.5",
+  revision: 3,
+  prdSha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94",
+  specSha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70",
+  currentPrdSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae",
+  resultSha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73",
+  currentPrdPath: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+  specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
+  resultPath: "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
+  historicalPrdCommit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5",
+  closeEvidencePath: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md",
+  closeEvidenceSha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1",
+  releaseTag: "v0.4.6",
+  releaseCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d",
+  releaseTree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b",
+  releaseTagObject: "78359ae1ba7e0194111e531c060db615e4994e40",
+});
+
+function legacyPreimage(current) {
+  const normalized = isObject(current) && !Object.hasOwn(current, "closeTransition")
+    ? { ...current, closeTransition: null } : current;
+  return validateContinuityState(normalized, LEGACY_ADOPTION.featureId).ok
+    && current.featureId === LEGACY_ADOPTION.featureId
+    && current.revision === LEGACY_ADOPTION.revision
+    && current.authority.prd.sha256 === LEGACY_ADOPTION.prdSha256
+    && current.authority.spec.sha256 === LEGACY_ADOPTION.specSha256
+    && current.authority.result === null
+    && current.queueHead.packageId === "continuity-adoption"
+    && current.queueHead.actionId === "review-active-feature"
+    && current.queueHead.nextAction === "review"
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.queueHead.dispatch === null
+    && current.blocker === null
+    && current.acknowledgedFinal === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && (current.closeTransition === null || !Object.hasOwn(current, "closeTransition"));
+}
+
+export function planLegacyContinuityAdoption(current, request = {}) {
+  if (!legacyPreimage(current)) return result(false, "CS-LEGACY-PREIMAGE");
+  const requestKeys = ["expectedRevision", "currentPrd", "spec", "result", "closeEvidence", "history"];
+  const exactArtifact = (value) => exactKeys(value, ARTIFACT_KEYS);
+  const exactHistory = (value) => exactKeys(value, new Set(["commit", "path", "sha256"]))
+    && gitOid(value.commit) && safePath(value.path) && digest(value.sha256);
+  if (!isObject(request) || Object.keys(request).length !== requestKeys.length
+    || !requestKeys.every((key) => Object.hasOwn(request, key))
+    || !exactArtifact(request.currentPrd) || !exactArtifact(request.spec)
+    || !exactArtifact(request.result) || !exactArtifact(request.closeEvidence)
+    || !exactHistory(request.history)
+    || request.currentPrd.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.spec.path !== LEGACY_ADOPTION.specPath
+    || request.result.path !== LEGACY_ADOPTION.resultPath
+    || request.closeEvidence.path !== LEGACY_ADOPTION.closeEvidencePath
+    || request.history.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.history.commit !== LEGACY_ADOPTION.historicalPrdCommit
+    || request.history.sha256 !== LEGACY_ADOPTION.prdSha256
+    || request.currentPrd.sha256 !== LEGACY_ADOPTION.currentPrdSha256
+    || request.spec.sha256 !== LEGACY_ADOPTION.specSha256
+    || request.result.sha256 !== LEGACY_ADOPTION.resultSha256
+    || request.closeEvidence.sha256 !== LEGACY_ADOPTION.closeEvidenceSha256
+    || request.expectedRevision !== LEGACY_ADOPTION.revision) {
+    return result(false, "CS-LEGACY-BINDING");
+  }
+  return result(true, "CS-LEGACY-ADOPTION-PLAN", {
+    featureId: LEGACY_ADOPTION.featureId,
+    expectedRevision: LEGACY_ADOPTION.revision,
+    authorityDigests: {
+      historicalPrdSha256: LEGACY_ADOPTION.prdSha256,
+      currentPrdSha256: LEGACY_ADOPTION.currentPrdSha256,
+      specSha256: LEGACY_ADOPTION.specSha256,
+      resultSha256: LEGACY_ADOPTION.resultSha256,
+    },
+  });
+}
+
+export function applyLegacyContinuityAdoption(current, request = {}, activeFeatureId = undefined) {
+  const planned = planLegacyContinuityAdoption(current, request);
+  if (!planned.ok || activeFeatureId !== undefined && activeFeatureId !== LEGACY_ADOPTION.featureId) {
+    return result(false, planned.ok ? "CS-LEGACY-FEATURE" : planned.code);
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.prd = structuredClone(request.currentPrd);
+  next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  const after = validateContinuityState(
+    Object.hasOwn(next, "closeTransition") ? next : { ...next, closeTransition: null },
+    LEGACY_ADOPTION.featureId,
+  );
+  if (!after.ok || next.revision !== current.revision + 1
+    || !sameJson(current.runtime, next.runtime) || !sameJson(current.authority.spec, next.authority.spec)
+    || !sameJson(current.acknowledgedFinal, next.acknowledgedFinal)
+    || next.queueHead.packageId !== current.queueHead.packageId
+    || next.queueHead.actionId !== current.queueHead.actionId
+    || next.queueHead.productRetryCount !== current.queueHead.productRetryCount
+    || next.queueHead.environmentRerouteCount !== current.queueHead.environmentRerouteCount
+    || !sameJson(current.queueHead.dispatch, next.queueHead.dispatch)
+    || !sameJson(current.blocker, next.blocker) || !sameJson(current.resume, next.resume)
+    || !sameJson(current.recovery, next.recovery) || !sameJson(current.decisionTxn, next.decisionTxn)
+    || !sameJson(current.capacity, next.capacity) || !sameJson(current.closeTransition, next.closeTransition)
+    || next.queueHead.nextAction !== "close") return result(false, after.ok ? "CS-LEGACY-SCOPE" : after.code);
+  return result(true, "CS-LEGACY-ADOPTION-APPLIED", next, true);
+}
+
+export const LEGACY_CONTINUITY_ADOPTION = LEGACY_ADOPTION;
+
+export const CONTINUITY_STATE_CODES = Object.freeze([
+  "CS-RESULT-CLOSE-REQUEST", "CS-RESULT-CLOSE-PREIMAGE",
+  "CS-RESULT-CLOSE-CONFLICT", "CS-RESULT-CLOSE-REPLAY",
+  "CS-RESULT-CLOSE-APPLIED", "CS-RESULT-CLOSE-SCOPE",
+  "CS-LEGACY-PREIMAGE", "CS-LEGACY-BINDING", "CS-LEGACY-FEATURE", "CS-LEGACY-SCOPE",
+  "CS-LEGACY-ADOPTION-PLAN", "CS-LEGACY-ADOPTION-APPLIED",
+  "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
+  "CS-FAILURE-DISPOSITION-REQUEST", "CS-FAILURE-DISPOSITION-PREIMAGE",
+  "CS-FAILURE-EVIDENCE", "CS-FAILURE-EVIDENCE-UNRECOGNIZED",
+  "CS-PRODUCT-RETRY-BUDGET", "CS-ENVIRONMENT-REROUTE-BUDGET",
+  "CS-PRODUCT-RETRY-ADMITTED", "CS-ENVIRONMENT-REROUTE-UNAVAILABLE",
+  "CS-SESSION-CLEANUP-REQUEST", "CS-SESSION-CLEANUP-ALREADY-BOUND",
+  "CS-SESSION-CLEANUP-PROTECTED", "CS-SESSION-CLEANUP-TOO-LATE",
+  "CS-SESSION-CLEANUP-BOUND",
+  "CS-SESSION-CLEANUP-RELEASE-REQUEST", "CS-SESSION-CLEANUP-ALREADY-RELEASED",
+  "CS-SESSION-CLEANUP-RELEASE-TOO-LATE", "CS-SESSION-CLEANUP-RELEASED",
+  "CS-REVISION-OVERFLOW", "CS-REVISION", "CS-CAS-APPLIED", "CS-NO-DISPATCH",
+  "CS-SUPERSEDED-ORIGIN-FINAL", "CS-RUNNING", "CS-COMPLETED-UNDELIVERED",
+  "CS-HOST-FAILED", "CS-DUPLICATE-FINAL", "CS-FINAL-REJECTED",
+  "CS-ACK-MISMATCH", "CS-FINAL-INTEGRATED", "CS-DECISION-PENDING", "CS-BLOCKED", "CS-NOT-DISPATCH-ACTION",
+  "CS-DISPATCHABLE", "CS-DECISION-REPLAY", "CS-DECISION-CONFLICT",
+  "CS-DECISION-INVALID", "CS-NO-DECISION-TXN", "CS-DECISION-RECEIPT-MISMATCH", "CS-PROTECTED-ACK", "CS-PROTECTED-DECISION",
+  "CS-COURSE-BRIEF-STALE", "CS-COURSE-BRIEF-INVALID",
+  "CS-COURSE-DISPOSITION-PROTECTED",
+  "CS-PROTECTED-FINAL-FIELDS",
+  "CS-PROTECTED-AUTHORITY",
+  "CS-PROTECTED-RETRY-COUNTERS",
+  "CS-PROTECTED-CLOSE-TRANSITION",
+  "CS-INTERRUPT-DRIFT",
+  "CS-CLOSE-REPLAY", "CS-CLOSE-CONFLICT", "CS-CLOSE-INTENT-INVALID",
+  "CS-CLOSE-CAS-APPLIED", "CS-CLOSE-VERIFY-INVALID", "CS-CLOSE-VERIFY-RECORDED",
+  "CS-CLOSE-MUTATION-INVALID", "CS-CLOSE-VERIFY-STALE", "CS-CLOSE-DELIVERY-BLOCKED",
+  "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
+  "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
+]);
