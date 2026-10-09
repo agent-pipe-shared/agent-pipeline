@@ -1,0 +1,145 @@
+command: node scratch/m2b-check.mjs
+label: ALFRED-M2B-IGNORE-20261009
+exitCode: 0
+head: 3344c4689a1a54f01fa63ec281d885636c00dbbb
+tree: 7fad1fc5fe483f06a3faed507cafca8785866dad
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.m2b-rule-check.v1",
+  "pass": 14,
+  "fail": 0,
+  "results": [
+    {
+      "path": "specs/alpha/evidence/direct.log",
+      "ignored": false
+    },
+    {
+      "path": "specs/alpha/evidence/direct.jsonl",
+      "ignored": false
+    },
+    {
+      "path": "specs/alpha/evidence/nested/deeper/child.log",
+      "ignored": false
+    },
+    {
+      "path": "specs/alpha/evidence/nested/deeper/child.jsonl",
+      "ignored": false
+    },
+    {
+      "path": "backlog/evidence/direct.log",
+      "ignored": false
+    },
+    {
+      "path": "backlog/evidence/direct.jsonl",
+      "ignored": false
+    },
+    {
+      "path": "backlog/evidence/nested/deeper/child.log",
+      "ignored": false
+    },
+    {
+      "path": "backlog/evidence/nested/deeper/child.jsonl",
+      "ignored": false
+    },
+    {
+      "path": "scratch/private.log",
+      "ignored": true
+    },
+    {
+      "path": "scratch/private.jsonl",
+      "ignored": true
+    },
+    {
+      "path": "arbitrary/private.log",
+      "ignored": true
+    },
+    {
+      "path": "arbitrary/private.jsonl",
+      "ignored": true
+    },
+    {
+      "path": "evidence/generated.log",
+      "ignored": true
+    },
+    {
+      "path": "evidence/generated.jsonl",
+      "ignored": true
+    }
+  ],
+  "m1": {
+    "schema": "alfred.m1-rule-check.v1",
+    "pass": 14,
+    "fail": 0,
+    "results": [
+      {
+        "path": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
+        "ignored": false,
+        "text": "unset",
+        "sha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7"
+      },
+      {
+        "path": "evidence/design-course/sprint-alfred-epic/r5d.readiness.json",
+        "ignored": false,
+        "text": "unset",
+        "sha256": "2d93d4871098bc255e2d5851c5a76bdd71a11cdad194abb07952c611da87a853"
+      },
+      {
+        "path": "evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json",
+        "ignored": false,
+        "text": "unset",
+        "sha256": "85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324"
+      },
+      {
+        "path": "evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json",
+        "ignored": false,
+        "text": "unset",
+        "sha256": "1502f9982f9c6ac9961f7cc2783c4071b3373dfafc4ee0b8bbed49e7014fc718"
+      },
+      {
+        "path": "evidence/verify-latest.json",
+        "ignored": true
+      },
+      {
+        "path": "evidence/security-latest.json",
+        "ignored": true
+      },
+      {
+        "path": "evidence/dispatch-record-other-task.json",
+        "ignored": true
+      },
+      {
+        "path": "evidence/design-course/sprint-alfred-epic/unapproved-probe.json",
+        "ignored": true
+      },
+      {
+        "path": "evidence/design-course/other-feature/r1.package.json",
+        "ignored": true
+      },
+      {
+        "path": "scratch/repository-fixture/file.json",
+        "ignored": true
+      },
+      {
+        "path": ".env",
+        "ignored": true
+      },
+      {
+        "path": ".pipeline/private-overlay.yaml",
+        "ignored": true
+      },
+      {
+        "path": ".pipeline/machine-local.yaml",
+        "ignored": true
+      },
+      {
+        "path": ".claude/settings.local.json",
+        "ignored": true
+      }
+    ],
+    "fixtureRemoved": true
+  },
+  "fixtureRemoved": true
+}
+
+--- stderr ---
