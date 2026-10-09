@@ -44,14 +44,15 @@ export function createGoldfishCommitCommandFlow({ taskId, type, scope, summary,
     return fail("GF-COMMAND-MESSAGE");
   }
   const stageArgv = ["add", "--", ...normalized];
-  const commitArgv = ["commit", "-m", subject,
-    ...bodyParagraphs.flatMap((part) => ["-m", part]),
-    "--trailer", `Dispatch: ${taskId} (goldfish)`, "--trailer", "AI-Assisted: true",
-    "--", ...normalized];
+  // Ruling 150: the message-file route. guard-push refuses `-m` with a parenthesised `--trailer`, so the
+  // producer names the file (the agent writes it with its Write tool) and the commit step reads it with -F.
+  const messagePath = `scratch/commit-msg/${taskId}.txt`;
+  const commitArgv = ["commit", "-F", messagePath, "--", ...normalized];
   const stage = singleLine(boundedCopySafeCommand({ executable: "git", argv: stageArgv, forceCopyCommand: true }), stageArgv);
   const commit = singleLine(boundedCopySafeCommand({ executable: "git", argv: commitArgv, forceCopyCommand: true }), commitArgv);
   return { ok: true, schema: GOLDFISH_COMMIT_COMMAND_FLOW_SCHEMA,
     code: "GF-COMMAND-PREVIEW-ONLY", taskId, paths: normalized,
+    message, messagePath,
     steps: [{ kind: "stage-exact-paths", ...stage }, { kind: "commit-exact-paths", ...commit }],
-    disclaimer: "Use each step's POSIX or PowerShell copyCommand for that shell, separately from the same repository root after reviewing the exact paths. The command field is POSIX only. This preview does not attest dispatch identity, stage files, commit, bypass hooks, or publish a dispatch record." };
+    disclaimer: "Write `message` to `messagePath` with the Write tool first (this preview never writes it), then use each step's POSIX or PowerShell copyCommand for that shell, separately from the same repository root after reviewing the exact paths. The command field is POSIX only. This preview does not attest dispatch identity, stage files, commit, bypass hooks, or publish a dispatch record." };
 }

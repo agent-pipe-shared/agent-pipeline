@@ -506,19 +506,24 @@ Use this module when dispatching a bugfix (not for new features or mini-edits). 
 ## Final report (mandatory format, target ≤ 1,000 tokens, hard max 40 lines)
 
 For ordinary write tasks **outside native host-commit mode**, first run the
-read-only `goldfish-commit-command-flow.mjs` producer from the repository root.
+read-only `goldfish-commit-command-flow.mjs` producer through the plugin root
+(the absolute `<plugin-root>` path the bootstrap printed; the guard admits only that path).
 Supply the exact task ID, Conventional Commit type/scope/summary, one to four
 single-line WHY body paragraphs, and the complete sorted changed-path list
 (repeat `--body` and `--path`). Example:
 
 ```text
-node plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs --task-id {{TASK_ID}} --type docs --scope pipeline --summary 'update guidance' --body 'Explain the supported route.' --path path/to/file
+node "<plugin-root>/scripts/goldfish-commit-command-flow.mjs" --task-id {{TASK_ID}} --type docs --scope pipeline --summary 'update guidance' --body 'Explain the supported route.' --path path/to/file
 ```
 
-Inspect the returned paths. For a POSIX shell, execute each step's
-`copyCommand.posix`; for PowerShell, execute each step's
-`copyCommand.powershell`. Run the stage and commit blocks in **two separate
-tool calls**. The plain `command` field is POSIX-only. Never compose
+Inspect the returned paths. The result carries `message` (the full commit
+message, subject, body and both trailers) and `messagePath`
+(`scratch/commit-msg/<taskId>.txt`). First write `message` to `messagePath`
+with the Write tool (the producer never writes it), then run the stage step,
+then the commit step (`git commit -F <messagePath> -- <paths>`). For a POSIX
+shell, execute each step's `copyCommand.posix`; for PowerShell, execute each
+step's `copyCommand.powershell`. Run the stage and commit blocks in **two
+separate tool calls**. The plain `command` field is POSIX-only. Never compose
 either Git command yourself or join them with `&&`. This producer only renders
 quoted exact-path commands: it does not stage, commit, authorize attribution,
 bypass hooks, or publish the v4 record. If it refuses an input, report its
