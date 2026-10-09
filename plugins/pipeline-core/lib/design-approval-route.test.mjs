@@ -60,7 +60,7 @@
 //
 // Fixtures are synthetic: a mkdtemp directory under the OS temporary root, no real home, no network, no git.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -633,4 +633,224 @@ test("L4 classification: a legacy intent (v1 or v2 policy) is told apart from th
   assert.equal(classify(intent("design-workflow-package", "design-workflow-package-v2")), "legacy-design-workflow-package");
   assert.equal(classify({ value: intent("design-workflow-package", "design-workflow-package-v2"), sha256: digest("intent") }), "legacy-design-workflow-package");
   assert.equal(classify(intent("design-approval", "design-workflow-package-v2")), "unknown");
+});
+
+// ---------------------------------------------------------------------------
+// S: the stored signature verifier on the approved-package re-read (C2, decision T) -- slice F2b
+// ---------------------------------------------------------------------------
+// Added by dispatch ADR0085-T2c (test-only, QG-04: slice F2b never edits this block). It pins what the
+// header above lists under "NOT PINNED HERE" as owned by F2b: verifyStoredDesignWorkflowPackageSignature
+// (design-workflow-approval.mjs) must verify a stored v7 approval through rereadApprovedDesignWorkflowPackage
+// and reach no live candidate, course store, host evidence, revision chain or readiness file (note C2, items
+// 1-5). Fixtures are the R-block synthetic repositories: no .git, no readiness file, no course store.
+//
+// readCandidate THROWS and is counted (candidateReader replaces a non-function with () => null, so a
+// function is the only way to prove the candidate is never sampled). Every anchor list is NON-empty:
+// verifyAgainstTrustAnchors derives trust from the proof itself when the list is empty.
+//
+// VACUITY GUARD: every refusal case runs a positive control first (the same, unmodified approval is
+// accepted), so a refusal cannot be green because the fixture was never acceptable. S9 (record shape) is the
+// one exception: that refusal happens before any read, so its control is S1/S2.
+//
+// Expected state at the candidate where this block is created (F2b not landed):
+//   RED   S1-S8, S10, S11 (the verifier still re-reads through readApprovedDesignWorkflowPackage, which
+//         needs a Git repository, the readiness file and a live candidate)
+//   GREEN S9 (regression guard: RECORD-SHAPE is decided at design-workflow-approval.mjs:186, before any read)
+const STORED_VERIFIER = "verifyStoredDesignWorkflowPackageSignature";
+const STORED_ACCEPT_CODE = "DWP-APPROVAL-STORED-SIGNATURE-VERIFIED";
+const STORED_KEY_REFERENCE = "adr0085-t2c-anchored-key";
+const STORED_APPROVED_AT = "2026-10-02T00:00:00.000Z";
+
+async function loadStoredVerifier() {
+  const verify = await loadExport("./design-workflow-approval.mjs", STORED_VERIFIER, "slice F2b");
+  assert.equal(typeof verify, "function", `RED: ${STORED_VERIFIER} is not a function [slice F2b]`);
+  return verify;
+}
+
+const publicKeyPem = (publicKey) => publicKey.export({ type: "spki", format: "pem" }).toString();
+
+/** A proof over `intent` made with `privateKey` (public half `pem`), claiming `keyReference`. */
+function proofOf({ intent, keyReference, pem, privateKey }) {
+  return {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference,
+    publicKey: pem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64"),
+  };
+}
+
+/** A validly signed v7 approval record for the fixture package, plus the single-key anchor list that trusts it. */
+async function signedApproval(fixture) {
+  const createPoApprovalIntent = await loadExport("./po-approval-proof.mjs", "createPoApprovalIntent", "slice F2b");
+  const verifyAgainstTrustAnchors = await loadExport("./critical-human-proof-policy.mjs", "verifyAgainstTrustAnchors", "slice F2b");
+  const args = fixture.args();
+  const keys = generateKeyPairSync("ed25519");
+  const pem = publicKeyPem(keys.publicKey);
+  const anchors = [{ keyReference: STORED_KEY_REFERENCE, publicKeySha256: sha256(Buffer.from(pem)) }];
+  const intent = createPoApprovalIntent({
+    kind: "design-workflow-package",
+    featureId: FEATURE,
+    planSha256: args.planSha256,
+    specSha256: args.specSha256,
+    candidate: fixture.workflowPackage.candidate,
+    policyRevision: fixture.workflowPackage.schema === "pipeline.design-workflow-package.v2" ? "design-workflow-package-v2" : "design-workflow-package-v1",
+    subjectSha256: fixture.packageSha256,
+    decision: "approve",
+  });
+  const proof = proofOf({ intent, keyReference: STORED_KEY_REFERENCE, pem, privateKey: keys.privateKey });
+  const verified = verifyAgainstTrustAnchors({ intent, anchors, proof });
+  assert.equal(verified.verified, true, `fixture precondition: the signed proof verifies against its anchor: ${JSON.stringify(verified)}`);
+  const approval = {
+    schema: LEGACY_RECORD_SCHEMA,
+    mode: "signature",
+    approvedBy: `verified:${STORED_KEY_REFERENCE}`,
+    approvedAt: STORED_APPROVED_AT,
+    packageSha256: fixture.packageSha256,
+    intentSha256: intent.sha256,
+    proofSha256: verified.proofSha256,
+    proof,
+    ...(args.advisorExceptionBinding === null ? {} : { advisorException: args.advisorExceptionBinding }),
+  };
+  return { approval, anchors, intent };
+}
+
+function assertStoredAccepted(result, fixture, why) {
+  assert.equal(result?.ok, true, `RED: ${why}: expected the stored signature to verify, got ${JSON.stringify(result)}`);
+  assert.equal(result.code, STORED_ACCEPT_CODE, why);
+  assert.equal(result.packageSha256, fixture.packageSha256, why);
+  assert.equal(result.signer?.keyReference, STORED_KEY_REFERENCE, why);
+}
+
+/**
+ * Runs `body` against a validly signed approval of a synthetic fixture. `call(overrides)` invokes the stored
+ * verifier with a THROWING, counted readCandidate. With `control` (the default) the unmodified call must be
+ * accepted first; after `body`, the live candidate reader must never have been sampled.
+ */
+async function withStoredApproval(options, body, { control = true } = {}) {
+  await withRepo(options, async (fixture) => {
+    const verify = await loadStoredVerifier();
+    const signed = await signedApproval(fixture);
+    let candidateReads = 0;
+    const readCandidate = () => {
+      candidateReads += 1;
+      throw new Error("the stored-signature verifier must not sample a live candidate");
+    };
+    const call = (overrides = {}) => {
+      const base = fixture.args();
+      delete base.advisorExceptionBinding;
+      return verify({ ...base, approval: signed.approval, anchors: signed.anchors, readCandidate, ...overrides });
+    };
+    if (control) assertStoredAccepted(await call(), fixture, "positive control: the unmodified signed approval");
+    await body({ fixture, signed, call });
+    assert.equal(candidateReads, 0, "the live candidate reader was sampled");
+  });
+}
+
+test("S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file", async () => {
+  await withStoredApproval({}, async ({ fixture, signed, call }) => {
+    assert.equal(existsSync(join(fixture.repoRoot, ".git")), false, "fixture precondition: no git repository");
+    assert.equal(signed.approval.advisorException?.kind, "advisor-unavailable", "fixture precondition: the v2 record carries its exception");
+    assertStoredAccepted(await call(), fixture, "v2 approval");
+  }, { control: false });
+});
+
+test("S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file", async () => {
+  await withStoredApproval({ version: 1 }, async ({ fixture, signed, call }) => {
+    assert.equal(Object.hasOwn(signed.approval, "advisorException"), false, "fixture precondition: a v1 record has no exception key");
+    assertStoredAccepted(await call(), fixture, "v1 approval");
+  }, { control: false });
+});
+
+test("S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)", async () => {
+  await withStoredApproval({}, async ({ fixture, call }) => {
+    fixture.write(PACKAGE_PATH, `${canon({ ...fixture.workflowPackage, createdAt: "2026-10-02T00:00:00.000Z" })}\n`);
+    assertRefused(await call(), "DWP-APPROVAL-DIGEST-DRIFT", "tampered package bytes");
+  });
+});
+
+test("S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)", async () => {
+  await withStoredApproval({}, async ({ fixture, call }) => {
+    fixture.write(PRD_PATH, `${PRD_TEXT}An edit after the approval.\n`);
+    assertRefused(await call(), "DWP-APPROVAL-SOURCE-DRIFT", "PRD bytes drifted");
+  });
+  await withStoredApproval({}, async ({ fixture, call }) => {
+    fixture.write(SPEC_PATH, `${SPEC_TEXT}An edit after the approval.\n`);
+    assertRefused(await call(), "DWP-APPROVAL-SOURCE-DRIFT", "Spec bytes drifted");
+  });
+});
+
+test("S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)", async () => {
+  await withStoredApproval({}, async ({ signed, call }) => {
+    assert.equal(signed.approval.advisorException?.kind, "advisor-unavailable", "fixture precondition: the v2 record carries its exception");
+    const altered = { ...signed.approval, advisorException: { ...signed.approval.advisorException, rationale: "A different rationale." } };
+    assertRefused(await call({ approval: altered }), "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING", "altered rationale");
+    const dropped = structuredClone(signed.approval);
+    delete dropped.advisorException;
+    assertRefused(await call({ approval: dropped }), "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING", "exception dropped from the record");
+  });
+});
+
+test("S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)", async () => {
+  await withStoredApproval({ version: 1 }, async ({ fixture, signed, call }) => {
+    const replayed = {
+      kind: "advisor-unavailable",
+      oneTime: true,
+      packageSha256: fixture.packageSha256,
+      courseId: "dac_synthetic0001",
+      initialContextSha256: digest("course-initial-context"),
+      failureEvidenceSha256: digest("failure-evidence"),
+      rationale: "A replayed exception.",
+    };
+    assertRefused(await call({ approval: { ...signed.approval, advisorException: replayed } }), "DWP-APPROVAL-ADVISOR-EXCEPTION-BINDING", "exception replayed on a v1 package");
+  });
+});
+
+test("S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused", async () => {
+  await withStoredApproval({}, async ({ signed, call }) => {
+    assertRefused(await call({ approval: { ...signed.approval, intentSha256: digest("another-intent") } }), "DWP-APPROVAL-INTENT-DRIFT", "intent digest drifted");
+  });
+});
+
+test("S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused", async () => {
+  await withStoredApproval({}, async ({ signed, call }) => {
+    assertRefused(await call({ approval: { ...signed.approval, approvedBy: "verified:another-anchored-key" } }), "DWP-APPROVAL-RECORD-DRIFT", "approvedBy names another key");
+    assertRefused(await call({ approval: { ...signed.approval, proofSha256: digest("another-proof") } }), "DWP-APPROVAL-RECORD-DRIFT", "proofSha256 differs from the verified proof");
+  });
+});
+
+test("S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)", async () => {
+  await withStoredApproval({}, async ({ fixture, signed, call }) => {
+    const withoutProof = structuredClone(signed.approval);
+    delete withoutProof.proof;
+    const refused = [
+      ["extra key", { ...signed.approval, unexpectedKey: true }],
+      ["chat mode", { ...signed.approval, mode: "chat" }],
+      ["another record schema", { ...signed.approval, schema: "pipeline.design-approval.v1" }],
+      ["package digest of another package", { ...signed.approval, packageSha256: digest("another-package") }],
+      ["intent digest not a sha256", { ...signed.approval, intentSha256: "not-a-digest" }],
+      ["proof digest not a sha256", { ...signed.approval, proofSha256: "not-a-digest" }],
+      ["proof missing", withoutProof],
+    ];
+    for (const [why, approval] of refused) assertRefused(await call({ approval }), "DWP-APPROVAL-RECORD-SHAPE", why);
+    assert.equal(fixture.args().packageSha256, signed.approval.packageSha256, "fixture precondition: the unmodified record binds the package");
+  }, { control: false });
+});
+
+test("S10 stored verifier: a signature made with another key over the same intent is refused", async () => {
+  await withStoredApproval({}, async ({ signed, call }) => {
+    const other = generateKeyPairSync("ed25519");
+    const forged = { ...signed.approval.proof, signatureBase64: sign(null, Buffer.from(signed.intent.sha256), other.privateKey).toString("base64") };
+    assertRefused(await call({ approval: { ...signed.approval, proof: forged } }), "PO-APPROVAL-PROOF-MISMATCH", "forged signature under the anchored public key");
+  });
+});
+
+test("S11 stored verifier: a proof whose key is not in the configured anchors is refused", async () => {
+  await withStoredApproval({}, async ({ signed, call }) => {
+    const other = generateKeyPairSync("ed25519");
+    const unanchored = proofOf({ intent: signed.intent, keyReference: STORED_KEY_REFERENCE, pem: publicKeyPem(other.publicKey), privateKey: other.privateKey });
+    assertRefused(await call({ approval: { ...signed.approval, proof: unanchored } }), "PO-APPROVAL-TRUST-MISMATCH", "valid signature by an unanchored key under the anchored key reference");
+    const otherAnchors = [{ keyReference: "another-anchored-key", publicKeySha256: signed.anchors[0].publicKeySha256 }];
+    assertRefused(await call({ anchors: otherAnchors }), "PO-APPROVAL-PROOF-INVALID", "the signer's key reference is not anchored");
+  });
 });
