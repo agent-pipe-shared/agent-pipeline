@@ -48,6 +48,27 @@ const ROOT_OTHER = resolve("/projects/other");
 const ROOT_THIRD = resolve("/projects/third");
 const ROOT_NOT_A_REPOSITORY = resolve("/projects/does-not-exist-as-a-repository");
 const ROOT_REPO = resolve("/repo");
+// TR-J-T2b: the same rule for the registry fixture's local marketplace, its cache, the Antigravity
+// manifest root and the Codex attestation checkout. Each is used on both sides of its assertion.
+const ROOT_LOCAL_MARKETPLACE = resolve("/local/agent-pipeline");
+const ROOT_CACHE_MARKETPLACE = resolve("/cache/agent-pipeline");
+const ROOT_PLUGIN = resolve("/plugins/pipeline-core");
+const ROOT_PROJECT = resolve("/project");
+
+// TR-J-T2b: a symlink needs a privilege some hosts withhold (EPERM on Windows without it). The
+// attempt itself is the probe: the case is skipped, with this typed reason, only when symlinkSync
+// throws EPERM. Any other error is rethrown, and there is no platform check.
+const SYMLINK_EPERM_SKIP_REASON = "SYMLINK-EPERM: symlinkSync was refused with EPERM on this host; the assertions that need the symlink were not run";
+function symlinkOrSkip(t, target, linkPath, type) {
+  try {
+    symlinkSync(target, linkPath, type);
+    return true;
+  } catch (error) {
+    if (error?.code !== "EPERM") throw error;
+    t.skip(SYMLINK_EPERM_SKIP_REASON);
+    return false;
+  }
+}
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
 const pluginList = (
@@ -65,11 +86,11 @@ const pluginList = (
     source: {
       source: "local",
       path: sourceType === "local"
-        ? "/local/agent-pipeline/plugins/pipeline-core"
-        : "/cache/agent-pipeline/plugins/pipeline-core",
+        ? join(ROOT_LOCAL_MARKETPLACE, "plugins", "pipeline-core")
+        : join(ROOT_CACHE_MARKETPLACE, "plugins", "pipeline-core"),
     },
     marketplaceSource: sourceType === "local"
-      ? { sourceType: "local", source: "/local/agent-pipeline" }
+      ? { sourceType: "local", source: ROOT_LOCAL_MARKETPLACE }
       : { sourceType: "git", source: "https://github.com/agent-pipe-shared/agent-pipeline.git" },
   }],
   available: [],
@@ -341,7 +362,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     kind: "command",
     executable: "node",
     argv: [
-      `${result.pluginRoot}/scripts/project-onboarding-v3.mjs`,
+      join(result.pluginRoot, "scripts", "project-onboarding-v3.mjs"),
       "inspect",
       "--root",
       cwd,
@@ -379,7 +400,7 @@ test("normal bootstrap surfaces brownfield architecture adoption as a read-only 
     kind: "command",
     executable: "node",
     argv: [
-      `${result.pluginRoot}/scripts/architecture-adoption.mjs`, "propose", "--root", cwd, "--json",
+      join(result.pluginRoot, "scripts", "architecture-adoption.mjs"), "propose", "--root", cwd, "--json",
     ],
     mutation: false,
     requiresConfirmation: false,
@@ -407,7 +428,7 @@ test("a durable deferral with a missing physical map retains its decision and of
   assert.deepEqual(result.architectureOrientation.nextAction, {
     kind: "command",
     executable: "node",
-    argv: [`${result.pluginRoot}/scripts/architecture-adoption.mjs`, "propose", "--root", cwd, "--json"],
+    argv: [join(result.pluginRoot, "scripts", "architecture-adoption.mjs"), "propose", "--root", cwd, "--json"],
     mutation: false,
     requiresConfirmation: false,
     executionBoundary: "default",
@@ -592,7 +613,7 @@ test("NVA-K-DRIVERREACH: a not-ready project's nextAction names the guided drive
     kind: "command",
     executable: "node",
     argv: [
-      `${result.pluginRoot}/scripts/onboarding-init.mjs`,
+      join(result.pluginRoot, "scripts", "onboarding-init.mjs"),
       "--root",
       cwd,
       "--runner",
@@ -619,7 +640,7 @@ test("a soft plugin refresh still exposes the not-ready project's onboarding act
   });
   assert.equal(result.status, "plugin-refresh-required");
   assert.equal(result.nextAction.kind, "command");
-  assert.equal(result.nextAction.argv[0], `${result.pluginRoot}/scripts/onboarding-init.mjs`);
+  assert.equal(result.nextAction.argv[0], join(result.pluginRoot, "scripts", "onboarding-init.mjs"));
   assert.equal(result.nextAction.expected.schema, "pipeline.onboarding-init.v1");
 });
 test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-existing inspect action, unchanged", () => {
@@ -637,7 +658,7 @@ test("NVA-K-DRIVERREACH: an already-ready project's nextAction stays the pre-exi
     kind: "command",
     executable: "node",
     argv: [
-      `${result.pluginRoot}/scripts/project-onboarding-v3.mjs`,
+      join(result.pluginRoot, "scripts", "project-onboarding-v3.mjs"),
       "inspect",
       "--root",
       cwd,
@@ -993,7 +1014,7 @@ test("a Claude session reads the Claude source manifest, never the Codex one", (
     env: { CLAUDECODE: "1" },
     pluginList: () => JSON.stringify([]),
     read: (path) => {
-      if (String(path).endsWith(".claude-plugin/plugin.json")) return claudeManifest;
+      if (String(path).replaceAll("\\", "/").endsWith(".claude-plugin/plugin.json")) return claudeManifest;
       throw new Error(`unexpected manifest path for the Claude runner: ${path}`);
     },
     cwd: ROOT_CURRENT,
@@ -1006,7 +1027,7 @@ test("a non-Claude-Code session still reads the Codex source manifest, never the
     env: {},
     pluginList: pluginList(),
     read: (path) => {
-      if (String(path).endsWith(".codex-plugin/plugin.json")) return manifest;
+      if (String(path).replaceAll("\\", "/").endsWith(".codex-plugin/plugin.json")) return manifest;
       throw new Error(`unexpected manifest path for the Codex runner: ${path}`);
     },
     cwd: ROOT_CURRENT,
@@ -1016,13 +1037,13 @@ test("a non-Claude-Code session still reads the Codex source manifest, never the
 
 test("Antigravity reads its own plugin manifest, never the Codex-shaped manifest", () => {
   const paths = [];
-  const version = resolvePluginManifestVersion("/plugins/pipeline-core", "antigravity", (path) => {
+  const version = resolvePluginManifestVersion(ROOT_PLUGIN, "antigravity", (path) => {
     paths.push(String(path));
-    if (String(path).endsWith("/plugin.json")) return JSON.stringify({ version: "0.6.2+antigravity.test" });
+    if (String(path).replaceAll("\\", "/").endsWith("/plugin.json")) return JSON.stringify({ version: "0.6.2+antigravity.test" });
     throw new Error(`unexpected manifest path for Antigravity: ${path}`);
   });
   assert.equal(version, "0.6.2+antigravity.test");
-  assert.deepEqual(paths, ["/plugins/pipeline-core/plugin.json"]);
+  assert.deepEqual(paths, [join(ROOT_PLUGIN, "plugin.json")]);
 });
 
 test("a Claude bare-array registry resolves an attested local-development installation", () => {
@@ -1308,7 +1329,7 @@ test("Codex registry binding rejects equal manifest versions with stale cached i
   });
   const aliasRoot = join(base, "marketplace-alias", "plugins", "pipeline-core");
   mkdirSync(join(base, "marketplace-alias", "plugins"), { recursive: true });
-  symlinkSync(sourceRoot, aliasRoot, "dir");
+  if (!symlinkOrSkip(t, sourceRoot, aliasRoot, "dir")) return;
   assert.deepEqual(observeCodexRegistryContentBinding({
     registrySourcePluginRoot: aliasRoot,
     installedPluginRoot: installedRoot,
@@ -1493,12 +1514,12 @@ test("Codex attestation source selection binds only a verified checkout and reta
   const ready = { schema: "pipeline.public-core-observation.v1", status: "ready", plugin };
   const gitlessRegistry = { schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-GIT-MISSING"] };
   const exact = resolveCodexAttestationSourceForPreflight({
-    cwd: "/project", registrySourcePluginRoot, plugin,
+    cwd: ROOT_PROJECT, registrySourcePluginRoot, plugin,
     observe: ({ sourcePluginRoot }) => sourcePluginRoot === registrySourcePluginRoot ? gitlessRegistry : ready,
   });
   assert.deepEqual(exact, {
     status: "checkout-source",
-    sourcePluginRoot: "/project/plugins/pipeline-core",
+    sourcePluginRoot: join(ROOT_PROJECT, "plugins", "pipeline-core"),
     reasonCodes: [],
   });
 
@@ -2011,13 +2032,13 @@ test("observeDutyNotRuntimeLive reports in-force when roots are identical or mat
   }
 });
 
-test("observeDutyNotRuntimeLive recognizes two paths to one physical plugin root", () => {
+test("observeDutyNotRuntimeLive recognizes two paths to one physical plugin root", (t) => {
   const base = mkdtempSync(join(tmpdir(), "duty-live-alias-"));
   try {
     const physicalRoot = join(base, "physical");
     const aliasRoot = join(base, "alias");
     mkdirSync(physicalRoot);
-    symlinkSync(physicalRoot, aliasRoot, "dir");
+    if (!symlinkOrSkip(t, physicalRoot, aliasRoot, "dir")) return;
     const result = observeDutyNotRuntimeLive({
       checkoutPluginRoot: physicalRoot,
       installedPluginRoot: aliasRoot,
