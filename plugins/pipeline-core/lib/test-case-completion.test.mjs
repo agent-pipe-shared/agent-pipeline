@@ -145,16 +145,27 @@ if (fixture !== "") {
   // which is exactly the state `node <file>` / `node --test <file>` leave a suite in outside the
   // Verify runner. Verify signals itself to a suite child through PIPELINE_VERIFY_CASE_COMPLETION_FD
   // (set by verify-journal.mjs next to the descriptor it opens); `verifySignal` toggles that variable.
-  function runPlainFixtureSuite({ verifySignal }) {
+  //
+  // `fd3: true` (default false, which leaves every existing call exactly as it was) gives the child a
+  // descriptor 3 that the parent owns: a temp file opened "w+" and passed in stdio slot 3. The parent
+  // closes it after the child exits and returns what the child wrote as `fd3` (a string, "" for no bytes).
+  // `fd3Probe` is the child's own fstat of descriptor 3 ("file" when it really arrived as a regular
+  // file), so a zero-byte result can be told apart from a descriptor that never reached the child.
+  function runPlainFixtureSuite({ verifySignal, fd3 = false }) {
     const directory = mkdtempSync(join(tmpdir(), "pipeline-tcc-"));
     try {
       const marks = join(directory, "case-marks.txt");
       const registration = join(directory, "registration-error.txt");
+      const probe = join(directory, "fd3-probe.txt");
+      const channelPath = join(directory, "fd3-channel.jsonl");
       const suite = join(directory, "plain-suite.mjs");
       writeFileSync(suite, [
-        'import { appendFileSync, writeFileSync } from "node:fs";',
+        `import { appendFileSync, writeFileSync${fd3 ? ", fstatSync" : ""} } from "node:fs";`,
         `import { registerTestCaseCompletion } from ${JSON.stringify(helperUrl)};`,
         `const mark = (id) => appendFileSync(${JSON.stringify(marks)}, id + "\\n");`,
+        ...(fd3 ? [
+          `try { writeFileSync(${JSON.stringify(probe)}, fstatSync(3).isFile() ? "file" : "other"); } catch (error) { writeFileSync(${JSON.stringify(probe)}, "absent:" + error?.code); }`,
+        ] : []),
         "try {",
         "  registerTestCaseCompletion({",
         "    fd: 3,",
@@ -182,13 +193,20 @@ if (fixture !== "") {
         env.PIPELINE_VERIFY_CASE_COMPLETION_FD = "3";
         env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES = "16384";
       }
-      const child = spawnSync(process.execPath, [suite], {
-        encoding: "utf8",
-        cwd: directory,
-        env,
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 30_000,
-      });
+      const channelFd = fd3 ? openSync(channelPath, "w+") : null;
+      let child;
+      try {
+        child = spawnSync(process.execPath, [suite], {
+          encoding: "utf8",
+          cwd: directory,
+          env,
+          stdio: fd3 ? ["ignore", "pipe", "pipe", channelFd] : ["ignore", "pipe", "pipe"],
+          timeout: 30_000,
+        });
+      } finally {
+        // Closed before the directory removal below: an open handle would block it on Windows.
+        if (channelFd !== null) closeSync(channelFd);
+      }
       const read = (path) => {
         try { return readFileSync(path, "utf8"); } catch { return null; }
       };
@@ -198,6 +216,8 @@ if (fixture !== "") {
         stderr: child.stderr ?? "",
         marks: read(marks),
         registrationError: read(registration),
+        fd3: fd3 ? read(channelPath) : null,
+        fd3Probe: fd3 ? read(probe) : null,
       };
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -220,6 +240,49 @@ if (fixture !== "") {
     assert.equal(run.registrationError, "TCC-FD-WRITE");
     assert.match(run.stderr, /TCC-FD-WRITE/u);
     assert.equal(run.marks, null, "no case may run once registration failed closed");
+  });
+
+  // Ruling 107 (TOILRES T33). The two pins above leave descriptor 3 to chance: no fd 3 at all. A real
+  // run does not: under WSL descriptor 3 is one Node itself owns (a write fails EINVAL, TCC-FD-WRITE),
+  // and under any runner it can be a writable channel nobody announced. Without the Verify signal the
+  // recorder has no claim on descriptor 3, so the next two pins give the child a real, writable one.
+  // The assumption, named here because Ruling 107 allows both a pipe and a temp file: a regular file
+  // is used as the channel so the parent can read back exactly what arrived.
+  test("outside Verify a descriptor 3 nobody announced receives no completion bytes", () => {
+    const run = runPlainFixtureSuite({ verifySignal: false, fd3: true });
+    assert.equal(run.fd3Probe, "file", `descriptor 3 must reach the child as a regular file, or a zero-byte result proves nothing: ${run.stderr}`);
+    assert.equal(run.registrationError, null, `registration must not throw without the Verify signal: ${run.stderr}`);
+    assert.equal(run.status, 0, `a plain single-file run must exit 0: ${run.stderr}`);
+    assert.equal(run.marks, "PR01\nPR03\n", "both runnable cases must execute and the skipped case must not");
+    for (const id of ["PR01", "PR02", "PR03"]) {
+      assert.match(run.stdout, new RegExp(id, "u"), `the per-case result for ${id} must be reported`);
+    }
+    assert.equal(run.fd3, "", "without the Verify signal the recorder must leave an unannounced descriptor 3 untouched");
+  });
+
+  test("inside Verify a writable descriptor 3 receives the complete declared-to-terminal stream", () => {
+    const run = runPlainFixtureSuite({ verifySignal: true, fd3: true });
+    assert.equal(run.fd3Probe, "file", `descriptor 3 must reach the child as a regular file: ${run.stderr}`);
+    assert.equal(run.registrationError, null, `registration must not throw with a writable descriptor: ${run.stderr}`);
+    assert.equal(run.status, 0, `the suite must exit 0 when its descriptor is writable: ${run.stderr}`);
+    assert.equal(run.marks, "PR01\nPR03\n", "both runnable cases must execute and the skipped case must not");
+    const observed = run.fd3.trim().split("\n").filter(Boolean).map((row) => JSON.parse(row));
+    assert.deepEqual(observed.map((entry) => entry.event), ["DECLARED", "DISPOSED", "DISPOSED", "DISPOSED", "TERMINAL"]);
+    assert.ok(observed.every((entry) => entry.schema === TEST_CASE_COMPLETION_SCHEMA), "every record carries the completion schema");
+    assert.deepEqual(
+      observed.filter((entry) => entry.event === "DISPOSED").map(({ id, ordinal, disposition }) => ({ id, ordinal, disposition })),
+      [
+        { id: "PR01", ordinal: 0, disposition: "pass" },
+        { id: "PR02", ordinal: 1, disposition: "skip" },
+        { id: "PR03", ordinal: 2, disposition: "pass" },
+      ],
+    );
+    const terminal = observed.at(-1);
+    assert.deepEqual(terminal.caseIds, ["PR01", "PR02", "PR03"]);
+    assert.equal(terminal.declaredCount, 3);
+    assert.equal(terminal.disposedCount, 3);
+    assert.deepEqual(terminal.counts, { pass: 2, fail: 0, skip: 1, todo: 0 });
+    assert.equal(terminal.caseSetSha256, observed[0].caseSetSha256, "declaration and terminal bind the same case set");
   });
 
   test("preflights the complete bounded stream before declaration and emits within the accepted cap", () => {
