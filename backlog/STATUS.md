@@ -201,6 +201,7 @@
 | pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | closed | defect | pipeline | nova-b | 2026-09-01 | 2026-09-30 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
+| pipeline.concurrent-session-warning-never-fires-on-native-windows | open | defect | pipeline | alfred | 2026-10-09 | 2026-10-12 | — |
 | pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -875,7 +876,7 @@
 
 ## Counts
 
-- open: 189
+- open: 190
 - in_progress: 0
 - closed: 664
 - rejected: 3

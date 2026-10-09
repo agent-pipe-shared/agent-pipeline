@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8c85e2d84f3ac5908d8bae8fb8a669a0d2d5517eaa088b954ecb000470b03e63"
+    "transitionHead": "ae269f2b79df77030d1f518e720c454b3c5bc1b8f5aae75f9a4fae1b2bcf44e3"
   },
   "counts": {
-    "open": 189,
+    "open": 190,
     "in_progress": 0,
     "closed": 664,
     "rejected": 3,
@@ -2572,6 +2572,17 @@
       "closureRepository": "self",
       "closureCommit": "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78",
       "closureEvidence": "backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md"
+    },
+    {
+      "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-09",
+      "source": "TR-J-D2 diagnosis, specs/sprint-alfred-epic/evidence/tr-j-d-native-preflight-reds-2026-10-09.md",
+      "deferred": false,
+      "due": "2026-10-12",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.consumer-must-allowlist-every-runner-lane",
