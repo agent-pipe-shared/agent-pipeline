@@ -185,6 +185,43 @@ async function append(root, event = intent()) {
 
 async function cleanup(root) { await rm(root, { recursive: true, force: true }); }
 
+// WIN-GES-T3: host-class probes. Whether a case can run on this host is decided by ATTEMPTING the operation
+// here, never by a platform check. Same form as scripts/pipeline-start-preflight.test.mjs (SYMLINK-EPERM):
+// only the privilege error skips, any other error is rethrown. A caller must `return` after a false result,
+// because t.skip() does not stop the test body.
+const SYMLINK_EPERM_SKIP_REASON = "SYMLINK-EPERM: symlink was refused with EPERM on this host; the assertions that need the symlink were not run";
+async function symlinkOrSkip(t, target, linkPath, type) {
+  try {
+    await symlink(target, linkPath, type);
+    return true;
+  } catch (error) {
+    if (error?.code !== "EPERM") throw error;
+    t.skip(SYMLINK_EPERM_SKIP_REASON);
+    return false;
+  }
+}
+
+// Whether this host's temp filesystem reports a chmod 0o600 back as 0o600. win32 reports a writable file as
+// 0o666 whatever was asked, so POSIX mode-bit assertions (and the existing-binding mode predicate) cannot hold there.
+const POSIX_MODE_UNHONOURED_SKIP_REASON = "POSIX-MODE-UNHONOURED: this host reads chmod 0o600 back as something else, so the POSIX mode-bit assertions of this case cannot be exercised here";
+const POSIX_MODE_HONOURED_SKIP_REASON = "POSIX-MODE-HONOURED: this host honours POSIX mode bits, where the existing-binding mode predicate is correct; the pin applies only to hosts that do not";
+const EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON = `${POSIX_MODE_UNHONOURED_SKIP_REASON}; the (mode & 0o022n) === 0n predicate in readExistingLocalRepositoryFingerprint refuses every binding on such a host (product fault, pinned RED by the WIN-GES-T3 pin until WIN-GES-F4)`;
+let posixModeBitsHonouredProbe;
+function hostHonoursPosixModeBits() {
+  posixModeBitsHonouredProbe ??= (async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "governance-mode-probe-"));
+    try {
+      const probe = path.join(directory, "probe");
+      await writeFile(probe, "probe");
+      await chmod(probe, 0o600);
+      return ((await stat(probe)).mode & 0o777) === 0o600;
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  })();
+  return posixModeBitsHonouredProbe;
+}
+
 /* ADR-0072 fixtures: a fork disposition is no longer self-mintable, so every
  * disposition below now carries a real, verified PO approval. The trust anchor
  * is declared in the repository's OWN policy file because the store accepts no
@@ -537,17 +574,18 @@ test("inspectForkedGovernanceStream tolerates exactly the forked-sequence condit
   assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventId).sort(), ["evt-2", "evt-fork"]);
   assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventDigest).sort(), [second.eventDigest, fork.eventDigest].sort());
 
-  const symlinkedRoot = await fixtureRoot(); t.after(() => cleanup(symlinkedRoot));
-  await mkdir(path.join(symlinkedRoot, "outside"));
-  await symlink(path.join(symlinkedRoot, "outside"), path.join(symlinkedRoot, "governance/events/lifecycle"));
-  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: symlinkedRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-SYMLINK", "an unrelated symlinked stream directory must still hard-fail even though no fork is present");
-
   const noncanonicalRoot = await fixtureRoot(); t.after(() => cleanup(noncanonicalRoot));
   const noncanonicalAppend = await append(noncanonicalRoot);
   const noncanonicalPath = path.join(noncanonicalRoot, noncanonicalAppend.eventPath);
   const storedValue = JSON.parse(await readFile(noncanonicalPath, "utf8"));
   await writeFile(noncanonicalPath, `${JSON.stringify(storedValue, null, 2)}\n`);
   await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: noncanonicalRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-NONCANONICAL", "non-canonical bytes must still hard-fail even though no fork is present — this is scanStream tolerant of exactly one condition, not scanStream-that-never-throws");
+
+  // WIN-GES-T3: the symlink block runs LAST so a SYMLINK-EPERM skip drops nothing that does not need the symlink.
+  const symlinkedRoot = await fixtureRoot(); t.after(() => cleanup(symlinkedRoot));
+  await mkdir(path.join(symlinkedRoot, "outside"));
+  if (!await symlinkOrSkip(t, path.join(symlinkedRoot, "outside"), path.join(symlinkedRoot, "governance/events/lifecycle"))) return;
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: symlinkedRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-SYMLINK", "an unrelated symlinked stream directory must still hard-fail even though no fork is present");
 });
 
 test("K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery", async (t) => {
@@ -816,7 +854,7 @@ test("ADR-0072 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path 
   const outside = await mkdtemp(path.join(os.tmpdir(), "governance-fork-disposition-outside-")); t.after(() => cleanup(outside));
   await mkdir(path.join(outside, "lifecycle"), { recursive: true });
   await writeFile(path.join(outside, "lifecycle/2.json"), "{}\n");
-  await symlink(outside, path.join(root, "governance/events/fork-disposition"));
+  if (!await symlinkOrSkip(t, outside, path.join(root, "governance/events/fork-disposition"))) return;
   await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-SYMLINK", "a disposition served through a symlinked ancestor must be refused before its content is ever considered");
 });
 
@@ -899,7 +937,7 @@ test("symlink, cross-repository, and writer-owned intent fields are rejected", a
   await assert.rejects(() => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: "d".repeat(64), intent: intent() }), (error) => error.code === "GES-CROSS-REPOSITORY");
   await assert.rejects(() => append(root, { ...intent(), sequence: 1 }), (error) => error.code === "GES-INTENT-FIELDS");
   await mkdir(path.join(root, "outside"));
-  await symlink(path.join(root, "outside"), path.join(root, "governance/events/lifecycle"));
+  if (!await symlinkOrSkip(t, path.join(root, "outside"), path.join(root, "governance/events/lifecycle"))) return;
   await assert.rejects(() => append(root), (error) => error.code === "GES-SYMLINK");
 });
 
@@ -1018,7 +1056,7 @@ test("NVA-REPOID-1: the same repository resolves to one identity across two diff
   await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
   t.after(() => cleanup(root));
   const alias = `${root}-alias`;
-  await symlink(root, alias);
+  if (!await symlinkOrSkip(t, root, alias)) return;
   t.after(() => rm(alias, { force: true }));
 
   // First access, via the real path, binds a fresh identity.
@@ -1099,7 +1137,12 @@ test("competing dead-lock recovery cannot delete a newly acquired writer lock", 
 
 test("restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
-  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedRoot));
+  // WIN-GES-T3 fixture fix: production only HARDENS a restricted root it creates (create: true) and only ASSESSES a
+  // pre-existing one, so a bare mkdtemp root fails the win32 DACL assessment before the case asserts anything. Create
+  // the root through that same production route; on a POSIX host this is a plain 0o700 mkdir.
+  const restrictedParent = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedParent));
+  const restrictedRoot = path.join(restrictedParent, "restricted");
+  await assertRestrictedRoot(root, restrictedRoot, { create: true });
   const key = Buffer.alloc(32, 7);
   const restricted = sealGovernanceEvent({
     ...intent({
@@ -1132,7 +1175,9 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   const conflict = sealGovernanceEvent({ ...restricted, payload: { complete: "different restricted content" }, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
   await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: conflict }), (error) => error.code === "GES-IDEMPOTENCY-CONFLICT");
   assert.ok(!stored.recordId.includes(restricted.eventId), "the local identifier must not create a portable join handle");
-  assert.equal((await stat(restrictedRoot)).mode & 0o077, 0);
+  // WIN-GES-T3: a POSIX mode-bit assertion only means something where the host reports mode bits. Where it does not,
+  // owner-only is established by the DACL assessment every restricted operation above already passed through.
+  if (await hostHonoursPosixModeBits()) assert.equal((await stat(restrictedRoot)).mode & 0o077, 0);
   const queryAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "query", recordId: stored.recordId });
   const queried = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId });
   assert.equal(queried.event.payload.complete, restricted.payload.complete);
@@ -1245,6 +1290,8 @@ test("PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails cl
 });
 
 test("PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged)", async (t) => {
+  // WIN-GES-T3: the injected platform is "linux" but the real stat mode of this host applies.
+  if (!await hostHonoursPosixModeBits()) { t.skip(POSIX_MODE_UNHONOURED_SKIP_REASON); return; }
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-posix-")); t.after(() => cleanup(restrictedRoot));
   let assessCalled = false;
@@ -1305,6 +1352,7 @@ test('existing repository identity: legacy identity refuses without migration or
   assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);assert.deepEqual(existingIdentityFileSnapshot(f.path),identityBefore);
 });
 test('existing repository identity: actual sanctioned v2 mint and pure observer share stable identity without writes',async t=>{
+  if(!await hostHonoursPosixModeBits()){t.skip(EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON);return;}
   const f=existingIdentityFixture(t);const bound=await mintExistingIdentity({repositoryRoot:f.root});const before=existingIdentityFs.readFileSync(f.path);
   assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);
   assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
@@ -1317,19 +1365,43 @@ test('existing repository identity: closed v2 validation rejects schema/digest/a
     await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
   }
 });
-test('existing repository identity: file/root aliases, multiple links and writable binding refuse',async t=>{
-  const f=existingIdentityFixture(t);f.seed();const alias=f.root+'-alias';existingIdentityFs.symlinkSync(f.root,alias);t.after(()=>existingIdentityFs.rmSync(alias,{force:true}));
-  await assert.rejects(observeExistingIdentity({repositoryRoot:alias}),existingIdentityUnavailable);
+// WIN-GES-T3: split from the former 'file/root aliases, multiple links and writable binding refuse' case. The hard-link
+// and writable-binding assertions need no symlink privilege and run unconditionally; the two symlink assertions follow
+// as their own case under the SYMLINK-EPERM probe.
+test('existing repository identity: multiple links and writable binding refuse',async t=>{
+  const f=existingIdentityFixture(t);f.seed();
   const duplicate=existingIdentityJoin(f.directory,'copy');existingIdentityFs.linkSync(f.path,duplicate);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
   existingIdentityFs.rmSync(duplicate);existingIdentityFs.chmodSync(f.path,0o666);await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
-  existingIdentityFs.chmodSync(f.path,0o600);const renamed=f.path+'.original';existingIdentityFs.writeFileSync(renamed,existingIdentityFs.readFileSync(f.path),{mode:0o600});existingIdentityFs.rmSync(f.path);existingIdentityFs.symlinkSync(renamed,f.path);
+});
+test('existing repository identity: file/root symlink aliases refuse',async t=>{
+  const f=existingIdentityFixture(t);f.seed();const alias=f.root+'-alias';
+  if(!await symlinkOrSkip(t,f.root,alias))return;t.after(()=>existingIdentityFs.rmSync(alias,{force:true}));
+  await assert.rejects(observeExistingIdentity({repositoryRoot:alias}),existingIdentityUnavailable);
+  existingIdentityFs.chmodSync(f.path,0o600);const renamed=f.path+'.original';existingIdentityFs.writeFileSync(renamed,existingIdentityFs.readFileSync(f.path),{mode:0o600});existingIdentityFs.rmSync(f.path);
+  if(!await symlinkOrSkip(t,renamed,f.path))return;
   await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);
+});
+// WIN-GES-T3 RED PIN. readExistingLocalRepositoryFingerprint requires (mode & 0o022n) === 0n, which no file on a host
+// that does not report POSIX mode bits satisfies (win32 reports a writable file as 0o666), so EVERY existing-v2
+// binding there refuses with GES-EXISTING-REPOSITORY-BINDING, and the catch-all hides which predicate fired. The probe is
+// the one the other host-class cases use. Where mode bits are honoured the predicate is correct and the pin is skipped.
+// The binding is minted by the sanctioned writer and its directory is hardened first by the production win32 hardener.
+// RED today on win32; goes green when WIN-GES-F4 replaces the mode predicate with the DACL assessor.
+test('WIN-GES-T3 pin: on a host without POSIX mode bits a correctly hardened existing-v2 binding is accepted',async t=>{
+  if(await hostHonoursPosixModeBits()){t.skip(POSIX_MODE_HONOURED_SKIP_REASON);return;}
+  const f=existingIdentityFixture(t);
+  existingIdentityFs.mkdirSync(f.directory,{recursive:true});
+  const{hardenWindowsPrivateDirectory}=await import('./windows-private-state.mjs');
+  assert.equal(hardenWindowsPrivateDirectory(f.directory).status,'secure','pin precondition: the binding directory could not be hardened on this host');
+  const bound=await mintExistingIdentity({repositoryRoot:f.root});
+  assert.equal(await observeExistingIdentity({repositoryRoot:f.root}),bound,'a hardened sanctioned v2 binding must be accepted where POSIX mode bits do not exist');
 });
 test('existing repository identity: oversized binding is rejected while preserving exact synthetic bytes',async t=>{
   const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(f.path,Buffer.alloc(65537,0x20));const before=existingIdentityFs.readFileSync(f.path);
   await assert.rejects(observeExistingIdentity({repositoryRoot:f.root}),existingIdentityUnavailable);assert.deepEqual(existingIdentityFs.readFileSync(f.path),before);
 });
 test('existing repository identity: linked worktree observes same common identity; bare repository remains unsupported',async t=>{
+  if(!await hostHonoursPosixModeBits()){t.skip(EXISTING_BINDING_MODE_PRODUCT_FAULT_SKIP_REASON);return;}
   const f=existingIdentityFixture(t);f.seed();existingIdentityFs.writeFileSync(existingIdentityJoin(f.root,'README'),'synthetic');
   execFileSync('git',['add','README'],{cwd:f.root});
   execFileSync('git',['-c','user.name=Synthetic','-c','user.email=synthetic@example.invalid','commit','-qm','fixture'],{cwd:f.root});
