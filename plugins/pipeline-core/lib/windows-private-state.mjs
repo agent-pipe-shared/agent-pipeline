@@ -65,16 +65,28 @@ const OBSERVE_SCRIPT = [
   "[pscustomobject]@{currentOwner=$me;owner=$a.Owner;reparsePoint=[bool]($i.Attributes -band [IO.FileAttributes]::ReparsePoint);principals=$principals}|ConvertTo-Json -Compress",
 ].join(";");
 
+// Fixed marker the hardener script writes to stderr when it fails. Only an exception TYPE name follows it, so a reason
+// built from it can never carry a path or a localized message.
+const CHILD_ERROR_TYPE_MARKER = "PIPELINE-ERROR-TYPE:";
+
+// The DACL is persisted through the .NET security API restricted to the Access and Owner sections, not through the
+// Set-Acl cmdlet: once a directory's DACL is protected, Set-Acl fails with PrivilegeNotHeldException
+// (SeSecurityPrivilege) even for an unmodified ACL object or one holding only those two sections, so a second
+// hardening of the same directory was refused (WIN-HARDEN-F, Ruling 148). Directory.SetAccessControl stayed
+// repeatable for an ordinary token in the mechanism probe. The batch observer below reads the same two sections.
 const HARDEN_DIRECTORY_SCRIPT = [
   "$ErrorActionPreference='Stop'",
   "$p=$env:PIPELINE_PRIVATE_STATE_PATH",
-  "$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name",
-  "$a=Get-Acl -LiteralPath $p",
-  "$a.SetAccessRuleProtection($true,$false)",
-  "$a.SetOwner([System.Security.Principal.NTAccount]::new($me))",
-  "$rule=[System.Security.AccessControl.FileSystemAccessRule]::new($me,[System.Security.AccessControl.FileSystemRights]::FullControl,[System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',[System.Security.AccessControl.PropagationFlags]::None,[System.Security.AccessControl.AccessControlType]::Allow)",
-  "$a.ResetAccessRule($rule)",
-  "Set-Acl -LiteralPath $p -AclObject $a",
+  "try{" + [
+    "$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name",
+    "$sections=[System.Security.AccessControl.AccessControlSections]'Access,Owner'",
+    "$a=[System.IO.Directory]::GetAccessControl($p,$sections)",
+    "$a.SetAccessRuleProtection($true,$false)",
+    "$a.SetOwner([System.Security.Principal.NTAccount]::new($me))",
+    "$rule=[System.Security.AccessControl.FileSystemAccessRule]::new($me,[System.Security.AccessControl.FileSystemRights]::FullControl,[System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',[System.Security.AccessControl.PropagationFlags]::None,[System.Security.AccessControl.AccessControlType]::Allow)",
+    "$a.ResetAccessRule($rule)",
+    "[System.IO.Directory]::SetAccessControl($p,$a)",
+  ].join(";") + "}catch{$e=$_.Exception;while($e.InnerException){$e=$e.InnerException};[Console]::Error.WriteLine('" + CHILD_ERROR_TYPE_MARKER + "'+$e.GetType().Name);exit 1}",
 ].join(";");
 
 const OBSERVE_BATCH_SCRIPT = [
@@ -116,7 +128,24 @@ export function sanitizeChildEnvironment(environment) {
   return sanitized;
 }
 
-function invoke(path, script, { run = spawnSync, environment = process.env } = {}) {
+/**
+ * Build the `reason` for a child that did not complete: the operation, the child's exit status, the spawn error code
+ * or signal when there is one and, when the hardener script caught an exception, its TYPE name. Every part is a
+ * number, a closed token or an identifier-shaped name, so the reason can never carry a path or a localized message.
+ */
+function childFailureReason(operation, result) {
+  const parts = [];
+  if (Number.isInteger(result?.status)) parts.push(`exit ${result.status}`);
+  const code = result?.error?.code;
+  if (typeof code === "string" && /^[A-Z0-9_]{1,32}$/u.test(code)) parts.push(code);
+  const signal = result?.signal;
+  if (typeof signal === "string" && /^SIG[A-Z0-9]{1,16}$/u.test(signal)) parts.push(signal);
+  const typed = new RegExp(`^${CHILD_ERROR_TYPE_MARKER}([A-Za-z0-9_]{1,64})\\r?$`, "mu").exec(String(result?.stderr ?? ""));
+  if (typed) parts.push(typed[1]);
+  return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
+}
+
+function invoke(path, script, { run = spawnSync, environment = process.env } = {}, operation = "observation") {
   const executable = fixedPowerShell();
   if (executable === null) return unavailable("fixed Windows PowerShell is unavailable");
   const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], {
@@ -126,7 +155,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
     windowsHide: true,
     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
   });
-  if (!isSuccessfulSpawn(result)) return unavailable("native Windows DACL observation failed");
+  if (!isSuccessfulSpawn(result)) return unavailable(childFailureReason(operation, result));
   return result;
 }
 
@@ -225,10 +254,11 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
  * created by the caller or a pre-existing directory being auto-remediated
  * (worktree-lifecycle.mjs's `assureWindowsLocalDirectories` does the latter);
  * either way this only ever resets the DACL to the concrete current
- * principal, never loosens access or touches contents.
+ * principal, never loosens access or touches contents. It is repeatable: hardening a directory this function
+ * already hardened persists the same Access and Owner sections again and returns the same result.
  */
 export function hardenWindowsPrivateDirectory(path, options = {}) {
-  const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options);
+  const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options, "hardening");
   if (result?.status) return result;
   return assessWindowsPrivatePath(path, options);
 }
