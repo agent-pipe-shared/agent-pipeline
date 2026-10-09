@@ -231,17 +231,22 @@ export { CLOSING_ALLOWANCE, DENIAL_CODE, INVALID_INPUT_CODE, SAFETY_MARGIN };
 /** The hook's own refusal code for a bounded counter-lock wait that timed out (contention, not invalid budget state). */
 export const COUNTER_LOCK_TIMEOUT_CODE = "DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT";
 const DISPATCH_RECORD_PATTERN = /^evidence\/dispatch-record-.*\.json$/u;
-const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)\b/u;
+// TR-G-F4 (Ruling 150, Finding 3): the verb is followed by whitespace or the end of the command. `\b` also matched
+// before a hyphen, so `git commit-graph write` and `git commit-tree HEAD` were taken for a closing `git commit`.
+const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)(\s|$)/u;
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
 }
 
-function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false }) {
+function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count, smallRole = false, producerPath = null }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
       + `Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) \`git add\` your own paths, (3) \`git commit\` your own paths${closingNotesClause(agentType)}, plus the read-only commit-flow producer \`goldfish-commit-command-flow.mjs\` from the plugin scripts directory (it is counted like any closing call).\n`
+      // TR-G-F4 (Ruling 150, Finding 1): a refusal that only says "from the plugin scripts directory" leaves the agent to guess
+      // the spelling; the one admitted absolute path is named, and a relative spelling (a different program) is said to stay refused.
+      + (producerPath === null ? "" : `The only admitted spelling of the producer is \`node "${producerPath}" <args>\` -- exactly this absolute path below the plugin root this guard resolves. A relative spelling names a different program and stays refused; on win32 a bare (unquoted) token containing a backslash is refused too, so quote the path or write it with forward slashes.\n`)
       + "Stop working and emit the closing report when finished.\n"
     : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
       + "Emit the closing report without another tool call.\n";
@@ -614,6 +619,11 @@ function isCommitFlowProducerCommand(command, pluginRoot) {
   const match = PRODUCER_COMMAND_PATTERN.exec(command);
   if (match === null) return false;
   if (PRODUCER_ARGS_CONTROL_PATTERN.test(command.slice(match[0].length))) return false;
+  // TR-G-F4 (Ruling 150, Finding 2): a shell reads a backslash in an unquoted token as an escape, so a bare
+  // `...\scripts\goldfish-commit-command-flow.mjs` does not run the file whose path the guard compared. Only a quoted
+  // token gets the win32 backslash mapping; a bare token containing one is no closing act on win32. On a POSIX host a
+  // backslash is an ordinary file-name character and the comparison below already keeps such a path distinct.
+  if (match[3] !== undefined && process.platform === "win32" && match[3].includes("\\")) return false;
   const scriptPath = match[1] ?? match[2] ?? match[3];
   return comparableScriptPath(scriptPath) === comparableScriptPath(join(pluginRoot, "scripts", COMMIT_FLOW_PRODUCER_SCRIPT));
 }
@@ -1144,6 +1154,7 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
   return blocked({
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
     workingCap: budget.workingCap, count: counter.count, smallRole: policyMaxTurns !== maxTurns,
+    producerPath: join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", COMMIT_FLOW_PRODUCER_SCRIPT),
   });
 }
 

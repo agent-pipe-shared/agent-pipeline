@@ -202,3 +202,33 @@ Not shown by these captures: (j) red-then-green against the TR-G-F4 guard (not r
 Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0.
 
 Independent Critic review: pending.
+
+## TR-G-F4 guard post-image: producer path in the refusal, anchored closing verbs, bare backslash on win32
+
+Dispatch: TR-G-F4-20261009 (class guard). Guard post-image only; the test post-image is read only and unchanged. Implements Ruling 150 against the
+pins added by TR-G-T4 and TR-G-T5.
+
+- Guard post-image: `hooks/guard-dispatch-budget.mjs`. Base (TR-G-F3, candidate `e7db47331`) sha256 `2ec5a564dc05f47d188bd3486919ee05dc9d232ba232b277ad8f76756012d808` (86028 bytes). New sha256
+  `f7649839d83cfaad1f4163269a07284e91efe71751e3b3634f09b92ccbfa4c4f` (87604 bytes, LF, 1520 lines).
+- Test post-image, read only, unchanged: sha256 `0bda864c5087f90de59216231522ae81529fe8ad8d7a44dd479092ad557e431e` (133519 bytes).
+- Anchored edits (each anchor occurs exactly once in the base): (1) `GIT_CLOSING_VERB_PATTERN` becomes `/^git\s+(add|commit)(\s|$)/u` (pins m, n); (2)
+  `blocked()` takes `producerPath` and, while closing slots remain, adds one sentence naming `node "<producerPath>" <args>` as the only admitted
+  spelling, a relative spelling as refused, and the win32 bare-backslash rule (pin l); (3) the one `blocked(...)` call site passes
+  `join(resolveAgentPluginRoot(rootDir, dependencies), "scripts", COMMIT_FLOW_PRODUCER_SCRIPT)`; (4) `isCommitFlowProducerCommand` returns false for an
+  unquoted token containing a backslash when `process.platform === "win32"` (pins p, q). Nothing else changes; POSIX behaviour of the comparison is
+  untouched.
+- Method: the TR-G-T4 load-hook redirect, scratch under `scratch/dispatch-wip/TR-G-F4/` (git-ignored); sidecar `TRF4-REDIRECT-FIRED` in both captures.
+
+Results (captures under `evidence/TR-G-F4-20261009/`):
+
+- WSL, whole test post-image: 106 tests, 101 pass, 3 fail, 2 skipped (wrapped exit 1); (l), (m), (n) green, and the three failures are exactly the three accepted 10 s timeouts of TR-G-T5 (the orchestrating-session never-limited case, the orchestrator observation-sink case, the implementor base cap 40 case); TR-G-T5 state was 98 pass, 6 fail.
+- Native, `TR-G T49` cases only: 17 tests, 15 pass, 0 fail, 2 skipped (wrapped exit 0); (p), (q) and (j) green, (d) and (e) skipped with their typed skip text, every other T49 case green as before.
+
+```
+wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F4-20261009/wsl.txt --label TR-G-F4-wsl -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-F4/guard-dispatch-budget.trf4.test.mjs"
+node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-F4-20261009/native.txt --label TR-G-F4-native -- node --test --test-reporter=spec --test-name-pattern="TR-G T49" scratch/dispatch-wip/TR-G-F4/guard-dispatch-budget.trf4.test.mjs
+```
+
+Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0.
+
+Independent Critic review: pending (the next batched Opus Critic, Ruling 156).
