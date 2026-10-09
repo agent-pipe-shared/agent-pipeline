@@ -1,0 +1,179 @@
+command: node scratch/alfred-schema-context-verify.mjs
+label: alfred-schema-context-preservation
+exitCode: 0
+head: 7f0950d4485e264ff2061f3a91464b6a32c59d3c
+tree: 2c9d1cf2c9314b8e513f103ba6e03d6e7153a2c4
+dirty: true
+--- stdout ---
+beforeSha256: b9770c37b843f7f81fcb4bb51177e618a77a71fb57fbf9d92c33b87ffb68aed9
+afterSha256: 6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2
+commentOnlyTokenParity: true
+executableTokenCount: 637
+commentOnlyNarrowDiff: true
+--- focused diff ---
+diff --git a/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+index febffc8b6..10b0341a2 100644
+--- a/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+@@ -3 +3 @@
+- * Parked exact-alternatives implementation for schema-lite.
++ * schema-lite.mjs -- hand-rolled JSON-Schema validator, no library dependency.
+@@ -5,2 +5,28 @@
+- * This is based on the live dependency-free validator and adds only oneOf:
+- * a non-empty array of object schemas matches when exactly one branch accepts.
++ * DEPENDENCY-FREE LIBRARY (plugins/pipeline-core/lib/): shared by callers under
++ * hooks/ and scripts/. Never imports node:fs/node:child_process/etc. -- pure
++ * data-in/data-out functions only.
++ *
++ * Provenance: extracted VERBATIM from
++ * plugins/pipeline-core/scripts/critic-bare.mjs, where it validated a critic
++ * verdict against critic-verdict.schema.json. That call site now imports
++ * validateAgainstSchema from here instead of defining it locally -- see
++ * critic-bare.mjs for the loadSchema()/readFileSync() file-loading half, which
++ * stayed there (it is file I/O, not schema validation, and this module stays
++ * dependency-free of node:fs).
++ *
++ * Understands exactly the keywords used by critic-verdict.schema.json: type,
++ * required, properties, items, enum, additionalProperties. Extend in lockstep
++ * with any schema file that starts relying on more -- it silently ignores
++ * keywords it does not know (unchanged behavior from the original). This
++ * proposal also recognizes `oneOf` as a non-empty array of object schemas,
++ * requiring exactly one branch to accept; schemas without `oneOf` retain the
++ * prior behavior.
++ *
++ * EXTENSION vs. the original (additive, existing semantics unchanged): when
++ * `additionalProperties` is a schema OBJECT (not the literal boolean `false`),
++ * every extra/unlisted key's value is validated against that schema instead of
++ * being silently ignored -- e.g. `{ "type": "object", "properties": {...},
++ * "additionalProperties": { "type": "string" } }` requires every extra key's
++ * value to be a string. `additionalProperties: false` keeps its original
++ * "reject any extra key" behavior; `additionalProperties` absent/true keeps
++ * its original "extra keys allowed, unchecked" behavior -- both unchanged.
+@@ -12 +38 @@ function jsTypeOf(value) {
+-  return typeof value;
++  return typeof value; // "object" | "string" | "boolean" | "number" | "undefined"
+@@ -51,0 +78,2 @@ function validateNode(value, schema, path, errors) {
++      // Additive extension: additionalProperties as a schema object validates every
++      // extra/unlisted key's value against it, instead of leaving extra keys unchecked.
+
+--- syntax ---
+node --check specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+exitCode: 0
+
+--- existing proposal diagnostic ---
+node scratch/alfred-schema-choice-diagnostic.mjs
+exitCode: 0
+schema-choice proposal diagnostic v1
+source: plugins/pipeline-core/lib/schema-lite.mjs
+sourceSha256: 189b0ebe6c35859123fe999e25cba4a81d8205e4d0f99545245a729e5cbe96c4
+proposal: specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+proposalSha256: 6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2
+
+--- source-to-proposal diff (git diff --no-index -- source proposal) ---
+diff --git a/plugins/pipeline-core/lib/schema-lite.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+index 1eb0481bc..10b0341a2 100644
+--- a/plugins/pipeline-core/lib/schema-lite.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs
+@@ -17,7 +17,10 @@
+  * Understands exactly the keywords used by critic-verdict.schema.json: type,
+  * required, properties, items, enum, additionalProperties. Extend in lockstep
+  * with any schema file that starts relying on more -- it silently ignores
+- * keywords it does not know (unchanged behavior from the original).
++ * keywords it does not know (unchanged behavior from the original). This
++ * proposal also recognizes `oneOf` as a non-empty array of object schemas,
++ * requiring exactly one branch to accept; schemas without `oneOf` retain the
++ * prior behavior.
+  *
+  * EXTENSION vs. the original (additive, existing semantics unchanged): when
+  * `additionalProperties` is a schema OBJECT (not the literal boolean `false`),
+@@ -40,6 +43,10 @@ function typeMatches(actual, expectedType) {
+   return expectedList.includes(actual);
+ }
+ 
++function isSchemaObject(value) {
++  return value !== null && typeof value === "object" && !Array.isArray(value);
++}
++
+ function validateNode(value, schema, path, errors) {
+   if (schema.type && !typeMatches(jsTypeOf(value), schema.type)) {
+     errors.push(`${path}: expected type "${schema.type}", got "${jsTypeOf(value)}"`);
+@@ -82,9 +89,25 @@ function validateNode(value, schema, path, errors) {
+     const arr = Array.isArray(value) ? value : [];
+     arr.forEach((item, i) => validateNode(item, schema.items, `${path}[${i}]`, errors));
+   }
++  if (Object.prototype.hasOwnProperty.call(schema, "oneOf")) {
++    const branches = schema.oneOf;
++    if (!Array.isArray(branches) || branches.length === 0 || !branches.every(isSchemaObject)) {
++      errors.push(`${path}: oneOf must be a non-empty array of object schemas`);
++    } else {
++      let matches = 0;
++      for (const branch of branches) {
++        const branchErrors = [];
++        validateNode(value, branch, path, branchErrors);
++        if (branchErrors.length === 0) matches += 1;
++      }
++      if (matches !== 1) {
++        errors.push(`${path}: oneOf matched ${matches} branches; expected exactly one`);
++      }
++    }
++  }
+ }
+ 
+-/** Returns { valid: boolean, errors: string[] }. Never throws on a malformed verdict. */
++/** Returns { valid: boolean, errors: string[] }. Never throws on a malformed oneOf. */
+ export function validateAgainstSchema(value, schema) {
+   const errors = [];
+   validateNode(value, schema, "$", errors);
+diffExitCode: 1 (differences recorded)
+
+--- adaptation inventory ---
+plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs -> scratch/schema-choice-graph/schema-lite-alternatives.test.mjs: import already resolves to the local proposal; no source change
+plugins/pipeline-core/lib/schema-lite.test.mjs -> scratch/schema-choice-graph/schema-lite.test.mjs: import already resolves to the local proposal; no source change
+plugins/pipeline-core/lib/test-case-completion.mjs -> scratch/schema-choice-graph/test-case-completion.mjs: byte copy, no adaptation
+specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs -> scratch/schema-choice-graph/schema-lite.mjs: byte copy, proposal under test
+
+--- node --test scratch/schema-choice-graph/schema-lite-alternatives.test.mjs ---
+exitCode: 0
+✔ SC-ALTERNATIVES-ACCEPT each exact closed alternative accepts (0.773984ms)
+✔ SC-ALTERNATIVES-AMBIGUOUS a value matching more than one branch refuses under oneOf (0.122398ms)
+✔ SC-ALTERNATIVES-CLOSED unmatched, mixed, and unknown-key objects refuse (0.159685ms)
+✔ SC-ALTERNATIVES-MALFORMED malformed oneOf declarations refuse (0.149735ms)
+✔ SC-ALTERNATIVES-NESTED-ARRAY oneOf is enforced in nested properties and array items (0.188191ms)
+✔ SC-ALTERNATIVES-Z-REGRESSION schemas without oneOf retain type required and additionalProperties behavior (0.110049ms)
+✔ SC-ALTERNATIVES-ZZ-MATCH a value matching no alternative refuses (0.703721ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.046362
+
+--- node --test scratch/schema-choice-graph/schema-lite.test.mjs ---
+exitCode: 0
+PASS  TYPE match  a string value passes a {type: string} schema
+PASS  TYPE mismatch  a number fails a {type: string} schema and names the expected/actual type
+PASS  TYPE array  a type array ["string","null"] accepts either listed type
+PASS  ENUM  a value in the enum passes, one outside it fails and is named
+PASS  REQUIRED  a complete object passes, a missing required property fails and names it
+PASS  ARRAY items  every array item is validated against `items`, a bad one is named by index
+PASS  ADDPROPS false  additionalProperties:false rejects any extra key (original semantics unchanged)
+PASS  ADDPROPS absent  no additionalProperties keyword leaves extra keys unchecked (original semantics unchanged)
+PASS  ADDPROPS schema-accept  extra keys whose values match the additionalProperties schema pass
+PASS  ADDPROPS schema-reject  an extra key whose value fails the additionalProperties schema is named with its path
+PASS  ADDPROPS schema-scope  additionalProperties-as-schema only applies to UNLISTED keys, not declared properties
+PASS  ADDPROPS schema-nested  additionalProperties may itself be a nested object schema, recursively validated
+
+12/12 cases passed.
+✔ scratch/schema-choice-graph/schema-lite.test.mjs (26.698589ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.435496
+
+--- stderr ---

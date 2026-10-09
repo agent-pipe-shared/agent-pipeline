@@ -1,0 +1,219 @@
+command: node scratch/alfred-capacity-assembled-diagnostic.mjs
+label: ALFRED-shared-capacity-context-preserved
+exitCode: 0
+head: 7f0950d4485e264ff2061f3a91464b6a32c59d3c
+tree: 2c9d1cf2c9314b8e513f103ba6e03d6e7153a2c4
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.capacity-assembled-diagnostic.v1",
+  "records": [
+    {
+      "source": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "sourceSha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/continuity-state.mjs",
+      "proposalSha256": "43845ab88ba6c99fa2c075805e1e8dedd2a4169498e5ef2376d713d11275998a"
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "sourceSha256": "b3c51a274f3534bb935241924ff78215b555b6daee7341f66bac5ed2fa82f877",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/continuity-state.schema.json",
+      "proposalSha256": "281217053aebf3272430fc927e04f79b96160d6b5346b4b26894d39a49405091"
+    },
+    {
+      "source": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "sourceSha256": "189b0ebe6c35859123fe999e25cba4a81d8205e4d0f99545245a729e5cbe96c4",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/lib/schema-lite.mjs",
+      "proposalSha256": "6ee7358ae14b852b074f9580dcf9405fc83ba85a9b81940d74d42d5f93f0f2b2"
+    }
+  ],
+  "inventory": [
+    {
+      "path": "plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs",
+      "sha256": "8d861b9f9dae0ddc2be6cbd88d23e14d7e393b42ed29fe9a7d73c3b8cc2876de"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "sha256": "189b0ebe6c35859123fe999e25cba4a81d8205e4d0f99545245a729e5cbe96c4"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "sha256": "b3c51a274f3534bb935241924ff78215b555b6daee7341f66bac5ed2fa82f877"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.test.mjs",
+      "sha256": "45e2957101d42e49aee1db6777bc56cf369d1b715ca77c822931dd47ac28863b"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "sha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+      "sha256": "812f33572af19353ab7fbcb6ee3344536685736fecb2aa967a98a2dc12acd59f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/review-economy.mjs",
+      "sha256": "47cec431331c832ebffb49fbb79123c15ff4115ae85c4c3b8a39e7726bbde573"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-native-continuation.mjs",
+      "sha256": "90eae0d37836bc59534e9754b0ca5fac91ee8184fb044e55f47df22e79c54e29"
+    }
+  ],
+  "adaptations": [],
+  "scope": "Only three existing parked proposal byte substitutions; tests and imports byte-exact; no live State, writer, authority or production edit."
+}
+{"command":["node","--test","scratch/alfred-capacity-assembled-graph/plugins/pipeline-core/lib/continuity-capacity-shared.test.mjs"],"exitCode":0}
+✔ legacy full continuity state remains readable (5.955476ms)
+✔ canonical full continuity state validates with the runtime validator (0.193021ms)
+✔ formal capacity schema accepts the exact canonical and legacy objects (0.294541ms)
+✔ formal capacity schema rejects mixed and unknown capacity keys (0.123288ms)
+✔ canonical and legacy pure reads normalize to the same shared shape (0.599231ms)
+✔ normalization preserves operator ceilings for legacy and canonical values (0.241307ms)
+✔ normalization refuses malformed numeric values from a valid canonical control (0.2057ms)
+✔ normalization refuses bad fallback, mixed legacy fields and unknown keys (0.171593ms)
+✔ normalization leaves deeply frozen caller state and its authority, approval, history and revision byte-identical (0.371284ms)
+✔ runtime validator rejects bad integer limits while schema-lite documents its integer adaptation (3.685179ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53.183742
+
+
+{"command":["node","--test","scratch/alfred-capacity-assembled-graph/plugins/pipeline-core/lib/continuity-state.test.mjs"],"exitCode":0}
+ok 1 - failure disposition derives one runner-neutral product retry and generic CAS cannot forge counters
+ok 2 - caller-manufactured environment evidence cannot authorize a reroute
+ok 3 - failure disposition refuses stale, unbound, caller-directed and exhausted retries
+ok 4 - generic CAS cannot reset or reintroduce a consumed budget through a null queue
+ok 5 - a consumed retry survives a course blocker and must be restored by the selected queue
+ok 6 - valid queue state passes runtime and supported schema subset
+ok 7 - runtime accepts an optional two-letter documentLanguage without touching humanFacingLanguage enforcement
+ok 8 - runtime with documentLanguage still rejects an unsupported humanFacingLanguage
+ok 9 - runtime rejects a non-string documentLanguage even when it stringifies to a valid code
+ok 10 - Result-close binding changes only revision, Result, review action and resume
+ok 11 - Result-close binding accepts only its exact committed replay
+ok 12 - Result-close binding makes an exact bootstrap-bound Result close-ready
+ok 13 - Result-close binding rejects non-review, retries and active lifecycle work
+ok 14 - legacy adoption plan/apply accepts the exact six-key request
+ok 15 - legacy adoption rejects extra request keys and authority/root drift
+ok 16 - runtime may carry only a redacted session-cleanup descriptor handle
+ok 17 - session cleanup binding is a one-time pre-dispatch CAS
+ok 18 - session cleanup binding rejects replacement, stale input and admitted dispatches
+ok 19 - session cleanup release is exact, replayable and permits the next session
+ok 20 - session cleanup release rejects the wrong tuple and admitted dispatch
+ok 21 - runtime rejects unsafe duty pattern while schema-lite exposes its documented keyword limit
+ok 22 - runtime rejects non-integer revision while schema-lite exposes its documented keyword limit
+ok 23 - valid blocker state passes
+ok 24 - formal schema carries authority-path and recovery/decision safe-ID patterns
+ok 25 - both queue and blocker fails closed
+ok 26 - neither queue nor blocker fails closed
+ok 27 - wrong active feature fails closed
+ok 28 - unknown root field fails closed
+ok 29 - unknown nested field fails closed
+ok 30 - negative revision fails closed
+ok 31 - fractional revision fails closed
+ok 32 - missing runtime fails closed
+ok 33 - unsupported runtime language fails closed
+ok 34 - unsafe active duty fails closed
+ok 35 - unsupported documentLanguage pattern fails closed
+ok 36 - unknown runtime field fails closed
+ok 37 - unsafe authority path fails closed
+ok 38 - uppercase digest fails closed
+ok 39 - delegating dispatch fails closed
+ok 40 - future dispatch revision fails closed
+ok 41 - product retry above one fails closed
+ok 42 - retry budget above one fails closed
+ok 43 - retry budget disagrees with queue fails closed
+ok 44 - missing critic reservation fails closed
+ok 45 - result authority may be absent without creating a prose copy
+ok 46 - a live dispatch from a lower state revision is stale and invalid
+ok 47 - a pre-seeded acknowledgement without an integration revision is invalid
+ok 48 - maximal bounded hot-state fixture remains below 8 KiB
+ok 49 - stale CAS is zero mutation and input remains byte-identical
+ok 50 - CAS accepts exactly one validated revision
+ok 51 - CAS rejects a skipped revision
+ok 52 - generic CAS cannot forge an acknowledgement
+ok 53 - generic CAS cannot mutate runtime or authority digests
+ok 54 - generic CAS cannot install or clear a decision marker
+ok 55 - a polling head is valid but not dispatchable
+ok 56 - an existing dispatch cannot be created a second time
+ok 57 - exact succeeded final acknowledges and advances in one proposal
+ok 58 - failed structured final requires and accepts a blocker disposition
+ok 59 - failed final cannot silently advance to another queue head
+ok 60 - final integration cannot mutate protected runtime or PRD authority
+ok 61 - exact replay after head advance is a zero-mutation duplicate
+ok 62 - dispatch mismatch final is null-mutating
+ok 63 - attempt mismatch final is null-mutating
+ok 64 - digest mismatch final is null-mutating
+ok 65 - outcome flip final is null-mutating
+ok 66 - failed recovery rejects a retained queue even when its routing fields are coherent
+ok 67 - active recovery rejects reroute count zero
+ok 68 - active recovery rejects product retry drift
+ok 69 - active recovery rejects unrelated dispatch
+ok 70 - failed recovery is coherent only as a typed terminal blocker without a queue
+ok 71 - failed recovery accepts typed terminal course blocker
+ok 72 - failed recovery accepts typed terminal capacity blocker
+ok 73 - failed recovery accepts typed terminal product blocker
+ok 74 - failed recovery accepts typed terminal environment blocker
+ok 75 - non-failed recovery rejects a terminal blocker without a queue
+ok 76 - completed without final is represented but not integrated
+ok 77 - superseded origin final is null-mutating during fallback
+ok 78 - recovery same lane fails closed
+ok 79 - recovery same dispatch fails closed
+ok 80 - recovery second reroute count fails closed
+ok 81 - recovery same-lane retry not prohibited fails closed
+ok 82 - recovery product retry drift fails closed
+ok 83 - recovery unsafe recovery ID fails closed
+ok 84 - decision selection installs one dispatch-blocking marker
+ok 85 - same decision transaction replay is idempotent and conflict blocks
+ok 86 - matching durable decision receipt clears marker at dispatchable revision
+ok 87 - mismatched decision receipt is zero mutation
+ok 88 - clearing without a live decision marker never claims replay
+ok 89 - Result-bound course brief, intent marker and receipt clear each advance only their authorized digest
+ok 90 - generic CAS cannot auto-resume a durable stop or defer disposition
+ok 91 - PO interrupt retains the exact queue head while advancing only revision and resume
+ok 92 - PO interrupt cannot silently change the queue head or next action
+ok 93 - PO interrupt may replace work only with a typed authority security or scope blocker
+ok 94 - close writes deterministic Result intent before the State CAS logical commit
+ok 95 - close intent binds the pre-append Result rather than claiming a self-hash
+ok 96 - Result-before-State and State-acknowledged close crashes replay the exact same transition
+ok 97 - close CAS expected revision is the logical commit point and stale input is fail-closed
+ok 98 - close requires an exact green Stage-1 verify before it may enter semantic close
+ok 99 - final full verify must bind the post-CAS exact candidate and preserve the Stage-1 command
+ok 100 - tracked candidate mutation stales final evidence and blocks delivery until same-command reverify
+ok 101 - delivery, exact readback, and close permit no candidate mutation in their tail
+ok 102 - malformed close input and contradictory receipt identities are total and null-mutating
+ok 103 - generic CAS cannot forge a syntactically valid direct delivered close transition
+ok 104 - generic CAS cannot forge a syntactically valid direct closed close transition
+ok 105 - generic CAS cannot clear or advance a typed close transition
+ok 106 - persisted close transition fails closed on authority or delivery-candidate drift
+ok 107 - closed code vocabulary has no raw-data channel
+ok 108 - native goal activation returns an adapter-readback-bound CAS successor
+ok 109 - additive input persists a bounded digest and continues without duplicate goal activation
+ok 110 - resume refreshes the active native-goal readback without advancing its generation
+ok 111 - a recorded PO decision resumes the same native Goal after an exact paused readback
+ok 112 - a later named PO gate clears the prior resolution receipt before persisting its new pause
+ok 113 - resume degrades stale active-goal identity instead of trusting it or overwriting user control
+ok 114 - verified completion requires acceptance evidence and unsupported capability persists degraded evidence
+ok 115 - generic CAS cannot forge or replace native readback evidence
+1..115
+# pass 115
+✔ <repo-root>/scratch/alfred-capacity-assembled-graph/plugins/pipeline-core/lib/continuity-state.test.mjs (55.489355ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60.456449
+
+
+source, proposals and immutable tests read back unchanged
+
+--- stderr ---

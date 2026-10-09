@@ -1,15 +1,41 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * Parked exact-alternatives implementation for schema-lite.
+ * schema-lite.mjs -- hand-rolled JSON-Schema validator, no library dependency.
  *
- * This is based on the live dependency-free validator and adds only oneOf:
- * a non-empty array of object schemas matches when exactly one branch accepts.
+ * DEPENDENCY-FREE LIBRARY (plugins/pipeline-core/lib/): shared by callers under
+ * hooks/ and scripts/. Never imports node:fs/node:child_process/etc. -- pure
+ * data-in/data-out functions only.
+ *
+ * Provenance: extracted VERBATIM from
+ * plugins/pipeline-core/scripts/critic-bare.mjs, where it validated a critic
+ * verdict against critic-verdict.schema.json. That call site now imports
+ * validateAgainstSchema from here instead of defining it locally -- see
+ * critic-bare.mjs for the loadSchema()/readFileSync() file-loading half, which
+ * stayed there (it is file I/O, not schema validation, and this module stays
+ * dependency-free of node:fs).
+ *
+ * Understands exactly the keywords used by critic-verdict.schema.json: type,
+ * required, properties, items, enum, additionalProperties. Extend in lockstep
+ * with any schema file that starts relying on more -- it silently ignores
+ * keywords it does not know (unchanged behavior from the original). This
+ * proposal also recognizes `oneOf` as a non-empty array of object schemas,
+ * requiring exactly one branch to accept; schemas without `oneOf` retain the
+ * prior behavior.
+ *
+ * EXTENSION vs. the original (additive, existing semantics unchanged): when
+ * `additionalProperties` is a schema OBJECT (not the literal boolean `false`),
+ * every extra/unlisted key's value is validated against that schema instead of
+ * being silently ignored -- e.g. `{ "type": "object", "properties": {...},
+ * "additionalProperties": { "type": "string" } }` requires every extra key's
+ * value to be a string. `additionalProperties: false` keeps its original
+ * "reject any extra key" behavior; `additionalProperties` absent/true keeps
+ * its original "extra keys allowed, unchecked" behavior -- both unchanged.
  */
 
 function jsTypeOf(value) {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
-  return typeof value;
+  return typeof value; // "object" | "string" | "boolean" | "number" | "undefined"
 }
 
 function typeMatches(actual, expectedType) {
@@ -49,6 +75,8 @@ function validateNode(value, schema, path, errors) {
         if (!allowed.has(key)) errors.push(`${path}: unexpected additional property "${key}"`);
       }
     } else if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
+      // Additive extension: additionalProperties as a schema object validates every
+      // extra/unlisted key's value against it, instead of leaving extra keys unchecked.
       const allowed = new Set(Object.keys(schema.properties ?? {}));
       for (const key of Object.keys(obj)) {
         if (!allowed.has(key)) {
