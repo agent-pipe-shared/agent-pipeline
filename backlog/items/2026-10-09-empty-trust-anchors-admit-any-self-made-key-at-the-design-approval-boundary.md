@@ -51,7 +51,9 @@ This is a security-posture change: PO decision required (PO list, 2026-10-09).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** rejected as a defect — by design (PO, Ruling 157).
+- **Rationale:** PO: "Das ist so gewollt! Die Pipeline sperrt den Agenten ein und nicht den human." The Pipeline
+  confines the agent, not the human; an empty anchor set admitting a self-made key is the intended posture. Where the
+  docs describe this posture, they state it as intended, not as a limitation.
+- **Assignment (if accepted):** none.
+- **Date:** 2026-10-09.
