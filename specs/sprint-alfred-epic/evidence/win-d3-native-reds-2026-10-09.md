@@ -50,7 +50,25 @@ diagnosed here.
 
 ### A1: `GES-LOCKED` at install (end-to-end and drift cases, `signing-ceremony.test.mjs:221`, `:327`)
 
-**Classification: product defect on win32 (host-specific lock-guard command), mechanism hypothesised, not proven.**
+**Classification: product defect on win32 (host-specific lock-guard command). CONFIRMED (WIN-D3b-20261009), with one
+correction to the mechanism and one additional defect found.**
+
+Confirmation: `evidence/WIN-D3b-20261009/guard-spawn.txt` lines 9-10 spawn the identical argv
+(`governance-event-store.mjs:730-731`, HEAD version) against a scratch file: exit **1**, empty stdout, stderr is a
+PowerShell **ParserError** ("Unexpected token <guard path> in expression or statement", `FullyQualifiedErrorId :
+UnexpectedToken`). So the correction: the trailing argument is not bound to `$args` (hypothesis point 2) and is not
+null either; `-Command` appends it to the command text, where it is a parse error and PowerShell exits 1 before
+running anything. Control with the path embedded as a literal (lines 11-12): exit 0, stdout `ready\r\n`, no stderr, so
+nobody holds a lock and the product code, not contention, raises `GES-LOCKED`. The end-to-end case capture
+`evidence/WIN-D3b-20261009/ceremony-e2e.txt` (exit 1) shows `code: 'GES-LOCKED'` at line 41.
+
+**Additional defect (will surface once the path binding is fixed):** the readiness check
+(`governance-event-store.mjs:714`, `output.includes("ready\n")`) does not match PowerShell's `ready\r\n` (control
+line 11: `storeReadyCheck(includes "ready\n")=false`), because `[Console]::Out.WriteLine` emits CRLF on Windows. The
+fixed guard would start, hold the lock, and the store would wait forever. The slice must also change the match to
+`/ready\r?\n/` or write the literal `ready\n` (for example `[Console]::Out.Write("ready`n")`).
+
+Original text (hypothesis, kept for traceability):
 
 Evidence:
 
