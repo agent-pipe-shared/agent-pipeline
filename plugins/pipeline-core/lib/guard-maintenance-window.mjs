@@ -189,6 +189,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/feature-package-topology.mjs",
   "plugins/pipeline-core/lib/gate-estimate.mjs",
   "plugins/pipeline-core/lib/git-cmd.mjs",
+  // WIN-AP-F2: kernel-listed installers import this module (GMWKC01), and it now also hosts the
+  // private-root entry point. Its own imports (private-boundary, windows-private-state) are listed.
+  "plugins/pipeline-core/lib/hardened-private-directory.mjs",
   "plugins/pipeline-core/lib/human-guard-override.mjs",
   "plugins/pipeline-core/lib/human-role-labels.mjs",
   "plugins/pipeline-core/lib/machine-plane.mjs",
@@ -732,14 +735,19 @@ const PROJECT_KERNEL_PATHS = NEVER_LIFTABLE_KERNEL_PATHS
   .filter((path) => !path.startsWith("plugins/pipeline-core/"))
   .map((path) => path.toLowerCase());
 
-/** Same normalization as `gateStrengthRuleFor`: forward-slashed, case-insensitive, root-relative. Null when `filePath` escapes `anchor`. */
+/**
+ * Same normalization as `gateStrengthRuleFor`: forward-slashed, case-insensitive, root-relative.
+ * Null when `filePath` escapes `anchor`. That includes a path on another win32 volume: there
+ * `relative()` has no relative spelling and returns the ABSOLUTE target, which carries no `..`
+ * prefix and would otherwise read as "inside the anchor" (GS-6, Ruling 140).
+ */
 function normalizeRepoRelativePath(anchor, filePath) {
   if (typeof filePath !== "string" || filePath.length === 0) return null;
   let root;
   try { root = resolve(anchor); } catch { return null; }
   const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(root, filePath);
   const rel = relative(root, absolute);
-  if (rel === "" || rel.startsWith(`..${sep}`) || rel === "..") return null;
+  if (rel === "" || rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel)) return null;
   return rel.split(sep).join("/").toLowerCase();
 }
 
