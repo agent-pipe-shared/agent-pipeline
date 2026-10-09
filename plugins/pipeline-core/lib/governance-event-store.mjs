@@ -702,33 +702,63 @@ async function acquireStreamLockGuard(lock) {
   if (entry && (!entry.isFile() || entry.isSymbolicLink())) fail("GES-UNSAFE-PATH", "The stream contains an unsafe lock-guard path.");
   const command = nativeStreamLockGuardCommand(guard);
   return new Promise((resolve, reject) => {
-    const child = spawn(command.file, command.args, { stdio: ["pipe", "pipe", "ignore"] });
+    const child = spawn(command.file, command.args, { stdio: ["pipe", "pipe", "pipe"], env: command.env ?? process.env });
+    const heldExitCode = command.heldExitCode ?? STREAM_LOCK_GUARD_HELD_EXIT;
     let ready = false;
     let output = "";
+    let diagnostic = "";
     let settled = false;
     const rejectOnce = (error) => { if (!settled) { settled = true; reject(error); } };
     const waitForExit = () => new Promise((done) => child.once("exit", () => done()));
     child.once("error", (error) => rejectOnce(new GovernanceEventStoreError("GES-LOCK-RUNTIME", error.message)));
+    // Always drain stderr (an unread full pipe would block the child) but keep
+    // only a bounded head of it, so a guard that failed to start can say why.
+    child.stderr.on("data", (chunk) => {
+      if (diagnostic.length < STREAM_LOCK_GUARD_DIAGNOSTIC_LIMIT) diagnostic = `${diagnostic}${chunk.toString("utf8")}`.slice(0, STREAM_LOCK_GUARD_DIAGNOSTIC_LIMIT);
+    });
     child.stdout.on("data", (chunk) => {
       output += chunk.toString("utf8");
-      if (!ready && output.includes("ready\n")) {
+      if (!ready && STREAM_LOCK_GUARD_READY.test(output)) {
         ready = true;
         settled = true;
         resolve(Object.freeze({ release: async () => { const exited = waitForExit(); child.kill(); await exited; } }));
       }
     });
-    child.once("exit", (code) => {
-      if (!ready) rejectOnce(new GovernanceEventStoreError(code === 1 ? "GES-LOCKED" : "GES-LOCK-RUNTIME"));
+    // `close`, not `exit`: stderr must be fully read before it is quoted.
+    child.once("close", (code, signal) => {
+      if (ready) return;
+      // Only the guard's own "somebody else holds the lock" exit is contention;
+      // every other way of not becoming ready is a guard that failed to start.
+      if (code === heldExitCode) {
+        rejectOnce(new GovernanceEventStoreError("GES-LOCKED", "The stream is already being written."));
+        return;
+      }
+      const reason = diagnostic.replace(/\s+/gu, " ").trim() || "no stderr output";
+      rejectOnce(new GovernanceEventStoreError("GES-LOCK-RUNTIME", `The stream lock guard did not become ready (exit code ${code ?? "none"}${signal ? `, signal ${signal}` : ""}): ${reason}`));
     });
   });
 }
 
+// PowerShell writes CRLF and perl writes LF; the readiness line is either.
+const STREAM_LOCK_GUARD_READY = /ready\r?\n/u;
+const STREAM_LOCK_GUARD_DIAGNOSTIC_LIMIT = 2048;
+// The perl guard exits 1 when flock() reports another holder (2 when it cannot
+// open the file); a guard that reports anything else did not start.
+const STREAM_LOCK_GUARD_HELD_EXIT = 1;
+// The guard path travels in the environment, never in the command text:
+// `powershell -Command` appends trailing arguments to the script, where a path
+// is a parse error (which also exits 1, so it must not be a "held" signal).
+const STREAM_LOCK_GUARD_PATH_ENV = "GES_STREAM_LOCK_GUARD_PATH";
+const WIN32_STREAM_LOCK_GUARD_HELD_EXIT = 75;
+
 function nativeStreamLockGuardCommand(guard) {
   if (process.platform === "win32") {
     // A FileStream opened with FileShare.None is the Windows equivalent of a
-    // non-blocking advisory guard.  The child owns it until stdin closes.
-    const script = "$s=[System.IO.File]::Open($args[0],[System.IO.FileMode]::OpenOrCreate,[System.IO.FileAccess]::ReadWrite,[System.IO.FileShare]::None);[Console]::Out.WriteLine('ready');[Console]::In.ReadLine()|Out-Null;$s.Dispose()";
-    return Object.freeze({ file: "powershell.exe", args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script, guard] });
+    // non-blocking advisory guard.  The child owns it until stdin closes.  A
+    // sharing/lock violation (Win32 error 32/33) means another process holds
+    // it; any other failure is reported on stderr with a different exit code.
+    const script = `try{$s=[System.IO.File]::Open($env:${STREAM_LOCK_GUARD_PATH_ENV},[System.IO.FileMode]::OpenOrCreate,[System.IO.FileAccess]::ReadWrite,[System.IO.FileShare]::None)}catch{$e=$_.Exception;if($e.InnerException){$e=$e.InnerException};$h=$e.HResult -band 0xFFFF;if($h -eq 32 -or $h -eq 33){exit ${WIN32_STREAM_LOCK_GUARD_HELD_EXIT}};[Console]::Error.WriteLine($e.GetType().FullName+': '+$e.Message);exit 2};[Console]::Out.WriteLine('ready');[Console]::In.ReadLine()|Out-Null;$s.Dispose()`;
+    return Object.freeze({ file: "powershell.exe", args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script], env: Object.freeze({ ...process.env, [STREAM_LOCK_GUARD_PATH_ENV]: guard }), heldExitCode: WIN32_STREAM_LOCK_GUARD_HELD_EXIT });
   }
   if (process.platform === "darwin" || process.platform === "linux") {
     // Perl's built-in flock maps to the host POSIX advisory lock on both
