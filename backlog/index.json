@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "365e55b164a1a2b7108653ce2ca36ed35da2f167115447d97d7f5a27a9b9dbcb"
+    "transitionHead": "8c85e2d84f3ac5908d8bae8fb8a669a0d2d5517eaa088b954ecb000470b03e63"
   },
   "counts": {
-    "open": 181,
+    "open": 189,
     "in_progress": 0,
-    "closed": 663,
+    "closed": 664,
     "rejected": 3,
     "deferred": 11
   },
@@ -1036,6 +1036,16 @@
       "source": "PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session.",
       "deferred": false,
       "due": "2026-09-06"
+    },
+    {
+      "id": "pipeline.approval-verification-demands-head-equals-candidate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "Haupt-PC session 2026-10-08 late, installed candidate 0.7.0+claude.20261008194106.da20519d: after restoring the device-local approval files, onboarding inspect still demanded reopen-design with DWP-READINESS-HOST-RECEIPT-INVALID; a PO-run step-by-step diagnosis (scratch/diag-readiness.mjs) located the throw.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.approve-announce-test-fixture-missing-present-plan-step",
@@ -3027,6 +3037,16 @@
       "sprint": "batman"
     },
     {
+      "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "Haupt-PC session 2026-10-08 late: GUARD-DEVPLAN-SHELL denial during an unverifiable approval.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
       "status": "open",
       "type": "defect",
@@ -3819,13 +3839,17 @@
     },
     {
       "id": "pipeline.fanout-ledger-spawns-powershell-on-every-stop-on-windows",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-10-06",
       "source": "Observed live during the Alfred night run, 2026-10-06 (FANOUT-F5b2 spawn tripwire, stop-fanout.test.mjs SF22).",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-10-09",
+      "closureRepository": "self",
+      "closureCommit": "7d2837f8d9dd077e2079fbbb766c573bf01978b3",
+      "closureEvidence": "specs/sprint-alfred-epic/signed-package/tranche-2/README.md"
     },
     {
       "id": "pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy",
@@ -3889,6 +3913,17 @@
       "closureRepository": "self",
       "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
       "closureEvidence": "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
+    },
+    {
+      "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-09",
+      "source": "toil log 2026-10-06-07, row T87",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
@@ -4126,11 +4161,11 @@
       "id": "pipeline.gh-delivery-classifier-is-not-wired",
       "status": "open",
       "type": "workflow-improvement",
-      "owner": "elephant",
+      "owner": "pipeline",
       "created": "2026-10-08",
       "source": "Critic record pr-s1-full.md PR-F3",
       "deferred": false,
-      "due": "before the 0.7.0 candidate is called complete",
+      "due": "2026-10-12",
       "sprint": "alfred"
     },
     {
@@ -4431,6 +4466,17 @@
       "closureRepository": "self",
       "closureCommit": "b273a1a055bae1e29f7489d232d0c83dff05c7ed",
       "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
+    },
+    {
+      "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-09",
+      "source": "toil log 2026-10-06-07, row T86",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
@@ -4920,6 +4966,17 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-09",
+      "source": "toil log 2026-10-06-07, row T85",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
       "status": "open",
       "type": "defect",
@@ -5348,6 +5405,16 @@
       "closureRepository": "self",
       "closureCommit": "887ac164e61fdb81effe8de50e2464ff95753e6c",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+    },
+    {
+      "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-09",
+      "source": "Live, Alfred session 2026-10-09 (toil T90): every override plan and ceremony refused with HGO-AUDIT-LOCK-AMBIGUOUS although the lock owner process no longer exists.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.hgo-patch-preflight-before-signature",
@@ -6231,6 +6298,16 @@
       "owner": "pipeline",
       "created": "2026-09-30",
       "source": "Explicit PO direction: approve new model types once; automatically select their latest version; retain old versions only on explicit PO request.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "Live bootstrap, Agent-Pipeline Claude/Windows session 2026-10-08 (installed 0.7.0+claude.20261005202045.7170ed20, win32); cause read from source, not yet reproduced by a test.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -9533,6 +9610,17 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "tranche signing ceremony 2026-10-08 (PO report, measured by the Elephant)",
+      "deferred": false,
+      "due": "2026-10-31",
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
       "status": "open",
       "type": "defect",
@@ -10335,6 +10423,16 @@
       "closureRepository": "self",
       "closureCommit": "571e67a820cdf6912b02e069c3c2d68c73a0f443",
       "closureEvidence": "backlog/items/2026-09-06-the-exact-transcript-file-exception-admits-a-nonexistent-child-path.md"
+    },
+    {
+      "id": "pipeline.transfer-redaction-alters-digest-bound-files",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-08",
+      "source": "Haupt-PC session 2026-10-08 late: the machine-switch transfer bundle carried the approval-bound package with altered bytes.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",

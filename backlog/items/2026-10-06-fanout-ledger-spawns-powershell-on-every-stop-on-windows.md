@@ -3,14 +3,43 @@ schema: pipeline.backlog-item.v1
 id: pipeline.fanout-ledger-spawns-powershell-on-every-stop-on-windows
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-10-06
 source: "Observed live during the Alfred night run, 2026-10-06 (FANOUT-F5b2 spawn tripwire, stop-fanout.test.mjs SF22)."
 sprint: alfred
 done_when: manual
+closed_at: 2026-10-09
+closure_repository: self
+closure_commit: 7d2837f8d9dd077e2079fbbb766c573bf01978b3
+closure_evidence: specs/sprint-alfred-epic/signed-package/tranche-2/README.md
 ---
 
-# The fan-out ledger spawns PowerShell on every Stop evaluation on native Windows
+# First Stop per common dir: one-time directory-creation latency, accepted (re-scoped from "the fan-out ledger spawns PowerShell on every Stop evaluation on native Windows")
+
+> **Re-scoped and closed 2026-10-09 (Ruling 87, FANOUT-WIN-M).** The original premise "spawns on every Stop" does not
+> hold. Only the FIRST ledger-writing Stop per git common dir spawns 4 `powershell.exe`, all from `ensureLedgerDirectory`
+> -> `ensurePrivateDirectory` creating the directory (about 1.2 s once). Every later Stop spawns 0 (about 0.24 s). The
+> one-time latency is accepted; there is no production fix in 0.7.0. The body below is the original observation, kept
+> as written (append-only).
+
+## Closure
+
+- **Measurement** (`evidence/FANOUT-WIN-M-20261009/spawns.txt`, git-ignored, so the numbers are copied here; native
+  win32, node v24.20.0, x64, one run, real hook process per Stop, tripwire control recorded 1):
+
+  | Stop | Common dir | Ledger dir pre-existed | Decision | Wall | Spawns |
+  |---|---|---|---|---|---|
+  | 1 (enforce, fresh common dir A) | fresh | false | block | 1158 ms | 4 (`powershell.exe`=4, git=0) |
+  | 2 (same dir A, same session) | A | true | block, ledger append | 244 ms | 0 |
+  | 2b (same dir A, different session id) | A | true | block | 235 ms | 0 |
+  | 3 (`requiresEnforcement:false`, fresh dir B) | B | false | silent, nothing created | 234 ms | 0 |
+
+  The 4 spawns of Stop 1 all share one chain: `windows-private-state.mjs>private-boundary.mjs>fanout-ledger.mjs>stop-fanout.mjs`.
+- **Ruling 87** (`specs/sprint-alfred-epic/plans/0.7-execution-order.md`, "Ruling 87 (FANOUT-WIN-M, 2026-10-09 night)"):
+  no production fix; SF22's bound of 4 is correct for its fresh sandbox and stays.
+- **Tranche-2 pin SF22b** (`specs/sprint-alfred-epic/signed-package/tranche-2/README.md`, section SF22b; test commit
+  `7d2837f8d`): a second Stop against the same common dir pins 0 spawns, so a regression to per-Stop spawning goes red.
+- **Not measured:** WSL, macOS, Codex, agy (the hook is the Claude Stop adapter; SF22 already pins 0 off win32).
 
 ## Description
 
@@ -47,7 +76,7 @@ hook (and in any case before the 0.7.0 release candidate); until then SF22 must 
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed, re-scoped to "first Stop per common dir: one-time directory-creation latency, accepted" (Ruling 87).
+- **Rationale:** measured premise failure: only the first ledger-writing Stop per common dir spawns (4 `powershell.exe`, about 1.2 s once); later Stops spawn 0. Steady state is pinned by SF22b.
+- **Assignment (if accepted):** none; no production fix in 0.7.0.
+- **Date:** 2026-10-09

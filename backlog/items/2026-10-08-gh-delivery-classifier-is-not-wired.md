@@ -2,13 +2,13 @@
 schema: pipeline.backlog-item.v1
 id: pipeline.gh-delivery-classifier-is-not-wired
 type: workflow-improvement
-owner: elephant
+owner: pipeline
 status: open
 created: 2026-10-08
 source: "Critic record pr-s1-full.md PR-F3"
 sprint: alfred
 done_when: manual
-due: before the 0.7.0 candidate is called complete
+due: 2026-10-12
 ---
 
 # gh delivery classifier is not wired
