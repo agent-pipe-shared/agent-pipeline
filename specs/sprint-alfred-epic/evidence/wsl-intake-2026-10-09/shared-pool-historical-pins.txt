@@ -1,0 +1,639 @@
+command: node scratch/historical-pins-20261009.mjs
+label: ALFRED-POOL-HISTORICAL-T-20261009
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{"phase":"snapshot","inputs":[{"path":"plugins/pipeline-core/lib/local-worker-pool.test.mjs","sha256":"46f3d8b1bfb4f64aca8e09af8fae618cbec9c251573a406dd76a188a8a4b3895"},{"path":"plugins/pipeline-core/lib/local-worker-pool.mjs","sha256":"6456e4545d3615629e1a45f180fdd2f8a1ba8fc7c1998331b278f09e79b12493"},{"path":"plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","sha256":"73d01d04c70cddef9c255a4a6e7e702c9ed6091b61bdc9db09b141018bac6574"},{"path":"plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","sha256":"5a931566776ddf2bf0420ac715eef33936504f8e45f9ee538a1a4348656fc9b0"},{"path":"plugins/pipeline-core/lib/test-case-completion.mjs","sha256":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/local-worker-pool.mjs","sha256":"700efdc0b1424969f798f9d4f3190f5a90051549f7554bd0f32517fa1bc344f4"}],"output":{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/local-worker-pool.test.mjs","sha256":"38bb45b8c6a922d56ab7f23da3633a181b639b65c499aa0a9572864bd320999f"},"caseIds":["LWP01","LWP02","LWP03","LWP04","LWP05","LWP06"],"assertionsPreserved":true}
+EXACT_NARROW_ASSERTION_DIFF
+diff --git a/scratch/historical-pins-20261009/baseline/local-worker-pool.test.mjs b/scratch/historical-pins-20261009/proposal-candidate/local-worker-pool.test.mjs
+index 49275995d..f128141b0 100644
+--- a/scratch/historical-pins-20261009/baseline/local-worker-pool.test.mjs
++++ b/scratch/historical-pins-20261009/proposal-candidate/local-worker-pool.test.mjs
+@@ -7,7 +7,7 @@ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { devNull } from "node:os";
+ 
+ const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), O = "1".repeat(40);
+-const bounds = (certified = 3, pressure = 5) => ({ configured:{concurrentTasks:8,required:true}, operator:{concurrentTasks:6,required:true}, certified:{concurrentTasks:certified,required:true}, observed:{concurrentTasks:4,required:true}, pressure:{concurrentTasks:pressure,required:false}, reserved:{elephant:1,verify:1,critic:0}, effective:{status:"available",concurrentTasks:Math.max(0,Math.min(8,6,certified,4,pressure)-2),reasonCodes:[]} });
++const bounds = (certified = 3, pressure = 5) => ({ configured:{concurrentTasks:8,required:true}, operator:{concurrentTasks:6,required:true}, certified:{concurrentTasks:certified,required:true}, observed:{concurrentTasks:4,required:true}, pressure:{concurrentTasks:pressure,required:false}, reserved:{elephant:1,verify:1,critic:0}, effective:{status:"available",concurrentTasks:Math.min(8,6,certified,4,pressure),reasonCodes:[]} });
+ const worker = (subject = A, leaseId = "lease-1") => ({ subjectSha256:subject, workspaceLease:{leaseId,subjectSha256:subject,repository:A,baseCommit:O,candidateCommit:O,worktreePathSha256:B,writePaths:["lib/pool.mjs"],ownerNonce:"owner-1",issuedMonotonicMs:0,expiresMonotonicMs:60000,cleanupState:"active",evidenceSha256:C}, process:{identitySha256:B,separation:"observed",assuranceEvidenceSha256:C}, heartbeat:{intervalMs:1000,orphanAfterMs:3000,lastObservedMonotonicMs:0,evidenceSha256:C}, state:"running",lastTransitionMonotonicMs:0,stateEvidenceSha256:C });
+ const pool = () => createLocalWorkerPool({ poolId:"pool-1",candidate:{repositorySha256:A,baseCommit:O,candidateCommit:O},queueRevision:0,capacity:bounds(),workers:[worker()],admissionSet:[{taskId:"task-1",subjectSha256:A,requestSha256:B,baseCommit:O,candidateCommit:O,writePaths:["lib/pool.mjs"],state:"admitted"}],cleanupOwner:{subjectSha256:A,ownerNonce:"owner-1",evidenceSha256:C},serialFallback:true });
+ 
+@@ -18,9 +18,9 @@ function check(name, fn) {
+ }
+ 
+ const event = (kind, extra = {}) => ({ kind,subjectSha256:A,candidateCommit:O,monotonicMs:1000,evidenceSha256:B,...extra });
+-check("calculates minimum known capacity after Elephant, Verify, and Critic reservation", () => { assert.deepEqual(computeEffectiveCapacity(bounds()), {status:"available",concurrentTasks:1,reasonCodes:[]}); assert.deepEqual(computeEffectiveCapacity(bounds(3,2)), {status:"available",concurrentTasks:0,reasonCodes:[]}); assert.deepEqual(computeEffectiveCapacity({...bounds(),certified:{concurrentTasks:null,required:true}}), {status:"unavailable",concurrentTasks:null,reasonCodes:["UNKNOWN:certified"]}); });
++check("calculates minimum known gross capacity without subtracting idle role reservations", () => { assert.deepEqual(computeEffectiveCapacity(bounds()), {status:"available",concurrentTasks:3,reasonCodes:[]}); assert.deepEqual(computeEffectiveCapacity(bounds(3,2)), {status:"available",concurrentTasks:2,reasonCodes:[]}); assert.deepEqual(computeEffectiveCapacity({...bounds(),certified:{concurrentTasks:null,required:true}}), {status:"unavailable",concurrentTasks:null,reasonCodes:["UNKNOWN:certified"]}); });
+ check("creates a frozen closed contract with portable workspace leases and no isolation claim", () => { const value = pool(); assert.equal(validateLocalWorkerPool(value).ok, true); assert.equal(localWorkerPoolDigest(value).length, 64); assert.equal(Object.isFrozen(value), true); });
+-check("projects serial and in-process reference adapters without starting a worker", () => { const value=pool(); assert.deepEqual(selectLocalWorkerPoolReferenceAdapter(value,"serial"),{status:"available",kind:"serial",concurrentTasks:1,reasonCode:null}); assert.equal(selectLocalWorkerPoolReferenceAdapter(value,"in-process").reasonCode,"UNAVAILABLE:parallel-admission"); const parallel=structuredClone(value); parallel.serialFallback=false; assert.equal(selectLocalWorkerPoolReferenceAdapter(parallel,"in-process").concurrentTasks,1); });
++check("projects serial and in-process reference adapters without starting a worker", () => { const value=pool(); assert.deepEqual(selectLocalWorkerPoolReferenceAdapter(value,"serial"),{status:"available",kind:"serial",concurrentTasks:1,reasonCode:null}); assert.equal(selectLocalWorkerPoolReferenceAdapter(value,"in-process").reasonCode,"UNAVAILABLE:parallel-admission"); const parallel=structuredClone(value); parallel.serialFallback=false; assert.equal(selectLocalWorkerPoolReferenceAdapter(parallel,"in-process").concurrentTasks,3); });
+ check("rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission", () => { const value = pool(); const malformed = structuredClone(value); malformed.workers[0].workspaceLease.writePaths=["../escape"]; assert.equal(validateLocalWorkerPool(malformed).ok, false); malformed.workers[0].workspaceLease.writePaths=["lib/pool.mjs"]; malformed.workers[0].heartbeat.orphanAfterMs=2999; assert.equal(validateLocalWorkerPool(malformed).ok, false); malformed.workers[0].heartbeat.orphanAfterMs=3000; malformed.workers[0].workspaceLease.expiresMonotonicMs=0; assert.equal(validateLocalWorkerPool(malformed).ok, false); malformed.workers[0].workspaceLease.expiresMonotonicMs=60000; malformed.cleanupOwner.ownerNonce="stale"; assert.equal(validateLocalWorkerPool(malformed).code,"STALE:cleanup-owner"); malformed.cleanupOwner.ownerNonce="owner-1"; malformed.workers[0].workspaceLease.candidateCommit="2".repeat(40); assert.equal(validateLocalWorkerPool(malformed).code,"AUTHORITY:workspace-binding"); const duplicate = structuredClone(value); duplicate.workers.push(worker(A,"lease-2")); duplicate.serialFallback=false; assert.equal(validateLocalWorkerPool(duplicate).ok, false); });
+ check("models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state", () => { let value = pool(); value = reduceLocalWorkerPool(value,event("heartbeat")).pool; assert.equal(value.workers[0].heartbeat.lastObservedMonotonicMs,1000); value = reduceLocalWorkerPool(value,event("cancel")).pool; assert.equal(value.workers[0].state,"cancel-requested"); assert.equal(reduceLocalWorkerPool(value,event("cancelled",{monotonicMs:1001})).pool.workers[0].state,"cancelled"); assert.equal(reduceLocalWorkerPool(pool(),event("completed")).pool.workers[0].state,"completed"); assert.equal(reduceLocalWorkerPool(pool(),event("timeout")).pool.workers[0].state,"timed-out"); assert.equal(reduceLocalWorkerPool(pool(),event("orphan-suspected")).code,"BOUND:orphan-deadline"); let orphan = reduceLocalWorkerPool(pool(),event("orphan-suspected",{monotonicMs:3000})).pool; orphan = reduceLocalWorkerPool(orphan,event("recovered",{monotonicMs:3001})).pool; assert.equal(orphan.workers[0].state,"recovered"); });
+ check("invalidates stale candidates and leaves result import unavailable until B1-I authority exists", () => { const value=pool(); assert.equal(reduceLocalWorkerPool(value,event("heartbeat",{candidateCommit:"2".repeat(40)})).code,"STALE:candidate"); const stale=reduceLocalWorkerPool(value,event("stale-candidate",{candidateCommit:"2".repeat(40)})); assert.equal(stale.pool.workers[0].state,"rejected"); assert.equal(stale.pool.admissionSet[0].state,"invalidated"); assert.equal(reduceLocalWorkerPool(value,event("result-import")).code,"UNAVAILABLE:result-import-authority"); });
+
+{"phase":"run","label":"historical-source-baseline","command":"node --test --test-reporter=tap scratch/historical-pins-20261009/baseline/local-worker-pool.test.mjs","exitCode":0,"expectedStatus":0,"expectedCount":6}
+TAP version 13
+# Subtest: LWP01 calculates minimum known capacity after Elephant, Verify, and Critic reservation
+ok 1 - LWP01 calculates minimum known capacity after Elephant, Verify, and Critic reservation
+  ---
+  duration_ms: 1.029287
+  type: 'test'
+  ...
+# Subtest: LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+ok 2 - LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+  ---
+  duration_ms: 0.754706
+  type: 'test'
+  ...
+# Subtest: LWP03 projects serial and in-process reference adapters without starting a worker
+ok 3 - LWP03 projects serial and in-process reference adapters without starting a worker
+  ---
+  duration_ms: 0.949459
+  type: 'test'
+  ...
+# Subtest: LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+ok 4 - LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+  ---
+  duration_ms: 0.434946
+  type: 'test'
+  ...
+# Subtest: LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+ok 5 - LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+  ---
+  duration_ms: 1.016568
+  type: 'test'
+  ...
+# Subtest: LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+ok 6 - LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+  ---
+  duration_ms: 0.373168
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 46.232419
+
+
+{"phase":"run","label":"reconciled-source-expected-RED","command":"node --test --test-reporter=tap scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs","exitCode":1,"expectedStatus":1,"expectedCount":6}
+TAP version 13
+# Subtest: LWP01 calculates minimum known gross capacity without subtracting idle role reservations
+not ok 1 - LWP01 calculates minimum known gross capacity without subtracting idle role reservations
+  ---
+  duration_ms: 1.592638
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+    +   concurrentTasks: 1,
+    -   concurrentTasks: 3,
+        reasonCodes: [],
+        status: 'available'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    status: 'available'
+    concurrentTasks: 3
+    reasonCodes:
+  actual:
+    status: 'available'
+    concurrentTasks: 1
+    reasonCodes:
+  operator: 'deepStrictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:21:108)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+not ok 2 - LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+  ---
+  duration_ms: 0.489444
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.mjs:82:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:22:119)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: LWP03 projects serial and in-process reference adapters without starting a worker
+not ok 3 - LWP03 projects serial and in-process reference adapters without starting a worker
+  ---
+  duration_ms: 0.209313
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.mjs:82:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:23:106)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+not ok 4 - LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+  ---
+  duration_ms: 0.192384
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.mjs:82:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:24:146)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+not ok 5 - LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+  ---
+  duration_ms: 0.789365
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.mjs:82:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:25:126)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+not ok 6 - LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+  ---
+  duration_ms: 0.269571
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.mjs:82:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/local-worker-pool.test.mjs:26:124)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/source-candidate/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 0
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 46.52008
+
+
+{"phase":"run","label":"historical-proposal-obsolete-pins-RED","command":"node --test --test-reporter=tap scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs","exitCode":1,"expectedStatus":1,"expectedCount":6}
+TAP version 13
+# Subtest: LWP01 calculates minimum known capacity after Elephant, Verify, and Critic reservation
+not ok 1 - LWP01 calculates minimum known capacity after Elephant, Verify, and Critic reservation
+  ---
+  duration_ms: 1.572228
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+    +   concurrentTasks: 3,
+    -   concurrentTasks: 1,
+        reasonCodes: [],
+        status: 'available'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    status: 'available'
+    concurrentTasks: 1
+    reasonCodes:
+  actual:
+    status: 'available'
+    concurrentTasks: 3
+    reasonCodes:
+  operator: 'deepStrictEqual'
+  stack: |-
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:21:106)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+not ok 2 - LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+  ---
+  duration_ms: 0.506343
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.mjs:84:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:22:119)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3)
+  ...
+# Subtest: LWP03 projects serial and in-process reference adapters without starting a worker
+not ok 3 - LWP03 projects serial and in-process reference adapters without starting a worker
+  ---
+  duration_ms: 0.166964
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.mjs:84:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:23:106)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+not ok 4 - LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+  ---
+  duration_ms: 0.164735
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.mjs:84:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:24:146)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+not ok 5 - LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+  ---
+  duration_ms: 0.786665
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.mjs:84:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:25:126)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+not ok 6 - LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+  ---
+  duration_ms: 0.270781
+  type: 'test'
+  location: '<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: 'BOUND:pool'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    createLocalWorkerPool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.mjs:84:64)
+    pool (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:12:20)
+    Object.run (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/local-worker-pool.test.mjs:26:124)
+    TestContext.<anonymous> (file://<repo-root>/scratch/historical-pins-20261009/proposal-legacy/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 0
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47.207848
+
+
+{"phase":"run","label":"full-reconciled-historical-proposal","command":"node --test --test-reporter=tap scratch/historical-pins-20261009/proposal-candidate/local-worker-pool.test.mjs","exitCode":0,"expectedStatus":0,"expectedCount":6}
+TAP version 13
+# Subtest: LWP01 calculates minimum known gross capacity without subtracting idle role reservations
+ok 1 - LWP01 calculates minimum known gross capacity without subtracting idle role reservations
+  ---
+  duration_ms: 1.059766
+  type: 'test'
+  ...
+# Subtest: LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+ok 2 - LWP02 creates a frozen closed contract with portable workspace leases and no isolation claim
+  ---
+  duration_ms: 0.91837
+  type: 'test'
+  ...
+# Subtest: LWP03 projects serial and in-process reference adapters without starting a worker
+ok 3 - LWP03 projects serial and in-process reference adapters without starting a worker
+  ---
+  duration_ms: 0.94614
+  type: 'test'
+  ...
+# Subtest: LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+ok 4 - LWP04 rejects path escape, relational heartbeat/lease drift, stale owner, foreign workspace and capacity over-admission
+  ---
+  duration_ms: 0.455785
+  type: 'test'
+  ...
+# Subtest: LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+ok 5 - LWP05 models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state
+  ---
+  duration_ms: 1.007948
+  type: 'test'
+  ...
+# Subtest: LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+ok 6 - LWP06 invalidates stale candidates and leaves result import unavailable until B1-I authority exists
+  ---
+  duration_ms: 0.389737
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47.070552
+
+
+{"phase":"run","label":"shared-bounds-and-occupancy-proposal","command":"node --test --test-reporter=tap scratch/historical-pins-20261009/proposal-candidate/shared-pool-bounds.test.mjs scratch/historical-pins-20261009/proposal-candidate/shared-pool-occupancy.test.mjs","exitCode":0,"expectedStatus":0,"expectedCount":16}
+TAP version 13
+# Subtest: SP-BND01 SP01 idle legacy role holds preserve the minimum known gross ceiling of three
+ok 1 - SP-BND01 SP01 idle legacy role holds preserve the minimum known gross ceiling of three
+  ---
+  duration_ms: 1.114574
+  type: 'test'
+  ...
+# Subtest: SP-BND02 SP01 pressure bounds the shared ceiling at two without subtracting idle holds
+ok 2 - SP-BND02 SP01 pressure bounds the shared ceiling at two without subtracting idle holds
+  ---
+  duration_ms: 0.180624
+  type: 'test'
+  ...
+# Subtest: SP-BND03 SP02 required unknown bounds refuse with sorted reasons
+ok 3 - SP-BND03 SP02 required unknown bounds refuse with sorted reasons
+  ---
+  duration_ms: 0.199104
+  type: 'test'
+  ...
+# Subtest: SP-BND04 SP02 optional unknown pressure is omitted from the minimum
+ok 4 - SP-BND04 SP02 optional unknown pressure is omitted from the minimum
+  ---
+  duration_ms: 0.203834
+  type: 'test'
+  ...
+# Subtest: SP-BND05 SP02 all optional unknown bounds refuse rather than claiming capacity
+ok 5 - SP-BND05 SP02 all optional unknown bounds refuse rather than claiming capacity
+  ---
+  duration_ms: 0.137386
+  type: 'test'
+  ...
+# Subtest: SP-BND06 SP02 each known zero remains a zero ceiling
+ok 6 - SP-BND06 SP02 each known zero remains a zero ceiling
+  ---
+  duration_ms: 0.775645
+  type: 'test'
+  ...
+# Subtest: SP-BND07 SP02 malformed bounds refuse through the current exported API
+ok 7 - SP-BND07 SP02 malformed bounds refuse through the current exported API
+  ---
+  duration_ms: 0.996828
+  type: 'test'
+  ...
+# Subtest: SP-BND08 SP02 malformed legacy reservation declarations remain refused
+ok 8 - SP-BND08 SP02 malformed legacy reservation declarations remain refused
+  ---
+  duration_ms: 0.580611
+  type: 'test'
+  ...
+# Subtest: SP-OCC01 timeout keeps an unresolved execution occupied at C1
+ok 9 - SP-OCC01 timeout keeps an unresolved execution occupied at C1
+  ---
+  duration_ms: 7.157158
+  type: 'test'
+  ...
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":1000,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"timed-out","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=47290b7718ef28cc9174f4dc0309bb0b3b74a5ec478d70a4f1eb9059469e3d91
+# Subtest: SP-OCC02 orphaned after suspicion keeps an unresolved execution occupied at C1
+ok 10 - SP-OCC02 orphaned after suspicion keeps an unresolved execution occupied at C1
+  ---
+  duration_ms: 0.836403
+  type: 'test'
+  ...
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":3001,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"orphaned","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=276a5e9d9ad4cc08e851a53d88e2fe114b4fdbcf145dd96bfe1b1c97722e0a6e
+# Subtest: SP-OCC03 recovered observation alone keeps an unresolved execution occupied at C1
+ok 11 - SP-OCC03 recovered observation alone keeps an unresolved execution occupied at C1
+  ---
+  duration_ms: 0.810243
+  type: 'test'
+  ...
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":3001,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"recovered","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=91f4a075685f1c4cdc8306c643aa1002c667b905a5620bb04dda1d6977453bbc
+# Subtest: SP-OCC04 stale-candidate invalidation keeps the unresolved process occupied at C1
+ok 12 - SP-OCC04 stale-candidate invalidation keeps the unresolved process occupied at C1
+  ---
+  duration_ms: 0.587981
+  type: 'test'
+  ...
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"invalidated","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":1000,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"rejected","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=76900a90d55a28cb59abed21ab14f25b3cff8d6be81b788d28ecda0bab0c4293
+# Subtest: SP-OCC05 running cancellation and orphan suspicion retain capacity refusals
+ok 13 - SP-OCC05 running cancellation and orphan suspicion retain capacity refusals
+  ---
+  duration_ms: 1.661526
+  type: 'test'
+  ...
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"running","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}}]}
+# fixtureSha256=8a3404d1c24adf1e2a6007a091dadd1632e5bef0b0157cc54eb9fd3a6a347bcd
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":1000,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"cancel-requested","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=21f3fb6899f0ccab736e0693790379f8ec3bdde502cc8953d11f2186fb7b4354
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":3000,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"observed"},"state":"orphan-suspected","stateEvidenceSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}}]}
+# fixtureSha256=68e1c40d29f35ecdbbc4a69dc9a9f1a379363357c179c70dc4d1ce8998318f0b
+# fixture={"admissionSet":[{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","taskId":"task-1","writePaths":["lib/worker-1.mjs"]},{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","requestSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","state":"admitted","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","taskId":"task-2","writePaths":["lib/worker-2.mjs"]}],"candidate":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","repositorySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"capacity":{"certified":{"concurrentTasks":1,"required":true},"configured":{"concurrentTasks":1,"required":true},"effective":{"concurrentTasks":1,"reasonCodes":[],"status":"available"},"observed":{"concurrentTasks":1,"required":true},"operator":{"concurrentTasks":1,"required":true},"pressure":{"concurrentTasks":1,"required":true},"reserved":{"critic":0,"elephant":0,"verify":0}},"cleanupOwner":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","ownerNonce":"owner-1","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"poolId":"occupancy-pool","queueRevision":0,"schema":"pipeline.local-worker-pool.v1","serialFallback":false,"workers":[{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","separation":"unavailable"},"state":"running","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-1","ownerNonce":"owner-1","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","worktreePathSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","writePaths":["lib/worker-1.mjs"]}},{"heartbeat":{"evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","intervalMs":1000,"lastObservedMonotonicMs":0,"orphanAfterMs":3000},"lastTransitionMonotonicMs":0,"process":{"assuranceEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","identitySha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","separation":"observed"},"state":"admitted","stateEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workspaceLease":{"baseCommit":"1111111111111111111111111111111111111111","candidateCommit":"1111111111111111111111111111111111111111","cleanupState":"active","evidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","expiresMonotonicMs":60000,"issuedMonotonicMs":0,"leaseId":"lease-2","ownerNonce":"owner-2","repository":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subjectSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","worktreePathSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","writePaths":["lib/worker-2.mjs"]}}]}
+# fixtureSha256=cb33bd2a944559210435863867330f45149fe3a4aa92d728f205cf82342a2637
+# Subtest: SP-OCC06 over-capacity unavailable bounds and serial limits still refuse
+ok 14 - SP-OCC06 over-capacity unavailable bounds and serial limits still refuse
+  ---
+  duration_ms: 0.754626
+  type: 'test'
+  ...
+# Subtest: SP-OCC07 malformed lease stale owner and foreign candidate still refuse
+ok 15 - SP-OCC07 malformed lease stale owner and foreign candidate still refuse
+  ---
+  duration_ms: 0.229352
+  type: 'test'
+  ...
+# Subtest: SP-OCC08 result import and stale evidence cannot supply release authority
+ok 16 - SP-OCC08 result import and stale evidence cannot supply release authority
+  ---
+  duration_ms: 1.149823
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54.340105
+
+
+{"phase":"run","label":"consumer-safe-paths","command":"node --test --test-reporter=tap harness/scripts/check-consumer-safe-paths.test.mjs","exitCode":0,"expectedStatus":0,"expectedCount":null}
+TAP version 13
+# check-consumer-safe-paths: fixture and repository checks passed
+# Subtest: a fixture naming a source-only path fails
+ok 1 - a fixture naming a source-only path fails
+  ---
+  duration_ms: 0.64562
+  type: 'test'
+  ...
+# Subtest: a clean fixture passes
+ok 2 - a clean fixture passes
+  ---
+  duration_ms: 0.419197
+  type: 'test'
+  ...
+# Subtest: an allowlisted occurrence passes
+ok 3 - an allowlisted occurrence passes
+  ---
+  duration_ms: 0.160605
+  type: 'test'
+  ...
+# Subtest: a stale allowlist entry (never matches) is itself reported
+ok 4 - a stale allowlist entry (never matches) is itself reported
+  ---
+  duration_ms: 0.175714
+  type: 'test'
+  ...
+# Subtest: multiple prefix hits on one line each produce a finding
+ok 5 - multiple prefix hits on one line each produce a finding
+  ---
+  duration_ms: 0.095297
+  type: 'test'
+  ...
+# Subtest: SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+ok 6 - SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+  ---
+  duration_ms: 0.133875
+  type: 'test'
+  ...
+# Subtest: every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+ok 7 - every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+  ---
+  duration_ms: 0.326429
+  type: 'test'
+  ...
+# Subtest: current repository passes with the real ALLOWLIST (AC-11)
+ok 8 - current repository passes with the real ALLOWLIST (AC-11)
+  ---
+  duration_ms: 84.442319
+  type: 'test'
+  ...
+# Subtest: real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+ok 9 - real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+  ---
+  duration_ms: 5.53989
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132.483191
+
+
+{"phase":"final-input-readback","inputs":[{"path":"plugins/pipeline-core/lib/local-worker-pool.test.mjs","snapshotSha256":"46f3d8b1bfb4f64aca8e09af8fae618cbec9c251573a406dd76a188a8a4b3895","currentSha256":"46f3d8b1bfb4f64aca8e09af8fae618cbec9c251573a406dd76a188a8a4b3895"},{"path":"plugins/pipeline-core/lib/local-worker-pool.mjs","snapshotSha256":"6456e4545d3615629e1a45f180fdd2f8a1ba8fc7c1998331b278f09e79b12493","currentSha256":"6456e4545d3615629e1a45f180fdd2f8a1ba8fc7c1998331b278f09e79b12493"},{"path":"plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","snapshotSha256":"73d01d04c70cddef9c255a4a6e7e702c9ed6091b61bdc9db09b141018bac6574","currentSha256":"73d01d04c70cddef9c255a4a6e7e702c9ed6091b61bdc9db09b141018bac6574"},{"path":"plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","snapshotSha256":"5a931566776ddf2bf0420ac715eef33936504f8e45f9ee538a1a4348656fc9b0","currentSha256":"5a931566776ddf2bf0420ac715eef33936504f8e45f9ee538a1a4348656fc9b0"},{"path":"plugins/pipeline-core/lib/test-case-completion.mjs","snapshotSha256":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55","currentSha256":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/local-worker-pool.mjs","snapshotSha256":"700efdc0b1424969f798f9d4f3190f5a90051549f7554bd0f32517fa1bc344f4","currentSha256":"700efdc0b1424969f798f9d4f3190f5a90051549f7554bd0f32517fa1bc344f4"}],"recompositionRequired":false,"independentReview":"pending","poAcceptance":"open","noImplementationEdits":true}
+
+--- stderr ---

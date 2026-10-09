@@ -59,10 +59,12 @@ function poolCode(value) {
   const owner = value.workers.find((entry) => entry.subjectSha256 === value.cleanupOwner.subjectSha256 && entry.workspaceLease.ownerNonce === value.cleanupOwner.ownerNonce);
   if (!owner) return "STALE:cleanup-owner";
   if (!value.admissionSet.every((entry) => { const assigned = value.workers.find((candidate) => candidate.subjectSha256 === entry.subjectSha256); return assigned && entry.baseCommit === value.candidate.baseCommit && entry.candidateCommit === value.candidate.candidateCommit && entry.writePaths.every((path) => assigned.workspaceLease.writePaths.includes(path)); })) return "AUTHORITY:admission-binding";
-  const active = value.workers.filter((entry) => ACTIVE_WORKER_STATES.has(entry.state));
-  if (value.capacity.effective.status === "unavailable" && active.length > 0) return "AUTHORITY:parallel-unavailable";
-  if (value.capacity.effective.status === "available" && active.length > value.capacity.effective.concurrentTasks) return "BOUND:capacity-exceeded";
-  if (value.serialFallback && active.length > 1) return "BOUND:serial-fallback";
+  // Every retained worker has a process identity; v1 supplies no exit or
+  // disposal proof. Lifecycle state alone cannot release its occupied slot.
+  const occupied = value.workers.length;
+  if (value.capacity.effective.status === "unavailable" && occupied > 0) return "AUTHORITY:parallel-unavailable";
+  if (value.capacity.effective.status === "available" && occupied > value.capacity.effective.concurrentTasks) return "BOUND:capacity-exceeded";
+  if (value.serialFallback && occupied > 1) return "BOUND:serial-fallback";
   return null;
 }
 export function validateLocalWorkerPool(value) { const code = poolCode(value); return code ? { ok: false, code } : { ok: true, code: null }; }

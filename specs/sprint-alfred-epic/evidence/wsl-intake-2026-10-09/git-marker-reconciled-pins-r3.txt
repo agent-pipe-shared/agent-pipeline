@@ -1,0 +1,90 @@
+command: node scratch/git-marker-r3-verify.mjs
+label: git-marker-reconciled-pins-r3
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+input-sha256-before {"plugins/pipeline-core/lib/git-cmd.mjs":"e6ae412caba75a418ec940148187962e7ae25d274f705a3ae4df98f0b74cd1c5","plugins/pipeline-core/lib/git-cmd.test.mjs":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","specs/sprint-alfred-epic/signed-package/tranche-2/lib/git-cmd.mjs":"0130bcd6c1645273c6a31eb6e1894b6c6dc9ba83f51383836749f4f2980c7a34","specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs":"68def38e9e29c8b7bdf7a75a0b491c5fc17d0f56ade318e2b9d7f34d60904fa5","plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"}
+assertion-byte-preservation {"originalSha256":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","reconstructedSha256":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","passed":true}
+suite {"label":"immutable-baseline","command":"node scratch/git-marker-r3-graph/git-cmd.test.mjs","moduleSha256":"e6ae412caba75a418ec940148187962e7ae25d274f705a3ae4df98f0b74cd1c5","testsSha256":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","exitCode":0,"summary":"439/439 cases passed.","assertionsReached":439,"assertionIdsSha256":"a8957327f5c08f89cb7b3149e575545e3ce1a7b719725774d32ad8a9ad7fca2f","failures":[],"stderr":""}
+suite {"label":"carried-source-with-immutable-old-tests","command":"node scratch/git-marker-r3-graph/git-cmd.test.mjs","moduleSha256":"0130bcd6c1645273c6a31eb6e1894b6c6dc9ba83f51383836749f4f2980c7a34","testsSha256":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","exitCode":1,"summary":"438/439 cases passed.","assertionsReached":439,"assertionIdsSha256":"a8957327f5c08f89cb7b3149e575545e3ce1a7b719725774d32ad8a9ad7fca2f","failures":["FAIL  Q12-ACCEPTED-FP \"git commit -m \\\"$(date)\\\"\"  ACCEPTED false positive: command substitution inside a double-quoted commit message -- cmd=\"git commit -m \\\"$(date)\\\"\" expected=true out=false"],"stderr":""}
+suite {"label":"assembled-test-candidate","command":"node scratch/git-marker-r3-graph/git-cmd.test.mjs","moduleSha256":"0130bcd6c1645273c6a31eb6e1894b6c6dc9ba83f51383836749f4f2980c7a34","testsSha256":"2441b69f0302313053048c8281f0871b4c5a6893f84d2b24aed3014e31e56ff0","exitCode":0,"summary":"469/469 cases passed.","assertionsReached":469,"assertionIdsSha256":"74dac495f7dd0c8eb8fd37bafac150b7c4fc1e521bc8b076763d511e682d829d","failures":[],"stderr":""}
+preserved-existing-case-identifiers 439 new-accept-controls 12 new-push-ambiguity-composition-denials 18
+precise-assertion-diff
+--- plugins/pipeline-core/lib/git-cmd.test.mjs	2026-10-09 10:32:27.276742844 +0200
++++ specs/sprint-alfred-epic/signed-package/tranche-2/lib/git-cmd.test.mjs	2026-10-09 14:51:02.385628039 +0200
+@@ -957,16 +957,16 @@
+ ];
+ recordQ12Table("Q12-PLAIN", false, Q12_PLAIN_TABLE);
+ 
+-// Option-B accepted false positives, pinned as candidates ON PURPOSE. Neither command is a push. Under the decided
+-// fail-closed marker rule a dollar sign in any position after a git word makes the command a push candidate, so both
+-// are routed to the push gate for nothing. This is the accepted Codex-route cost of Q12 option B (the alternative,
+-// classifying what an expansion produces, is the deny-list that never converged). A later change that "fixes" these
+-// by exempting expansions reopens the bypass class and must be a new PO decision, not a test edit.
++// GREP-PUSH-F reconciles only the quoted date substitution's expectation. Historical
++// case identifiers and fixture descriptions are retained for comparison; the unquoted
++// revision substitution remains a candidate, as do every real push and ambiguous case.
+ const Q12_ACCEPTED_FALSE_POSITIVE_TABLE = [
+   ['git commit -m "$(date)"', "ACCEPTED false positive: command substitution inside a double-quoted commit message"],
+   ["git diff $(git merge-base HEAD main)", "ACCEPTED false positive: command substitution as a revision argument"],
+ ];
+-recordQ12Table("Q12-ACCEPTED-FP", true, Q12_ACCEPTED_FALSE_POSITIVE_TABLE);
++for (const row of Q12_ACCEPTED_FALSE_POSITIVE_TABLE) {
++  recordQ12Table("Q12-ACCEPTED-FP", row[0] !== 'git commit -m "$(date)"', [row]);
++}
+ 
+ // ---- commandIsGitPush: the heredoc narrowing, both sides (PO decision X, Q12-T3) ----
+ // Test-only pin. Contract: PO decision X (2026-10-07), recorded in specs/sprint-alfred-epic/plans/po-decisions-2026-10-07.md
+@@ -1332,6 +1332,45 @@
+   record(`GITCLS-T2: ${JSON.stringify(cmd)} is not a push  ${why}`, out === false, `cmd=${JSON.stringify(cmd)} out=${out}`);
+ }
+ 
++// ---- GREP-PINS-R2: independent quoted non-push acceptance and fail-closed controls ----
++// These strings are classifier inputs only; no shell command or substitution is executed.
++const GREP_PINS_R2_ACCEPT_TABLE = [
++  ["git grep '(alpha|beta)' -- a.mjs", "single-quoted regex parentheses and pipe are data"],
++  ['git grep "(alpha|beta)" -- a.mjs', "double-quoted regex parentheses and pipe are data"],
++  ["git log --grep='cost $5 {item} (note) `literal`'", "single-quoted marker characters are inert"],
++  ["git show 'HEAD:dir/(item){x}$file'", "quoted revision path markers are data"],
++  ["git diff -- 'dir/(item){x}$file'", "quoted pathspec markers are data"],
++  ["git status -- 'dir/(item){x}$file'", "quoted status pathspec markers are data"],
++  ["git commit -m 'cost $5 {item} (note) `literal`'", "single-quoted commit markers are inert"],
++  ['git log --grep="$(date)"', "plain non-push substitution in double quotes"],
++  ['git grep "$(git status)" -- a.mjs', "recursive plain read substitution"],
++  ['git show "$(git log)"', "recursive log substitution"],
++  ['git diff -- "$NAME"', "plain variable in double quotes"],
++  ['git status -- "(dir){x}"', "double-quoted balanced parentheses and brace"],
++];
++recordQ12Table("GREP-PINS-R2: ACCEPT", false, GREP_PINS_R2_ACCEPT_TABLE);
++const GREP_PINS_R2_DENY_TABLE = [
++  ["git push origin main", "literal real push stays a candidate"],
++  ["git push 'origin' 'main'", "quoted real push operands stay candidates"],
++  ['git commit -m "$(git push origin main)"', "real push inside substitution stays a candidate"],
++  ['git grep "`git push origin main`"', "push in backtick substitution stays a candidate"],
++  ['git status -- "${NAME:-push}"', "parameter operator remains ambiguous"],
++  ['git grep "$(date; git push origin main)"', "composed substitution remains a candidate"],
++  ["git grep (alpha)", "unquoted parentheses remain ambiguous"],
++  ["git log --grep={alpha,beta}", "unquoted brace expansion remains ambiguous"],
++  ["git grep '$NAME' && git push origin main", "composition cannot gain the exemption"],
++  ["git grep '(alpha)' > result.txt", "redirect cannot gain the exemption"],
++  ["git grep '(alpha)' | cat", "pipeline cannot gain the exemption"],
++  ["git grep '(alpha)' # comment", "comment cannot gain the exemption"],
++  ["git grep '(alpha)'\ngit push origin main", "multiple lines cannot gain the exemption"],
++  ["git -c alias.x=status x '(alpha)'", "global option and alias remain ambiguous"],
++  ["git remote '(alpha)'", "push-capable subcommand is excluded"],
++  ["git config '(alpha)'", "configuration subcommand is excluded"],
++  ["git grep '(alpha)", "unterminated quote remains ambiguous"],
++  ["bash -c 'git grep (alpha)'", "nested shell remains ambiguous"],
++];
++recordQ12Table("GREP-PINS-R2: DENY", true, GREP_PINS_R2_DENY_TABLE);
++
+ // ---- Summary ------------------------------------------------------------------------------
+ const total = pass + failures.length;
+ console.log(`\n${pass}/${total} cases passed.`);
+
+input-sha256-after {"plugins/pipeline-core/lib/git-cmd.mjs":"e6ae412caba75a418ec940148187962e7ae25d274f705a3ae4df98f0b74cd1c5","plugins/pipeline-core/lib/git-cmd.test.mjs":"2a356d10a595ae0031f263a7f9129a8809d63395568e8fd1cfe6281712fd5189","specs/sprint-alfred-epic/signed-package/tranche-2/lib/git-cmd.mjs":"0130bcd6c1645273c6a31eb6e1894b6c6dc9ba83f51383836749f4f2980c7a34","specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs":"68def38e9e29c8b7bdf7a75a0b491c5fc17d0f56ade318e2b9d7f34d60904fa5","plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"}
+source-hash-invariance passed; setup-failures 0; expected historical RED reached 439 assertions; candidate GREEN reached 469 assertions
+
+--- stderr ---

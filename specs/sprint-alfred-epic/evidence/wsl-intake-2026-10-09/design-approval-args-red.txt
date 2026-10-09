@@ -1,0 +1,298 @@
+command: node scratch/verify-ALFRED-DESIGN-ARGS-T-20261009.mjs
+label: ALFRED-DESIGN-ARGS-T-20261009
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+COMMAND node --test --test-reporter=tap plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs
+TAP version 13
+# Subtest: DAGA001 present admits one explicit existing review receipt
+not ok 1 - DAGA001 present admits one explicit existing review receipt
+  ---
+  duration_ms: 4.353977
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    imported parser/catalogue policy for ["present-plan","--by","Public reviewer","--review-receipt","reviews/round-1.json"]
+    + actual - expected
+    
+      [
+    +   false,
+    +   false
+    -   true,
+    -   true
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: true
+    1: true
+  actual:
+    0: false
+    1: false
+  operator: 'deepStrictEqual'
+  stack: |-
+    admission (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:45:12)
+    file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:50:114
+    fixture (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:34:16)
+    Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:50:92)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.start (node:internal/test_runner/test:1096:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+  ...
+# Subtest: DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+not ok 2 - DAGA002 present admits two distinct receipts and attribution at the UTF-8 bound
+  ---
+  duration_ms: 2.268092
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    imported parser/catalogue policy for ["present-plan","--by","éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé","--review-receipt","reviews/round-1.json","--review-receipt","reviews/round-2.json"]
+    + actual - expected
+    
+      [
+    +   false,
+    +   false
+    -   true,
+    -   true
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: true
+    1: true
+  actual:
+    0: false
+    1: false
+  operator: 'deepStrictEqual'
+  stack: |-
+    admission (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:45:12)
+    file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:53:5
+    fixture (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:34:16)
+    Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:51:112)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+  ...
+# Subtest: DAGA003 mini presentation admits plain bounded attribution
+not ok 3 - DAGA003 mini presentation admits plain bounded attribution
+  ---
+  duration_ms: 2.107725
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    imported parser/catalogue policy for ["present-plan","--by","Public reviewer"]
+    + actual - expected
+    
+      [
+    +   false,
+    +   false
+    -   true,
+    -   true
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: true
+    1: true
+  actual:
+    0: false
+    1: false
+  operator: 'deepStrictEqual'
+  stack: |-
+    admission (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:45:12)
+    file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:55:113
+    fixture (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:34:16)
+    Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:55:91)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+  ...
+# Subtest: DAGA004 approve admits the exact physically contained regular Scratch request
+not ok 4 - DAGA004 approve admits the exact physically contained regular Scratch request
+  ---
+  duration_ms: 2.064666
+  type: 'test'
+  location: '<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    imported parser/catalogue policy for ["approve-plan","--by","Public reviewer","--design-approval-request","scratch/design-approval-request-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json"]
+    + actual - expected
+    
+      [
+    +   false,
+    +   false
+    -   true,
+    -   true
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: true
+    1: true
+  actual:
+    0: false
+    1: false
+  operator: 'deepStrictEqual'
+  stack: |-
+    admission (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:45:12)
+    file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:56:132
+    fixture (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:34:16)
+    Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs:56:110)
+    TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1201:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    Test.postRun (node:internal/test_runner/test:1330:19)
+    Test.run (node:internal/test_runner/test:1258:12)
+  ...
+# Subtest: DAGA005 preserve existing inspect submit phase and approval branches
+ok 5 - DAGA005 preserve existing inspect submit phase and approval branches
+  ---
+  duration_ms: 2.910558
+  type: 'test'
+  ...
+# Subtest: DAGA006 reject third and duplicate review receipt paths
+ok 6 - DAGA006 reject third and duplicate review receipt paths
+  ---
+  duration_ms: 1.904089
+  type: 'test'
+  ...
+# Subtest: DAGA007 reject missing duplicate blank oversize and flag-form attribution
+ok 7 - DAGA007 reject missing duplicate blank oversize and flag-form attribution
+  ---
+  duration_ms: 2.246812
+  type: 'test'
+  ...
+# Subtest: DAGA008 reject unknown duplicate request and spliced flag forms
+ok 8 - DAGA008 reject unknown duplicate request and spliced flag forms
+  ---
+  duration_ms: 2.156173
+  type: 'test'
+  ...
+# Subtest: DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+ok 9 - DAGA009 reject unsafe absolute escaping non-JSON and missing receipt paths
+  ---
+  duration_ms: 2.168404
+  type: 'test'
+  ...
+# Subtest: DAGA010 reject unsafe request paths and invalid digest basenames
+ok 10 - DAGA010 reject unsafe request paths and invalid digest basenames
+  ---
+  duration_ms: 2.328851
+  type: 'test'
+  ...
+# Subtest: DAGA011 reject receipt symlinks and physical parent escapes
+ok 11 - DAGA011 reject receipt symlinks and physical parent escapes
+  ---
+  duration_ms: 2.953227
+  type: 'test'
+  ...
+# Subtest: DAGA012 reject request symlinks parent escape directory and multiple links
+ok 12 - DAGA012 reject request symlinks parent escape directory and multiple links
+  ---
+  duration_ms: 3.236191
+  type: 'test'
+  ...
+# Subtest: DAGA013 new flags do not widen unrelated commands or foreign script admission
+ok 13 - DAGA013 new flags do not widen unrelated commands or foreign script admission
+  ---
+  duration_ms: 2.195953
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 9
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 198.261655
+EXIT 1
+COMMAND node --test --test-reporter=tap harness/scripts/check-consumer-safe-paths.test.mjs
+TAP version 13
+# check-consumer-safe-paths: fixture and repository checks passed
+# Subtest: a fixture naming a source-only path fails
+ok 1 - a fixture naming a source-only path fails
+  ---
+  duration_ms: 0.701745
+  type: 'test'
+  ...
+# Subtest: a clean fixture passes
+ok 2 - a clean fixture passes
+  ---
+  duration_ms: 0.478359
+  type: 'test'
+  ...
+# Subtest: an allowlisted occurrence passes
+ok 3 - an allowlisted occurrence passes
+  ---
+  duration_ms: 0.424471
+  type: 'test'
+  ...
+# Subtest: a stale allowlist entry (never matches) is itself reported
+ok 4 - a stale allowlist entry (never matches) is itself reported
+  ---
+  duration_ms: 0.194266
+  type: 'test'
+  ...
+# Subtest: multiple prefix hits on one line each produce a finding
+ok 5 - multiple prefix hits on one line each produce a finding
+  ---
+  duration_ms: 0.104748
+  type: 'test'
+  ...
+# Subtest: SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+ok 6 - SOURCE_ONLY_PREFIXES carries the backlog item's minimum set
+  ---
+  duration_ms: 0.129057
+  type: 'test'
+  ...
+# Subtest: every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+ok 7 - every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason
+  ---
+  duration_ms: 0.362432
+  type: 'test'
+  ...
+# Subtest: current repository passes with the real ALLOWLIST (AC-11)
+ok 8 - current repository passes with the real ALLOWLIST (AC-11)
+  ---
+  duration_ms: 85.38818
+  type: 'test'
+  ...
+# Subtest: real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+ok 9 - real allowlisted (file, match) entries still exist and still contain the allowlisted substring
+  ---
+  duration_ms: 9.015898
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 142.316337
+EXIT 0
+{"schema":"design-approval-args-red-check.v1","passed":true,"policyRed":["DAGA001","DAGA002","DAGA003","DAGA004"],"greenControls":["DAGA005","DAGA006","DAGA007","DAGA008","DAGA009","DAGA010","DAGA011","DAGA012","DAGA013"],"setupFailures":[],"immutableSourceSha256":{"plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs":"505e64749efa191e10e0522298d74908a8656f164eb7bfdee6412d7f53ebb1d9","plugins/pipeline-core/lib/guard/command-catalogue.mjs":"c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs":"8dc5efc5b2631744d8d4baa6527e4ce9c8b3fda01053cb31773fef3d1cef2c9e","plugins/pipeline-core/lib/test-case-completion.mjs":"616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55"},"consumerSafePathsExit":0,"independentReview":"pending","poAcceptance":"open"}
+
+--- stderr ---

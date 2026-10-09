@@ -1,0 +1,16 @@
+command: rg -n "reject empty signature anchors|actual proof against a nonempty trust anchor|C2 admit|A7|Empty trust anchors: by design|Ablehnen" scratch/contract-ALFRED-DESIGN-BOUNDARY-F-20261009.md specs/sprint-alfred-epic/plans/design-flow-integration-contract-2026-10-09.md specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs specs/sprint-alfred-epic/plans/0.7-execution-order.md
+label: design-boundary-contract-contradiction
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs:69: *   A7  The signature fixture ships no trust-policy file. With project/critical-human-proof.json
+specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-devplan-design-approval.test.mjs:309:test("C2 admit  v8 signature record under configured chat (the stronger proof satisfies the weaker mode)", async () => {
+specs/sprint-alfred-epic/plans/0.7-execution-order.md:50:  A1–A7 ratified as pinned. (21) AL proceeds provisionally with N1=B (digest in the Critic receipt) and N2=B
+specs/sprint-alfred-epic/plans/0.7-execution-order.md:2512:    - **Empty trust anchors: by design.** PO verbatim: "Das ist so gewollt! Die Pipeline sperrt den Agenten ein und
+specs/sprint-alfred-epic/plans/0.7-execution-order.md:2786:  - **PO decision, empty trust anchors:** "Ablehnen + Setup" — signature mode refuses an empty anchor set with a typed
+specs/sprint-alfred-epic/plans/design-flow-integration-contract-2026-10-09.md:37:actual proof against a nonempty trust anchor. It reads no course store or
+scratch/contract-ALFRED-DESIGN-BOUNDARY-F-20261009.md:3:IMPLEMENT existing approved ADR0085 F3 only in parked guard-devplan-policy postimage. Current source lacks new-record branch; legacy reread/signature export already exists and library45 cases pass, reuse it. Validate complete v8 binding and current digests, proof/trust or chat attribution, reject empty signature anchors with setup guidance, apply configured-mode downgrade rule, no course-store/readiness host dependency. Frozen pre-v7 branches preserved; v7 uses legacy reread. Code-specific remediation: new ordinary review/present/approve route; reopen only actual content drift. No tests edits. New complete Scratch graph runs both immutable parked boundary suites, exact modes/source/proof/candidate controls; current state validator/writer integration is separately owned, report dependencies without stubbing actual assertion APIs. Preserve all other security invariants.
+
+--- stderr ---

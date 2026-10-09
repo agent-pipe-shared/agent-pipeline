@@ -1,0 +1,317 @@
+command: node scratch/design-retirement-verify.mjs
+label: design-retirement-postimages
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.design-retirement-postimage-inventory.v1",
+  "newTableSha256": "ca1c9f524e97bc3d75d342930ee78b18d107b643a98cbe30f3b6f40b743fec4b",
+  "inventory": [
+    {
+      "source": "plugins/pipeline-core/scripts/design-advisory-coordinator.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-coordinator.mjs",
+      "baseSha256": "466a66592422ae9a12f2dc1573de883b78e782ae3303256d7f83a4744a63be35",
+      "postimageSha256": "b3f4a1d63e5082e25425a9aea43ebff4be5a965578e5103bb4d21ed0d1187298",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export async function runDesignAdvisoryCoordinator(argv = process.argv.slice(2), dependencies = {}) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/design-advisory-admission.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-admission.mjs",
+      "baseSha256": "9b2c1a1461cd0394b25f5447179c5534995856002cc66841b2e3565959f5f7af",
+      "postimageSha256": "86d00d105b418078d63521a2c457e5145561a6405810b20c408db8eecd38080d",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/design-course-session.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-session.mjs",
+      "baseSha256": "d322ed15901a8a9345650873c4db7d2eafef0a3784110d16319ca1b9f0782c74",
+      "postimageSha256": "924abfc7f39491b520b296b58ae907df96a501e92bdf4d2b9ec38f4d0be104a7",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export async function runDesignCourseV2(input = {}, dependencies = {}) {",
+        "early typed refusal: export async function main(argv = process.argv.slice(2), io = process, dependencies = {}) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/design-course-coordinator.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-coordinator.mjs",
+      "baseSha256": "efc996c89af57f07287d7f54814730c3a0ca7828acbcafbdf48561ac1c6b5513",
+      "postimageSha256": "61b94d6a2deb9a66a693cdc61b9772ca29a03f6723de9acc8ac56195a9e08f62",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export function inspectDesignCourse({ rootDir, runner = null, read = readFileSync, runGit = execFileSync } = {}) {",
+        "early typed refusal: export function main(argv = process.argv.slice(2), io = console) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/runner-design-readiness-bootstrap.mjs",
+      "baseSha256": "a7522bb9d11a86fb41fa45fc27d8b29b143dcf3c8404b2642cd018ca859bae09",
+      "postimageSha256": "2d4d980f83a189fce2fe74c5a8b0cf6ead59ea3b4e47a68ec04066919280b747",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export async function runRunnerDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/codex-design-readiness-bootstrap.mjs",
+      "baseSha256": "d9b2c4e48071353e0653ad36ca4f5b17c695e7f8c200da9bfb3af03b37fbe6bb",
+      "postimageSha256": "665b5dc45b621b472c870e04db6950900edfd16a609177bfe7c9a437395933a8",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {",
+        "preserved imported exports and direct-invocation guard"
+      ]
+    },
+    {
+      "source": "plugins/pipeline-core/scripts/spec-readiness-host.mjs",
+      "target": "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/spec-readiness-host.mjs",
+      "baseSha256": "1248f22c7512e24b3bcca6a44b5777489bb064d6fe76d8ab9191ad427aa4f087",
+      "postimageSha256": "5a473b77a13813ad9f24ab7e681da510da11cb920dac140f1ddfc82fc2dea9b9",
+      "changes": [
+        "shared retirement import",
+        "early typed refusal: export async function runSpecReadinessHost({ dispatch, dispatchId, sources, references, repoFingerprint, requested, sandboxRuntime, hostBridge }, dependencies = undefined) {",
+        "guarded direct-invocation retirement"
+      ]
+    }
+  ]
+}
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-coordinator.mjs
+diff --git a/plugins/pipeline-core/scripts/design-advisory-coordinator.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-coordinator.mjs
+index b3ace7172..6176a1093 100644
+--- a/plugins/pipeline-core/scripts/design-advisory-coordinator.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-coordinator.mjs
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_ADVISORY_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ 
+ /**
+  * Versioned five-source initial-design Advisor entry for productive runners.
+@@ -53,6 +54,8 @@ function rationale(root, path) {
+ }
+ 
+ export async function runDesignAdvisoryCoordinator(argv = process.argv.slice(2), dependencies = {}) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED);
+   if(!argv.includes('--legacy-v1'))return runInitialCoordinator(argv);
+   // Explicit historical diagnostics preserve their actual v1 contract. They
+   // cannot supply initial-five-source provenance to the productive v2 reader.
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-admission.mjs
+diff --git a/plugins/pipeline-core/scripts/design-advisory-admission.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-admission.mjs
+index 7e87053b4..04c143998 100644
+--- a/plugins/pipeline-core/scripts/design-advisory-admission.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-advisory-admission.mjs
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_ADVISORY_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ 
+ /**
+  * Runner-neutral writer for the durable initial-design Advisor admission.
+@@ -104,6 +105,8 @@ function disposition(root, values) {
+ }
+ 
+ export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED);
+   const { command, values } = parsed(argv);
+   const root = resolve(values["--repo-root"]);
+   safePath(values["--plan"], "plan"); safePath(values["--spec"], "spec");
+@@ -137,6 +140,6 @@ export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+-  try { process.stdout.write(`${JSON.stringify(runDesignAdvisoryAdmission())}\n`); }
++  try { const result = runDesignAdvisoryAdmission(); process.stdout.write(`${JSON.stringify(result)}\n`); if (!result.ok) process.exitCode = 2; }
+   catch (error) { process.stderr.write(`DESIGN-ADVISORY-ADMISSION-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
+ }
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-session.mjs
+diff --git a/plugins/pipeline-core/scripts/design-course-session.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-session.mjs
+index 5331e45a6..51e6b42f1 100644
+--- a/plugins/pipeline-core/scripts/design-course-session.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-session.mjs
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ /**
+  * Executable handoff for the existing design-course producers. This module
+  * never synthesizes Advisor/readiness evidence or signs a package. It emits
+@@ -558,6 +559,8 @@ export async function buildFinalDesignReviewRequest({
+  * preparation and final package, and return the unsigned final PO request.
+  * Execution is impossible without the caller's explicit confirmation bit. */
+ export async function runDesignCourseV2(input = {}, dependencies = {}) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_COURSE_RETIRED);
+   if (input.confirmProducerExecution !== true) {
+     return { ok: false, status: "producer-confirmation-required", code: "DESIGN-COURSE-EXECUTION-EXPLICIT-CONFIRMATION-REQUIRED",
+       implementationAuthority: false };
+@@ -669,6 +672,10 @@ function readBoundInput(root, ref, kind) {
+ }
+ 
+ export async function main(argv = process.argv.slice(2), io = process, dependencies = {}) {
++  const retirement = retiredDesignResult(DESIGN_COURSE_RETIRED);
++  io.stdout.write(`${JSON.stringify(retirement)}\n`);
++  io.exitCode = 2;
++  return retirement;
+   const input = parseCli(argv);
+   if (input.inspect) {
+     if (input.runV2 || input.execute || input.stage !== undefined || input.sources && Object.keys(input.sources).length
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-coordinator.mjs
+diff --git a/plugins/pipeline-core/scripts/design-course-coordinator.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-coordinator.mjs
+index 9dd154fd2..09373112c 100644
+--- a/plugins/pipeline-core/scripts/design-course-coordinator.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/design-course-coordinator.mjs
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ /** Read-only route handoff for the Epic/Feature Advisor -> readiness -> one-approval course. */
+ import { execFileSync } from "node:child_process";
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+@@ -11,6 +12,8 @@ const RUNNERS = new Set(["claude", "codex", "antigravity"]);
+ function fail(code) { throw Object.assign(new Error(code), { code }); }
+ 
+ export function inspectDesignCourse({ rootDir, runner = null, read = readFileSync, runGit = execFileSync } = {}) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_COURSE_RETIRED);
+   const root = resolve(rootDir ?? "");
+   if (!isAbsolute(rootDir ?? "") || root !== rootDir) fail("DESIGN-COURSE-ROOT-UNSAFE");
+   const rootInfo = lstatSync(root);
+@@ -63,6 +66,9 @@ export function inspectDesignCourse({ rootDir, runner = null, read = readFileSyn
+ }
+ 
+ export function main(argv = process.argv.slice(2), io = console) {
++  const retirement = retiredDesignResult(DESIGN_COURSE_RETIRED);
++  io.log(JSON.stringify(retirement));
++  return retirement;
+   let rootDir = null; let runner = null;
+   for (let index = 0; index < argv.length; index++) {
+     if (argv[index] === "--root" && typeof argv[index + 1] === "string") rootDir = argv[++index];
+@@ -76,5 +82,5 @@ export function main(argv = process.argv.slice(2), io = console) {
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+-  try { main(); } catch (error) { process.stderr.write(`${error.code ?? "DESIGN-COURSE-ERROR"}\n`); process.exitCode = 2; }
++  try { const result = main(); if (!result.ok) process.exitCode = 2; } catch (error) { process.stderr.write(`${error.code ?? "DESIGN-COURSE-ERROR"}\n`); process.exitCode = 2; }
+ }
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/runner-design-readiness-bootstrap.mjs
+diff --git a/plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/runner-design-readiness-bootstrap.mjs
+index d35c74447..51f887746 100644
+--- a/plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/runner-design-readiness-bootstrap.mjs
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ 
+ /**
+  * Independent design-readiness producer for a Claude-only or Antigravity-only
+@@ -278,6 +279,8 @@ function privateRunnerExecutable(runner, deps) {
+ 
+ /** Produce one independently reviewed, execution-bound Claude or Agy receipt. */
+ export async function runRunnerDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_COURSE_RETIRED);
+   const args = parseArgs(argv);
+   physicalDirectory(args.repoRoot);
+   const config = parseYaml(readFileSync(join(args.repoRoot, "pipeline.user.yaml"), "utf8"));
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/codex-design-readiness-bootstrap.mjs
+diff --git a/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/codex-design-readiness-bootstrap.mjs
+index 10fe4eae3..c7f67d8ae 100644
+--- a/plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/codex-design-readiness-bootstrap.mjs
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ 
+ /**
+  * Read-only Codex readiness producer for one already-authored design package.
+@@ -167,6 +168,8 @@ function readSources(root, paths, candidate, deps) {
+ 
+ /** Run one separately dispatched, exact-candidate Codex readiness review. */
+ export async function runCodexDesignReadinessBootstrap(argv = process.argv.slice(2), deps = {}) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_COURSE_RETIRED);
+   const args = parseArgs(argv);
+   const rootInfo = lstatSync(args.repoRoot);
+   if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() || realpathSync(args.repoRoot) !== args.repoRoot) fail("repository root must be a physical absolute directory");
+
+PASS syntax, preserved exports and direct refusal: specs/sprint-alfred-epic/signed-package/tranche-2/scripts/spec-readiness-host.mjs
+diff --git a/plugins/pipeline-core/scripts/spec-readiness-host.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/spec-readiness-host.mjs
+index bc80058b3..750e20b90 100644
+--- a/plugins/pipeline-core/scripts/spec-readiness-host.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/scripts/spec-readiness-host.mjs
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: SUL-1.0
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ 
+ /** Explicit refs-only readiness call site for the generic selected transport. */
+ import { readFileSync } from "node:fs";
+@@ -66,6 +67,8 @@ function hostUnavailable() {
+ 
+ /** Delegates a fresh refs-only readiness review to the selected generic host. */
+ export async function runSpecReadinessHost({ dispatch, dispatchId, sources, references, repoFingerprint, requested, sandboxRuntime, hostBridge }, dependencies = undefined) {
++  // Retired before parsing, state access, dispatch or publication. Keep legacy exports.
++  return retiredDesignResult(DESIGN_COURSE_RETIRED);
+   validateDispatch(dispatch);
+   if (!ID.test(dispatchId ?? "")) fail("readiness dispatch id is invalid");
+   const freshReferences = referencesOnly(references);
+@@ -127,3 +130,10 @@ export async function runSpecReadinessHost({ dispatch, dispatchId, sources, refe
+   if (!schemaResult.valid) fail(`readiness report schema is invalid: ${schemaResult.errors.join("; ")}`);
+   return { ...result, readinessReceipt };
+ }
++
++/** Direct invocation refuses without starting a host or reading caller inputs. */
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++if (isDirectInvocation(import.meta.url)) {
++  process.stdout.write(`${JSON.stringify(retiredDesignResult(DESIGN_COURSE_RETIRED))}\n`);
++  process.exitCode = 2;
++}
+
+COMMAND node --test --test-name-pattern=retired: scripts/|retired: lib/ scratch/design-retirement-mirror/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+✔ retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (141.541092ms)
+ℹ design-advisory-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (31.896602ms)
+ℹ design-advisory-admission.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (27.523926ms)
+ℹ design-course-session.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (20.431218ms)
+ℹ design-course-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (132.043448ms)
+ℹ runner-design-readiness-bootstrap.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (0.740114ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 398.384965
+
+
+EXIT 0
+PASS all seven parked entrypoints, shared table and six unchanged retired E2E assertions; dependent main-writer retirement cases excluded from this disjoint slice. Independent review and PO acceptance pending.
+
+--- stderr ---

@@ -1,0 +1,476 @@
+command: node scratch/alfred-candidate-assembly-close-audit-20261009.mjs
+label: ALFRED-CANDIDATE-ASSEMBLE-20261009-final-blocked
+exitCode: 1
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.candidate-assembly-closing-audit.v1",
+  "baseCommit": "0e21eccd9acbef6a0bd32f8e104a2291e3210ef7",
+  "status": "blocked",
+  "inventoryTargets": 42,
+  "packageInputs": 61,
+  "publicSourceInputs": 1923,
+  "mirror": "scratch/alfred-candidate-assembly-20261009-r2/b",
+  "originalAssemblerCommand": "node scratch/alfred-candidate-assemble-20261009.mjs",
+  "originalAssemblerExitCode": 0,
+  "originalAssemblerResult": "Invalid green: patch postconditions were missing.",
+  "syntaxChecks": [
+    {
+      "kind": "json-syntax",
+      "target": "harness/verify-suites.json",
+      "exitCode": 0
+    },
+    {
+      "kind": "json-syntax",
+      "target": "plugins/pipeline-core/config/routing-authority.json",
+      "exitCode": 0
+    },
+    {
+      "kind": "json-syntax",
+      "target": "plugins/pipeline-core/config/runner-mappings.json",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-git.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-push.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-testpath-override.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/guard-testpath.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/denial-telemetry.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/env-dump-lane.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/local-worker-pool.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/private-boundary.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/review-economy.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "json-syntax",
+      "target": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "exitCode": 0
+    },
+    {
+      "kind": "syntax",
+      "target": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "exitCode": 0
+    }
+  ],
+  "whitespaceChecks": [
+    {
+      "target": "harness/verify-suites.json",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/agents/critic.md",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/config/routing-authority.json",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/config/runner-mappings.json",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-git.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-push.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-testpath-override.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-testpath.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/git-cmd.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/bootstrap-receipt.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/denial-telemetry.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/private-boundary.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/review-economy.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/policies/model-policy.md",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "passed": true
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "passed": true
+    }
+  ],
+  "assertionBytesPreserved": true,
+  "finalReadbackAssertions": {
+    "pipelineStateDrift": false,
+    "pipelineStateRebind": false,
+    "kernelAddition": false
+  },
+  "finalReadbackInputDrift": [],
+  "unresolved": [
+    {
+      "targets": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/lib/guard-maintenance-window.mjs"
+      ],
+      "reason": "Second scratch setup failure after one permitted correction: nested Git apply returned 0 while leaving patch targets unchanged. No further recovery attempted."
+    },
+    {
+      "target": "plugins/pipeline-core/config/runner-mappings.json",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/architecture-design.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/review-economy.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/schema-lite.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/lib/windows-private-state.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/policies/model-policy.md",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/continuity-state.schema.json",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "reason": "No exact documented target/source citation found; mirrored tranche layout supplies mapping, needs confirmation."
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "reason": "Required tranche suite registration absent in composed verify-suites.json"
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "reason": "Required tranche suite registration absent in composed verify-suites.json"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "reason": "Required tranche suite registration absent in composed verify-suites.json"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "reason": "Required tranche suite registration absent in composed verify-suites.json"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "reason": "Required tranche suite registration absent in composed verify-suites.json"
+    },
+    {
+      "reason": "harness/scripts/pipeline-state.test.mjs TESTFIX-A regions A/B, AR03h and HL are named same-tranche obligations without a carried postimage in signed-package."
+    },
+    {
+      "reason": "Q11/T33 registration disposition remains named unresolved by tranche-1 README."
+    },
+    {
+      "reason": "Full postimages replace captured source bytes; stale-base preservation requires review of every target diff and final input rebind."
+    },
+    {
+      "reason": "Other workers own local-worker-pool and guard-git test corrections; recomposition after their delivery is required."
+    }
+  ],
+  "output": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly.json",
+  "nextBriefing": "Fresh bounded assembler dispatch must use a proven isolated patch application method, verify resulting patch markers/digests, capture every latest worker proposal, and confirm map/documentation and suite-registration obligations before signing.",
+  "independentReview": "pending",
+  "poAcceptance": "open"
+}
+
+--- stderr ---

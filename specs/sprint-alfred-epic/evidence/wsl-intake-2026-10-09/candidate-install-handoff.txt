@@ -1,0 +1,426 @@
+command: node scratch/install-handoff-readback-ALFRED-INSTALL-HANDOFF-20261009.mjs
+label: ALFRED-INSTALL-HANDOFF-20261009
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.source-install-handoff-diagnosis.v1",
+  "dispatchId": "ALFRED-INSTALL-HANDOFF-20261009",
+  "verificationKind": "source-contract-assertions-only",
+  "inputSha256": [
+    {
+      "path": "scratch/contract-ALFRED-INSTALL-HANDOFF-20261009.md",
+      "sha256": "c37924080eb3bf7ea849df636d7c23c5951e9f9683b562508dcdefef71725e5f"
+    },
+    {
+      "path": "docs/codex-local-plugin-development.md",
+      "sha256": "66cebe8ff8f5c1c9a6b3bd5677be8b45977d0f3b6fbe54e61f7b4c12593f9eec"
+    },
+    {
+      "path": "docs/claude-local-plugin-development.md",
+      "sha256": "a09407cdbec8f94ac6b9eb6cc876a4d2f1e6012e76104b2f2d047ee6361e99a5"
+    },
+    {
+      "path": "docs/po-human-approval.md",
+      "sha256": "a60e6b8b919b22c56a464f8181af79bad4ad6d1d68023f23196b08783163a095"
+    },
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "sha256": "66f34f09a1345a476e8a32dddad7f9599fca635e1c7f13a0d8c27e870a3dfd08"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/quality-package-materializer.mjs",
+      "sha256": "0fbe60e5c85644f1ae2725fe5394195cfa8f51cdbe766df1c420414781b716c7"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "sha256": "d6ab8b735fb3745b6bb980047250cbc99b7ca02d761c6ee9ebde0b658cd62128"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "sha256": "d6495ab13e2d3d87c60fca73cb30cc112fb0ec2dea399e5a1ebd0ce31c8cea24"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/installed-plugin-attestation.mjs",
+      "sha256": "31a5b43af438f3162cb1b168a0c149ad3072ca6fbb5c356366c5d1ce2ecabc0f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/public-core-observation.mjs",
+      "sha256": "0749ef3c806d6ba97e8bde793d3879bb3feb809e9ecde7ace7215c7facb220a0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "5725cc46667927d4d8bb49b3fa0da7308e345a2e84381d3b1ddce0fba1eb17bf"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-protected-path-integrity.mjs",
+      "sha256": "62b54383b39cbb8f1c471b957dec6d63a8ab0d36c7d5e05abe12b2b3f2056703"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
+      "sha256": "3a20c6cb1a43e02c8c69e041b400a8cfd8a88e4f7a7cca53bfb0dd67ebe63b7e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json",
+      "sha256": "5ffd8420069ec30ebf2891ed370e48809c7b0269c0cc106e05ddbee03c3750ec"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "7a705a110535a937e552caa3f34485959046f242cf0884ce830d874446db4200"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/native-plugin-readback.mjs",
+      "sha256": "8fc6d53129f827a626cafce6041344dc9ba03db7d673ba17377f78e7bb3f6f13"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/check-protected-delta.mjs",
+      "sha256": "5af4db49403afcaaf1f417d11af17cab15c75387b164995f4eb454905a520546"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/copy-safe-command.mjs",
+      "sha256": "7598d749d3041eba3f5d78ed111f18783315c673d81e1e617863e02a02ad51a3"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/ceremony-route.md",
+      "sha256": "d6604e0b5d0c3781b8b16e9c1c7d0fff843f1bac99d29cf0d8992f453261a0ca"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/README.md",
+      "sha256": "b6c26675b5edbcb821ce67856dfb01364f3a300046f78833aac18906d3b7ad07"
+    }
+  ],
+  "reachedAssertions": [
+    {
+      "name": "materializer argument count",
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "originalAssertionBytes": "args.length !== 5",
+      "passed": true
+    },
+    {
+      "name": "materializer modes",
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "originalAssertionBytes": "[\"verify\", \"apply\", \"authorize-commit\"].includes(mode)",
+      "passed": true
+    },
+    {
+      "name": "apply base and whole-tree clean binding",
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "originalAssertionBytes": "head !== packageIntent.baseCommit || runGit(root, [\"status\", \"--porcelain\"]) !== \"\"",
+      "passed": true
+    },
+    {
+      "name": "staged HEAD binding",
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "originalAssertionBytes": "runGit(root, [\"rev-parse\", \"HEAD\"]).trim() !== record.baseCommit",
+      "passed": true
+    },
+    {
+      "name": "isolated whitespace check",
+      "path": "plugins/pipeline-core/lib/signed-quality-package.mjs",
+      "originalAssertionBytes": "[\"apply\", \"--check\", \"--whitespace=error\", \"-\"]",
+      "passed": true
+    },
+    {
+      "name": "source plugin cleanliness",
+      "path": "plugins/pipeline-core/lib/public-core-observation.mjs",
+      "originalAssertionBytes": "if (pluginStatus !== \"\") fail(\"SNT-A2-SOURCE-DIRTY\")",
+      "passed": true
+    },
+    {
+      "name": "complete physical tree match",
+      "path": "plugins/pipeline-core/lib/public-core-observation.mjs",
+      "originalAssertionBytes": "!sameSnapshot(source, installed) || source.contentSha256 !== installed.contentSha256",
+      "passed": true
+    },
+    {
+      "name": "host operation user-copy-only",
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "originalAssertionBytes": "codexToolCallPermitted: false",
+      "passed": true
+    },
+    {
+      "name": "Codex registry operation",
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "originalAssertionBytes": "write-local-from-codex-registry",
+      "passed": true
+    },
+    {
+      "name": "Claude registry operation",
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "originalAssertionBytes": "write-local-from-registry",
+      "passed": true
+    },
+    {
+      "name": "Codex add",
+      "path": "docs/codex-local-plugin-development.md",
+      "originalAssertionBytes": "codex plugin add pipeline-core@agent-pipeline-local",
+      "passed": true
+    },
+    {
+      "name": "Codex restart",
+      "path": "docs/codex-local-plugin-development.md",
+      "originalAssertionBytes": "codex app-server daemon restart",
+      "passed": true
+    },
+    {
+      "name": "Claude update",
+      "path": "docs/claude-local-plugin-development.md",
+      "originalAssertionBytes": "claude plugin update pipeline-core@agent-pipeline-local --scope user",
+      "passed": true
+    },
+    {
+      "name": "whole package precommit admission",
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "originalAssertionBytes": "if (qualityPackageAuthorized) continue;",
+      "passed": true
+    },
+    {
+      "name": "Critic preimage byte pins",
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
+      "originalAssertionBytes": "if (actual !== entry.rawSha256) mismatches.push",
+      "passed": true
+    }
+  ],
+  "setupFailures": [
+    "One unsupported glob search refusal; no wrapped diagnostic launched."
+  ],
+  "pendingValuePolicy": "Every <pending-...> is unresolved and must be replaced by Coordinator/operator before execution. These are command templates, not currently executable approvals. All paths marked absolute must be canonical physical paths. Policy placeholder is exactly repo-root/project/critical-human-proof.json. Script placeholders identify the audited script basenames described by the stage, not arbitrary launchers.",
+  "commands": [
+    {
+      "stage": "human sign",
+      "prerequisite": "Attended external terminal; configured approval directory and key already available. Request basename contains request; digest finalized by Coordinator. --directory is an optional explicitly selected external directory, omitted here to use configured resolution.",
+      "executable": "node",
+      "argv": [
+        "<pending-approval-script-absolute>",
+        "sign-intent",
+        "--repo-root",
+        "<pending-repo-root-absolute>",
+        "--request",
+        "<pending-scratch-request-relative>"
+      ],
+      "posix": "CMD='node <pending-approval-script-absolute> sign-intent --repo-root '\nCMD=${CMD}'<pending-repo-root-absolute> --request '\nCMD=${CMD}'<pending-scratch-request-relative>'\neval \"$CMD\""
+    },
+    {
+      "stage": "quality package verify",
+      "prerequisite": "cwd is canonical repo root; intent/proof/policy are existing nonempty regular single-link files inside that root.",
+      "executable": "node",
+      "argv": [
+        "<pending-materializer-script-absolute>",
+        "<pending-repo-root-absolute>",
+        "<pending-intent-file-absolute>",
+        "<pending-proof-file-absolute>",
+        "<pending-committed-policy-file-absolute>",
+        "verify"
+      ],
+      "posix": "CMD='node <pending-materializer-script-absolute> '\nCMD=${CMD}'<pending-repo-root-absolute> <pending-intent-file-absolute> '\nCMD=${CMD}'<pending-proof-file-absolute> '\nCMD=${CMD}'<pending-committed-policy-file-absolute> verify'\neval \"$CMD\""
+    },
+    {
+      "stage": "quality package apply",
+      "prerequisite": "cwd is canonical repo root; intent/proof/policy are existing nonempty regular single-link files inside that root.",
+      "executable": "node",
+      "argv": [
+        "<pending-materializer-script-absolute>",
+        "<pending-repo-root-absolute>",
+        "<pending-intent-file-absolute>",
+        "<pending-proof-file-absolute>",
+        "<pending-committed-policy-file-absolute>",
+        "apply"
+      ],
+      "posix": "CMD='node <pending-materializer-script-absolute> '\nCMD=${CMD}'<pending-repo-root-absolute> <pending-intent-file-absolute> '\nCMD=${CMD}'<pending-proof-file-absolute> '\nCMD=${CMD}'<pending-committed-policy-file-absolute> apply'\neval \"$CMD\""
+    },
+    {
+      "stage": "quality package authorize-commit",
+      "prerequisite": "Exact complete signed path set staged; HEAD remains baseCommit.",
+      "executable": "node",
+      "argv": [
+        "<pending-materializer-script-absolute>",
+        "<pending-repo-root-absolute>",
+        "<pending-intent-file-absolute>",
+        "<pending-proof-file-absolute>",
+        "<pending-committed-policy-file-absolute>",
+        "authorize-commit"
+      ],
+      "posix": "CMD='node <pending-materializer-script-absolute> '\nCMD=${CMD}'<pending-repo-root-absolute> <pending-intent-file-absolute> '\nCMD=${CMD}'<pending-proof-file-absolute> '\nCMD=${CMD}'<pending-committed-policy-file-absolute> authorize-commit'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex isolate selector",
+      "prerequisite": "Only if the released selector is present; all affected Codex sessions closed.",
+      "executable": "codex",
+      "argv": [
+        "plugin",
+        "remove",
+        "pipeline-core@agent-pipeline"
+      ],
+      "posix": "CMD='codex plugin remove pipeline-core@agent-pipeline'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex register",
+      "prerequisite": "Separate agent-pipeline-local marketplace physically exists and its plugin link resolves to final clean source; fresh committed Codex stamp.",
+      "executable": "codex",
+      "argv": [
+        "plugin",
+        "marketplace",
+        "add",
+        "<pending-codex-local-marketplace-root-absolute>"
+      ],
+      "posix": "CMD='codex plugin marketplace add '\nCMD=${CMD}'<pending-codex-local-marketplace-root-absolute>'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex install candidate",
+      "prerequisite": "Register completed; existing local add/update behavior for changed version is not established by the bounded document. Inspect readback, do not guess an update flag.",
+      "executable": "codex",
+      "argv": [
+        "plugin",
+        "add",
+        "pipeline-core@agent-pipeline-local"
+      ],
+      "posix": "CMD='codex plugin add pipeline-core@agent-pipeline-local'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex restart",
+      "prerequisite": "Outside all Codex project sessions; no second daemon or socket deletion.",
+      "executable": "codex",
+      "argv": [
+        "app-server",
+        "daemon",
+        "restart"
+      ],
+      "posix": "CMD='codex app-server daemon restart'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex plugin readback",
+      "prerequisite": "Restart completed.",
+      "executable": "codex",
+      "argv": [
+        "plugin",
+        "list",
+        "--json"
+      ],
+      "posix": "CMD='codex plugin list --json'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex marketplace readback",
+      "prerequisite": "Exactly one enabled Pipeline local selector; expected version and sourceType local.",
+      "executable": "codex",
+      "argv": [
+        "plugin",
+        "marketplace",
+        "list",
+        "--json"
+      ],
+      "posix": "CMD='codex plugin marketplace list --json'\neval \"$CMD\""
+    },
+    {
+      "stage": "Codex installed attestation",
+      "prerequisite": "Operator host-only operation; installed root from actual readback; source and registry tree equal; optional explicit source supplied here.",
+      "executable": "node",
+      "argv": [
+        "<pending-attestation-script-absolute>",
+        "write-local-from-codex-registry",
+        "--version",
+        "<pending-codex-version>",
+        "--source-plugin-root",
+        "<pending-source-plugin-root-absolute>",
+        "--installed-plugin-root",
+        "<pending-codex-installed-root-absolute>"
+      ],
+      "posix": "CMD='node <pending-attestation-script-absolute> '\nCMD=${CMD}'write-local-from-codex-registry --version '\nCMD=${CMD}'<pending-codex-version> --source-plugin-root '\nCMD=${CMD}'<pending-source-plugin-root-absolute> '\nCMD=${CMD}'--installed-plugin-root '\nCMD=${CMD}'<pending-codex-installed-root-absolute>'\neval \"$CMD\""
+    },
+    {
+      "stage": "Claude copy entire candidate",
+      "prerequisite": "Operator outside agent session; existing marketplace copy has no stale extras and represents full final source, including previous features.",
+      "executable": "cp",
+      "argv": [
+        "-a",
+        "<pending-source-plugin-root-absolute>",
+        "<pending-claude-local-marketplace-plugins-directory-absolute>"
+      ],
+      "posix": "CMD='cp -a <pending-source-plugin-root-absolute> '\nCMD=${CMD}'<pending-claude-local-marketplace-plugins-directory-absolute'\nCMD=${CMD}'>'\neval \"$CMD\""
+    },
+    {
+      "stage": "Claude update existing",
+      "prerequisite": "Already installed; copy carries fresh committed Claude version. For first install use plugin install with same selector and scope after marketplace add.",
+      "executable": "claude",
+      "argv": [
+        "plugin",
+        "update",
+        "pipeline-core@agent-pipeline-local",
+        "--scope",
+        "user"
+      ],
+      "posix": "CMD='claude plugin update pipeline-core@agent-pipeline-local --scope '\nCMD=${CMD}'user'\neval \"$CMD\""
+    },
+    {
+      "stage": "Claude plugin readback",
+      "prerequisite": "Restart session conservatively; exact one local selector, version and loaded root.",
+      "executable": "claude",
+      "argv": [
+        "plugin",
+        "list",
+        "--json"
+      ],
+      "posix": "CMD='claude plugin list --json'\neval \"$CMD\""
+    },
+    {
+      "stage": "Claude marketplace readback",
+      "prerequisite": "Directory marketplace named agent-pipeline-local.",
+      "executable": "claude",
+      "argv": [
+        "plugin",
+        "marketplace",
+        "list"
+      ],
+      "posix": "CMD='claude plugin marketplace list'\neval \"$CMD\""
+    },
+    {
+      "stage": "Claude installed attestation",
+      "prerequisite": "Clean committed source; actual loaded root may be direct marketplace copy or cache; host writer independently validates registry binding and complete equivalence.",
+      "executable": "node",
+      "argv": [
+        "<pending-attestation-script-absolute>",
+        "write-local-from-registry",
+        "--provider",
+        "claude",
+        "--version",
+        "<pending-claude-version>",
+        "--source-plugin-root",
+        "<pending-source-plugin-root-absolute>",
+        "--installed-plugin-root",
+        "<pending-claude-loaded-root-absolute>"
+      ],
+      "posix": "CMD='node <pending-attestation-script-absolute> '\nCMD=${CMD}'write-local-from-registry --provider claude --version '\nCMD=${CMD}'<pending-claude-version> --source-plugin-root '\nCMD=${CMD}'<pending-source-plugin-root-absolute> '\nCMD=${CMD}'--installed-plugin-root '\nCMD=${CMD}'<pending-claude-loaded-root-absolute>'\neval \"$CMD\""
+    },
+    {
+      "stage": "fresh runner bootstrap",
+      "prerequisite": "Run in fresh session of each runner; ready, local-development, correct version/installedVersion and verified installed attestation.",
+      "executable": "node",
+      "argv": [
+        "<pending-actual-loaded-plugin-preflight-script-absolute>"
+      ],
+      "posix": "CMD='node <pending-actual-loaded-plugin-preflight-script-absolute>'\neval \"$CMD\""
+    }
+  ],
+  "notes": [
+    "SOURCE DIAGNOSIS ONLY: no signature, materializer, installer, cache mutation, staging, commit, native measurement, State/policy/config mutation or installed readback was executed. Source markers qualify the documented contract only.",
+    "Deadline: reviewed package for human signing 2026-10-09 17:00 Europe/Berlin; local Greenfield candidate 18:00. No completion of these downstream milestones is asserted.",
+    "Finalize all included unprotected changes and durable evidence first. Preserve the existing feature set by assembling the entire selected source tree; do not install a slice-only tree or overlay patches into cache. Coordinator owns final commit/tree and package digest binding.",
+    "Signed intent schema is pipeline.signed-quality-package.v1, exactly schema/baseCommit/unifiedDiff/expectedDigests/intentSha256. intentSha256 hashes canonical schema/baseCommit/unifiedDiff/expectedDigests. expectedDigests keys exactly equal +++ b/ paths, safe repository-relative; project/critical-human-proof.json is excluded. Trust comes from unchanged committed HEAD policy, never an arbitrary supplied policy.",
+    "verify creates and removes a detached verification worktree under plugins/tmp: it is not a purely read-only process despite leaving main content unchanged. It checks whitespace, complete resulting changed-path set and SHA-256. apply additionally requires HEAD==baseCommit and whole main tree/index untracked status empty. verify by itself does not enforce current HEAD equals baseCommit or main-tree cleanliness.",
+    "After apply, stage exactly every package path, nothing else, then authorize-commit with unchanged base HEAD and exact staged modes/blob SHA-256. Integration message requires Dispatch: quality-package-<final-intentSha256> (integration) plus AI-Assisted: true. One single-parent integration commit must have baseCommit parent and exact resulting path/blob/mode set; no intervening docs/metadata commit. This dispatch performs none of these steps.",
+    "There is no automatic source patch signature-to-installed-cache trust promotion. Installed attestation separately observes named branch, origin, commit/tree and clean plugins/pipeline-core status, snapshots all physical files and directories, rejects links/multiply-linked/nonregular files and mismatches, and writes an external path-free receipt after complete source/installed equivalence. Its source cleanliness scope is plugins/pipeline-core, narrower than materializer apply whole-tree cleanliness.",
+    "Unique versions are <semver>+codex.<14-digit-UTC-build-time>.<7-hex-functional-OID> and <semver>+claude.<same-selected-build-time>.<7-hex-functional-OID>. The functional OID is the content commit before metadata stamping, never a self-referential metadata commit. Both manifest base versions must match VERSION; retain build stamps until accepted release cut. No generic local stamping/build CLI was established; documents specify manifest editing and physical tree distribution. Do not misuse release-version-plan as a local candidate builder.",
+    "Stamping only the marketplace copy makes it differ from committed source and fails complete attestation. Stamp source manifests through authorized reviewed work, commit, then distribute the resulting whole clean tree. Neither stamping nor copying is authorized in this read-only dispatch.",
+    "Codex local marketplace plugin source is a symlink/junction to physical source; installed plugin itself must pass physical snapshot checks. Claude marketplace uses a physical copy, not a source link. Both use selector pipeline-core@agent-pipeline-local and exactly one enabled Pipeline selector; release identity remains separate.",
+    "A cp -a overlay can retain destination-only stale files, so full tree equivalence is the final gate. No destructive cleanup instruction is invented here. Existing unrelated plugins/config/registrations and previous included source changes must be preserved. Source files absent from newly assembled tree cannot be rescued by copying from older cache.",
+    "Claude docs differ on reload versus restart: local directory reload is described as sufficient, while hook wiring and install readback sections require restart. Use fresh sessions for Greenfield qualification, then observe actual loaded root; do not assume cache installPath is always the executing root.",
+    "Protected dependencies are distinct: shipped protected-baseline.json defines protected membership and config schema; it is not the private integrity content baseline. Critic protected-preimage.v1.json pins ten current files and its test checks exact raw SHA-256. Any reviewed change to those files requires an authorized complete inventory repin before verification, preserving the closed expected path list. No sanctioned production regeneration CLI for that pin inventory was established from discovered script names; do not hand-edit protected pins in this dispatch.",
+    "check-protected-path-integrity.mjs record --json is a private baseline writer; compare --json is diagnostic, exits 0 when clean, 1 findings, 3 missing baseline. Record only after separately authorized accepted changes; regenerating a baseline before resolving findings would hide the before/after comparison. Neither private baseline operation ran here. Protected-delta detector reports protected changes and is not an exemption or authorization producer.",
+    "native-plugin-readback.mjs exports a CAS-bound phase machine and physical manifest/chain readback; no direct CLI handler appears in this source. Do not invent a native-plugin-readback command with flags. A hand-composed receipt or isolated mirror cannot establish native qualified authorship or enforcement.",
+    "Remaining blockers: final coherent committed base and integration candidate; final package and request digest, proof and exact staged path set; independent review and PO acceptance; authorized manifest stamps and any protected repins; installed/marketplace roots and versions from actual host readbacks; actual Codex existing-local refresh behavior; one enabled selector per runner; fresh session and Greenfield behavior tests. This report is not a deadline qualification.",
+    "Procedural deviations: one unsupported glob search was refused without execution/mutation; no override sought. One broad public-doc search returned unsolicited state-archive snippets, excluded from conclusions and input hashes. No owned output was used as input. Independent review: pending. PO acceptance: open."
+  ]
+}
+
+--- stderr ---

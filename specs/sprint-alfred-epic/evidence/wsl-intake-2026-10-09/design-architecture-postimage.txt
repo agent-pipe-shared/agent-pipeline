@@ -1,0 +1,172 @@
+command: node scratch/verify-ALFRED-DESIGN-ARCH-F-20261009.mjs
+label: ALFRED-DESIGN-ARCH-F-20261009
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{"schema":"pipeline.architecture-postimage-check.v1","source":"plugins/pipeline-core/lib/architecture-design.mjs","sourceBaseSha256":"2ca715d8789dcdcf2890e7ee5578c9b6ed413bcb7c985d271dcf45cff54061e6","postimage":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","postimageSha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6","preservedPortableFinalReader":true,"narrowDiffInventory":["one boundary import","v8-only admission branch; frozen legacy branch retained"]}
+diff --git a/specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs
+index 832e00cf6..313c3bff2 100644
+--- a/specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs
+@@ -8,6 +8,7 @@ import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+ import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
+ import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
+ import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
++import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
+ import { validateAgainstSchema } from "./schema-lite.mjs";
+ import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+ import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
+@@ -205,9 +206,17 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+       expectedPlanSha256: observation.planSha256, expectedSpecSha256: observation.specSha256 });
+     const bootstrapAcknowledgementValid = verified.ok
+       && Object.entries(authority).every(([key, value]) => verified.value[key] === value);
+-    const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
+-    requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
+-      finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
++    if (state.planApproval?.schema === "pipeline.plan-approval.v8") {
++      // The complete stored v8 binding is authority. Reuse the implementation
++      // boundary's current-source, mode and actual proof checks; a bootstrap
++      // acknowledgement cannot replace the final design approval.
++      const finalDesignApproval = designAdvisoryAdmission(state, root, authority.planPath, authority.specPath);
++      requireValue(finalDesignApproval.ok, finalDesignApproval.code ?? "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
++    } else {
++      const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
++      requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
++        finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
++    }
+     // Brownfield and other non-greenfield repositories never carried the fresh
+     // greenfield map scaffold, so they cannot hold the greenfield design block
+     // either. Apply exactly the applicability predicate that
+
+COMMAND node --test --test-name-pattern=^(S[0-9]+ stored verifier|FINAL-READER) plugins/pipeline-core/lib/design-approval-route.test.mjs
+✔ S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file (32.665834ms)
+✔ S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file (4.2181ms)
+✔ S3 stored verifier: package bytes changed after the approval are refused (C2 item 1) (4.947714ms)
+✔ S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3) (11.220061ms)
+✔ S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4) (6.643858ms)
+✔ S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4) (4.998683ms)
+✔ S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused (5.391254ms)
+✔ S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused (7.076689ms)
+✔ S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today) (2.668713ms)
+✔ S10 stored verifier: a signature made with another key over the same intent is refused (5.045973ms)
+✔ S11 stored verifier: a proof whose key is not in the configured anchors is refused (6.073691ms)
+✔ FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state (16.333292ms)
+✔ FINAL-READER accepts the explicit rebind path with readiness execution disabled (5.087392ms)
+✔ FINAL-READER refuses a forged stored signature after its valid positive control (8.086028ms)
+✔ FINAL-READER refuses changed source bytes after its valid positive control (6.170369ms)
+✔ FINAL-READER refuses package and presentation digest drift after valid positive controls (10.839359ms)
+✔ FINAL-READER refuses Advisor-exception attribution drift after its valid positive control (5.901124ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 190.527457
+
+
+{"command":["node","--test","--test-name-pattern=^(S[0-9]+ stored verifier|FINAL-READER)","plugins/pipeline-core/lib/design-approval-route.test.mjs"],"exitCode":0,"setupError":null}
+COMMAND node --test plugins/pipeline-core/lib/architecture-design.test.mjs
+✔ architecture package explicitly carries bounded modules and renders only design artifacts (5.123311ms)
+✔ closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input (1.132586ms)
+✔ compact greenfield package derives redundant fitness rows and zero baseline (0.409721ms)
+ℹ architecture design authoring bytes: 1149 -> 766
+✔ field-local diagnostics identify the single invalid architecture input (0.406371ms)
+✔ brownfield proposal is read-only, reports unknown inventory, and materializer refuses to invent approval (1.822461ms)
+✔ materialization transaction restores exact scaffold after a partial staged write (5.481353ms)
+✔ materialization transaction preserves a target raced by another writer and restores earlier outputs (5.147471ms)
+✔ authority CAS change after first publication rolls back and a changed lock refuses all writes (5.354156ms)
+✖ hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry (4.161862ms)
+✖ hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check (0.173817ms)
+✖ hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted (0.168806ms)
+✖ hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed) (0.095348ms)
+✖ hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository (0.069239ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 8
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112.725066
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/architecture-design.test.mjs:267:1
+✖ hotfix 9: a brownfield repository (no greenfield scaffold) with a valid approval needs no design block at implementation entry (4.161862ms)
+  file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/architecture-design-staged.mjs:8
+  import { rereadApprovedDesignWorkflowPackage } from "file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs";
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module 'file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs' does not provide an export named 'rereadApprovedDesignWorkflowPackage'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:326:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:429:5)
+      at async node:internal/modules/esm/loader:639:26
+      at async file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:225:17
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:268:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/architecture-design.test.mjs:276:1
+✖ hotfix 9: the not-required branch never bypasses an earlier lifecycle, authority or continuity check (0.173817ms)
+  file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/architecture-design-staged.mjs:8
+  import { rereadApprovedDesignWorkflowPackage } from "file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs";
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module 'file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs' does not provide an export named 'rereadApprovedDesignWorkflowPackage'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:326:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:429:5)
+      at async node:internal/modules/esm/loader:639:26
+      at async file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:225:17
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:268:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/architecture-design.test.mjs:291:1
+✖ hotfix 9: greenfield stays strict (byte-exact fresh scaffold still requires the design block) and a receipt is never exempted (0.168806ms)
+  file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/architecture-design-staged.mjs:8
+  import { rereadApprovedDesignWorkflowPackage } from "file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs";
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module 'file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs' does not provide an export named 'rereadApprovedDesignWorkflowPackage'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:326:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:429:5)
+      at async node:internal/modules/esm/loader:639:26
+      at async file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:225:17
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:268:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/architecture-design.test.mjs:307:1
+✖ hotfix 9: implementation entry applies the same applicability predicate as the draft inspector (edited scaffold exempt, partial scaffold fails closed) (0.095348ms)
+  file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/architecture-design-staged.mjs:8
+  import { rereadApprovedDesignWorkflowPackage } from "file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs";
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module 'file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs' does not provide an export named 'rereadApprovedDesignWorkflowPackage'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:326:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:429:5)
+      at async node:internal/modules/esm/loader:639:26
+      at async file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:225:17
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:268:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+test at plugins/pipeline-core/lib/architecture-design.test.mjs:324:1
+✖ hotfix 9: materializeArchitectureDesign returns the not-required result unchanged and writes nothing for a brownfield repository (0.069239ms)
+  file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/architecture-design-staged.mjs:8
+  import { rereadApprovedDesignWorkflowPackage } from "file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs";
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  SyntaxError: The requested module 'file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/scratch/tmp/hf9-umNuvF/stub-dwp.mjs' does not provide an export named 'rereadApprovedDesignWorkflowPackage'
+      at #asyncInstantiate (node:internal/modules/esm/module_job:326:21)
+      at async ModuleJob.run (node:internal/modules/esm/module_job:429:5)
+      at async node:internal/modules/esm/loader:639:26
+      at async file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:225:17
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/architecture-integration-ALFRED-DESIGN-ARCH-F-20261009/plugins/pipeline-core/lib/architecture-design.test.mjs:268:26)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+
+{"command":["node","--test","plugins/pipeline-core/lib/architecture-design.test.mjs"],"exitCode":1,"setupError":null}
+{"actualAssertionsAllGreen":false,"independentReview":"pending","poAcceptance":"pending"}
+
+--- stderr ---

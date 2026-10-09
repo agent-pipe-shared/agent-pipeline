@@ -1,0 +1,19 @@
+command: node scratch/alfred-state-compose-verify.mjs
+label: ALFRED-STATE-COMPOSE-VERIFY-20261009
+exitCode: 2
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{"input":"plugins/pipeline-core/scripts/pipeline-state.mjs","sha256":"3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795"}
+{"input":"specs/sprint-alfred-epic/signed-package/tranche-1/plugins/pipeline-core/scripts/pipeline-state.mjs","sha256":"3404a533d8e501ba888e77c617b3987f3cabe77df41b6c5b4426540b52009795"}
+{"input":"specs/sprint-alfred-epic/signed-package/tranche-2/pipeline-state-R6F2b-R75.patch","sha256":"bf54af3122a55daf6918e27c1b018a013bd3acf102c8c17865787c079bf08893"}
+{"input":"harness/scripts/pipeline-state.test.mjs","sha256":"53b6c667e8709cd7c18e75c6614809c669e7308c83de14e2c3c3224be2bb6760"}
+{"hunk":1,"beforeSha256":"1f11fb138d6b06b3649165eb477f8eec74effc897e5850d0e50880938013bcd7","afterSha256":"ca0ea58e31036bd6d70ed4794b45c6d89749a4c356c803c34ce9124217cf68f4","oldMatches":1,"newMatches":0}
+{"hunk":2,"beforeSha256":"2f195b6fe02b63c9f77ec105f6c2174a38948b6d4177b3303ca534462b67847e","afterSha256":"6cca71e155c04e51b6268d0a077444a56d59d42c3b99e96452e8f49abdf46a62","oldMatches":1,"newMatches":0}
+{"hunk":3,"beforeSha256":"1ef22ab13ca410535fef37b399a6ef64552490873d2d83c15899612c8f06cd45","afterSha256":"a0f43f2bcaf08698bb0087268d035813484fe58126660fd26acb2f6195470687","oldMatches":1,"newMatches":0}
+{"hunk":4,"beforeSha256":"fe62c3a6fa34cac17a84934e7d2dd7529ff0b41f8d6db49860f25dac250ff0ac","afterSha256":"e8d68887834b1b320ed5224beefd207ec33258ed815a2f4ec2783b051914fbd3","oldMatches":0,"newMatches":0}
+COMPOSITION_BLOCKER hunk 4 lacks exact unique preimage/postimage equivalence
+STOP: exact composition contradiction; syntax and regression assertions not reached
+
+--- stderr ---

@@ -1,0 +1,154 @@
+command: node scratch/design-catalogue-f8-observe.mjs
+label: ALFRED-DESIGN-CATALOGUE-F-20261009
+exitCode: 1
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{"kind":"source-binding","sourceCatalogue":"plugins/pipeline-core/lib/guard/command-catalogue.mjs","sourceCatalogueSha256":"c61d8e3bccc89eb18b55a5fdcc114906b099d94bad406bf205bd5346a5f2c1ed","sourceArgs":"plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs","sourceArgsSha256":"505e64749efa191e10e0522298d74908a8656f164eb7bfdee6412d7f53ebb1d9","immutableSuite":"plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","immutableSuiteSha256":"8dc5efc5b2631744d8d4baa6527e4ce9c8b3fda01053cb31773fef3d1cef2c9e","catalogueDiffInventory":[],"productionMutation":false}
+{"kind":"immutable-suite","command":"node --test plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","exitCode":1,"result":"failed"}
+K3G002: AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is partial.
+Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+A narrow diagnosis lane stays admitted while status is partial: creating the repository's own scratch directory and writing exactly scratch/incident-report.md via Write or Edit.
+
+
+2 !== 0
+
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:185:14)
+    at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G011: AssertionError [ERR_ASSERTION]: ["<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs","--root","<repo-root>/scratch/design-catalogue-f8-DMBhgh/k3-guard-regression-c0dRaL","--runner","codex","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/codex","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+
+false !== true
+
+    at accepted (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:46)
+    at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+K3G014: AssertionError [ERR_ASSERTION]: ["<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs","--root","<repo-root>/scratch/design-catalogue-f8-DMBhgh/k3-guard-regression-X3iBTv","--runner","claude","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/claude","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+
+false !== true
+
+    at accepted (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+    at invoke (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:427:9)
+    at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:434:29)
+    at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+    at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    at async Test.run (node:internal/test_runner/test:1208:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+✔ K3G001 actual awaiting-approval inspect emits admitted read-only course action for feature and epic (514.977875ms)
+✖ K3G002 actual course inspect emits advisor execute action admitted by real guard entry point (251.251556ms)
+✔ K3G003 working readiness-stage fixed argv is admitted for every supported runner (696.425346ms)
+✔ K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv (5249.408859ms)
+✔ K3G005 inspect rejects extra flags and every agent signing shape including run-v2 (1792.763461ms)
+✔ K3G006 mini and existing package routes remain on present-plan while absent runner stays typed (74.384584ms)
+✔ K3G007 fixed run-v2 argv is strictly admitted for all runners with bound curation and optional resume result (1381.139039ms)
+✔ K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor (3288.505177ms)
+✔ K3G009 run-v2 rejects extra signing collision and stale or foreign curation references (3710.497176ms)
+✔ K3G010 physical source and preparation aliases never gain admission (719.270078ms)
+✖ K3G011 source and current submission changes invalidate previously emitted commands (37.408397ms)
+✔ K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair (2437.454221ms)
+✔ K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags (716.171008ms)
+✖ K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request (277.226175ms)
+✔ K3G015 trusted approve-push chat argv reaches the real guard under committed global policy (166.498639ms)
+✔ K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv (5077.23089ms)
+✔ K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval (1690.958509ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 14
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28260.618334
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G002 actual course inspect emits advisor execute action admitted by real guard entry point (251.251556ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-LIFECYCLE-NOT-READY: Pipeline session readiness is partial.
+  Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.
+  A narrow diagnosis lane stays admitted while status is partial: creating the repository's own scratch directory and writing exactly scratch/incident-report.md via Write or Edit.
+  
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:185:14)
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G011 source and current submission changes invalidate previously emitted commands (37.408397ms)
+  AssertionError [ERR_ASSERTION]: ["<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs","--root","<repo-root>/scratch/design-catalogue-f8-DMBhgh/k3-guard-regression-c0dRaL","--runner","codex","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/codex","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+  
+  false !== true
+  
+      at accepted (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:337:46)
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ K3G014 same guarded inspect advisor and resumed v2 argv execute real coordinator CLI to one unsigned request (277.226175ms)
+  AssertionError [ERR_ASSERTION]: ["<repo-root>/plugins/pipeline-core/scripts/design-course-session.mjs","--root","<repo-root>/scratch/design-catalogue-f8-DMBhgh/k3-guard-regression-X3iBTv","--runner","claude","--stage","advisor","--feature-id","feature-test","--authoring-dispatch-id","authoring-1","--profile","feature","--output-prefix","specs/feature-test/evidence/design-course/claude","--source","input","specs/feature-test/design-input.md","cf3d3e7ff3c7688b6b99472183283653ed055b85e909c688a7714bc35b6904cf","--source","prd","specs/feature-test/prd.md","56edab6e24480e13a3b7e5bd2f2ec674d691a642db5cbddad2e2755a54572c9c","--source","spec","specs/feature-test/spec.md","e2310e26730c733ee8011d7d8f57ec1bc18df5079807bc219900382df84c25c9","--source","design","specs/feature-test/design.md","3fd3af0234857da9bcc0c107209d07ff72f59c0400070a31a8a8464940e56426","--source","traceability","specs/feature-test/traceability.md","1ad14e1b5f4c3324cf6431b2986a7fab4306cf3b4a76d876b16f0ce6dc61d7ab","--execute"]
+  
+  false !== true
+  
+      at accepted (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:122:10)
+      at invoke (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:427:9)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:434:29)
+      at async Object.run (file://<repo-root>/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs:515:18)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+{"kind":"reached-pure-policy-assertion","id":"existing-inspect","expected":true,"actual":true,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"existing-submit","expected":true,"actual":true,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"existing-approve","expected":true,"actual":true,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"existing-stub-inspect","expected":true,"actual":true,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"present-one-receipt","expected":true,"actual":false,"result":"failed"}
+{"kind":"reached-pure-policy-assertion","id":"present-two-receipts","expected":true,"actual":false,"result":"failed"}
+{"kind":"reached-pure-policy-assertion","id":"approve-new-request","expected":true,"actual":false,"result":"failed"}
+{"kind":"reached-pure-policy-assertion","id":"present-three-receipts","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"approve-extra-flag","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"approve-duplicate-request","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"approve-traversal","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"stub-extra-flag","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"stub-wrong-runner","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"arbitrary-script","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"shell-composition","expected":false,"actual":false,"result":"passed"}
+{"kind":"reached-pure-policy-assertion","id":"shell-redirection","expected":false,"actual":false,"result":"passed"}
+{"kind":"separate-owned-dependency","path":"plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs","API":"sanctionedPipelineStateArgs","requiredPresentShape":["present-plan","--by","<bounded attribution>","--review-receipt","<safe explicit receipt path>","[--review-receipt <second distinct safe receipt path>]"],"requiredApproveShape":["approve-plan","--by","<bounded attribution>","--design-approval-request","scratch/design-approval-request-<lowercase hex64>.json"],"preserve":["legacy approval branches","existsSync and isPhysicalScratchTarget request checks","exact script binding","closed shell grammar","unknown and duplicate flag refusal"],"catalogueChangeRequired":false,"reason":"Catalogue delegates all pipeline-state argument parsing to this separately owned file. No shadow parser or scope expansion was authored."}
+{"kind":"scratch-cleanup","completed":true}
+
+--- stderr ---
+

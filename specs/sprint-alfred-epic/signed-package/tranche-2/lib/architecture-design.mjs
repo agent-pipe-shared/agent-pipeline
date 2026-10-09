@@ -8,6 +8,7 @@ import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { rereadApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
 import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { designAdvisoryAdmission } from "./guard-devplan-policy.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
@@ -205,9 +206,17 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
       expectedPlanSha256: observation.planSha256, expectedSpecSha256: observation.specSha256 });
     const bootstrapAcknowledgementValid = verified.ok
       && Object.entries(authority).every(([key, value]) => verified.value[key] === value);
-    const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
-    requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
-      finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
+    if (state.planApproval?.schema === "pipeline.plan-approval.v8") {
+      // The complete stored v8 binding is authority. Reuse the implementation
+      // boundary's current-source, mode and actual proof checks; a bootstrap
+      // acknowledgement cannot replace the final design approval.
+      const finalDesignApproval = designAdvisoryAdmission(state, root, authority.planPath, authority.specPath);
+      requireValue(finalDesignApproval.ok, finalDesignApproval.code ?? "ARCHITECTURE-DESIGN-APPROVAL-REQUIRED");
+    } else {
+      const finalWorkflowApproval = verifyFinalDesignWorkflowApproval(root, state, authority, observation, deps);
+      requireValue(bootstrapAcknowledgementValid || finalWorkflowApproval.ok,
+        finalWorkflowApproval.code ?? (verified.ok ? "ARCHITECTURE-DESIGN-PROFILE-AUTHORITY-STALE" : verified.code));
+    }
     // Brownfield and other non-greenfield repositories never carried the fresh
     // greenfield map scaffold, so they cannot hold the greenfield design block
     // either. Apply exactly the applicability predicate that

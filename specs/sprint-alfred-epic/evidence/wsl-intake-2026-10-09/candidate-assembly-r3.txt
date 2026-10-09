@@ -1,0 +1,108 @@
+command: node scratch/alfred-candidate-assemble-r3-20261009.mjs scratch/alfred-candidate-assembly-20261009-r3-final specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r3.json
+label: ALFRED-CANDIDATE-ASSEMBLE-R3
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{
+  "schema": "alfred.candidate-assembly.v3",
+  "status": "assembled-debt-pending",
+  "baseCommit": "0e21eccd9acbef6a0bd32f8e104a2291e3210ef7",
+  "mirror": "scratch/alfred-candidate-assembly-20261009-r3-final/b",
+  "output": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/candidate-assembly-r3.json",
+  "targets": 51,
+  "changedTargets": 49,
+  "postconditions": {
+    "pipelineStateDrift": true,
+    "pipelineStateRebind": true,
+    "kernelAddition": true
+  },
+  "assertionBytesPreserved": true,
+  "recompositionNeeded": true,
+  "unresolved": [
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations"
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-devplan-design-approval.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "reason": "Suite absent in declarative registry and inspected inline Verify registrations"
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "reason": "Fixture present-plan assertion failed; downstream rebind behavior not reached"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "reason": "Reached behavior assertions RED; inspect exact captured output"
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "reason": "Reached behavior assertions RED; inspect exact captured output"
+    },
+    {
+      "reason": "Latest worker delivery/full state writer requires fresh namespace recomposition",
+      "inputDrift": [
+        "specs/sprint-alfred-epic/signed-package/tranche-2/scripts/pipeline-state.mjs"
+      ],
+      "packageAdded": []
+    }
+  ],
+  "behavior": [
+    {
+      "target": "plugins/pipeline-core/scripts/rebind-approval.test.mjs",
+      "exitCode": 1,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs",
+      "exitCode": 1,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/design-approval-route.test.mjs",
+      "exitCode": 1,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/lib/git-cmd.test.mjs",
+      "exitCode": 0,
+      "error": null
+    },
+    {
+      "target": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "exitCode": 0,
+      "error": null
+    }
+  ]
+}
+
+--- stderr ---

@@ -1,0 +1,853 @@
+command: node scratch/alfred-v8-binding-assembled-red-r2.mjs
+label: assembled-v8-binding-independent-RED-r2
+exitCode: 0
+head: 0e21eccd9acbef6a0bd32f8e104a2291e3210ef7
+tree: ab3f8c2aea107a62137d2dba675212a65f3e357e
+dirty: true
+--- stdout ---
+{"inputDigests":[{"path":"plugins/pipeline-core/lib/design-approval-route.test.mjs","sha256":"9b319aa0b41ad7918caba095d2dd49a80e32867da60273efff78c9f977334249"},{"path":"plugins/pipeline-core/lib/plan-spec-state-v2.mjs","sha256":"e16a168f774ad8d053714af3b5ddd5d2acebd22c5800a7da32b627ea3c7bd9d8"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/design-approval-route.test.mjs","sha256":"245c4fbc9a1c63dd1b73619a227ebc18c56ceeb2600117b6747901e933cf680f"},{"path":"specs/sprint-alfred-epic/signed-package/tranche-2/lib/architecture-design.mjs","sha256":"d9e6eec7cec268d5195cd6c32708f3582680df7ab61dcbf246239b43b42500b6"}],"verification":"diagnostic only; immutable old tests and independently authored test proposal"}
+ASSEMBLED ORIGINAL BASELINE
+TAP version 13
+# Subtest: R1 re-read: design-workflow-package.mjs exports the re-read function
+ok 1 - R1 re-read: design-workflow-package.mjs exports the re-read function
+  ---
+  duration_ms: 23.046385
+  type: 'test'
+  ...
+# Subtest: R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+ok 2 - R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+  ---
+  duration_ms: 5.640958
+  type: 'test'
+  ...
+# Subtest: R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+ok 3 - R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+  ---
+  duration_ms: 1.560957
+  type: 'test'
+  ...
+# Subtest: R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+ok 4 - R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+  ---
+  duration_ms: 1.124886
+  type: 'test'
+  ...
+# Subtest: R5 re-read: package bytes changed after the approval are refused (item 1)
+ok 5 - R5 re-read: package bytes changed after the approval are refused (item 1)
+  ---
+  duration_ms: 0.9492
+  type: 'test'
+  ...
+# Subtest: R6 re-read: a missing package file is a typed refusal
+ok 6 - R6 re-read: a missing package file is a typed refusal
+  ---
+  duration_ms: 0.587947
+  type: 'test'
+  ...
+# Subtest: R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+ok 7 - R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+  ---
+  duration_ms: 0.863191
+  type: 'test'
+  ...
+# Subtest: R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+ok 8 - R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+  ---
+  duration_ms: 1.374201
+  type: 'test'
+  ...
+# Subtest: R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+ok 9 - R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+  ---
+  duration_ms: 2.499907
+  type: 'test'
+  ...
+# Subtest: R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+ok 10 - R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+  ---
+  duration_ms: 2.201843
+  type: 'test'
+  ...
+# Subtest: R11 re-read: a package of another feature is refused
+ok 11 - R11 re-read: a package of another feature is refused
+  ---
+  duration_ms: 1.531117
+  type: 'test'
+  ...
+# Subtest: R12 re-read: malformed approval inputs are a typed input refusal
+ok 12 - R12 re-read: malformed approval inputs are a typed input refusal
+  ---
+  duration_ms: 0.402371
+  type: 'test'
+  ...
+# Subtest: V0 v8: pipeline.plan-approval.v8 is the current approval schema
+ok 13 - V0 v8: pipeline.plan-approval.v8 is the current approval schema
+  ---
+  duration_ms: 2.77344
+  type: 'test'
+  ...
+# Subtest: V1 v8: a signature-mode record with a proof is valid
+ok 14 - V1 v8: a signature-mode record with a proof is valid
+  ---
+  duration_ms: 0.412231
+  type: 'test'
+  ...
+# Subtest: V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+ok 15 - V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+  ---
+  duration_ms: 0.141547
+  type: 'test'
+  ...
+# Subtest: V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+ok 16 - V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+  ---
+  duration_ms: 0.235175
+  type: 'test'
+  ...
+# Subtest: V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+ok 17 - V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+  ---
+  duration_ms: 0.290584
+  type: 'test'
+  ...
+# Subtest: V5 v8: the mode must be exactly signature or chat
+ok 18 - V5 v8: the mode must be exactly signature or chat
+  ---
+  duration_ms: 0.240214
+  type: 'test'
+  ...
+# Subtest: V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+ok 19 - V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+  ---
+  duration_ms: 0.211216
+  type: 'test'
+  ...
+# Subtest: V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+ok 20 - V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+  ---
+  duration_ms: 0.172867
+  type: 'test'
+  ...
+# Subtest: V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+ok 21 - V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+  ---
+  duration_ms: 0.179526
+  type: 'test'
+  ...
+# Subtest: V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+ok 22 - V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+  ---
+  duration_ms: 0.354043
+  type: 'test'
+  ...
+# Subtest: V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+ok 23 - V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+  ---
+  duration_ms: 0.257584
+  type: 'test'
+  ...
+# Subtest: V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+ok 24 - V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+  ---
+  duration_ms: 0.181726
+  type: 'test'
+  ...
+# Subtest: L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+ok 25 - L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+  ---
+  duration_ms: 1.656214
+  type: 'test'
+  ...
+# Subtest: L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+ok 26 - L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+  ---
+  duration_ms: 0.123167
+  type: 'test'
+  ...
+# Subtest: L3 classification: other or malformed records are unknown
+ok 27 - L3 classification: other or malformed records are unknown
+  ---
+  duration_ms: 0.074888
+  type: 'test'
+  ...
+# Subtest: L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+ok 28 - L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+  ---
+  duration_ms: 0.178216
+  type: 'test'
+  ...
+# Subtest: S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 29 - S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 5.150059
+  type: 'test'
+  ...
+# Subtest: S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 30 - S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 1.687024
+  type: 'test'
+  ...
+# Subtest: S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 31 - S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 2.318071
+  type: 'test'
+  ...
+# Subtest: S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 32 - S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 5.637658
+  type: 'test'
+  ...
+# Subtest: S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 33 - S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 2.709101
+  type: 'test'
+  ...
+# Subtest: S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 34 - S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 2.082725
+  type: 'test'
+  ...
+# Subtest: S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 35 - S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 2.037887
+  type: 'test'
+  ...
+# Subtest: S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 36 - S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 3.484565
+  type: 'test'
+  ...
+# Subtest: S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 37 - S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 0.748734
+  type: 'test'
+  ...
+# Subtest: S10 stored verifier: a signature made with another key over the same intent is refused
+ok 38 - S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 2.046127
+  type: 'test'
+  ...
+# Subtest: S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 39 - S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 2.635694
+  type: 'test'
+  ...
+# Subtest: FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+ok 40 - FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+  ---
+  duration_ms: 10.454645
+  type: 'test'
+  ...
+# Subtest: FINAL-READER accepts the explicit rebind path with readiness execution disabled
+ok 41 - FINAL-READER accepts the explicit rebind path with readiness execution disabled
+  ---
+  duration_ms: 2.274092
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses a forged stored signature after its valid positive control
+ok 42 - FINAL-READER refuses a forged stored signature after its valid positive control
+  ---
+  duration_ms: 3.591513
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses changed source bytes after its valid positive control
+ok 43 - FINAL-READER refuses changed source bytes after its valid positive control
+  ---
+  duration_ms: 2.438858
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses package and presentation digest drift after valid positive controls
+ok 44 - FINAL-READER refuses package and presentation digest drift after valid positive controls
+  ---
+  duration_ms: 4.874726
+  type: 'test'
+  ...
+# Subtest: FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+ok 45 - FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+  ---
+  duration_ms: 2.731151
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 154.435571
+
+
+{"exitCode":0,"signal":null,"setupError":null,"completion":""}
+INDEPENDENT COMPLETE V8 BINDING PINS
+TAP version 13
+# Subtest: ADR0085-ROUTE-001 R1 re-read: design-workflow-package.mjs exports the re-read function
+ok 1 - ADR0085-ROUTE-001 R1 re-read: design-workflow-package.mjs exports the re-read function
+  ---
+  duration_ms: 22.233522
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-002 R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+ok 2 - ADR0085-ROUTE-002 R2 re-read: an approved v2 package re-reads as ok, in the visible DWP2-LEGACY-APPROVED-REREAD mode
+  ---
+  duration_ms: 3.586053
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-003 R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+ok 3 - ADR0085-ROUTE-003 R3 re-read: reads no live candidate and no course store (no .git, no evidence besides the package)
+  ---
+  duration_ms: 1.345391
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-004 R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+ok 4 - ADR0085-ROUTE-004 R4 re-read: a v1 package re-reads as ok with a null recorded exception binding
+  ---
+  duration_ms: 1.094277
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-005 R5 re-read: package bytes changed after the approval are refused (item 1)
+ok 5 - ADR0085-ROUTE-005 R5 re-read: package bytes changed after the approval are refused (item 1)
+  ---
+  duration_ms: 1.079656
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-006 R6 re-read: a missing package file is a typed refusal
+ok 6 - ADR0085-ROUTE-006 R6 re-read: a missing package file is a typed refusal
+  ---
+  duration_ms: 0.644766
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-007 R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+ok 7 - ADR0085-ROUTE-007 R7 re-read: a package outside the closed shape is refused even when its digest matches (item 2)
+  ---
+  duration_ms: 1.002009
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-008 R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+ok 8 - ADR0085-ROUTE-008 R8 re-read: package PRD/Spec references that differ from the approved digests are refused (item 3)
+  ---
+  duration_ms: 1.635725
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-009 R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+ok 9 - ADR0085-ROUTE-009 R9 re-read: a PRD or Spec whose current file bytes differ from the package reference is refused (item 3)
+  ---
+  duration_ms: 2.732261
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-010 R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+ok 10 - ADR0085-ROUTE-010 R10 re-read: a recorded advisor exception that differs from the one recomputed from the package is refused (item 4)
+  ---
+  duration_ms: 3.098733
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-011 R11 re-read: a package of another feature is refused
+ok 11 - ADR0085-ROUTE-011 R11 re-read: a package of another feature is refused
+  ---
+  duration_ms: 0.90615
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-012 R12 re-read: malformed approval inputs are a typed input refusal
+ok 12 - ADR0085-ROUTE-012 R12 re-read: malformed approval inputs are a typed input refusal
+  ---
+  duration_ms: 0.379942
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-013 V0 v8: pipeline.plan-approval.v8 is the current approval schema
+ok 13 - ADR0085-ROUTE-013 V0 v8: pipeline.plan-approval.v8 is the current approval schema
+  ---
+  duration_ms: 2.81292
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-014 V1 v8: a signature-mode record with a proof is valid
+not ok 14 - ADR0085-ROUTE-014 V1 v8: a signature-mode record with a proof is valid
+  ---
+  duration_ms: 0.804802
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (signature mode) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:528:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-015 V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+not ok 15 - ADR0085-ROUTE-015 V2 v8: a chat-mode record (proofSha256 and proof null, intentSha256 bound) is valid
+  ---
+  duration_ms: 0.304673
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (chat mode) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:537:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-016 V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+not ok 16 - ADR0085-ROUTE-016 V3 v8: a chat-mode record carrying a proof is invalid (control: the same record without it is valid)
+  ---
+  duration_ms: 0.256614
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:542:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-017 V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+not ok 17 - ADR0085-ROUTE-017 V4 v8: a signature-mode record without its proof is invalid (control: the full record is valid)
+  ---
+  duration_ms: 0.190886
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:551:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-018 V5 v8: the mode must be exactly signature or chat
+not ok 18 - ADR0085-ROUTE-018 V5 v8: the mode must be exactly signature or chat
+  ---
+  duration_ms: 0.279274
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:560:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-019 V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+not ok 19 - ADR0085-ROUTE-019 V6 v8: the designApproval key set is closed, with no package or advisor-exception field (hybrid)
+  ---
+  duration_ms: 0.218525
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:570:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-020 V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+not ok 20 - ADR0085-ROUTE-020 V7 v8: the plan approval carries designApproval and none of the four retired v7 fields
+  ---
+  duration_ms: 0.223905
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:585:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-021 V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+not ok 21 - ADR0085-ROUTE-021 V8 v8: bindingSha256 must be a lowercase sha256 digest and the record schema exactly pipeline.design-approval.v1
+  ---
+  duration_ms: 0.326193
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:590:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-022 V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+not ok 22 - ADR0085-ROUTE-022 V9 v8: the attribution fields are well-formed (approvedBy non-blank, approvedAt canonical ISO)
+  ---
+  duration_ms: 0.239395
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:601:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-023 V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+ok 23 - ADR0085-ROUTE-023 V10 v8: once v8 is current, a well-formed v7 record is handled by validPreviousCurrentPlanApproval and not by validCurrentPlanApproval
+  ---
+  duration_ms: 0.379702
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-024 V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+ok 24 - ADR0085-ROUTE-024 V11 v8: a well-formed v7 record stays accepted by at least one approval validator (legacy stays readable)
+  ---
+  duration_ms: 0.219925
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-025 L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+ok 25 - ADR0085-ROUTE-025 L1 classification: a v7 designWorkflowApproval record is legacy, with or without its advisor exception
+  ---
+  duration_ms: 1.605996
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-026 L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+ok 26 - ADR0085-ROUTE-026 L2 classification: a new-schema record is design-approval in both modes; a hybrid is invalid
+  ---
+  duration_ms: 0.142607
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-027 L3 classification: other or malformed records are unknown
+ok 27 - ADR0085-ROUTE-027 L3 classification: other or malformed records are unknown
+  ---
+  duration_ms: 0.103058
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-028 L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+ok 28 - ADR0085-ROUTE-028 L4 classification: a legacy intent (v1 or v2 policy) is told apart from the design-approval intent
+  ---
+  duration_ms: 0.238374
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-029 S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+ok 29 - ADR0085-ROUTE-029 S1 stored verifier: a validly signed v2 (Advisor-unavailable) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 6.04012
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-030 S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+ok 30 - ADR0085-ROUTE-030 S2 stored verifier: a validly signed v1 (answered Advisor) approval verifies with no live candidate, course store or readiness file
+  ---
+  duration_ms: 1.822981
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-031 S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+ok 31 - ADR0085-ROUTE-031 S3 stored verifier: package bytes changed after the approval are refused (C2 item 1)
+  ---
+  duration_ms: 2.464797
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-032 S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+ok 32 - ADR0085-ROUTE-032 S4 stored verifier: a PRD or Spec whose current bytes differ from the package reference is refused (C2 item 3)
+  ---
+  duration_ms: 5.046651
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-033 S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+ok 33 - ADR0085-ROUTE-033 S5 stored verifier: a recorded Advisor exception that differs from the package's, or is dropped from a v2 unavailable record, is refused (C2 item 4)
+  ---
+  duration_ms: 2.78143
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-034 S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+ok 34 - ADR0085-ROUTE-034 S6 stored verifier: an exception replayed onto a v1 (answered Advisor) record is refused (C2 item 4)
+  ---
+  duration_ms: 2.069696
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-035 S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+ok 35 - ADR0085-ROUTE-035 S7 stored verifier: a recorded intent digest that differs from the intent re-derived from the package is refused
+  ---
+  duration_ms: 1.994998
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-036 S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+ok 36 - ADR0085-ROUTE-036 S8 stored verifier: an approvedBy or proofSha256 that the verified signature does not support is refused
+  ---
+  duration_ms: 3.392588
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-037 S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+ok 37 - ADR0085-ROUTE-037 S9 stored verifier: a record outside the closed shape is refused before any read (regression guard, GREEN today)
+  ---
+  duration_ms: 0.762164
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-038 S10 stored verifier: a signature made with another key over the same intent is refused
+ok 38 - ADR0085-ROUTE-038 S10 stored verifier: a signature made with another key over the same intent is refused
+  ---
+  duration_ms: 2.056375
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-039 S11 stored verifier: a proof whose key is not in the configured anchors is refused
+ok 39 - ADR0085-ROUTE-039 S11 stored verifier: a proof whose key is not in the configured anchors is refused
+  ---
+  duration_ms: 2.612984
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-040 FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+ok 40 - ADR0085-ROUTE-040 FINAL-READER accepts a transferred v7 signed approval without candidate, readiness, or private course state
+  ---
+  duration_ms: 10.127612
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-041 FINAL-READER accepts the explicit rebind path with readiness execution disabled
+ok 41 - ADR0085-ROUTE-041 FINAL-READER accepts the explicit rebind path with readiness execution disabled
+  ---
+  duration_ms: 2.064536
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-042 FINAL-READER refuses a forged stored signature after its valid positive control
+ok 42 - ADR0085-ROUTE-042 FINAL-READER refuses a forged stored signature after its valid positive control
+  ---
+  duration_ms: 3.510474
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-043 FINAL-READER refuses changed source bytes after its valid positive control
+ok 43 - ADR0085-ROUTE-043 FINAL-READER refuses changed source bytes after its valid positive control
+  ---
+  duration_ms: 3.067024
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-044 FINAL-READER refuses package and presentation digest drift after valid positive controls
+ok 44 - ADR0085-ROUTE-044 FINAL-READER refuses package and presentation digest drift after valid positive controls
+  ---
+  duration_ms: 4.16143
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-045 FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+ok 45 - ADR0085-ROUTE-045 FINAL-READER refuses Advisor-exception attribution drift after its valid positive control
+  ---
+  duration_ms: 2.505896
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-046 V12 v8: the fixture binding independently validates through U3 and its canonical digest matches
+ok 46 - ADR0085-ROUTE-046 V12 v8: the fixture binding independently validates through U3 and its canonical digest matches
+  ---
+  duration_ms: 0.47078
+  type: 'test'
+  ...
+# Subtest: ADR0085-ROUTE-047 V13 v8: a missing, null or malformed feature binding is refused
+not ok 47 - ADR0085-ROUTE-047 V13 v8: a missing, null or malformed feature binding is refused
+  ---
+  duration_ms: 0.201146
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:1010:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-048 V14 v8: binding and nested source and receipt key sets are closed
+not ok 48 - ADR0085-ROUTE-048 V14 v8: binding and nested source and receipt key sets are closed
+  ---
+  duration_ms: 0.159356
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:1021:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-049 V15 v8: a shape-valid binding with a mismatched approval digest is refused in both modes
+not ok 49 - ADR0085-ROUTE-049 V15 v8: a shape-valid binding with a mismatched approval digest is refused in both modes
+  ---
+  duration_ms: 0.194096
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (digest control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:1035:5)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+# Subtest: ADR0085-ROUTE-050 V16 v8: mini accepts both design keys null and refuses either half-null or missing key
+not ok 50 - ADR0085-ROUTE-050 V16 v8: mini accepts both design keys null and refuses either half-null or missing key
+  ---
+  duration_ms: 0.225585
+  type: 'test'
+  location: '<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:218:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    RED: validCurrentPlanApproval does not accept a well-formed pipeline.plan-approval.v8 record (control) [slice F1]
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    assertV8Valid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:508:10)
+    assertVariantsInvalid (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:513:3)
+    Object.run (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/design-approval-route.test.mjs:1053:3)
+    async TestContext.<anonymous> (file://<repo-root>/scratch/alfred-v8-binding-assembled-red-r2/plugins/pipeline-core/lib/test-case-completion.mjs:236:9)
+    async Test.run (node:internal/test_runner/test:1208:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+  ...
+1..50
+# tests 50
+# suites 0
+# pass 37
+# fail 13
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 164.072783
+
+
+{"exitCode":1,"signal":null,"setupError":null,"completion":""}
+CONFIRMED: assembled original45 GREEN; independent stronger50 cases reached genuine assertion RED. No source or assertions changed. New validator fix/review/PO acceptance pending.
+
+--- stderr ---
