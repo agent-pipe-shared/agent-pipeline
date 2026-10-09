@@ -22,7 +22,7 @@ plugin tree (`../lib/governance-scope.mjs` and `./guard-dispatch-budget.mjs`), s
 `43ad22368883ea4a67579dad9274e18672dcee6474289decc958ecc263f8230e`.
 
 ```
-wsl.exe -e bash -lc "cd /mnt/d/Dev/agent-pipeline-share; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T2-20261009/red.txt --label TR-G-T2-red -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs"
+wsl.exe -e bash -lc "cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T2-20261009/red.txt --label TR-G-T2-red -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T/guard-dispatch-budget.test.mjs"
 ```
 
 Wrapped exit code 1 (expected: red pins by design plus the baseline reds). Artifact: `evidence/TR-G-T2-20261009/red.txt`.
