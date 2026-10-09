@@ -4,6 +4,30 @@ Active approved implementation continues at continuity revision 32. This is
 operational handover, not candidate qualification, PO acceptance or release.
 Actual host capacity is eleven total threads: primary plus ten children.
 
+## Fixed local-candidate handoff: 2026-10-09
+
+PO priority: provide a new finished local candidate for Greenfield testing by
+18:00 Europe/Berlin. Begin signing and final wiring/integration by 17:00 at
+the latest, against a fixed, fully prepared and reviewed package contract.
+The test focus is the complete new Design-phase approval flow, explicitly
+confirmed by the PO. Preserve every already included function and partial
+change; this priority does not authorize removing existing scope or resetting
+to an earlier candidate. Finish the reviewable package before asking for its
+digest-bound human signature. The earlier signature cannot authorize a new
+intent. No push, tag or public release is requested.
+
+Latest completed wave: F14's unchanged eight bootstrap/acknowledgement cases
+now all pass in the parked assembled proposal. Critic budget proposals pass
+all sixteen explicit checkpoint/closing pins and the complete preserved suite
+(120 pass, zero fail, two native-Windows skips). The pool arithmetic proposal
+passes all eight independent bound cases; live-occupancy implementation and
+historical assertion reconciliation remain pending. New fanout/migration
+contracts remain proposed, not shipped or architecture-accepted. The direct
+design trailer claim was contradicted by current source; historical 'landed'
+status is not acceptance evidence. Git-marker baseline passes 439 cases; the
+carried classifier requires reconciliation of one obsolete non-push assertion.
+All workers have returned; no protected proposal is applied or installed.
+
 F6 recovery: classify the two proposed shared-capacity ADR files as maintainer
 review candidates in the existing inventory group. No policy boundary changed.
 Checker passed with 241 documents, installed preflight and onboarding inspection

@@ -1,0 +1,27 @@
+command: node --test harness/scripts/generate-agent-obligations.test.mjs
+label: obligations-generator-byte-equality
+exitCode: 0
+head: e0e468c265fad7feaa93cb4ba66c58d411b565d5
+tree: b31b89ef9512396c3563570fa74e1c4e1bf57699
+dirty: true
+--- stdout ---
+✔ AC-2: the committed document is byte-identical to a fresh generation (141.335201ms)
+✔ AC-2b: the vendored plugin copy is byte-identical to the canonical document (0.192601ms)
+✔ AC-3 (drift): a protected path added at the source changes the generated document (280.264234ms)
+✔ AC-4: every protected path appears verbatim, and the count is stated (0.283656ms)
+✔ AC-4: the no-in-session-override fact is stated with its citation, not as folklore (0.115534ms)
+✔ AC-3: the draft-phase exempt prefixes come from the guard's own constant (0.132514ms)
+✔ AC-5: liftability is delegated to the repair map, never copied (0.167052ms)
+✔ AC-9 (contract): the command §5 prints is the command the lifecycle guard admits (0.854709ms)
+✔ AC-7: the document carries no absolute or machine-specific path (0.2165ms)
+✔ AC-1: a hand-maintained line is marked as such, so the boundary is visible (0.19353ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 600.310111
+
+--- stderr ---

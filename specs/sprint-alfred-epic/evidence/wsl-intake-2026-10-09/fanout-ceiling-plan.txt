@@ -1,0 +1,389 @@
+command: node scratch/fanout-ceiling-readback-ALFRED-FANOUT-R3-20261009.mjs
+label: fanout-ceiling-contract-readback
+exitCode: 0
+head: f2d2d5bfda170398ef6797aa42bbc546db413cc6
+tree: 25650bbaea3f35ad50c918a09a7d84bb4b603e19
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.fanout-ceiling-plan-readback.v1",
+  "verification": {
+    "status": "passed",
+    "scope": "structural contract completeness and observed source facts only",
+    "behavioralAcceptance": "not executed; proposed cases are not PASS results",
+    "productionChanges": 0,
+    "stateWrites": 0,
+    "independentReview": "pending",
+    "poAcceptance": "open"
+  },
+  "sources": [
+    {
+      "path": "docs/adr/draft-shared-agent-capacity.md",
+      "bytes": 4402,
+      "sha256": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/wsl-intake-2026-10-09/consumer-capacity-diagnostic.txt",
+      "bytes": 54427,
+      "sha256": "68b97daf27adc996d14e54ead4c07ffa05ab24726b47057a7f6dea97a55a732e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/fanout-governor.mjs",
+      "bytes": 26798,
+      "sha256": "e449515ac0bd898d971bda13932744a34f5d91321a1c91fc3606e2b5f09d59ae"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/fanout-governor.test.mjs",
+      "bytes": 41852,
+      "sha256": "e6a6eb15f456c1fb29c477f8374d6f6d42fc9929c9b2c1b4c421dea45fb9e9bc"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs",
+      "bytes": 13351,
+      "sha256": "2820233fded07e2006e308b772fc597d2a69a04024be1ff07a8987c924ea1341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+      "bytes": 9164,
+      "sha256": "a5f769430fcd6913354b4ccd555324bf244e7a9f0e463ae3188108cca8c65b14"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/stop-fanout.mjs",
+      "bytes": 12182,
+      "sha256": "58623ca11401d5d6b4766d106621ba2e4ab4d4290baa1bd6719140c3245d5d54"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/post-compact-reground.mjs",
+      "bytes": 16229,
+      "sha256": "c62b3f71a2c154488a32b2b763c2a012f0cc43f17cf4ca3a1699406c7288637c"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+      "bytes": 31113,
+      "sha256": "afef271c5b8c2a644045ed78fcf0f55d03519f666f7545ea89fe7326350a4de9"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/execution-plane-launch.mjs",
+      "bytes": 24182,
+      "sha256": "3cc7c7307f49980eb5a143965655840fca068b7e08cfefa661c3b0297eabf526"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+      "bytes": 34722,
+      "sha256": "c74de5cca8641b0581ffb6d0f32600c7e70ec9b854ccc3c290fb679ed5774aae"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "bytes": 424003,
+      "sha256": "a2fd4987318766171ea548de002c37447539960885b9b6a882b5d29c1df5919d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/continuity-state.mjs",
+      "bytes": 75889,
+      "sha256": "4ebe9600ff2c21dfc6320c2a15862c9b0f9df3e7e951214e7b8fe1d108ab1e77"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/scheduling-lifecycle.mjs",
+      "bytes": 15183,
+      "sha256": "436409ab1e55ea932e47e5df16f94e87b2b389f1971fe6fe55c09aa9edbbb847"
+    }
+  ],
+  "observed": {
+    "governor": {
+      "path": "plugins/pipeline-core/lib/fanout-governor.mjs",
+      "exports": [
+        "resolveFanoutConfig(config)",
+        "evaluateFanoutStop(args)"
+      ],
+      "defaults": {
+        "mode": "shadow",
+        "target": 4,
+        "maxTarget": 6,
+        "maxLoadUnitsConstrained": 4,
+        "maxLoadUnitsOther": 6,
+        "wslTestSlots": 2,
+        "tierCaps": {
+          "critic": 1,
+          "deep": 2
+        }
+      },
+      "behavior": "effectiveTarget=min(target,maxTarget); slots=max(0,min(effectiveTarget-liveCount,loadUnitsFree)); foreign live occupies one slot and load unit; malformed individual tunables fall back to defaults"
+    },
+    "planner": {
+      "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs",
+      "inputSchema": "pipeline.parallel-dispatch-input.v1",
+      "exactKeys": [
+        "schema",
+        "maxParallel",
+        "reservedSlots",
+        "completed",
+        "packages"
+      ],
+      "limits": "maxParallel 1..32; reservedSlots 0..maxParallel; 1..32 packages",
+      "behavior": "maximum-cardinality conflict-free ready subset; deterministic lexical ties; exact, ancestor/descendant write-path and resource conflicts; receipt recomputation rejects unexplained serialization"
+    },
+    "discovery": "Direct rg searches on known lib/scripts subtrees. PIPELINE_FANOUT_CONFIG found in assigned hooks but no producer found in searched lib/scripts. This bounded negative search does not establish absence elsewhere."
+  },
+  "proposal": {
+    "status": "PROPOSED; not shipped API; no architecture acceptance; independent review pending; PO acceptance open",
+    "configuration": {
+      "proposedSchema": "pipeline.fanout-policy.v1",
+      "exactKeys": [
+        "schema",
+        "allocation",
+        "target",
+        "maxTarget",
+        "maxLoadUnits",
+        "wslTestSlots",
+        "tierCaps"
+      ],
+      "types": {
+        "schema": "literal pipeline.fanout-policy.v1",
+        "allocation": "literal shared",
+        "target": "safe integer 0..64",
+        "maxTarget": "safe integer 2..64 operator ceiling",
+        "maxLoadUnits": "safe integer 1..1000",
+        "wslTestSlots": "null or safe integer 0..1000",
+        "tierCaps": "exact {critic,deep}; each null or safe integer 0..1000"
+      },
+      "validation": "Reject unknown, mixed, malformed keys and limits. Explicit lower target or maxTarget remains lower. target above maxTarget is clamped. Missing policy is an explicitly reported legacy-profile path, never synthesized ten. Ten is this Codex host operator policy only. Portable enrollment asks the operator and requires actual runner evidence; do not rewrite existing declared limits.",
+      "persistence": "Proposed placement: optional fanoutPolicy in portable neutral project calibration, using its sanctioned plan/apply writer; expose via enrollment and explicit configuration repair. This dispatch neither reads calibration through shell nor writes it. PIPELINE_FANOUT_CONFIG remains an adapter transport, not durable authority.",
+      "transport": "Existing queuePath/commonDir/queueOptions, governance/phase, mode, platform, WSL, cutoff and pause inputs stay adapter-owned; new proposed bound capacity receipt is injected separately. Relative queuePath resolves against physical project cwd; commonDir must be validated absolute. Never persist raw session identity or host paths in policy."
+    },
+    "capacityResolver": {
+      "proposedName": "resolveSharedFanoutCapacity; proposed new pure export, no current implementation claimed",
+      "exactInputKeys": [
+        "policy",
+        "consumerLimit",
+        "runner",
+        "certified",
+        "observed",
+        "pressure",
+        "occupied"
+      ],
+      "hostBoundShape": "certified and observed each exactly {basis,value,primaryIncluded}; basis total-threads or spawned-agents; value safe integer 0..64; primaryIncluded boolean must be true for total-threads and false for spawned-agents; unknown/malformed/stale/mismatched-runner required evidence refuses parallel admission",
+      "hostEvidenceEnvelope": "Adapter validates observation runner, provenance, timestamp/expiry and dispatch/candidate binding before injecting bounds; configured/operator numbers are never observations or certification.",
+      "consumerLimit": "null when absent or safe integer 2..64; preserves an explicitly lower continuity concurrencyLimit; pure exact canonical {concurrencyLimit,allocation:shared,fallbackPolicy} or exact approved legacy normalization, preserving ceiling and fallback, never mutating State",
+      "pressure": "required safe integer 0..64 maximum concurrent spawned tasks from validated pressure observer; missing/unknown pressure refuses parallel admission; workload load-unit pressure is separately capped",
+      "occupied": "deduplicated stable task/dispatch identities across coordinator, host and supervisor; count running, review, recovery and unresolved execution once; retain silent/unresolved work until terminal verified disposition; conflicting identity/status evidence refuses parallel admission",
+      "arithmetic": "normalize total-threads as max(0,value-1) exactly once; spawned-agents stays value. C=min(policy.maxTarget,consumerLimit when present,normalizedCertified,normalizedObserved,pressure,32 planner ceiling). activeTarget=min(policy.target,C). free=max(0,activeTarget-occupiedCount). No idle Elephant/Verify/Critic/recovery reservations.",
+      "plannerBridge": "Keep frozen v1 planner shape. When free>0 pass maxParallel=activeTarget and reservedSlots=min(activeTarget,occupiedCount); reservedSlots denotes actually occupied places only. Supply the complete dependency-valid candidate package set and retain largest-safe-wave selection, then atomically admit the whole selected wave against live ownership and workload/tier/test budgets before any spawn. If a workload cap prevents admission, replan with the validated admissible candidate set and reduced wave bound rather than truncating a receipt or admitting a partial tool call. No planner call when activeTarget=0 (v1 requires >=1); emit typed capacity refusal. Above 32, serialize extra packages across dependency-valid bounded waves instead of widening v1.",
+      "receipt": "Proposed exact {schema,status,code,ceiling,target,occupied,free}; schema pipeline.shared-fanout-capacity.v1; status known or refused; known code null and numeric fields safe nonnegative integers; refused code fixed enum and all five numeric fields null. Codes: HOST-UNKNOWN, HOST-INVALID, PRESSURE-UNKNOWN, OCCUPANCY-UNKNOWN, POLICY-INVALID. Readbacks bind immutable source digests outside this core receipt.",
+      "guardSafety": "Governor infrastructure fail-open remains an allow-to-stop result, never permission-to-spawn. Admission gate refuses unknown capacity; serial fallback requires its own certified execution availability and pre-authorized route. Keep DAG readiness, retry/attempt caps, cancellation and unresolved recovery accounting."
+    },
+    "callerMatrix": [
+      {
+        "caller": "plugins/pipeline-core/lib/fanout-governor.mjs:resolveFanoutConfig/evaluateFanoutStop",
+        "current": "4/6 defaults; no host bound inputs",
+        "proposed": "consume validated shared receipt; derive target/free from it; preserve modes, rule precedence, load/tier/WSL caps and recorded-block anti-loop; no block when zero admissible plan"
+      },
+      {
+        "caller": "plugins/pipeline-core/hooks/stop-fanout.mjs:decideStop",
+        "current": "env JSON; required queuePath and absolute commonDir; runner claude; append before block",
+        "proposed": "adapter resolves canonical policy and runner evidence, injects one receipt; retain durable append-before-block and silent infrastructure failure; actual runner identity mandatory for future adapters"
+      },
+      {
+        "caller": "plugins/pipeline-core/hooks/post-compact-reground.mjs:buildFanoutSummaryLine",
+        "current": "env JSON; resolver effectiveTarget; free uses derived.live only; runner claude",
+        "proposed": "read same receipt and occupied aggregate including foreign/unresolved tasks; report free from capacity/load limits; unknown emits fixed unavailable summary; no State write on compact"
+      },
+      {
+        "caller": "plugins/pipeline-core/hooks/guard-dispatch.mjs:observeFanoutDispatches",
+        "current": "env queue/mode; transport determines runner; pairwise pending in-call slices; target telemetry; no shared host ceiling admission",
+        "proposed": "bind one capacity snapshot and full proposed wave; normalize every entry including absolute/relative paths before ownership checks; reject entire wave before launch events/spawn if aggregate exceeds capacity or conflicts with live writes/resources; preserve shadow/advisory scope behavior but production admission must enforce capacity"
+      },
+      {
+        "caller": "plugins/pipeline-core/scripts/execution-plane-launch.mjs:runReal plannerInput0",
+        "current": "bounded Nova e2e fixture maxParallel 2/reservedSlots 0; companion shares cpu resource",
+        "proposed": "keep fixture explicitly bounded; separate future production launcher receives resolver bridge, never treat this two-package fixture as portable default; preserve scheduling receipt recomputation and execution verification"
+      },
+      {
+        "caller": "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs:planParallelDispatch/validateParallelDispatchReceipt",
+        "current": "closed v1 caller-held maxParallel/reservedSlots, maximum safe wave",
+        "proposed": "no frozen-v1 schema edit; caller bridge supplies actual occupied count and shared ceiling; retain path/resource/dependency errors and largest safe wave"
+      },
+      {
+        "caller": "plugins/pipeline-core/lib/scheduling-lifecycle.mjs",
+        "current": "validates same exact planner v1 input with 1..32 ceiling",
+        "proposed": "bind admitted full-wave receipt and queue revision; prevent stale/caller-forged overrides; do not widen validator independently"
+      }
+    ],
+    "propagation": {
+      "newRepos": "Update canonical enrollment/adoption seeds in discovered onboarding-continuity.mjs and formal continuity validator/schema as a separately reviewed writer tranche. New canonical capacity {concurrencyLimit:<operator runner-specific ceiling>,allocation:shared,fallbackPolicy:<existing choice>}; fanout policy exposes target/ceiling and constrained workload defaults separately. Runtime adapters consume one read-only resolved policy; installer/enrollment must wire transport with absolute commonDir, actual runner and validated evidence. No fixed ten across runners.",
+      "existingRepos": "Plugin update distributes pure compatible readers first. Exact legacy capacity remains readable with idle reservations ignored, preserving current ceiling/fallback. Onboarding inspection advertises dedicated proposed capacity migration plan/apply (new API, not existing command): bind physical State path/raw hash/feature/revision, requested optional ceiling change and exact post-image; defer while active dispatch binds queue revision. Sanctioned writer acquires existing lock, checks CAS/hash/identity, changes capacity only, increments revision once, verifies readback, preserves approval/authority/Result/history/retries. Conflicts fail closed; repeat completed migration is idempotent. Fanout config repair is a separate digest-bound calibration action, never incidental State mutation.",
+      "updateBoundary": "Discovered scripts/pipeline-update-channel.mjs selects alpha/beta/stable and writes calibration via its dedicated transaction; it is not capacity migration or State writer. Channel readback/selection, plugin refresh, bootstrap and compact must not rewrite State, seed ceiling ten, or reapprove an architecture decision. Adoption of draft-shared-agent-capacity and supersession of ADR-0048 remain separate pending decisions."
+    }
+  },
+  "cases": [
+    {
+      "id": "CAP01",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "policy target/maxTarget 10; consumer 10; certified total 11; observed spawned 10; pressure10; occupied0",
+      "expected": "ceiling10/free10; primary subtracted once"
+    },
+    {
+      "id": "CAP02",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "same policy; certified/observed spawned6; pressure10; occupied0",
+      "expected": "ceiling6/free6"
+    },
+    {
+      "id": "CAP03",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host spawned10; explicit consumer4; target10; occupied0",
+      "expected": "ceiling4/free4; preserve serialized ceiling4"
+    },
+    {
+      "id": "CAP04",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host spawned10; policy maxTarget3/target10; consumer10",
+      "expected": "ceiling3/free3"
+    },
+    {
+      "id": "CAP05",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host10; running impl A, critic B, recovery C; duplicate B in supervisor",
+      "expected": "occupied3/free7; no idle role deduction"
+    },
+    {
+      "id": "CAP06",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host10; 11 distinct unresolved/running tasks",
+      "expected": "occupied11/free0; refuse new launch; do not cancel existing tasks"
+    },
+    {
+      "id": "CAP07",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host10; silent unresolved task U with no terminal disposition",
+      "expected": "occupied1/free9; age alone never releases place"
+    },
+    {
+      "id": "CAP08",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "certified unknown OR observed stale OR runner mismatch",
+      "expected": "typed refused receipt; parallel spawn count0; allow-to-stop fail-open is separate"
+    },
+    {
+      "id": "CAP09",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host10; pressure2 then pressure0",
+      "expected": "free2 then0; no pending wave escapes latest admission bound"
+    },
+    {
+      "id": "CAP10",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "missing pressure or conflicting occupied identity statuses",
+      "expected": "PRESSURE-UNKNOWN or OCCUPANCY-UNKNOWN; zero parallel spawns"
+    },
+    {
+      "id": "CAP11",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "ten ready disjoint packages; free10; load budget10; tier/test limits permit",
+      "expected": "selected ten; full-wave admission precedes any launch"
+    },
+    {
+      "id": "CAP12",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "free1; request a two-entry tool wave",
+      "expected": "reject whole wave with capacity reason; no partial launch events or spawn"
+    },
+    {
+      "id": "CAP13",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "alpha writes src; beta writes src/b; gamma writes docs; live writer owns docs",
+      "expected": "reject conflicting wave against live scope; replanning beta only remains possible"
+    },
+    {
+      "id": "CAP14",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "alpha owns src; beta/gamma own disjoint children; free2; no live conflict",
+      "expected": "maximum safe planner wave beta/gamma; validate recomputed receipt; no greedy alpha serialization"
+    },
+    {
+      "id": "CAP15",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "distinct writes share resource database:migration",
+      "expected": "resource conflict serializes; every blocked ready entry has exact reason"
+    },
+    {
+      "id": "CAP16",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "WSL budget4; light weight1/test-heavy2; test slots2; deep2/critic1",
+      "expected": "no wave exceeds load/tier/test caps; inactive roles hold no unused places"
+    },
+    {
+      "id": "CAP17",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "ready task at attempt cap or unmet dependency or PO hold",
+      "expected": "no dispatch; serial mode cannot bypass retry/readiness/hold"
+    },
+    {
+      "id": "CAP18",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "missing host evidence; explicit pre-authorized serial fallback with verified one-place availability",
+      "expected": "serial one task only; absent certification/fallback binding defers"
+    },
+    {
+      "id": "CAP19",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "hook fixture includes absolute cwd/commonDir and relative queuePath; relative and absolute write-scope aliases",
+      "expected": "physical cwd resolution; canonical ownership catches same-file conflict; unsafe/outside paths refuse"
+    },
+    {
+      "id": "CAP20",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "each caller receives identical snapshot; compact summary includes foreign running task",
+      "expected": "governor/guard/planner/summary agree free; compact writes no State"
+    },
+    {
+      "id": "CAP21",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "legacy exact capacity limit4 fallback defer; compatible read after update",
+      "expected": "canonical returned limit4/allocation shared/fallback defer; original bytes unchanged"
+    },
+    {
+      "id": "CAP22",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "mixed canonical/legacy keys, unknown policy key, fractional/out-of-range number",
+      "expected": "reject; never silently raise limits or adopt ten"
+    },
+    {
+      "id": "CAP23",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "enroll Codex host10 then another runner host3 with operator ceiling3",
+      "expected": "runner-specific ceilings10 and3; no global configuration mutation"
+    },
+    {
+      "id": "CAP24",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "legacy migration plan revision7/hash H; apply while active dispatch OR with changed raw hash",
+      "expected": "defer active dispatch; stale CAS refuses; no authority/approval/retry/Result change"
+    },
+    {
+      "id": "CAP25",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "idle valid migration revision7; apply then repeat same final state",
+      "expected": "only capacity changes; revision8 once; repeat idempotent/readback confirms"
+    },
+    {
+      "id": "CAP26",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "channel readback/selection, plugin refresh, bootstrap, compact",
+      "expected": "no consumer State bytes or revision change; migration remains separate explicit action"
+    },
+    {
+      "id": "CAP27",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "host/consumer64; 40 independent packages",
+      "expected": "planner waves at most32 packages; caller batches remainder; no v1 shape widening"
+    },
+    {
+      "id": "CAP28",
+      "status": "PROPOSED-NOT-EXECUTED",
+      "input": "stop enforce block but ledger append fails; anti-loop exhausted; pause/cutoff",
+      "expected": "no unrecorded block; preserve governor fail-open and bounded block loop"
+    }
+  ]
+}
+
+--- stderr ---

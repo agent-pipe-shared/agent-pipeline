@@ -1,0 +1,105 @@
+command: node scratch/critic-budget-close-ALFRED-20261009.mjs
+label: ALFRED-CRITIC-BUDGET-20261009-setup-unverified
+exitCode: 0
+head: f2d2d5bfda170398ef6797aa42bbc546db413cc6
+tree: 25650bbaea3f35ad50c918a09a7d84bb4b603e19
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.critic-budget-setup-observation.v1",
+  "dispatchId": "ALFRED-CRITIC-BUDGET-20261009",
+  "candidateCommit": "f2d2d5bfda170398ef6797aa42bbc546db413cc6",
+  "status": "setup-unverified",
+  "inputs": [
+    {
+      "path": "scratch/contract-ALFRED-CRITIC-BUDGET-20261009.md",
+      "bytes": 2207,
+      "sha256": "6d56072d5c0c874760c265d218c6a576b8c8f7a1debb06957238ab05b2fc8206"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.mjs",
+      "bytes": 90377,
+      "sha256": "360a645e4b77f32bd18971d8a94463a02cd49536e12f966bd4d03cb5018f7a33"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-dispatch-budget.test.mjs",
+      "bytes": 150645,
+      "sha256": "006d766d2d4d28aab54066612b2070ae20a2c371ebe04c8484076f8ba38732eb"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/signed-package/tranche-2/agents/critic.md",
+      "bytes": 16037,
+      "sha256": "59c6a1ead83b0b570956920d74a6a078c94dd3602a5beff152726779a974710b"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "bytes": 79351,
+      "sha256": "61e8fc35463a9103336a7730a547680a7c18ab5779ca19ae14c0091c5e2d9cea"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+      "bytes": 109358,
+      "sha256": "e92bc503189bec44737699058643d6023230f38c196ad53e581765de2dc52a4d"
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "bytes": 15443,
+      "sha256": "5089d1849f46214fd9a1daded4e90f445d2e671d9efd115af9caa3b74649f36d"
+    },
+    {
+      "path": "harness/verify-suites.json",
+      "bytes": 80601,
+      "sha256": "fd9319c6444f2b4f01109d69af856361acd2d79608751d445301582102651f9c"
+    }
+  ],
+  "observedPins": [
+    {
+      "line": 2206,
+      "text": "test(\"CRITIC-CKPT-T2 (a): a dispatched Critic is admitted for 50 working calls and the 51st is DISPATCH-BUDGET-EXHAUSTED\", () => {"
+    },
+    {
+      "line": 2214,
+      "text": "test(\"CRITIC-CKPT-T2 (b): the first checkpoint notice reaches the Critic on call 40, not on call 39\", () => {"
+    },
+    {
+      "line": 2222,
+      "text": "test(\"CRITIC-CKPT-T2 (c): five closing acts after the 50th call pass and the sixth names the exhausted closing allowance\", () => {"
+    }
+  ],
+  "observedAgentMaxTurns": 65,
+  "requiredCheckpoint": 30,
+  "existingCheckpointPin": 40,
+  "checkpointRequirement": "not behaviorally verified; existing assertion conflicts with checkpoint30 requirement",
+  "freshGraphCreated": false,
+  "testsExecuted": [],
+  "redEvidence": false,
+  "productionWrites": [],
+  "sourceImmutability": "no source or test writes performed; before/after hashes not established",
+  "budget": {
+    "workingCalls": 30,
+    "cap": 30,
+    "checkpoint": 24,
+    "checkpointYieldMissed": true
+  },
+  "closingAllowance": {
+    "committed": [
+      "nothing committed"
+    ],
+    "verifiedGreen": [],
+    "remainsUndone": [
+      "fresh public dependency graph",
+      "behavioral maxTurns65/working50/checkpoint30 verification",
+      "named checkpoint and closing tests",
+      "default Critic base30 verification",
+      "complete dependency input hashes and before/after immutability check",
+      "independent review: pending",
+      "PO acceptance: open"
+    ],
+    "nextBriefingAdjustments": [
+      "Put working cap before context reads; bound mandatory setup reads and use compact targeted output so graph assembly and verification fit before call24 checkpoint. Preserve all assertion bodies and report checkpoint40 versus checkpoint30 conflict without edits."
+    ]
+  },
+  "enforcementLimitation": "Authenticated enforcement is Claude-only. No authenticated Codex live-call counting or cross-runner enforcement claimed."
+}
+
+--- stderr ---

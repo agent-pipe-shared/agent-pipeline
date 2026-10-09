@@ -1,0 +1,62 @@
+command: node scratch/verify-pool-bound-postimage.mjs
+label: shared-pool-bounds-postimage
+exitCode: 0
+head: e0e468c265fad7feaa93cb4ba66c58d411b565d5
+tree: b31b89ef9512396c3563570fa74e1c4e1bf57699
+dirty: true
+--- stdout ---
+sourceSha256: 6456e4545d3615629e1a45f180fdd2f8a1ba8fc7c1998331b278f09e79b12493
+postimageSha256: 924f3c8da822cb9be8b85bae92e1551df9aa70e96ce9e541e076963a657c9fae
+testSha256: 73d01d04c70cddef9c255a4a6e7e702c9ed6091b61bdc9db09b141018bac6574
+completionHelperSha256: 616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55
+scratchGraphSha256: 7a150f3281c570cd26d842e6185960b68a03c111f1b6fce90e1f172ed618b9e6
+committedPinsMatch: true
+scratchGraphByteExact: true
+reachedCases: 8
+pass: 8
+fail: 0
+narrowSourcePostimageDiff:
+diff --git a/plugins/pipeline-core/lib/local-worker-pool.mjs b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/local-worker-pool.mjs
+index 08963ed11..2f3e88855 100644
+--- a/plugins/pipeline-core/lib/local-worker-pool.mjs
++++ b/specs/sprint-alfred-epic/signed-package/tranche-2/lib/local-worker-pool.mjs
+@@ -67,7 +67,7 @@ function poolCode(value) {
+ }
+ export function validateLocalWorkerPool(value) { const code = poolCode(value); return code ? { ok: false, code } : { ok: true, code: null }; }
+ export function localWorkerPoolDigest(value) { return poolCode(value) ? null : hash(value); }
+-/** Derive the only portable capacity claim: minimum known bound less reserved slots. */
++/** Derive the minimum known gross capacity bound; legacy role holds do not deduct idle places. */
+ export function computeEffectiveCapacity(capacity) {
+   if (!capacity || typeof capacity !== "object" || ![capacity.configured, capacity.operator, capacity.certified, capacity.observed, capacity.pressure].every(bound) || !reserved(capacity.reserved)) return { status: "unavailable", concurrentTasks: null, reasonCodes: ["SHAPE:capacity"] };
+   const named = Object.entries({ configured: capacity.configured, operator: capacity.operator, certified: capacity.certified, observed: capacity.observed, pressure: capacity.pressure });
+@@ -75,7 +75,7 @@ export function computeEffectiveCapacity(capacity) {
+   if (unknown.length) return { status: "unavailable", concurrentTasks: null, reasonCodes: unknown.sort() };
+   const known = named.map(([, entry]) => entry.concurrentTasks).filter((entry) => entry !== null);
+   if (!known.length) return { status: "unavailable", concurrentTasks: null, reasonCodes: ["UNKNOWN:all"] };
+-  return { status: "available", concurrentTasks: Math.max(0, Math.min(...known) - capacity.reserved.elephant - capacity.reserved.verify - capacity.reserved.critic), reasonCodes: [] };
++  return { status: "available", concurrentTasks: Math.min(...known), reasonCodes: [] };
+ }
+ export function createLocalWorkerPool(input) {
+   const value = { schema: LOCAL_WORKER_POOL_SCHEMA, ...clone(input) };
+
+verifyCommand: node --test scratch/pool-bound-postimage-graph/plugins/pipeline-core/lib/shared-pool-bounds.test.mjs
+verifyExitCode: 0
+--- test stdout ---
+✔ SP-BND01 SP01 idle legacy role holds preserve the minimum known gross ceiling of three (1.093848ms)
+✔ SP-BND02 SP01 pressure bounds the shared ceiling at two without subtracting idle holds (0.183601ms)
+✔ SP-BND03 SP02 required unknown bounds refuse with sorted reasons (0.234208ms)
+✔ SP-BND04 SP02 optional unknown pressure is omitted from the minimum (0.21023ms)
+✔ SP-BND05 SP02 all optional unknown bounds refuse rather than claiming capacity (0.160382ms)
+✔ SP-BND06 SP02 each known zero remains a zero ceiling (0.821811ms)
+✔ SP-BND07 SP02 malformed bounds refuse through the current exported API (1.027612ms)
+✔ SP-BND08 SP02 malformed legacy reservation declarations remain refused (0.607182ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 47.692898
+
+--- stderr ---

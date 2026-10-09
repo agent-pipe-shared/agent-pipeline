@@ -1070,6 +1070,9 @@ export function main(args = process.argv.slice(2), {
     INTAKE_GENERATE_APPLY_SCHEMA,
     "pipeline.bootstrap-plan-acknowledgement-plan.v1", "pipeline.bootstrap-plan-acknowledgement-apply.v1",
   ].includes(output.schema)) return 0;
+  // The chat planner succeeded when it offers the confirmation boundary;
+  // acknowledgement is applied only by the separate digest-bound apply action.
+  if (output.schema === "pipeline.bootstrap-plan-acknowledgement-chat-plan.v1") return output.status === "confirmation-required" ? 0 : 1;
   // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2): bootstrap-bind-apply calls
   // applyOnboardingBootstrapBind(), which calls applyOnboardingKickoffPromotion() DIRECTLY --
   // bypassing the v4Inspection wrapper kickoff-promote-apply goes through

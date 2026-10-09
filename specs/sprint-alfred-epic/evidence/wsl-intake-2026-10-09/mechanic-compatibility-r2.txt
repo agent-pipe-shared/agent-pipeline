@@ -1,0 +1,710 @@
+command: node scratch/diagnostic-ALFRED-MECH-COMPAT-R2-20261009.mjs
+label: ALFRED-mechanic-compatibility-recovered-public-graph
+exitCode: 1
+head: e0e468c265fad7feaa93cb4ba66c58d411b565d5
+tree: b31b89ef9512396c3563570fa74e1c4e1bf57699
+dirty: true
+--- stdout ---
+{
+  "inventory": [
+    {
+      "source": "plugins/pipeline-core/config/routing-authority.json",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/config/routing-authority.json",
+      "sourceSha256": "87d360fbaa2c16a9dc88b0056eab78073dafd46e98d02b7be5f859091708b3f3",
+      "proposalSha256": "4db7f19aed7fcd3b2289a7f2db2bf030794f247cc40281e088546fee92f50585"
+    },
+    {
+      "source": "plugins/pipeline-core/config/runner-mappings.json",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/config/runner-mappings.json",
+      "sourceSha256": "5b9bbd7f8c41cdecb43be89089ababfe899d77dac1a090dfb218b8dbefd99377",
+      "proposalSha256": "cbc1315e7f410f6ba6a13ac97f3c6407f5de431ce8784765efd764186f5a7963"
+    },
+    {
+      "source": "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/agents/goldfish-mechanic.md",
+      "sourceSha256": "886e229e57da04f9eb317f7e7a1be65088b71958cf3a3069b9c69b68509adbcc",
+      "proposalSha256": "162d4261abb87d7c45039b34ce4a1be82a5f1d58b22e7f84ba899d7bf472f79b"
+    },
+    {
+      "source": "policies/model-policy.md",
+      "proposal": "specs/sprint-alfred-epic/signed-package/tranche-2/policies/model-policy.md",
+      "sourceSha256": "82d0b43b5303666c34260a1cb97c2eac4adf0986424d409cf671898236ffdbb9",
+      "proposalSha256": "7b5f84273a14e190b0c3f26878a3dcc831dab65d2066ef050b98bc4eb4d4fe6d"
+    }
+  ],
+  "graphModules": [
+    "plugins/pipeline-core/config/control-execution-extension-namespaces.json",
+    "plugins/pipeline-core/config/lifecycle-extension-namespaces.json",
+    "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+    "plugins/pipeline-core/hooks/staleness-check.mjs",
+    "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+    "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+    "plugins/pipeline-core/lib/advisory-receipt.mjs",
+    "plugins/pipeline-core/lib/advisory-route-selection.mjs",
+    "plugins/pipeline-core/lib/agent-decision-journal.mjs",
+    "plugins/pipeline-core/lib/agent-model-registry.mjs",
+    "plugins/pipeline-core/lib/agy-central-refresh.mjs",
+    "plugins/pipeline-core/lib/agy-central-snapshot.mjs",
+    "plugins/pipeline-core/lib/agy-final-return.mjs",
+    "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-receipt.mjs",
+    "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+    "plugins/pipeline-core/lib/agy-session-authority.mjs",
+    "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+    "plugins/pipeline-core/lib/agy-start-hint.mjs",
+    "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+    "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+    "plugins/pipeline-core/lib/antigravity-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+    "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",
+    "plugins/pipeline-core/lib/architecture-adoption-orientation.mjs",
+    "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+    "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+    "plugins/pipeline-core/lib/architecture-design.mjs",
+    "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+    "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+    "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+    "plugins/pipeline-core/lib/audit-bundle.mjs",
+    "plugins/pipeline-core/lib/authority-revision-proof.mjs",
+    "plugins/pipeline-core/lib/bootstrap-payload-budget.mjs",
+    "plugins/pipeline-core/lib/bound-design-line-endings.mjs",
+    "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+    "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
+    "plugins/pipeline-core/lib/claude-initial-prompt-pointer.mjs",
+    "plugins/pipeline-core/lib/claude-intake-prompt-capture.mjs",
+    "plugins/pipeline-core/lib/claude-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-admission.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-execution.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-advisor-request.mjs",
+    "plugins/pipeline-core/lib/codex-design-readiness-host-store.mjs",
+    "plugins/pipeline-core/lib/codex-host-layout.mjs",
+    "plugins/pipeline-core/lib/codex-host-output-custody.mjs",
+    "plugins/pipeline-core/lib/codex-host-plugin-list.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-exec-worker.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-launcher.mjs",
+    "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+    "plugins/pipeline-core/lib/codex-isolated-structured-host.mjs",
+    "plugins/pipeline-core/lib/codex-model-host-observation.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-app-server.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+    "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-finalization.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-host-record.mjs",
+    "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+    "plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs",
+    "plugins/pipeline-core/lib/codex-tool-free-design-readiness.mjs",
+    "plugins/pipeline-core/lib/commit-message-policy.mjs",
+    "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
+    "plugins/pipeline-core/lib/consumer-verify.mjs",
+    "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+    "plugins/pipeline-core/lib/continuity-state.mjs",
+    "plugins/pipeline-core/lib/continuity-status.mjs",
+    "plugins/pipeline-core/lib/control-execution-exchange.mjs",
+    "plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs",
+    "plugins/pipeline-core/lib/copy-safe-command.mjs",
+    "plugins/pipeline-core/lib/critic-course-admission.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-packet.mjs",
+    "plugins/pipeline-core/lib/critic-disposition-addendum.mjs",
+    "plugins/pipeline-core/lib/critic-export-policy.mjs",
+    "plugins/pipeline-core/lib/critic-packet-governance.mjs",
+    "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+    "plugins/pipeline-core/lib/critic-route-v3.mjs",
+    "plugins/pipeline-core/lib/critic-session-model-route.mjs",
+    "plugins/pipeline-core/lib/critic-skip-decision.mjs",
+    "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+    "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+    "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+    "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
+    "plugins/pipeline-core/lib/design-advisor-course-store.mjs",
+    "plugins/pipeline-core/lib/design-advisor-course.mjs",
+    "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+    "plugins/pipeline-core/lib/design-authoring.mjs",
+    "plugins/pipeline-core/lib/design-readiness-hashes.mjs",
+    "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+    "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+    "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-builder.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+    "plugins/pipeline-core/lib/design-workflow-package.mjs",
+    "plugins/pipeline-core/lib/dispatch-budget-binding.mjs",
+    "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
+    "plugins/pipeline-core/lib/dispatch-policy.mjs",
+    "plugins/pipeline-core/lib/dispatch-record.mjs",
+    "plugins/pipeline-core/lib/document-hooks.mjs",
+    "plugins/pipeline-core/lib/enrollment-retirement-coordinator.mjs",
+    "plugins/pipeline-core/lib/entrypoint.mjs",
+    "plugins/pipeline-core/lib/external-push-ledger.mjs",
+    "plugins/pipeline-core/lib/feature-close-audit-receipt.mjs",
+    "plugins/pipeline-core/lib/feature-package-topology.mjs",
+    "plugins/pipeline-core/lib/fs-durability.mjs",
+    "plugins/pipeline-core/lib/gate-estimate.mjs",
+    "plugins/pipeline-core/lib/git-cmd.mjs",
+    "plugins/pipeline-core/lib/git-hook-footprint.mjs",
+    "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+    "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs",
+    "plugins/pipeline-core/lib/git-null-device.mjs",
+    "plugins/pipeline-core/lib/governance-action-artifact.mjs",
+    "plugins/pipeline-core/lib/governance-action-events.mjs",
+    "plugins/pipeline-core/lib/governance-event-store.mjs",
+    "plugins/pipeline-core/lib/governance-event.mjs",
+    "plugins/pipeline-core/lib/governance-gate-action.mjs",
+    "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
+    "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
+    "plugins/pipeline-core/lib/governance-review-action.mjs",
+    "plugins/pipeline-core/lib/governance-scope.mjs",
+    "plugins/pipeline-core/lib/governance-verification-action.mjs",
+    "plugins/pipeline-core/lib/guard-handoff-offer.mjs",
+    "plugins/pipeline-core/lib/guard-maintenance-window.mjs",
+    "plugins/pipeline-core/lib/hardened-private-directory.mjs",
+    "plugins/pipeline-core/lib/hook-currentness.mjs",
+    "plugins/pipeline-core/lib/human-governance-decision.mjs",
+    "plugins/pipeline-core/lib/human-guard-override.mjs",
+    "plugins/pipeline-core/lib/human-role-exception-decision.mjs",
+    "plugins/pipeline-core/lib/human-role-labels.mjs",
+    "plugins/pipeline-core/lib/installed-plugin-attestation.mjs",
+    "plugins/pipeline-core/lib/intake-material-reference.mjs",
+    "plugins/pipeline-core/lib/lifecycle-governance-events.mjs",
+    "plugins/pipeline-core/lib/machine-plane.mjs",
+    "plugins/pipeline-core/lib/manifest.mjs",
+    "plugins/pipeline-core/lib/model-family-authority.mjs",
+    "plugins/pipeline-core/lib/model-family-discovery.mjs",
+    "plugins/pipeline-core/lib/model-family-execution.mjs",
+    "plugins/pipeline-core/lib/model-family-host-store.mjs",
+    "plugins/pipeline-core/lib/model-family-invocation.mjs",
+    "plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+    "plugins/pipeline-core/lib/model-family-route-source.mjs",
+    "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+    "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+    "plugins/pipeline-core/lib/model-role-dispatch.mjs",
+    "plugins/pipeline-core/lib/model-role-host-identity.mjs",
+    "plugins/pipeline-core/lib/model-role-host-observations.mjs",
+    "plugins/pipeline-core/lib/model-role-host-session.mjs",
+    "plugins/pipeline-core/lib/model-role-host-store.mjs",
+    "plugins/pipeline-core/lib/model-role-route-source.mjs",
+    "plugins/pipeline-core/lib/model-role-session.mjs",
+    "plugins/pipeline-core/lib/model-role-v3-baseline.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+    "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+    "plugins/pipeline-core/lib/native-initial-advisor-execution.mjs",
+    "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+    "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+    "plugins/pipeline-core/lib/onboarding-initial-answers-state.mjs",
+    "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
+    "plugins/pipeline-core/lib/onboarding-language-correction.mjs",
+    "plugins/pipeline-core/lib/onboarding-later-language.mjs",
+    "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+    "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+    "plugins/pipeline-core/lib/organization-policy.mjs",
+    "plugins/pipeline-core/lib/passive-read-policy.mjs",
+    "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
+    "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+    "plugins/pipeline-core/lib/po-approval-proof.mjs",
+    "plugins/pipeline-core/lib/po-gate-authority.mjs",
+    "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
+    "plugins/pipeline-core/lib/po-key-directory.mjs",
+    "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs",
+    "plugins/pipeline-core/lib/portable-critic-export.mjs",
+    "plugins/pipeline-core/lib/private-boundary.mjs",
+    "plugins/pipeline-core/lib/project-authority.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+    "plugins/pipeline-core/lib/provenance-attestation.mjs",
+    "plugins/pipeline-core/lib/provenance-envelope.mjs",
+    "plugins/pipeline-core/lib/public-core-observation.mjs",
+    "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
+    "plugins/pipeline-core/lib/publication-authority.mjs",
+    "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
+    "plugins/pipeline-core/lib/publication-bundle.mjs",
+    "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
+    "plugins/pipeline-core/lib/readiness-advisor-context-v2.mjs",
+    "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+    "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
+    "plugins/pipeline-core/lib/repository-path-identity.mjs",
+    "plugins/pipeline-core/lib/requirement-traceability.mjs",
+    "plugins/pipeline-core/lib/review-economy.mjs",
+    "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+    "plugins/pipeline-core/lib/routing-projection.mjs",
+    "plugins/pipeline-core/lib/ruleset-source.mjs",
+    "plugins/pipeline-core/lib/runner-native-continuation.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+    "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+    "plugins/pipeline-core/lib/runner-profiles-v2.mjs",
+    "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+    "plugins/pipeline-core/lib/runner-readiness-request.mjs",
+    "plugins/pipeline-core/lib/runtime-handover-projection.mjs",
+    "plugins/pipeline-core/lib/runtime-projection-v2.mjs",
+    "plugins/pipeline-core/lib/runtime-projection-v3.mjs",
+    "plugins/pipeline-core/lib/sandbox-failure.mjs",
+    "plugins/pipeline-core/lib/sandboxed-readonly-duty.mjs",
+    "plugins/pipeline-core/lib/schema-lite.mjs",
+    "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
+    "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+    "plugins/pipeline-core/lib/signed-quality-package.mjs",
+    "plugins/pipeline-core/lib/source-observation.mjs",
+    "plugins/pipeline-core/lib/successful-spawn.mjs",
+    "plugins/pipeline-core/lib/test-case-completion.mjs",
+    "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
+    "plugins/pipeline-core/lib/threat-model.mjs",
+    "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+    "plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+    "plugins/pipeline-core/lib/verify-evidence-path.mjs",
+    "plugins/pipeline-core/lib/verify-resume.mjs",
+    "plugins/pipeline-core/lib/verify-run-record.mjs",
+    "plugins/pipeline-core/lib/verify-selection.mjs",
+    "plugins/pipeline-core/lib/windows-hide-preload.mjs",
+    "plugins/pipeline-core/lib/windows-private-state.mjs",
+    "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+    "plugins/pipeline-core/lib/yaml-lite.mjs",
+    "plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.adoption-state.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.design-readiness-receipt.v1.json",
+    "plugins/pipeline-core/schemas/pipeline.design-workflow-package.v2.json",
+    "plugins/pipeline-core/schemas/pipeline.module-inventory.v1.json",
+    "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+    "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+    "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+    "plugins/pipeline-core/scripts/bootstrap-trust-recovery.mjs",
+    "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
+    "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+    "plugins/pipeline-core/scripts/check-routing-projections.mjs",
+    "plugins/pipeline-core/scripts/check-routing-projections.test.mjs",
+    "plugins/pipeline-core/scripts/check-runner-manifest-parity.mjs",
+    "plugins/pipeline-core/scripts/codex-app-server-health.mjs",
+    "plugins/pipeline-core/scripts/codex-app-server-model-probe.mjs",
+    "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+    "plugins/pipeline-core/scripts/codex-host-repository-init.mjs",
+    "plugins/pipeline-core/scripts/codex-onboarding-launch.mjs",
+    "plugins/pipeline-core/scripts/codex-project-runtime-readback-host.mjs",
+    "plugins/pipeline-core/scripts/codex-sandbox-compatibility-receipt.schema.json",
+    "plugins/pipeline-core/scripts/codex-sandbox-select.mjs",
+    "plugins/pipeline-core/scripts/codex-sandbox-selection.schema.json",
+    "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
+    "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+    "plugins/pipeline-core/scripts/continuity-status.mjs",
+    "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+    "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+    "plugins/pipeline-core/scripts/design-course-session.mjs",
+    "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+    "plugins/pipeline-core/scripts/generate-architecture-overview.mjs",
+    "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+    "plugins/pipeline-core/scripts/model-family-approval-request.mjs",
+    "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+    "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs",
+    "plugins/pipeline-core/scripts/module-inventory.mjs",
+    "plugins/pipeline-core/scripts/onboarding-init.mjs",
+    "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+    "plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+    "plugins/pipeline-core/scripts/po-approval-request.mjs",
+    "plugins/pipeline-core/scripts/po-gate-profile-repair.mjs",
+    "plugins/pipeline-core/scripts/po-human-approval.mjs",
+    "plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs",
+    "plugins/pipeline-core/scripts/portable-critic-export.mjs",
+    "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+    "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
+    "plugins/pipeline-core/scripts/project-authority-migration.mjs",
+    "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+    "plugins/pipeline-core/scripts/publication-close-journal.mjs",
+    "plugins/pipeline-core/scripts/push-gate-satisfiability.mjs",
+    "plugins/pipeline-core/scripts/push-prepare.mjs",
+    "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
+    "plugins/pipeline-core/scripts/ruleset-update-policy.mjs",
+    "plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
+    "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
+    "plugins/pipeline-core/scripts/session-capability-diagnose.mjs",
+    "plugins/pipeline-core/scripts/session-cleanup.mjs",
+    "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+    "plugins/pipeline-core/scripts/settings-allowlist-merge.mjs",
+    "plugins/pipeline-core/scripts/tool-identity.mjs",
+    "plugins/pipeline-core/scripts/toolchain-preflight.mjs",
+    "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
+    "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+    "plugins/pipeline-core/scripts/verify-journal.mjs",
+    "setup.mjs"
+  ],
+  "substitutions": [
+    "plugins/pipeline-core/config/routing-authority.json",
+    "plugins/pipeline-core/config/runner-mappings.json",
+    "plugins/pipeline-core/agents/goldfish-mechanic.md",
+    "policies/model-policy.md"
+  ]
+}
+
+GRAPH baseline ENTRY plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs EXIT 1 SETUP_ERROR true
+✖ RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization (7.594453ms)
+✖ RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner (4.377444ms)
+✔ RPM03 v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty (67.148426ms)
+✔ RPM04 V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature (95.237015ms)
+✔ RPM05 apply requires explicit activation and an unchanged in-process digest-only plan (7.116196ms)
+✔ RPM06 a V3 authority update refreshes every frozen routing mapping as one registry (53.150103ms)
+✔ RPM07 v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection (52.540062ms)
+✔ RPM08 an authority lock and the full V3 registry refresh share one recoverable transaction (59.676717ms)
+✔ RPM09 direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it (51.276901ms)
+✔ RPM10 stale, wrong-plan, and replayed recovery authorizations fail closed (149.965335ms)
+✔ RPM11 a cached preview acknowledgement cannot authorize a second recovery (37.614043ms)
+✔ RPM12 stale source invalidates a reviewed plan before staging (11.739098ms)
+✔ RPM13 a handled durable exclusive-commit error rolls every target back (48.161448ms)
+✔ RPM14 already-current v3 inspects ready and plans noop (47.840463ms)
+✔ RPM15 a newer registry-bound project cannot be downgraded by an older Core refresh (3.518745ms)
+✔ RPM16 the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial (54.499939ms)
+✖ RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy (3.397621ms)
+✖ RPM18 Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs (5.028044ms)
+✔ RPM19 accepted v1 and v2 inputs share the same legacy-only absent-Codex addition contract (139.080317ms)
+✖ RPM20 legacy additions roll back files and created directories after interruption (3.144342ms)
+✖ RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target (3.383352ms)
+✖ RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup (2.945221ms)
+✔ RPM23 every changed target rejects a post-prepare pre-commit race without deleting external bytes (2.886555ms)
+✖ RPM24 exclusive absent-target commit closes the race after its final preimage check (3.123024ms)
+✔ RPM25 existing-target displacement verifies the exact bytes moved at the commit boundary (39.312263ms)
+✔ RPM26 current V3 with any missing runtime target remains fail-closed (2.32948ms)
+✔ RPM27 slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable (44.46946ms)
+✔ RPM28 a host-managed-Codex fresh-project apply satisfies its own target boundary invariant (30.157633ms)
+✔ RPM29 overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent (57.678201ms)
+✔ RPM30 slim V3 initialization never replaces a present malformed runtime baseline (4.621073ms)
+✔ RPM31 legacy compatibility remains closed to malformed and unknown aliases (4.89529ms)
+✔ RPM32 existing V3 source without roles or session stays source-compatible while runtime defaults remain inert (40.108861ms)
+✔ RPM33 a one-key V3 refresh preserves the complete boundary without renaming unchanged targets (56.484284ms)
+✔ RPM34 authenticated noop apply remains bound to source, runtime digests, and root (57.301466ms)
+✔ RPM35 existing neutral authority mirrors join the authenticated migration transaction without creating absent mirrors (138.260722ms)
+✔ RPM36 an unsafe existing neutral authority mirror fails planning without a transaction (4.142619ms)
+✔ RPM37 legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply (47.475572ms)
+✔ RPM38 the registry-refresh table covers every declared Core-owned V3 surface generically (47.55849ms)
+✔ RPM39 a source stale in both routing and critic_export classifies as v3-refresh with both deltas recorded (49.194399ms)
+✔ RPM40 a source stale only in critic_export classifies as v3-refresh (49.092684ms)
+✔ RPM41 a source with critic_export entirely absent still fills it in unchanged (48.76167ms)
+✔ RPM42 a source with an unrelated defect that survives the registry refresh still classifies invalid (3.249262ms)
+✔ RPM43 CLI enforces inspect/plan/apply and explicit activation (53.838183ms)
+✖ RPM44 CLI activated apply emits the complete classified preview before any target mutation (5.084334ms)
+✖ RPM45 CLI production preview contract completes bounded short writes before activation (2.923068ms)
+✖ RPM46 CLI production preview zero-progress and failure seams stop before apply (2.993274ms)
+✖ RPM47 CLI preview-channel failure returns one sanitized result and cannot activate (2.942357ms)
+✔ RPM48 CLI previews a classified pending recovery before recovery and activation (90.001536ms)
+✔ RPM49 CLI completes bounded short writes for pending recovery before touching its journal (87.421622ms)
+✔ RPM50 CLI recovery-preview zero-progress and errors preserve pending repo and journal bytes (62.839697ms)
+✔ RPM51 the shipped v1 seed converts directly to V3 without a persistent V2 intermediate (80.556675ms)
+✔ RPM52 a freshly onboarded project seeds both manifest tiers byte-identically (354.32201ms)
+✔ RPM53 both freshly seeded manifest tiers resolve the same gate chapter (333.79541ms)
+✔ RPM54 a customised existing manifest is never replaced by the fresh seed (40.897142ms)
+✔ RPM55 fresh single-runner projects project only enabled native targets, including after runtime apply (907.188844ms)
+✔ RPM56 a Claude project can explicitly enable Codex after its initial runner-only seed (334.415669ms)
+✔ RPM57 a Claude-only enrolment publishes no .codex/* target, whether the Codex files are seeded, absent or refreshed (295.402954ms)
+✔ RPM58 a Codex enrolment publishes every native .codex/* target alongside the shared tier (262.800259ms)
+✔ RPM59 an Antigravity enrolment publishes its own tier and no Codex target (488.631684ms)
+✔ RPM60 a later Codex activation adds only the Codex targets and shows no false drift for the existing baselines (380.123158ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 48
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5432.469211
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM01 legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization (7.594453ms)
+  AssertionError [ERR_ASSERTION]: v0 must plan with  absent
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:157:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM02 legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner (4.377444ms)
+  AssertionError [ERR_ASSERTION]: v0 must plan with .claude/pipeline.yaml absent
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:194:14)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM17 historical Public aliases migrate atomically without pre-seeded Codex files or private policy (3.397621ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-source'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:676:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-source',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM18 Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs (5.028044ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:763:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM20 legacy additions roll back files and created directories after interruption (3.144342ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'interrupted'
+       ^
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:833:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'interrupted',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM21 a stale legacy-addition plan cannot overwrite a newly appeared Codex target (3.383352ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'apply-failed'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:851:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'apply-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM22 a parent appearing after prepare remains external and survives safe rollback cleanup (2.945221ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:885:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM24 exclusive absent-target commit closes the race after its final preimage check (3.123024ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:949:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM44 CLI activated apply emits the complete classified preview before any target mutation (5.084334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1504:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM45 CLI production preview contract completes bounded short writes before activation (2.923068ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1559:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM46 CLI production preview zero-progress and failure seams stop before apply (2.993274ms)
+  AssertionError [ERR_ASSERTION]: zero-progress
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'preview-failed'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1585:14)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'preview-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:218:5
+✖ RPM47 CLI preview-channel failure returns one sanitized result and cannot activate (2.942357ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'invalid-plan'
+  - 'preview-failed'
+  
+      at Object.run (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs:1604:12)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/mechanic-compat-ALFRED-MECH-COMPAT-R2-20261009/baseline/plugins/pipeline-core/lib/test-case-completion.mjs:236:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'invalid-plan',
+    expected: 'preview-failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+{
+  "results": [
+    {
+      "graph": "baseline",
+      "entry": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "exitCode": 1,
+      "reached": [],
+      "setupError": true
+    }
+  ],
+  "sourceAndProposalUnchanged": true,
+  "liveUserOverride": "not read or modified; no live runtime or user source writes",
+  "independentReview": "pending",
+  "poAcceptance": "pending",
+  "setupFailure": true
+}
+
+--- stderr ---

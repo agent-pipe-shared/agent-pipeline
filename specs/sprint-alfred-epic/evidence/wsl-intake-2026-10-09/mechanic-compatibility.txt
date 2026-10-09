@@ -1,0 +1,30 @@
+command: node scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs
+label: ALFRED-MECH-COMPAT-20261009
+exitCode: 1
+head: f2d2d5bfda170398ef6797aa42bbc546db413cc6
+tree: 25650bbaea3f35ad50c918a09a7d84bb4b603e19
+dirty: false
+--- stdout ---
+
+--- stderr ---
+node:fs:737
+  return binding.read(fd, buffer, offset, length, position);
+                 ^
+
+Error: EISDIR: illegal operation on a directory, read
+    at Object.readSync (node:fs:737:18)
+    at tryReadSync (node:fs:417:20)
+    at readFileSync (node:fs:471:19)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:23:16)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35)
+    at copyGraph (file://<repo-root>/scratch/diagnostic-ALFRED-MECH-COMPAT-20261009.mjs:29:35) {
+  errno: -21,
+  code: 'EISDIR',
+  syscall: 'read'
+}
+
+Node.js v24.15.0
