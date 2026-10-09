@@ -209,6 +209,245 @@ evidence without changing its importing kernel module. They therefore join
 TP enforcement boundaries also evaluate kernel membership before accepting a
 signed window: a valid TP-4 window still cannot lift `hooks/hooks.json`.
 
+**Kernel-list reconciliation correction, 2026-10-09 (dispatch ADR58-CORR-20261009).** The
+2026-08-10 correction made every `NEVER_LIFTABLE_KERNEL_PATHS` addition a decision of this ADR,
+recorded as a dated correction when the addition is made. Almost none were: the live array
+(`plugins/pipeline-core/lib/guard-maintenance-window.mjs`) holds 373 entries; this ADR named about
+two dozen. The rest were added by code commits under Decision 3's own transitive-closure rule
+(NVA-A7FIX-2: the kernel is closed under first-party import, enforced by GMWKC01), each with an
+explanatory comment in the array, and this record never followed. This correction closes that gap
+once: it names every live entry not named above, grouped by the commit that added it (found with
+`git log -S` on the exact path string in the array's file; short SHA and commit date), with the
+one reason each group is kernel. All paths below are relative to `plugins/pipeline-core/` unless
+they start with `harness/`; a `schemas/` name is listed once and means the plugin copy plus its
+project-root `schemas/` mirror. Every group carries the same reason class unless it says otherwise:
+a module imported (or process-spawned) by an already-kernel file runs with that file's authority,
+so a window that could rewrite it could change a kernel decision without touching the kernel file
+(Decision 3, closed under import). Going forward the standing process of the 2026-08-10
+correction is unchanged, and the full enumeration remains test-enforced by GMWKC01 and listed in
+`docs/guard-maintenance-window-threat-model.md`; this correction does not replace that list.
+
+Additions with a reason beyond closure:
+
+- `a58e83657` (2026-08-07) `lib/guard-maintenance-window.mjs` itself, the window verifier named in
+  Decision 3. `3bb7d14dc` (2026-08-19) `lib/guard-devplan-policy.mjs`, the dev-plan gate policy
+  the kernel guards consult. `f6c9800a5` (2026-08-25) `lib/chat-gate-ceremony.mjs`, the shared
+  attended-terminal confirmation primitive imported by `scripts/pipeline-state.mjs` and
+  `lib/project-onboarding-v3.mjs`.
+- `e51844ab8` (2026-10-09) `lib/hardened-private-directory.mjs` (WIN-AP-F2): kernel-listed
+  installers import it, and it now hosts the private-root entry point that repairs an own
+  insecure private-state segment, so a window rewriting it could weaken how every private
+  directory the kernel trusts is secured. Its own imports (`lib/private-boundary.mjs`,
+  `lib/windows-private-state.mjs`) are listed below.
+- `61673c647` (2026-09-13) `lib/po-key-directory.mjs`: resolves the PO signing-key directory the
+  proof verifiers read.
+- `9d533fa5b` (2026-08-28) `lib/repository-path-identity.mjs`: the single definition of how two
+  spellings of one physical repository path fold into one identity, used by the window verifier
+  itself when it matches a stored fingerprint.
+- `e7233fe61` (2026-09-02) `lib/rebase-authority.mjs`: decides whether an active rebase carries
+  its own approved authority and so relieves the dev-plan gate; kernel on the merits as well as by
+  closure.
+- `8bff2fc94` (2026-09-07) `lib/critic-route-v3.mjs`: the V3 authority that selects the
+  high-risk Critic model the protected health route probes. `51dc0c345` (2026-09-12)
+  `lib/critic-skip-decision.mjs`: the required/skip/evidence decision `lib/dispatch-record.mjs`
+  delegates to for every dispatch record. `69951b3b7` (2026-09-11) `lib/commit-message-policy.mjs`,
+  `scripts/commit-msg-hook-install.mjs`, `lib/dispatch-record.mjs`,
+  `scripts/settings-allowlist-merge.mjs` (NVA-B-COMMITMSG: the finished-message backstop and its
+  shared policy).
+- `46abe0304` (2026-08-29) `scripts/push-init.mjs` (NVA-V25-DRIVERKERNEL) and `4a1581c14`
+  (2026-09-15) `lib/push-destination-policy.mjs`: they construct the text of the
+  human-attended push-authorization signature command shown to the PO before signing;
+  `3dcc68825` (2026-08-29) `scripts/guard-human-override.mjs`, `scripts/guard-maintenance-window.mjs`,
+  `scripts/po-approval-gate.mjs`, `scripts/signing-ceremony.mjs` (NVA-V26-SIGNINGIMPORTERS): the
+  code that invokes the signer or arms the override capability. Both groups are importers of a
+  kernel module, a shape GMWKC01's outward walk cannot see.
+- `3047c9c88` (2026-09-01) `lib/handover-rotation.mjs` (NVA-B-KERNELEDGE, dynamic import edge);
+  `1e9f4564e` (2026-08-29) `scripts/pre-commit-hook-install.mjs`,
+  `scripts/check-protected-path-integrity.mjs`, `lib/onboarding-language-correction.mjs`;
+  `c598a9ede` (2026-08-27) `lib/onboarding-staging-authoring.mjs`; `b2606c05f` (2026-08-27)
+  `lib/onboarding-argv-shapes.mjs` (the one declaration of the argv shape the lifecycle guard
+  admits per mutating onboarding command).
+- Resolution of three earlier open items. `92fd818c1` (2026-08-28) added
+  `lib/self-application-attestation-gate.mjs` and `lib/public-core-origin-allowlist.mjs`, so
+  the two memberships left undecided above and in Follow-up are decided as members (closure from
+  `scripts/push-prepare.mjs` and the ruleset-freshness family), superseding that follow-up
+  bullet. `lib/guard-authority-ledger-intake.mjs` was added by `b5cb993e8` (2026-08-26), so
+  the "endorsed but not yet applied" follow-up bullet is satisfied. `hooks/guard-testpath.mjs`
+  remains outside the array, as decided above.
+
+Closure additions by commit (all closure-reached, no reason beyond Decision 3):
+
+- `ad512e80f` (2026-08-17, "close the GMW kernel's transitive-closure gap with a test", 40):
+  `lib/codex-host-layout.mjs`, `lib/codex-onboarding-app-server.mjs`,
+  `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
+  `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`, `lib/continuity-status.mjs`,
+  `lib/critic-export-policy.mjs`, `lib/critical-action-approval-request.mjs`,
+  `lib/document-hooks.mjs`, `lib/entrypoint.mjs`, `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
+  `lib/human-role-labels.mjs`, `lib/machine-plane.mjs`, `lib/manifest.mjs`,
+  `lib/onboarding-continuity.mjs`, `lib/plan-spec-state-v2.mjs`, `lib/po-gate-authority.mjs`,
+  `lib/po-gate-profile-publisher.mjs`, `lib/project-authority.mjs`,
+  `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
+  `lib/recovery-preview-attestation.mjs`, `lib/runner-native-continuation.mjs`,
+  `lib/runner-profile-migration-v2.mjs`, `lib/runner-profile-migration-v3.mjs`,
+  `lib/runner-profiles-v2.mjs`, `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
+  `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`, `lib/session-cleanup-recovery.mjs`,
+  `lib/source-observation.mjs`, `lib/windows-private-state.mjs`, `lib/worktree-lifecycle.mjs`,
+  `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`, `scripts/continuity-status.mjs`,
+  `scripts/v3-bootstrap-authority.mjs`.
+- `73b7abbe1` (2026-08-18, spawn-edge closure, 12): `lib/feature-package-topology.mjs`,
+  `lib/private-boundary.mjs`, `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
+  `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
+  `lib/publication-capability-preflight.mjs`, `lib/review-economy.mjs`,
+  `scripts/pipeline-state.mjs`, `scripts/po-gate-profile-repair.mjs`,
+  `scripts/project-onboarding-v3.mjs`, `scripts/publication-close-journal.mjs`.
+- `b5cb993e8` (2026-08-26, VFX2-GMW Phoenix-merge closure, 17) with `be7b9aae7`, `b8a0c639c`,
+  `b73959be2` (2026-09-12, 4 more): `lib/agent-decision-journal.mjs`,
+  `lib/authority-revision-proof.mjs`, `lib/control-execution-exchange.mjs`,
+  `lib/control-execution-lifecycle-event.mjs`, `lib/decision-reference-dual-evaluation.mjs`,
+  `lib/external-push-ledger.mjs`, `lib/governance-event-store.mjs`, `lib/governance-event.mjs`,
+  `lib/guard-handoff-offer.mjs`, `lib/human-decision-attribution.mjs`,
+  `lib/human-governance-decision.mjs`, `lib/human-governance-ledger.mjs`,
+  `lib/human-role-exception-decision.mjs`, `lib/lifecycle-governance-events.mjs`,
+  `lib/onboarding-consent-marker.mjs`, `lib/threat-model-approval-request.mjs`,
+  `lib/threat-model.mjs`, `lib/governance-action-artifact.mjs`, `lib/governance-gate-action.mjs`,
+  `lib/governance-action-events.mjs`, `lib/governance-recovery-reconciliation-action.mjs`.
+- `03a3cd86c` (2026-08-27, NVA-KERNELDYN-1, 6): `hooks/guard-dispatch-budget.mjs`,
+  `lib/plan-authority-staging-guard.mjs`, `lib/security-completeness-gate.mjs`,
+  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
+  `scripts/pre-push-hook-install.mjs`; `7c4456e57` (2026-09-17) `lib/checkpoint-push-audit.mjs`.
+- `92fd818c1` (2026-08-28, NVA-V22-KERNELCLOSURE, 15 beyond the two decided above):
+  `hooks/staleness-check.mjs`, `lib/bootstrap-payload-budget.mjs`, `lib/codex-host-plugin-list.mjs`,
+  `lib/copy-safe-command.mjs`, `lib/public-core-observation.mjs`, `lib/ruleset-source.mjs`,
+  `lib/trusted-tool-resolution.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
+  `scripts/po-human-approval.mjs` (the script the human signs with),
+  `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
+  `scripts/ruleset-freshness.mjs`, `scripts/ruleset-update-policy.mjs`.
+- `bbf55041c` (2026-09-11, 5): `lib/dispatch-budget-core.mjs`, `lib/installed-plugin-attestation.mjs`,
+  `lib/provenance-attestation.mjs`, `lib/provenance-envelope.mjs`,
+  `scripts/installed-plugin-attestation-host.mjs`; `399d0a2c5` (2026-09-10)
+  `lib/verify-selection.mjs`, `lib/consumer-baseline-verify.mjs`; `18ab3afd4` (2026-09-10)
+  `lib/consumer-verify.mjs`, `scripts/consumer-verify-check.mjs`.
+- `18bdaf9c6` (2026-09-23) `lib/signed-quality-package.mjs`,
+  `scripts/generate-architecture-overview.mjs`; `c296398e0` (2026-09-13)
+  `lib/successful-spawn.mjs`; `8b7da0f8a` (2026-09-18) `scripts/capture-evidence.mjs`,
+  `lib/release-promotion-envelope.mjs`.
+- `b7c660282` (2026-10-02, 12): `lib/critic-session-model-route.mjs`,
+  `scripts/codex-critic-session-route.mjs`, `lib/passive-read-policy.mjs`,
+  `lib/intake-material-reference.mjs`, `scripts/check-private-identifiers.mjs`,
+  `lib/model-family-authority.mjs`, `lib/model-family-execution.mjs`,
+  `lib/model-family-invocation.mjs`, `lib/model-family-runtime-host.mjs`,
+  `lib/model-family-route-source.mjs`, `lib/model-family-host-store.mjs`,
+  `lib/model-family-latest-selection.mjs`.
+- `755419f54` (2026-09-21, Alfred architecture-adoption and design-advisory closure, 20):
+  `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
+  `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,
+  `lib/architecture-map-scaffold.mjs`, `lib/critic-diagnostic-evidence.mjs`,
+  `lib/critic-diagnostic-packet.mjs`, `lib/design-advisory-admission.mjs`,
+  `lib/design-advisory-enforcement.mjs`, `lib/design-advisory-final-approval.mjs`,
+  `lib/design-advisory-transaction.mjs`, `lib/governance-authority-resolver.mjs`,
+  `lib/protected-baseline.mjs`, `scripts/architecture-adoption.mjs`,
+  `scripts/architecture-fitness.mjs`, `scripts/architecture-remedy.mjs`,
+  `scripts/check-clone-provisioning.mjs`, `scripts/governance-authority.mjs`,
+  `scripts/module-inventory.mjs`, `scripts/rigor-floor.mjs`.
+- `3b388ede3` (2026-09-22, Alfred close-audit and Critic-verification closure, 13):
+  `lib/architecture-entry-readiness.mjs`, `lib/audit-bundle.mjs`, `lib/critic-packet-governance.mjs`,
+  `lib/critic-review-lineage.mjs`, `lib/critic-verify-lifecycle.mjs`,
+  `lib/feature-close-audit-receipt.mjs`, `lib/governance-review-action.mjs`,
+  `lib/organization-policy.mjs`, `lib/requirement-traceability.mjs`,
+  `scripts/check-critic-skip-coverage.mjs`, `scripts/critic-dispatch-preflight.mjs`,
+  `scripts/critic-packet-preflight.mjs`, `scripts/session-critic-finalizer.mjs`;
+  `e2713f8c7` (2026-09-24) `lib/onboarding-initial-answers-state.mjs`,
+  `lib/onboarding-initial-answers-transaction.mjs`, `lib/onboarding-later-language.mjs`,
+  `lib/critic-course-admission.mjs`.
+- `ef471b03f` (2026-09-27, 48; 0.7 AC-19/A, AC-25, model-role and host-observation closure):
+  `lib/architecture-effective-decisions.mjs`, `lib/architecture-decision-continuity.mjs`,
+  `lib/architecture-decision-waiver-store.mjs`, `lib/organization-architecture-source.mjs`,
+  `lib/organization-architecture-source-store.mjs`, `lib/native-goldfish-host-observation.mjs`,
+  `lib/native-goldfish-host-return.mjs`, `lib/native-goldfish-host-state.mjs`,
+  `lib/agent-model-registry.mjs`, `lib/agy-host-commit-admission.mjs`,
+  `lib/agy-host-observed-local-readback.mjs`, `lib/agy-host-observed-receipt.mjs`,
+  `lib/agy-host-observed-store.mjs`, `lib/agy-final-return.mjs`, `lib/agy-session-authority.mjs`,
+  `lib/agy-session-dispatch.mjs`, `lib/antigravity-execution-host.mjs`,
+  `lib/critic-disposition-addendum.mjs`, `lib/portable-agy-authorship-export.mjs`,
+  `lib/portable-critic-export.mjs`, `lib/role-dispatch-preflight.mjs`,
+  `scripts/dispatch-authorship-verify.mjs`, `scripts/portable-agy-authorship-export.mjs`,
+  `scripts/portable-critic-export.mjs`, `scripts/model-role-dispatch-select.mjs`,
+  `scripts/model-role-bootstrap.mjs`, `lib/design-workflow-package.mjs`,
+  `lib/design-workflow-approval.mjs`, `lib/advisory-attempt-trail.mjs`,
+  `lib/model-role-host-session.mjs`, `lib/model-role-host-identity.mjs`,
+  `lib/model-role-host-store.mjs`, `lib/model-role-route-source.mjs`,
+  `lib/model-role-approved-policy.mjs`, `lib/model-role-host-observations.mjs`,
+  `lib/model-role-v3-baseline.mjs`, `lib/model-role-session.mjs`, `lib/model-role-dispatch.mjs`,
+  `lib/antigravity-model-host-observation.mjs`, `lib/claude-model-host-observation.mjs`,
+  `lib/codex-model-host-observation.mjs`, `lib/design-readiness-host-evidence.mjs`,
+  `lib/advisory-lifecycle-v2.mjs`, `lib/sandboxed-readonly-duty.mjs`,
+  `lib/codex-sandbox-compatibility.mjs`, `lib/design-readiness-runner-host-store.mjs`,
+  `scripts/codex-sandbox-select.mjs`, `lib/sandbox-failure.mjs`.
+- `8b5dcf4fb` (2026-09-28, Codex design-readiness host closure, 15): `lib/codex-host-output-custody.mjs`,
+  `lib/codex-readiness-host-record.mjs`, `lib/codex-host-process-journal.mjs`,
+  `lib/codex-host-process-launcher.mjs`, `lib/codex-host-process-exec-worker.mjs`,
+  `lib/codex-host-process-supervisor.mjs`, `lib/codex-readiness-ownership-verifier.mjs`,
+  `lib/codex-design-readiness-host-store.mjs`, `lib/codex-readiness-finalization.mjs`,
+  `lib/codex-isolated-structured-host.mjs`, `lib/codex-tool-free-design-readiness.mjs`,
+  `lib/design-readiness-hashes.mjs`, `scripts/codex-design-readiness-host.mjs`,
+  `scripts/codex-design-readiness-bootstrap.mjs`, `scripts/tool-identity.mjs`.
+- `26fef9e7d` (2026-09-29, 80; Advisor course, governance/lifecycle/retirement roots, completion
+  augmentation, enrollment retirement): `lib/physical-scratch-boundary.mjs`,
+  `lib/lifecycle-denial-loop.mjs`, `lib/advisory-route-selection.mjs`,
+  `lib/advisory-receipt-assurance.mjs`, `lib/codex-advisor-admission.mjs`,
+  `lib/codex-advisor-execution.mjs`, `lib/codex-advisor-host-record.mjs`,
+  `lib/codex-advisor-host-store.mjs`, `lib/codex-advisor-request.mjs`,
+  `lib/design-advisor-course-store.mjs`, `lib/design-advisor-course.mjs`,
+  `lib/design-advisor-provenance.mjs`, `lib/design-advisory-coordinator-v2.mjs`,
+  `lib/design-advisory-coordinator.mjs`, `lib/design-workflow-package-v2.mjs`,
+  `lib/native-initial-advisor-execution.mjs`, `lib/readiness-advisor-context-v2.mjs`,
+  `lib/runner-readiness-request.mjs`, `schemas/pipeline.design-workflow-package.v2.json`,
+  `scripts/codex-design-advisor-bootstrap.mjs`, `scripts/codex-design-advisor-host.mjs`,
+  `hooks/git-dangerous-policy.mjs`, `hooks/hook-governance-admission.mjs`,
+  `lib/advisory-coordinator.mjs`, `lib/advisory-decision-event.mjs`,
+  `lib/antigravity-json-spans.mjs`, `lib/antigravity-plugin-topology.mjs`,
+  `lib/antigravity-topology-refresh-host.mjs`, `lib/git-hook-footprint.mjs`,
+  `lib/git-hook-runtime-snapshot.mjs`, `lib/git-hook-snapshot-admission.mjs`,
+  `lib/governance-scope.mjs`, `lib/project-pipeline-footprint.mjs`,
+  `lib/project-uninstall-contract.mjs`, `lib/project-uninstall.fixture.mjs`,
+  `lib/project-uninstall.mjs`, `lib/project-uninstall-workspace.mjs`,
+  `lib/runtime-projection-removal.mjs`, `schemas/pipeline.governance-scope.v1.json`,
+  `schemas/project-uninstall-journal.schema.json`, `schemas/project-uninstall-plan.schema.json`,
+  `schemas/project-uninstall-request.schema.json`, `scripts/advisory-host-bridge.mjs`,
+  `scripts/browser-evidence-preflight.mjs`, `scripts/check-artifact-topology.mjs`,
+  `scripts/codex-advisory-app-server.mjs`, `scripts/codex-host-advisor-route.mjs`,
+  `scripts/codex-sandbox-preflight.mjs`, `scripts/codex-sandbox-runtime.mjs`,
+  `scripts/design-advisory-admission.mjs`, `scripts/design-advisory-coordinator.mjs`,
+  `scripts/host-advisor-workspace.mjs`, `scripts/project-activation.mjs`,
+  `scripts/project-uninstall.mjs`, `scripts/sandboxed-readonly-host-bridge.mjs`,
+  `harness/scripts/verify-case-completion-augmentation.mjs`,
+  `harness/scripts/verify-case-completion-augmentation.test.mjs`,
+  `harness/config/verify-case-completion-augmentations.v1.json`,
+  `lib/verify-case-completion-receipt.mjs`, `harness/scripts/check-verify-suite-registration.mjs`,
+  `lib/test-case-completion.mjs`, `lib/enrollment-retirement-coordinator.mjs`, and the schemas
+  `pipeline.enrollment-retirement-archive.v1.json`, `pipeline.enrollment-retirement-coordinator.v1.json`,
+  `pipeline.enrollment-retirement-result.v1.json`, `pipeline.enrollment-retirement-inspection.v1.json`,
+  `pipeline.plan-invalidation.v1.json`, `pipeline.enrollment-git-creation-plan.v1.json`,
+  `pipeline.enrollment-git-creation-barrier.v1.json`, `pipeline.enrollment-git-removal-barrier.v1.json`,
+  `pipeline.enrollment-git-creation.v1.json` (each under `schemas/` and the project-root mirror).
+- `866be2139` (2026-10-05, ALFRED-QP5 closure repair, 9): `lib/bound-design-line-endings.mjs`,
+  `lib/claude-initial-prompt-pointer.mjs`, `lib/claude-intake-prompt-capture.mjs`,
+  `lib/claude-task-output-read-scope.mjs`, `lib/design-authoring.mjs`,
+  `lib/model-family-discovery.mjs`, `lib/runtime-handover-projection.mjs`,
+  `scripts/check-runner-manifest-parity.mjs`, `scripts/model-family-approval-request.mjs`.
+- `46bf6a651` (2026-10-05, S2-70 guard split, 22): the modules extracted verbatim from
+  `hooks/guard-lifecycle-ready.mjs`, `lib/guard/bootstrap-receipt.mjs`, `lib/guard/command-catalogue.mjs`,
+  `lib/guard/constants.mjs`, `lib/guard/denial-route.mjs`, `lib/guard/denial-telemetry.mjs`,
+  `lib/guard/devplan-shell-lane.mjs`, `lib/guard/dispatch-record-lane.mjs`,
+  `lib/guard/entry-gates.mjs`, `lib/guard/evaluate.mjs`, `lib/guard/gate-strength-lane.mjs`,
+  `lib/guard/grammar-denials.mjs`, `lib/guard/lifecycle-gate.mjs`, `lib/guard/path-containment.mjs`,
+  `lib/guard/po-commands.mjs`, `lib/guard/powershell-dialect.mjs`, `lib/guard/read-scope.mjs`,
+  `lib/guard/rebase-lane.mjs`, `lib/guard/sanctioned-args-onboarding.mjs`,
+  `lib/guard/sanctioned-args-scripts.mjs`, `lib/guard/shell-grammar.mjs`, `lib/guard/verdict.mjs`,
+  `lib/guard/write-scope.mjs`; they carry the lane verdicts that file used to hold, so they carry the
+  same authority.
+
 ## Alternatives considered
 
 - **Extend HGO's existing single-tool-call capability to cover GS-6.** Rejected:
