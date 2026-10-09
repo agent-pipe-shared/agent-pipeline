@@ -37,14 +37,43 @@
  * `scratch/test-tmp/` where it is bounded and bulk-cleanable rather than lost
  * in host `/tmp`. Pair with `test-tmpdir-budget.mjs` to catch runaway
  * accumulation before it becomes a host-exhaustion incident again.
+ *
+ * OVERRIDE. `PIPELINE_TEST_TMP_BASE` (absolute path of an EXISTING directory)
+ * replaces the default base, so fixtures land in `<base>/scratch/test-tmp/`
+ * (same shape). Purpose: under WSL the repo may sit on a DrvFs mount where
+ * `chmod` does not take and every private-state assurance fails; pointing the
+ * base at a Linux-native directory (e.g. `$HOME/pipeline-test-tmp`) fixes that.
+ * Unset, empty, relative, missing or non-directory values fall back to the
+ * repo root, silently and without throwing at import.
  */
-import { mkdirSync, mkdtempSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdirSync, mkdtempSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** plugins/pipeline-core/lib -> repository root is three levels up. */
-export const DEFAULT_TEST_TMP_ROOT_BASE = resolve(HERE, "..", "..", "..");
+export const REPO_TEST_TMP_ROOT_BASE = resolve(HERE, "..", "..", "..");
+
+/**
+ * Resolve the default fixture base. Unset (or unusable) `PIPELINE_TEST_TMP_BASE`
+ * keeps the repo root; an absolute, existing directory replaces it. Never throws.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {string}
+ */
+export function resolveTestTmpBase(env = process.env) {
+  const override = env?.PIPELINE_TEST_TMP_BASE;
+  if (typeof override !== "string" || override.length === 0 || !isAbsolute(override)) {
+    return REPO_TEST_TMP_ROOT_BASE;
+  }
+  try {
+    return statSync(override).isDirectory() ? override : REPO_TEST_TMP_ROOT_BASE;
+  } catch {
+    return REPO_TEST_TMP_ROOT_BASE;
+  }
+}
+
+export const DEFAULT_TEST_TMP_ROOT_BASE = resolveTestTmpBase();
 
 /** The repo-local root every fixture this helper creates lives under. */
 export function testTmpRoot(base = DEFAULT_TEST_TMP_ROOT_BASE) {
