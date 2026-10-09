@@ -1260,7 +1260,23 @@ function checkRollbackCell(selectedCell) {
     },
     {
       name: "repository-pointer-readback",
+      // TR-S1-T6 (Rulings 137 and 152): the bootstrap, not the setup child, writes the repository pointer on every
+      // path, so the setup child here writes only the authority file and succeeds. The boundary under test is the
+      // bootstrap's OWN pointer readback: the injected `read` serves a pointer that names another directory, but only
+      // once setup has run, so the pre-setup conflict check still sees the real (absent) file and the transaction
+      // has started when the readback refuses.
       runSetup: ({ writeAuthority }) => { writeAuthority(); return { status: 0 }; },
+      expectedCode: "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED",
+      read: ({ setupRan, home }) => (path, ...args) => {
+        if (setupRan() && /[\\/]agent-pipeline[\\/]po-key-directory\.json$/u.test(String(path))) {
+          return `${JSON.stringify({
+            schema: "pipeline.po-key-directory.v1",
+            poKeyDirectory: join(home, "authority-elsewhere"),
+            updatedAt: new Date().toISOString(),
+          })}\n`;
+        }
+        return readFileSync(path, ...args);
+      },
     },
     {
       name: "machine-write",
@@ -1324,11 +1340,15 @@ function checkRollbackCell(selectedCell) {
           updatedAt: new Date().toISOString(),
         })}\n`);
       };
-      const runSetup = () => failure.runSetup({
-        destination,
-        writeAuthority,
-        writeAuthorityAndPointer() { writeAuthority(); writePointer(); },
-      });
+      let setupDone = false;
+      const runSetup = () => {
+        setupDone = true;
+        return failure.runSetup({
+          destination,
+          writeAuthority,
+          writeAuthorityAndPointer() { writeAuthority(); writePointer(); },
+        });
+      };
       const result = applyTrustAnchorBootstrap({
         rootDir: root,
         mode: failure.mode ?? "new",
@@ -1337,10 +1357,14 @@ function checkRollbackCell(selectedCell) {
         existingKey: failure.mode === "existing" ? existingKey : "none",
         env,
         runSetup,
+        ...(failure.read ? { read: failure.read({ setupRan: () => setupDone, home }) } : {}),
         ...(failure.writeMachine ? { writeMachine: failure.writeMachine } : {}),
         ...(failure.writePolicy ? { writePolicy: failure.writePolicy } : {}),
       });
       assert.equal(result.ok, false, failure.name);
+      if (failure.expectedCode) {
+        assert.equal(result.code, failure.expectedCode, `${failure.name}: the failure comes from the bootstrap's own boundary`);
+      }
       assert.doesNotMatch(result.code, /ROLLBACK-FAILED/u, failure.name);
       assert.equal(readFileSync(policyPath, "utf8"), policyPreimage, `${failure.name}: policy bytes restored`);
       assert.equal(existsSync(pointerPath), false, `${failure.name}: repository pointer absence restored`);
