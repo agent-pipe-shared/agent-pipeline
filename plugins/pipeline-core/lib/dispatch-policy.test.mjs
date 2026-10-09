@@ -285,10 +285,26 @@ const packetFor = (role, index, requiredPaths = ["input.txt"]) => {
       resultPath: `scratch/result-${index}.json`,
     };
 };
-const fixtureCheck = (label, run) => check(label, async () => {
+const fixtureCheck = (label, run) => check(label, async (t) => {
   ensureDispatchFixture();
-  await run();
+  await run(t);
 });
+// Capability probe (WIN-SKIPS pattern): true only when a directory symlink is refused with EPERM,
+// the native-Windows no-privilege host limitation. Any other error, or success, returns false so
+// the case runs unchanged.
+const SYMLINK_EPERM_SKIP_REASON = "host limitation: symlinkSync was refused with EPERM on this host (no symlink privilege); the symlink-parent replacement case was not run";
+const symlinkRefusedWithEperm = () => {
+  const probeRoot = mkdtempSync(join(tmpdir(), "pipeline-symlink-probe-"));
+  try {
+    mkdirSync(join(probeRoot, "target"));
+    symlinkSync(join(probeRoot, "target"), join(probeRoot, "link"));
+    return false;
+  } catch (error) {
+    return error?.code === "EPERM";
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+};
 
   fixtureCheck("DP17 the common envelope rejects a stale candidate tree before launch", () => {
     const packet = packetFor("consult-advisor", 17);
@@ -608,7 +624,11 @@ const fixtureCheck = (label, run) => check(label, async () => {
   });
 
   for (const mode of ["occupied", "symlink-parent"]) {
-    fixtureCheck(`DP23 ${mode} replacement after PREPARE blocks the affected launcher`, async () => {
+    fixtureCheck(`DP23 ${mode} replacement after PREPARE blocks the affected launcher`, async (t) => {
+      if (mode === "symlink-parent" && symlinkRefusedWithEperm()) {
+        t.skip(SYMLINK_EPERM_SKIP_REASON);
+        return;
+      }
       const resultRoot = mkdtempSync(join(tmpdir(), `pipeline-role-stale-${mode}-`));
       const outsideRoot = mkdtempSync(join(tmpdir(), "pipeline-role-stale-outside-"));
       try {
