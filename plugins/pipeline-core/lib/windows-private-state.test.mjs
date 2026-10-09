@@ -146,7 +146,45 @@ check("invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN
   }
 });
 
-if (completionCases.length !== 13) throw new Error("case completion count drift: expected 13, got " + completionCases.length);
+// WIN-HARDEN-T (Ruling 148): hardenWindowsPrivateDirectory must be idempotent. Today the first call on a directory
+// returns secure and every later call returns unavailable: the child PowerShell's Set-Acl throws
+// PrivilegeNotHeldException on an already protected DACL and the module collapses that. Call 1 is the control (green
+// today); these pins are red at call 2. Messages carry status and reason only, never a path.
+const WINDOWS_ONLY_SKIP = "win32-native only: no seam for the fixed powershell.exe lookup";
+function assertHardenerStaysSecure(target) {
+  for (let call = 1; call <= 3; call += 1) {
+    const hardened = hardenWindowsPrivateDirectory(target);
+    const role = call === 1 ? "control, directory not yet hardened" : "directory already hardened by an earlier call";
+    assert.equal(hardened.status, "secure", `hardenWindowsPrivateDirectory call ${call} of 3 (${role}) returned ${JSON.stringify(hardened)}`);
+  }
+  const assessed = assessWindowsPrivatePath(target);
+  assert.equal(assessed.status, "secure", `assessWindowsPrivatePath after three hardener calls returned ${JSON.stringify(assessed)}`);
+}
+check(`hardenWindowsPrivateDirectory stays secure when called again on the same directory (${WINDOWS_ONLY_SKIP})`, (context) => {
+  if (process.platform !== "win32") { context.skip(WINDOWS_ONLY_SKIP); return; }
+  const root = mkdtempSync(join(tmpdir(), "wps-reharden-"));
+  try {
+    const target = join(root, "private");
+    mkdirSync(target);
+    assertHardenerStaysSecure(target);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+check(`hardenWindowsPrivateDirectory stays secure on repeat calls with a child file present (${WINDOWS_ONLY_SKIP})`, (context) => {
+  if (process.platform !== "win32") { context.skip(WINDOWS_ONLY_SKIP); return; }
+  const root = mkdtempSync(join(tmpdir(), "wps-reharden-child-"));
+  try {
+    const target = join(root, "private");
+    mkdirSync(target);
+    writeFileSync(join(target, "child.json"), "{}\n");
+    assertHardenerStaysSecure(target);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+if (completionCases.length !== 15) throw new Error("case completion count drift: expected 15, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
