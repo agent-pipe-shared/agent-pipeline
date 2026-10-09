@@ -37,6 +37,7 @@ import { renderGitHookSnapshotAdmission } from "../lib/git-hook-snapshot-admissi
 import { publishGitHookRuntimeSnapshot, verifyGitHookRuntimeSnapshot } from "../lib/git-hook-runtime-snapshot.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
+import { assessWindowsPrivatePaths } from "../lib/windows-private-state.mjs";
 
 // TR-J-T3d (TOILRES T44/T58, Ruling 116): applyInstall inventories the plugin root twice (publishGitHookRuntimeSnapshot)
 // and the signed-window cases hash it, so a parallel writer into the LIVE tree fails these cases (the GHS-SOURCE-DRIFT
@@ -115,6 +116,29 @@ function implModule() {
   return implModulePromise;
 }
 
+// WINPRIV-T: how "the diagnostic witness remains private" is expressed per platform.
+//   POSIX: the exact mode check, inline in freshRepo (the witness is 0o600).
+//   win32: POSIX mode bits cannot express privacy there (Node reports 0o666 for a writable file), and production does not
+//   use them either. ensureHostRoot (governance-scope.mjs) hardens the host-store directory to an owner-only, inheriting
+//   DACL entry, the witness created inside it inherits that entry, and privatePath() requires
+//   assessWindowsPrivatePath(...).status === "secure" for it. This suite therefore asserts the same platform-native
+//   mechanism governance-scope-win32-acl.test.mjs already uses, from windows-private-state.mjs. Every assessment is a
+//   PowerShell spawn, so freshRepo only RECORDS the witness path and the single after() hook below assesses all recorded
+//   witnesses in one batch (assessWindowsPrivatePaths: one fixed PowerShell process per 64 paths, the identical owner /
+//   DACL / reparse-point policy) -- never one spawn per case. The fixture directories are not removed during the run, so
+//   every recorded witness still exists when the hook runs. The hook is not a test case, so the case count is unchanged.
+const WIN32_WITNESS_PATHS = [];
+after(() => {
+  if (WIN32_WITNESS_PATHS.length === 0) return;
+  const results = assessWindowsPrivatePaths(WIN32_WITNESS_PATHS, { timeout: 120000 });
+  assert.equal(results.length, WIN32_WITNESS_PATHS.length, "one DACL assessment per recorded diagnostic witness");
+  const notPrivate = results
+    .map((result, index) => ({ witnessPath: WIN32_WITNESS_PATHS[index], ...result }))
+    .filter((entry) => entry.status !== "secure");
+  assert.deepEqual(notPrivate, [], "diagnostic witness remains private (win32 DACL, assessWindowsPrivatePaths)");
+  process.stderr.write(`# win32 witness privacy: ${results.length} diagnostic witness file(s) assessed secure in one DACL batch\n`);
+});
+
 function freshRepo(prefix, { commitInitial = true, pipelineEnrollment = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), `pre-commit-hook-${prefix}-`));
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 20000 });
@@ -171,7 +195,8 @@ function freshRepo(prefix, { commitInitial = true, pipelineEnrollment = true } =
       decidedAt: witness.decidedAt,
       planSha256: plan.planSha256,
     });
-    assert.equal(statSync(witnessPath).mode & 0o777, 0o600, "diagnostic witness remains private");
+    if (process.platform === "win32") WIN32_WITNESS_PATHS.push(witnessPath);
+    else assert.equal(statSync(witnessPath).mode & 0o777, 0o600, "diagnostic witness remains private");
     assert.equal(governance.observe({rootDir: dir}).state, "active");
   } else {
     assert.deepEqual(readFileSync(configPath), configBefore, "opted-out fixture keeps its Git config exact");
