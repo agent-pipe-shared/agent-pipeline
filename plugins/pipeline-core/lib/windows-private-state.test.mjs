@@ -106,6 +106,13 @@ check("invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN
     mkdirSync(target);
     const hardened = hardenWindowsPrivateDirectory(target);
     assert.equal(hardened.status, "secure", `fixture could not harden ${target}: ${JSON.stringify(hardened)}`);
+    // The batch needs two paths that are both genuinely private. probeRoot itself sits in an unhardened TEMP directory
+    // whose inherited DACL grants non-owner principals, which the module documents as insecure, so it cannot be a
+    // "secure" row; harden a second sibling instead.
+    const secondTarget = join(probeRoot, "private-second");
+    mkdirSync(secondTarget);
+    const secondHardened = hardenWindowsPrivateDirectory(secondTarget);
+    assert.equal(secondHardened.status, "secure", `fixture could not harden the second directory: ${JSON.stringify(secondHardened)}`);
 
     // A synthetic module directory that reproduces the real PS7-ancestry defect
     // hermetically: it advertises Get-Acl/Set-Acl via manifest metadata (so the
@@ -138,7 +145,7 @@ check("invoke() stays independent of an inherited PS7-polluted PSModulePath (WIN
       "secure",
       "assessWindowsPrivatePath must not depend on the calling shell's own PSModulePath: " + JSON.stringify(assessed),
     );
-    const batch = assessWindowsPrivatePaths([target, probeRoot], { environment: pollutedEnvironment });
+    const batch = assessWindowsPrivatePaths([target, secondTarget], { environment: pollutedEnvironment });
     assert.deepEqual(batch.map((row) => row.status), ["secure", "secure"]);
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
