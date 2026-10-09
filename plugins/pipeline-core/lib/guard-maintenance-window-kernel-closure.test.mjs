@@ -62,6 +62,18 @@
  * (`\bimport\s*\(\s*[^)\s]`) so a *prose* mention of the `import()` operator in a comment
  * (no argument between the parens) is not miscounted as a real call site.
  *
+ * COMPUTED SITES (CLOSURE-REPAIR, Ruling 86a): ONE call site whose argument is a runtime lookup,
+ * such as `import(HOOK_INSTALLERS[id])` in toolchain-preflight.mjs, can resolve to several
+ * modules. It is declared as ONE element of the file's entry, an object
+ * `{ computed: "<argument expression>", alternatives: ["<specifier>", ...] }`: it counts as ONE
+ * call site toward the staleness check above, and the walk follows EVERY alternative exactly like
+ * a static specifier. Naming one alternative as a stand-in would leave the others unwalked, and
+ * listing the alternatives as separate plain elements is counted as that many sites, so the count
+ * check rejects it. A computed element is also checked against the source: its `computed`
+ * expression must be the argument of a real `import(...)` call, and `alternatives` must be a
+ * non-empty array of non-empty strings, or the declaration is reported. Every alternative still
+ * has to be a kernel path, or GMWKC01 fails on it (GMWKC09 pins all of this).
+ *
  * COMMENT-BLANKED SCAN (NVA-V19-VERIFYHONEST, 2026-08-28): every regex above (dynamic-import
  * count, `import ... from`, side-effect `import "..."`, the spawn-edge family) runs against
  * `stripCodeComments(source)`, not the raw file text. A line comment or a block comment can
@@ -200,9 +212,11 @@ const DYNAMIC_IMPORT_EDGES = {
   "plugins/pipeline-core/lib/consumer-verify.mjs": [
     "../scripts/consumer-verify-check.mjs",
   ],
-  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these six via
+  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these eight via
   // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
   // install-time-bound absolute path, not a literal specifier the static scanner can read.
+  // CLOSURE-REPAIR (Ruling 86a): the declaration had drifted from the source (six declared, eight
+  // real); the seventh and eighth are the checkpoint-push approval and the critical human-proof policy.
   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs": [
     "../lib/manifest.mjs",
     "../lib/verify-evidence-path.mjs",
@@ -210,6 +224,36 @@ const DYNAMIC_IMPORT_EDGES = {
     "../lib/push-destination-policy.mjs",
     "../lib/checkpoint-push-audit.mjs",
     "../lib/project-authority.mjs",
+    "../lib/checkpoint-push-approval.mjs",
+    "../lib/critical-human-proof-policy.mjs",
+  ],
+  // CLOSURE-REPAIR (Ruling 86a): the start preflight loads the toolchain/readiness coordinator and
+  // the model-role bootstrap lazily, so both are edges of the kernel closure.
+  "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs": [
+    "./toolchain-preflight.mjs",
+    "./model-role-bootstrap.mjs",
+  ],
+  // CLOSURE-REPAIR (Ruling 86a): toolchain-preflight.mjs has FOUR call sites. The first three load a
+  // literal sibling (the PO-approval script twice, then the clone-provisioning check). The fourth is
+  // the COMPUTED SITE `import(HOOK_INSTALLERS[id])`: ONE site that resolves to one of three hook
+  // installers at runtime, so its entry lists ALL three and the walk follows each of them -- never one
+  // installer as a stand-in (see "COMPUTED SITES" in the file header; GMWKC09 pins the form).
+  "plugins/pipeline-core/scripts/toolchain-preflight.mjs": [
+    "./po-human-approval.mjs",
+    "./po-human-approval.mjs",
+    "./check-clone-provisioning.mjs",
+    {
+      computed: "HOOK_INSTALLERS[id]",
+      alternatives: [
+        "./pre-push-hook-install.mjs",
+        "./pre-commit-hook-install.mjs",
+        "./commit-msg-hook-install.mjs",
+      ],
+    },
+  ],
+  // CLOSURE-REPAIR (Ruling 86a): the human-override script loads the toolchain coordinator lazily.
+  "plugins/pipeline-core/scripts/guard-human-override.mjs": [
+    "./toolchain-preflight.mjs",
   ],
   // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
   // generator dynamically imports these via `pathToFileURL(resolve(<dir>, "<name>")).href`
@@ -388,7 +432,35 @@ function relativeImportSpecifiersFromSource(rawSource, repoRelativePath, violati
   SIDE_EFFECT_IMPORT_RE.lastIndex = 0;
   while ((match = SIDE_EFFECT_IMPORT_RE.exec(source)) !== null) specs.add(match[1]);
   for (const spec of spawnEdgeSpecifiers(source, repoRelativePath, violations)) specs.add(spec);
-  if (declaredDynamicTargets) for (const spec of declaredDynamicTargets) specs.add(spec);
+  if (declaredDynamicTargets) {
+    for (const entry of declaredDynamicTargets) {
+      // A string is ONE call site with ONE target. An object is ONE COMPUTED call site with EVERY
+      // alternative it can resolve to (see "COMPUTED SITES" in the file header): all are folded in.
+      if (typeof entry === "string") { specs.add(entry); continue; }
+      const alternatives = entry?.alternatives;
+      const wellFormed = typeof entry?.computed === "string" && entry.computed !== "" && Array.isArray(alternatives) &&
+        alternatives.length > 0 && alternatives.every((alternative) => typeof alternative === "string" && alternative !== "");
+      if (!wellFormed) {
+        reportViolation(
+          violations,
+          `${repoRelativePath} declares a malformed dynamic-import edge ${JSON.stringify(entry)}: an element must be a ` +
+          "specifier string, or { computed: \"<argument expression>\", alternatives: [<specifier>, ...] } with a " +
+          "non-empty alternatives array of non-empty strings.",
+        );
+        continue;
+      }
+      const escaped = entry.computed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (!new RegExp(`\\bimport\\s*\\(\\s*${escaped}\\s*[,)]`).test(source)) {
+        reportViolation(
+          violations,
+          `${repoRelativePath} declares a computed dynamic-import site "${entry.computed}" but its source contains no ` +
+          `import(${entry.computed}) call -- a stale or misspelled declaration would otherwise silently stop covering ` +
+          "the real site; fix the table to match the source exactly.",
+        );
+      }
+      for (const alternative of alternatives) specs.add(alternative);
+    }
+  }
   const relativeSpecs = [];
   for (const spec of specs) {
     if (spec.startsWith("./") || spec.startsWith("../")) relativeSpecs.push(spec);
@@ -532,6 +604,97 @@ check("GMWKC08 the closure check reports EVERY violation in one run, not only th
     }),
     [],
   );
+});
+
+check("GMWKC09 a computed dynamic-import site is ONE site whose every alternative is walked (in-memory fixtures + the live toolchain-preflight entry)", () => {
+  const entry = "kernel/entry.mjs";
+  const alternatives = ["./a.mjs", "./b.mjs", "./c.mjs"];
+  const computedEdges = { [entry]: [{ computed: "INSTALLERS[id]", alternatives }] };
+  const sources = (extra = {}) => new Map(Object.entries({
+    [entry]: ["export async function install(id) {", "  const { run } = await import(INSTALLERS[id]);", "  return run();", "}"].join("\n"),
+    "kernel/a.mjs": "export const run = () => 1;",
+    "kernel/b.mjs": "export const run = () => 2;",
+    // The stray import sits on the LAST alternative: a walk that followed only the first one (or a
+    // single stand-in) would never see it.
+    "kernel/c.mjs": "import \"./stray.mjs\";\nexport const run = () => 3;",
+    "kernel/stray.mjs": "export const stray = 1;",
+    ...extra,
+  }));
+  const walk = ({ kernel, edges = computedEdges, files = sources() }) => {
+    const loaded = [];
+    const violations = kernelClosureViolations({
+      roots: [entry],
+      kernelSet: new Set(kernel),
+      loadSource: (relPath) => { loaded.push(relPath); return files.get(relPath) ?? null; },
+      dynamicEdges: edges,
+    });
+    return { violations, loaded };
+  };
+  const everyone = [entry, "kernel/a.mjs", "kernel/b.mjs", "kernel/c.mjs", "kernel/stray.mjs"];
+
+  // (1) A declared computed site with every alternative kernel: one site, all three walked, nothing reported.
+  const clean = walk({ kernel: everyone });
+  assert.deepEqual(clean.violations, []);
+  assert.deepEqual([...new Set(clean.loaded)].sort(), [...everyone].sort(), "all three alternatives, and the last one's own import, were loaded by the walk");
+
+  // (2) The walk really descends into the LAST alternative: its stray import is reported once the stray is not kernel.
+  assert.deepEqual(
+    walk({ kernel: everyone.filter((path) => path !== "kernel/stray.mjs") }).violations,
+    ["kernel/c.mjs imports \"./stray.mjs\" -> kernel/stray.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS"],
+  );
+
+  // (3) An alternative that is not a kernel path is reported against the file holding the computed site.
+  assert.deepEqual(
+    walk({ kernel: everyone.filter((path) => path !== "kernel/c.mjs") }).violations,
+    ["kernel/entry.mjs imports \"./c.mjs\" -> kernel/c.mjs, which is NOT in NEVER_LIFTABLE_KERNEL_PATHS"],
+  );
+
+  // (4) A count mismatch is reported in every direction.
+  //   (a) The anti-pattern: the three alternatives listed as three PLAIN elements declare three sites for one real site.
+  const asPlain = walk({ kernel: everyone, edges: { [entry]: alternatives } });
+  assert.equal(asPlain.violations.length, 1, asPlain.violations.join("\n"));
+  assert.match(asPlain.violations[0], /^kernel\/entry\.mjs declares 3 dynamic-import edge\(s\).*actually contains 1 dynamic-import/);
+  //   (b) The source gained a second call site that the one-element declaration does not cover.
+  const twoSites = walk({
+    kernel: everyone,
+    files: sources({ [entry]: "export const a = (id) => import(INSTALLERS[id]);\nexport const b = (id) => import(OTHERS[id]);" }),
+  });
+  assert.equal(twoSites.violations.length, 1, twoSites.violations.join("\n"));
+  assert.match(twoSites.violations[0], /^kernel\/entry\.mjs declares 1 dynamic-import edge\(s\).*actually contains 2 dynamic-import/);
+  //   (c) The declaration claims a second site that the source does not have.
+  const extraDeclared = walk({ kernel: everyone, edges: { [entry]: [{ computed: "INSTALLERS[id]", alternatives }, "./a.mjs"] } });
+  assert.equal(extraDeclared.violations.length, 1, extraDeclared.violations.join("\n"));
+  assert.match(extraDeclared.violations[0], /^kernel\/entry\.mjs declares 2 dynamic-import edge\(s\).*actually contains 1 dynamic-import/);
+
+  // (5) A computed element that does not match the source, or is malformed, is reported (and throws with no collector).
+  const misnamed = walk({ kernel: everyone, edges: { [entry]: [{ computed: "OTHER[id]", alternatives }] } });
+  assert.equal(misnamed.violations.length, 1, misnamed.violations.join("\n"));
+  assert.match(misnamed.violations[0], /declares a computed dynamic-import site "OTHER\[id\]" but its source contains no import\(OTHER\[id\]\) call/);
+  const malformed = walk({ kernel: everyone, edges: { [entry]: [{ computed: "INSTALLERS[id]", alternatives: [] }] } });
+  assert.equal(malformed.violations.length, 1, malformed.violations.join("\n"));
+  assert.match(malformed.violations[0], /declares a malformed dynamic-import edge/);
+  assert.throws(
+    () => relativeImportSpecifiersFromSource(sources().get(entry), entry, null, { [entry]: [{ computed: "INSTALLERS[id]", alternatives: [] }] }),
+    /declares a malformed dynamic-import edge/,
+  );
+
+  // (6) The LIVE table: toolchain-preflight.mjs declares its HOOK_INSTALLERS lookup as ONE computed element whose
+  // alternatives are exactly the installer map's values (never a stand-in subset), each of them a kernel path.
+  const toolchain = "plugins/pipeline-core/scripts/toolchain-preflight.mjs";
+  const live = DYNAMIC_IMPORT_EDGES[toolchain];
+  assert.equal(live.length, 4, "toolchain-preflight.mjs has four dynamic-import call sites");
+  const computed = live.filter((element) => typeof element !== "string");
+  assert.equal(computed.length, 1, "the HOOK_INSTALLERS lookup is declared as ONE computed element");
+  assert.equal(computed[0].computed, "HOOK_INSTALLERS[id]");
+  const mapBody = /const HOOK_INSTALLERS\s*=\s*Object\.freeze\(\{([^}]*)\}\)/.exec(readFileSync(join(REPO_ROOT, toolchain), "utf8"));
+  assert.ok(mapBody, "the HOOK_INSTALLERS map is still found in toolchain-preflight.mjs");
+  const mapped = [...mapBody[1].matchAll(/["'](\.\/[^"']+\.mjs)["']/g)].map((match) => match[1]).sort();
+  assert.equal(mapped.length, 3, "the installer map holds the three mandatory hook installers");
+  assert.deepEqual([...computed[0].alternatives].sort(), mapped, "the declared alternatives ARE the installer map's values");
+  for (const alternative of computed[0].alternatives) {
+    const resolved = resolveRepoRelative(toolchain, alternative);
+    assert.ok(NEVER_LIFTABLE_KERNEL_PATHS.includes(resolved), `${resolved} is a kernel path`);
+  }
 });
 
 check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from the extended array (both anchors)", () => {

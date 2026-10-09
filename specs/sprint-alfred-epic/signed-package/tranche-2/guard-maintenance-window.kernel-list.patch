@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 9943c943867064995c8164aeb25735875311527c..913fae338ddb9cddc000a66215109dd6104f5f6d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -714,6 +714,27 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+   "plugins/pipeline-core/lib/guard/verdict.mjs",
+   "plugins/pipeline-core/lib/guard/write-scope.mjs",
++  // CLOSURE-REPAIR (Ruling 86/86a, GMWKC01): the first-party import closure had drifted open again. These fifteen modules are imported,
++  // directly or one hop further, by kernel files listed above, so they run inside those files' process with their authority; a GS-6
++  // window must not be able to rewrite any of them. The walk was run to a fixed point with the corrected DYNAMIC_IMPORT_EDGES table
++  // (pre-push-hook-install 8 sites; pipeline-start-preflight, toolchain-preflight and guard-human-override declared, including the
++  // computed site import(HOOK_INSTALLERS[id]) whose three alternatives are already kernel): the second iteration adds nothing (372 -> 387).
++  // Measurement: evidence/CLOSURE-REPAIR-M-20261009/fixpoint.txt. Sorted by path.
++  "plugins/pipeline-core/lib/agy-central-refresh.mjs",
++  "plugins/pipeline-core/lib/agy-central-snapshot.mjs",
++  "plugins/pipeline-core/lib/agy-start-hint.mjs",
++  "plugins/pipeline-core/lib/checkpoint-push-approval.mjs",
++  "plugins/pipeline-core/lib/continuity-authority-drift.mjs",
++  "plugins/pipeline-core/lib/critical-action-authorization.mjs",
++  "plugins/pipeline-core/lib/fs-durability.mjs",
++  "plugins/pipeline-core/lib/git-null-device.mjs",
++  "plugins/pipeline-core/lib/guard/env-dump-lane.mjs",
++  "plugins/pipeline-core/lib/hardened-private-directory.mjs",
++  "plugins/pipeline-core/lib/hook-currentness.mjs",
++  "plugins/pipeline-core/scripts/security-readiness/gitleaks-readiness.mjs",
++  "plugins/pipeline-core/scripts/security-readiness/osv-scanner-readiness.mjs",
++  "plugins/pipeline-core/scripts/security-readiness/semgrep-readiness.mjs",
++  "plugins/pipeline-core/scripts/toolchain-preflight.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever

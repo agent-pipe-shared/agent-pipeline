@@ -71,6 +71,43 @@ Run the targeted files only; run the plugin regression suite under WSL, not on W
   staged), Region B (in PS06), and the AR03h and HL blocks. The list is in
   `specs/sprint-alfred-epic/plans/po-list-2026-10-08.md`.
 
+## KERNEL-LIST-R86a
+
+Patch of `plugins/pipeline-core/lib/guard-maintenance-window.mjs` (Ruling 86a; a kernel file, so the ceremony applies it, no
+shell tool does): `guard-maintenance-window.kernel-list.patch`, a unified diff `a/plugins/pipeline-core/lib/guard-maintenance-window.mjs`
+-> `b/...`, LF line endings, default 3 lines of context, ONE hunk. It was produced from a scratch copy with
+`git diff --no-index` and never applied to the working tree or index.
+
+- **Base blob:** `9943c943867064995c8164aeb25735875311527c` (`git rev-parse HEAD:plugins/pipeline-core/lib/guard-maintenance-window.mjs`
+  at candidate `f9007f38f`; the working file is clean against it). Post-image blob `913fae338ddb9cddc000a66215109dd6104f5f6d`
+  (the patch's `index` line; the patched copy passes `node --check`).
+- **Patch sha256:** `d3d281214d9ac470eac0568e13c595b896b99ff983f798ee04f61d9945bf2e89` (2358 bytes).
+- **Content:** adds exactly 15 paths to `NEVER_LIFTABLE_KERNEL_PATHS` (21 added lines: 15 paths and 6 comment lines), removes
+  nothing, reorders nothing. They are ONE new commented group appended after the last entry (`lib/guard/write-scope.mjs`), sorted
+  by path, which is the list's existing shape (chronological groups, each with a header comment). `lib/guard/env-dump-lane.mjs`
+  sits in that group, not in the older S2-70 `lib/guard/` block, whose comment says "the 22 modules extracted from
+  hooks/guard-lifecycle-ready.mjs" and would turn false. The 15 are `lib/agy-central-refresh`, `agy-central-snapshot`,
+  `agy-start-hint`, `checkpoint-push-approval`, `continuity-authority-drift`, `critical-action-authorization`, `fs-durability`,
+  `git-null-device`, `guard/env-dump-lane`, `hardened-private-directory`, `hook-currentness`, then `scripts/toolchain-preflight`
+  and its three `scripts/security-readiness/{gitleaks,osv-scanner,semgrep}-readiness` (all `.mjs`, all under `plugins/pipeline-core/`).
+- **Expected effect:** the kernel list goes 372 -> 387. GMWKC01 goes from RED to GREEN: in-tree it fails on exactly 26 edge lines
+  into these 15 paths and nothing else (`evidence/CLOSURE-REPAIR-P-20261009/in-tree.txt`); against a scratch-patched module it
+  passes (`evidence/CLOSURE-REPAIR-P-20261009/patched.txt`, 9 of 10 closure cases green).
+- **Two reds that applying this patch alone does NOT clear:**
+  1. GMWKC03 goes RED on apply: the 15 paths are not in `docs/guard-maintenance-window-threat-model.md`'s "Protected assets"
+     prose. The doc sync belongs in the SAME tranche (a doc edit, not covered by this patch).
+  2. `lib/guard/guard-split-contract.test.mjs` GSC01 and GSC02 are red in BOTH states (red before this patch, still red after):
+     `harness/guard-split-map.json` has no `env-dump-lane` module. GSC05 only walks the map's modules, so it is green either
+     way and does not see the gap. Fixing it needs a map entry with a layer assignment, a separate design call in `harness/`.
+- **Apply prerequisite:** confirm with `git hash-object plugins/pipeline-core/lib/guard-maintenance-window.mjs` that the file is
+  the base blob above before applying. Then, inside the ceremony: `git apply --check <patch>`, `git apply <patch>`.
+- **Pins to run between apply and `authorize-commit`:** `node plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs`
+  (GMWKC01 must pass; GMWKC03 passes only once the threat-model doc is synced) and
+  `node --test plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs` (GSC03-GSC05 green; GSC01/GSC02 per item 2 above).
+- **Same-tranche obligations:** the threat-model doc sync (GMWKC03). `clone-hook-readiness.mjs` and `refresh-mandatory-hooks.mjs`
+  (HOOKREFRESH-F2) are in neither the list nor today's walk; if F2 makes a kernel file import them, GMWKC01 goes red again and
+  the delta is measured then (Ruling 86a).
+
 ## New contract test files
 
 A contract test whose target path is under `plugins/pipeline-core/hooks/` cannot be written by an agent session
