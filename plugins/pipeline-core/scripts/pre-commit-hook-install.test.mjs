@@ -745,8 +745,29 @@ test("applyInstall: refuses to overwrite a pre-existing foreign hook", () => {
   assert.equal(readFileSync(hookPath, "utf8"), before, "foreign hook content must be untouched");
 });
 
-test("applyInstall then applyRemoval: removes exactly what was installed", async () => {
-  const { dir } = freshRepo("install-remove-roundtrip", {pipelineEnrollment: false});
+// Capability probe (WIN-SKIPS pattern): true only when a symlink is refused with EPERM, the
+// native-Windows no-privilege host limitation. Any other error, or success, returns false so the
+// case runs unchanged.
+const SYMLINK_EPERM_SKIP_REASON = "host limitation: symlinkSync was refused with EPERM on this host (no symlink privilege); the install/removal symlink case was not run";
+const symlinkRefusedWithEperm = () => {
+  const probeRoot = mkdtempSync(join(tmpdir(), "pipeline-symlink-probe-"));
+  try {
+    writeFileSync(join(probeRoot, "target"), "x\n");
+    symlinkSync(join(probeRoot, "target"), join(probeRoot, "link"));
+    return false;
+  } catch (error) {
+    return error?.code === "EPERM";
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+};
+
+test("applyInstall then applyRemoval: removes exactly what was installed", async (t) => {
+  if (symlinkRefusedWithEperm()) {
+    t.skip(SYMLINK_EPERM_SKIP_REASON);
+    return;
+  }
+  const { dir }= freshRepo("install-remove-roundtrip", {pipelineEnrollment: false});
   const install = applyInstall({ rootDir: dir, ...PLUGIN_DIRS });
   assert.equal(install.status, "installed");
   assert.ok(existsSync(install.hookPath));
