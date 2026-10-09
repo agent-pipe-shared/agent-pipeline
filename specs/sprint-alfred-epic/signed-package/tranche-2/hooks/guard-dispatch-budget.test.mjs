@@ -1862,6 +1862,84 @@ test("TR-G T49 (c): the producer cannot renew the closing allowance -- five post
   assert.equal(JSON.parse(results[11]).count, 11, "every attempt stays counted");
 });
 
+// ---------------------------------------------------------------------------
+// TR-G-T3 (tranche-2 post-image, 2026-10-09): pins for the two post-cap admission gaps the TR-G-F Critic (Opus,
+// partial) found in the producer lane and in the git closing verb (Ruling 138, F1 and F2). Appended after T49 (c);
+// every case above is unchanged.
+//   F1. comparableScriptPath maps "\" to "/" on EVERY platform, so on a POSIX host
+//       `<plugin root>/scripts\goldfish-commit-command-flow.mjs` (a different path there) is admitted as the producer.
+//       Pins (d) quoted and (e) bare: refused after the cap. They are POSIX-host pins and are skipped on a win32
+//       host, where "\" is a path separator and that spelling is rightly admitted. There is NO platform seam to
+//       inject: the guard reads process.platform directly and this runner has no scenario field that sets it, so no
+//       injected-win32 admission control exists here and none is invented.
+//   F2. The git closing verb is matched at the START of the command only, so a chained command that begins with
+//       `git add` / `git commit` is admitted after the cap. Pins (f) `&&`, (g) `;`, (h) `|`: refused. Controls (i)
+//       plain `git add -- <p>` / `git commit -F <f> -- <p>` and (j) the forward-slash producer spellings: admitted.
+// Every test keeps its post-cap calls within the five-call closing allowance, so a refusal below is the shape's and
+// never allowance exhaustion (the exhaustion text is asserted ABSENT).
+// ---------------------------------------------------------------------------
+const TRG_SKIP_ON_WIN32 = process.platform === "win32" ? "POSIX-host pin: on a win32 host the backslash is a path separator and that spelling stays admitted (the guard reads process.platform directly; no platform seam to inject)" : false;
+const TRG_TAIL = "--task TR-G-T3-20261009 -- evidence/x.json";
+const trgBackslashQuoted = () => `node "${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER}" ${TRG_TAIL}`;
+const trgBackslashBare = () => `node ${FAKE_ROOT}/plugins/pipeline-core/scripts\\${TRG_PRODUCER} ${TRG_TAIL}`;
+const trgForwardBare = () => `node ${FAKE_ROOT}/plugins/pipeline-core/scripts/${TRG_PRODUCER} ${TRG_TAIL}`;
+const trgPostCap = (commands) => {
+  const steps = [...trgCapSteps(), ...commands.map((command) => ({ op: "guard", input: trgDeepCall("Bash", { command }) }))];
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0, `work call ${index + 1} is within the cap`);
+  return results.slice(5);
+};
+const trgAssertRefusedAfterCap = (verdict, command) => {
+  assert.equal(verdict.exitCode, 2, `must stay refused after the cap, but it was admitted: ${command}`);
+  assert.match(verdict.stderr, /DISPATCH-BUDGET-EXHAUSTED/u, `must be the budget refusal: ${command}`);
+  assert.doesNotMatch(verdict.stderr, /closing allowance of 5 tool calls is exhausted/u, `the refusal must be the shape's, not allowance exhaustion: ${command}`);
+};
+const trgAssertAdmittedAfterCap = (verdict, command) => {
+  assert.equal(verdict.exitCode, 0, `must be admitted as a closing act after the cap: ${command} -- got: ${verdict.stderr.trim().slice(0, 300)}`);
+};
+
+test("TR-G T49 (d): after the working cap, a quoted producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_ON_WIN32 }, () => {
+  const command = trgBackslashQuoted();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (e): after the working cap, a bare producer path with a backslash before the script name is refused on a POSIX host", { skip: TRG_SKIP_ON_WIN32 }, () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const command = trgBackslashBare();
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (f): after the working cap, `git add <x> && <other>` is refused -- only one simple git command is a closing act", () => {
+  const command = "git add -- evidence/x.json && git push origin main";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (g): after the working cap, `git add <x>; <other>` is refused", () => {
+  const command = "git add -- evidence/x.json; echo done";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (h): after the working cap, `git commit -F <f> | <other>` is refused", () => {
+  const command = "git commit -F scratch/commit-msg/TR-G-T3.txt -- evidence/x.json | tee scratch/out.txt";
+  const [verdict] = trgPostCap([command]);
+  trgAssertRefusedAfterCap(verdict, command);
+});
+
+test("TR-G T49 (i): after the working cap, plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control, green today)", () => {
+  const commands = ["git add -- evidence/x.json", "git commit -F scratch/commit-msg/TR-G-T3.txt -- evidence/x.json"];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
+test("TR-G T49 (j): after the working cap, the forward-slash producer spellings, quoted and bare, stay admitted (control, green today)", () => {
+  assert.doesNotMatch(FAKE_ROOT, /[\s"']/u, "the bare spelling needs a plugin root without whitespace or quotes");
+  const commands = [trgProducerCommand(TRG_TAIL), trgForwardBare()];
+  trgPostCap(commands).forEach((verdict, index) => trgAssertAdmittedAfterCap(verdict, commands[index]));
+});
+
 function trgTwoChildrenOneParentFiles() {
   const files = boundImplementorFiles(20, 20);
   files[trgChildMetaPath("def456")] = trgChildMeta("parent-tool-1");

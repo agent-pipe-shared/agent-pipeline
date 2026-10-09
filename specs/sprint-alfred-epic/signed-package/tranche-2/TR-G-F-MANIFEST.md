@@ -122,3 +122,78 @@ Pre-existing cases, compared with `evidence/TR-G-T2-20261009/red.txt`:
 - Adjacent oddity left untouched: the existing git closing-verb check tests only the start of the command, so a chained
   `git add ... && <other command>` is admitted by this guard (the other guards of the union own that question).
 - Independent Critic review (class G, Opus): pending.
+
+## TR-G-T3 pins
+
+Dispatch: TR-G-T3-20261009. Test post-image only (QG-04: the guard fix that turns these pins green is TR-G-F3, a
+separate dispatch). Source: Ruling 138 in `plans/0.7-execution-order.md`, findings F1 and F2 of the TR-G-F Critic (Opus,
+partial). Nothing above this section is edited; in particular the Target section above still names the earlier test
+post-image sha256 `33411458...`, which this section supersedes.
+
+- Test post-image: `hooks/guard-dispatch-budget.test.mjs`, new sha256
+  `2967751fb1c536eda5a8bcbbd2d50923d0293b9c95cd728604771b68a275b019` (127070 bytes, LF). Seven cases are added after
+  `TR-G T49 (c)` (`TR-G T49 (d)` to `(j)`) with their helpers and a comment block; every earlier line is unchanged.
+- Guard under test, read only and unchanged: `hooks/guard-dispatch-budget.mjs`, sha256
+  `bad0bd5db55cbc362074f640e77d33dc9c2540a3bc915a0fb4c4fe2142b23d79`. The scratch guard copy built for this run has
+  sha256 `e0fb78707d4b8bb4552dfc86d0a8171720e058f7f18cc7439c8ac04caf01b18a`, equal to the TR-G-F value above, which is
+  the proof that the guard the pins ran against is the delivered post-image. Scratch test copy sha256
+  `8fed4a7c0a20b16aff0fe04e6a135b9821328a9b928eb33c99bbc0f1dd07bb7a`.
+
+### Pin table (against the CURRENT guard post-image; WSL)
+
+| Pin | Shape after the working cap | Today | After TR-G-F3 (expected, not verified here) |
+|---|---|---|---|
+| T49 (d) | `node "<plugin root>/scripts\goldfish-commit-command-flow.mjs" ...` (quoted, backslash before the script name) is refused | RED (admitted: exit 0, expected 2) | GREEN on a non-win32 host; skipped on win32 |
+| T49 (e) | the same path, bare (unquoted), is refused | RED (admitted: exit 0, expected 2) | GREEN on a non-win32 host; skipped on win32 |
+| T49 (f) | `git add -- <p> && <other>` is refused | RED (admitted) | GREEN |
+| T49 (g) | `git add -- <p>; <other>` is refused | RED (admitted) | GREEN |
+| T49 (h) | `git commit -F <f> -- <p> \| <other>` is refused | RED (admitted) | GREEN |
+| T49 (i) | plain `git add -- <p>` and `git commit -F <f> -- <p>` stay admitted (control) | GREEN | GREEN |
+| T49 (j) | the forward-slash producer spellings, quoted and bare, stay admitted (control) | GREEN | GREEN |
+
+Every refusal pin asserts exit code 2, the `DISPATCH-BUDGET-EXHAUSTED` code, and the ABSENCE of the allowance-exhausted
+text, so a green refusal is the shape's and never the sixth-call allowance. Each test spends at most two post-cap calls
+(allowance: five). The controls (i) and (j) are what show that (d) to (h) are refused for the shape and not for the
+`<p>`, `<f>` or tail spelling: the same tails are admitted there.
+
+### Scope and limits
+
+- **No platform seam, so no injected win32 control.** `comparableScriptPath` reads `process.platform` directly and the
+  runner has no scenario field that sets it (the `dependencies.platform` plumbing exists only in the counter-lock code).
+  The briefed control "the win32 backslash spelling stays admitted under win32" is therefore NOT built and no seam was
+  invented. (d) and (e) carry `skip` on a win32 host (reason text in the file), as the one existing platform-gated case
+  does, because on win32 the backslash is a separator and the spelling is rightly admitted before and after the fix.
+  A host-gated native-win32 admission case remains possible but cannot be verified from the WSL capture; it was not
+  added. The win32 branch stays unverified, as the Boundaries section above says.
+- Only the three chain shapes named in Ruling 138 are pinned for F2. Other shapes (`git add -- <p> && git commit ...`,
+  `||`, a redirect, a substitution, a line break) are not pinned here; they belong to the TR-G-F3 design and its Critic.
+- The producer and git commands are strings handed to the guard in a child process; nothing is executed.
+
+### Command and result
+
+Build (reads the two post-images, writes only the two scratch copies; prints the shas above):
+
+```
+node scratch/dispatch-wip/TR-G-T3/build.mjs
+```
+
+Run (scratch test copy against the scratch copy of the current guard post-image):
+
+```
+wsl.exe -e bash -lc "cd <repo-root-under-/mnt>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-G-T3-20261009/red.txt --label TR-G-T3 -- node --test --test-reporter=spec scratch/dispatch-wip/TR-G-T3/guard-dispatch-budget.test.mjs"
+```
+
+Wrapped exit code 1. Artifact: `evidence/TR-G-T3-20261009/red.txt` (99 tests, 91 pass, 8 fail). The 8 reds are the five new
+refusal pins (d) to (h) and three accepted 10 s runner timeouts (orchestrating-session-never-limited,
+orchestrator-sink-bounded, implementor-cap-40). Baseline `evidence/TR-G-F-20261009/green.txt` (92 tests, 87 pass, 5
+fail) had those three plus the two load-sensitive cases "a preflight-bound base cap of 20 ..." and R7-11a; both of those
+passed in this run, which is the known timing variation (this edit adds tests only and changes neither).
+Controls (i) and (j) and the earlier T49 (a) to (c), T37, T57 and T34 pins are GREEN. No earlier case changed state
+because of this edit.
+
+Other checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` exit 0 (9 pass);
+`node plugins/pipeline-core/scripts/check-private-identifiers.mjs --root .` exit 0, `{"ok":true,"findings":[]}` (the
+briefed `harness/scripts/check-private-identifiers.mjs` does not exist in this tree). No identity-scan substitution was
+needed.
+
+Independent Critic review: pending.
