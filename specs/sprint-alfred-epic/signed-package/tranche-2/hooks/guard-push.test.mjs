@@ -2434,6 +2434,28 @@ function freshRepoIn(parentDir, name) {
     'wsl.exe -e bash -lc "git push origin main"', dir, BLOCK);
   check("PGC-T85f block  a real push after a recognised global option stays refused (I5)",
     "git --no-pager push origin main:refs/heads/feature-test", dir, BLOCK);
+
+  // ---- TR-C-T5: the Why line scope, and git --help (TR-C Critic findings F3 and F4) -------------
+  // Added by the tranche-2 post-image of dispatch TR-C-T5-20261009. F3: the Why line says the command was refused because
+  // it names git together with a marker or a nested shell. That is true for the bundle, quoting and expansion refusals
+  // only; a push option or a refspec refusal involves no marker, so the line would mislead there. T5F3b and T5F3c are RED
+  // while the Why line is emitted on every refusal. Each also pins the exact Reason line, so a refusal for another cause
+  // can never satisfy the pin. T5F3a is the GREEN control (a bundle refusal keeps the line). The Instead line is not pinned.
+  // F4: git --help is pinned as TR-C-F-MANIFEST.md declares it (collapsed like --version); both are GREEN by design.
+  const WHY_LINE = "Why:";
+  check("PGC-T5F3a control  a shell-bundle refusal keeps the Why line (the marker is the cause)",
+    HEREDOC_PAREN, dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push must be a standalone command", WHY_LINE] });
+  check("PGC-T5F3b text   a push-option refusal carries no Why line (no marker is involved)",
+    "git push --tags origin", dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push option cannot be bound to exactly one source commit"], stderrNotIncludes: [WHY_LINE] });
+  check("PGC-T5F3c text   a refspec-count refusal carries no Why line (no marker is involved)",
+    "git push origin", dir, BLOCK,
+    { stderrIncludes: [REFUSAL, "Reason: push must name exactly one remote and one explicit source refspec"], stderrNotIncludes: [WHY_LINE] });
+  check("PGC-T5F4a allow  git --help is collapsed like --version: a bare git word that never reaches the push gate",
+    "git --help", dir, ALLOW, { stderrEmpty: true });
+  check("PGC-T5F4b block  a real push after --help is still a push candidate and stays refused (as declared for --version)",
+    "git --help push origin main:refs/heads/feature-test", dir, BLOCK);
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------

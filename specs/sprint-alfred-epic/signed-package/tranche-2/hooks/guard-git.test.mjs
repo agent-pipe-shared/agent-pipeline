@@ -1589,6 +1589,47 @@ check(
   { projectDir: gg22PathspecDebtFixture("guard-test-gg22-t51f-"), stderrIncludes: ["GG-17"] },
 );
 
+// ---- TR-C-T5: consumed-value flags before -i, and git --help (TR-C Critic findings F1 and F4) -----
+// Added by the tranche-2 post-image of dispatch TR-C-T5-20261009. F1: the GG-22 pathspec fast path skips a token
+// whenever the PREVIOUS token is a value-taking flag, even when that previous token was itself consumed as a value.
+// git reads the second --trailer in "--trailer --trailer -i" as the VALUE of the first, and the second -m in
+// "-m <subject> -m -m -i" likewise, so the following -i is a real --include that widens the commit to the staged index
+// (the unrelated staged source file of the fixture). T5F1a and T5F1b are RED while the skip stays unconditional.
+// T5F1c is a GREEN control: an ordinary second -m paragraph stays admitted. The subject is a conventional one on
+// purpose: GIT-01 answers first for a bare x subject, which would make the pin pass for the wrong rule.
+// NOT pinned: "-m <subject> -m -i -- <ledger>" (the briefed second spelling). There git takes -i as the VALUE of the
+// second -m, a message paragraph, so no --include exists; admitting it is correct and a block would be a false positive.
+// F4: git --help is pinned as TR-C-F-MANIFEST.md declares it: collapsed like --version, so alone it is a bare git word
+// and a following dangerous subcommand stays visible. Both are GREEN by design (the behaviour exists; it had no pin).
+check(
+  "GG22-T5F1a block  --trailer --trailer -i: the second --trailer is the first one's value, so -i is a real --include",
+  'git commit -m "chore: reconcile ledger" --trailer --trailer -i -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: gg22PathspecDebtFixture("guard-test-gg22-t5f1a-"), stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+check(
+  "GG22-T5F1b block  -m <subject> -m -m -i: the third -m is the second one's value, so -i is a real --include",
+  'git commit -m "chore: reconcile ledger" -m -m -i -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: gg22PathspecDebtFixture("guard-test-gg22-t5f1b-"), stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+check(
+  "GG22-T5F1c allow  control: an ordinary second -m paragraph on a pathspec ledger commit stays admitted",
+  'git commit -m "chore: reconcile ledger" -m "second paragraph" -- backlog/transitions.ndjson',
+  ALLOW,
+  { projectDir: gg22PathspecDebtFixture("guard-test-gg22-t5f1c-") },
+);
+check(
+  "GG22-T5F4a allow  git --help alone collapses to a bare git word and blocks nothing",
+  "git --help",
+  ALLOW,
+);
+check(
+  "GG22-T5F4b block  git --help collapses like --version, so a following reset --hard stays visible to the destructive rules",
+  "git --help reset --hard HEAD~1",
+  BLOCK,
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, NO_CONFIG_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, GIT03_DIR, GIT03_OUTSIDE_DIR, GIT03_BLOCKING_DIR, GIT03_WARN_DIR, ...SIGNED_ROOTS]) {
   try {

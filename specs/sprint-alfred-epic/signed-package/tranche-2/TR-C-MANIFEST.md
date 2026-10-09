@@ -120,3 +120,51 @@ guard-git totals: 6 new pins, 3 GREEN and 3 RED.
 5. Same-tranche obligation: none known beyond the refusal-text change in `hooks/guard-push.mjs` (Ruling 81) and the
    `--trailer` additions in `hooks/guard-git.mjs` and `lib/` that the F slice owns. If `verify-suites` pins a case count for
    either file it needs the matching refresh (not checked here).
+
+## TR-C-T5 (dispatch TR-C-T5-20261009): pins for the TR-C Critic's minors F1, F3 and F4
+
+Test-only. Both test post-images above gain ONE more inserted block each; no guard post-image, no live file, no existing case is touched.
+The sha256 and line counts in sections 1 and 2 describe the state before this section; the values below SUPERSEDE them for the
+ceremony copy (the base blobs and the install check `git hash-object <target>` are unchanged, the live files did not move).
+
+| Post-image | sha256 (bytes, lines) | Inserted block (new line range) |
+|---|---|---|
+| `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.test.mjs` | `8838587afbec84775bf929a73fd8d81cf6e339cbd7845bbce7d56cb0b985dfd5` (84514, 1648; was 81846, 1607) | 41 lines, 1592-1632: the `TR-C-T5` comment and 5 cases `GG22-T5F1a`-`GG22-T5F1c`, `GG22-T5F4a`, `GG22-T5F4b`, directly before `// ---- Summary` |
+| `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.test.mjs` | `f6ebe7a92c349650f23500190b141ef7c255a334bc5bda29f6aeb09039210152` (125779, 2478; was 123784, 2456) | 22 lines, 2437-2458: the `TR-C-T5` comment and 5 cases `PGC-T5F3a`-`PGC-T5F3c`, `PGC-T5F4a`, `PGC-T5F4b`, inside the existing `trc-classifier` block (so its `dir`, `REFUSAL` and `HEREDOC_PAREN` are reused) |
+
+### Per-pin state (against the guard post-images of TR-C-F, `dda3322d...` and `115ccc72...`, via the load-hook redirect)
+
+| Pin | Finding | State | Reason |
+|---|---|---|---|
+| GG22-T5F1a `-m "chore: reconcile ledger" --trailer --trailer -i -- <ledger>` blocks (GG-22) | F1 | RED | exit 0 (expected 2): the second `--trailer` is the first one's value, yet the look-behind skip at post-image `guard-git.mjs:1308` still treats the following `-i` as a value, so the pathspec stays "exclusive" while git reads `-i` as `--include` |
+| GG22-T5F1b `-m "chore: reconcile ledger" -m -m -i -- <ledger>` blocks (GG-22) | F1 | RED | exit 0 (expected 2): the same skip, reached through `PATHSPEC_VALUE_CONSUMING_FLAGS`; this is the pre-existing spelling the Critic named |
+| GG22-T5F1c an ordinary second `-m "second paragraph"` pathspec ledger commit is allowed | F1 control | GREEN | the F1 fix must not over-block ordinary multi-paragraph messages |
+| GG22-T5F4a `git --help` allowed | F4 | GREEN by design | `--help` is in `GIT_GLOBAL_OPT_FLAG` (edit 3 of TR-C-F); the behaviour existed and had no pin |
+| GG22-T5F4b `git --help reset --hard HEAD~1` blocked | F4 | GREEN by design | the collapse makes the dangerous subcommand more visible, as `TR-C-F-MANIFEST.md` reading 1 declares |
+| PGC-T5F3a a shell-bundle refusal (`HEREDOC_PAREN`) keeps the `Why:` line | F3 control | GREEN | bundle reason, marker is the cause |
+| PGC-T5F3b `git push --tags origin` refusal has no `Why:` line | F3 | RED | `stderr unexpectedly contains "Why:"`: the line is emitted on every `!pushBinding.ok` refusal; the pin also requires `Reason: push option cannot be bound to exactly one source commit` |
+| PGC-T5F3c `git push origin` refusal has no `Why:` line | F3 | RED | same cause; also requires `Reason: push must name exactly one remote and one explicit source refspec` |
+| PGC-T5F4a `git --help` allowed, stderr empty | F4 | GREEN by design | as T5F4a above, on the push gate |
+| PGC-T5F4b `git --help push origin main:refs/heads/feature-test` refused | F4 | GREEN by design | a real push after `--help` still collapses to a push candidate |
+
+Totals (`evidence/TR-C-T5-20261009/red.txt`, 37133 bytes; the command exit code was 1; `node --test` duration 630379 ms): guard-git 256/258 (the 2 failures are
+T5F1a and T5F1b); guard-push 198/202 (T5F3b and T5F3c, plus `PG-CHECKPOINT` and `PG-CHECKPOINT-WORKTREE`, which fail the same way in every earlier
+capture: exit 2, "signature mode requires a current approval"). Every earlier case has its TR-C-F result (guard-git 253 passes before, 253 of the
+256 now; guard-push 195 passes before, 195 of the 198 now). Both redirect lines are in the capture: `TRCT5-REDIRECT-FIRED guard-git.mjs (243 guard-process
+loads ...)` and `TRCT5-REDIRECT-FIRED guard-push.mjs (203 guard-process loads ...)`, so the run was not against the unmodified live guards.
+
+### Method and named deviations
+
+- Command (WSL, run in the background and awaited, because the combined run exceeds the 600000 ms foreground ceiling):
+  `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-T5-20261009/red.txt --label red -- node --test scratch/dispatch-wip/TR-C-T5/guard-push.trc.test.mjs scratch/dispatch-wip/TR-C-T5/guard-git.trc.test.mjs"`.
+  The load-hook redirect is the one of `TR-C-F-MANIFEST.md` (entries, `register.mjs`, `redirect-hooks.mjs` under `scratch/dispatch-wip/TR-C-T5/`, git-ignored), except that
+  the hook serves the tranche-2 guard post-images directly from their tranche path instead of from a scratch copy. The runnable bodies differ from the post-images only
+  in the `../lib/` import lines (5 push, 3 git) and the one `GUARD` url line.
+- Briefed spelling NOT pinned: `git commit -m x -m -i -- <ledger>`. Measured with a throwaway repository: `git commit -m "chore: probe" -m -i -- f.txt` commits the message body `-i`, so
+  git takes `-i` as the second `-m`'s value and no `--include` exists; admitting that spelling is correct. The pinned F1 spellings are the ones where `-i` really is a flag
+  (`-m <subject> -m -m -i`, the Critic's `-m -m -i`, and `--trailer --trailer -i`). The briefed bare subject `x` is replaced by a conventional subject: the commit-subject rule
+  (GIT-01, reasoned, not measured) answers first for `x`, which would make a block pin pass for the wrong rule.
+- The F4 pins are GREEN by construction (the behaviour exists and was unpinned), so the goal's "RED pins" framing holds for F1 and F3 only.
+- Not changed: `TR-C-F-MANIFEST.md` (forbidden) still records the pre-T5 test digests (`6c6b153f...`, `05e6d7a2...`), now stale for the ceremony copy; section 1 and 2 lines above and the absolute path
+  on line 21 (the Critic's F5) are left as they were.
+- Independent review: pending.
