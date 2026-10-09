@@ -6107,7 +6107,10 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 //   (d1) pid alive, recorded boot time equals local           -> AMBIGUOUS   green (seam, every host)
 //   (d2) pid alive, bootId "unavailable"                      -> AMBIGUOUS   green (seam, every host)
 //   (e)  foreign host (every host)                            -> AMBIGUOUS   green (unchanged)
-//   (f)  every AMBIGUOUS refusal carries error.recovery       -> typed       green (T90-F)
+//   (f)  AMBIGUOUS under a .git common dir carries error.recovery -> typed       green (T90-F, T90-T3)
+//        (files: POSIX paths relative to the main checkout root, Ruling 136)
+//   (g)  AMBIGUOUS under any other common dir carries no recovery -> absent      green (T90-T3, Ruling 136)
+//   (F-1) the recovery line renders only entries it validated     -> fail closed or validated only   RED (T90-T4)
 //   (L)  Linux control: dead owner reclaimed, live refused    -> unchanged   green on Linux
 //   (ii) tolerance boundary: 1 minute apart AMBIGUOUS, 2 apart dead         green (seam)
 //   (iii) a malformed injected seam -> HGO-AUDIT-LOCK-MALFORMED             green (seam)
@@ -6115,12 +6118,17 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
 //   (real host) native win32, no injection: gone pid dead, live pid + local boot time ambiguous
 //
 // ASSUMPTIONS the briefing/ruling do not fix (named here so the Critic can see them):
-//   1. Refusal shape. HumanGuardOverrideError carries only `code` and `message` today. Pin (f)
-//      therefore fixes a NEW own property named `recovery` with exactly the keys
-//      { files, command }: `files` is a non-empty array of strings that includes the exact
-//      path of the lock file that caused the refusal (paths.auditLock, or
-//      paths.auditLockRecovery for an abandoned recovery guard), and `command` is a non-empty
-//      string for an attended operator. The verb of the command is deliberately not pinned.
+//   1. Refusal shape. HumanGuardOverrideError carried only `code` and `message` when T90-T2 was
+//      written. Pin (f) therefore fixes a NEW own property named `recovery` with exactly the
+//      keys { files, command }, present ONLY when the lock store sits under a common dir named
+//      `.git` (Ruling 136; pin (g): any other common dir yields no `recovery` property at all,
+//      so the route text keeps its two lines). `files` is a non-empty array of POSIX paths
+//      relative to the main checkout root (the directory that holds `.git`): exactly
+//      .git/agent-pipeline/human-guard-overrides/audit.lock for paths.auditLock, or the same
+//      name with the suffix .recover for paths.auditLockRecovery (an abandoned recovery guard).
+//      It is never an absolute path and never relative to a linked worktree (pin (h)). `command`
+//      is a non-empty string for an attended operator. The verb of the command is deliberately
+//      not pinned.
 //   2. win32 boot-time encoding. Ruling 111 fixes "a coarse boot time in the bootId field" but
 //      not its textual format or its tolerance. The seam derives it as the decimal string of
 //      floor((nowMs - uptimeSeconds * 1000) / 60000); nowMs is injected, so (d1) is exact
@@ -6652,6 +6660,64 @@ test("concurrentWorktreeAdvisory() never throws: a failing spawn reports checked
             `${where}: the third line must carry no absolute host path: ${JSON.stringify(lines[2])}`);
         }
       } finally { box.cleanup(); }
+    }
+  });
+
+  // T90-T4 (Critic F-1, defence in depth): humanGuardAuditLockRecoveryLine validates
+  // recovery.files in one iteration (for...of) and renders from a second, independent one
+  // ([...new Set(files)]). `files` only has to pass Array.isArray, so an array carrying its own
+  // iterator, or a Proxy over one, can show the validator a valid entry and the renderer another.
+  // No current producer builds such an object. The contract pinned here: the rendered text never
+  // carries what the validator did not see. Either the line is absent (fail closed to today's two
+  // lines) or it renders only validated entries (for example by copying once with Array.from and
+  // validating and rendering from the copy). The renderer is reached through the public route
+  // text, the same path pins (g) and (j) use.
+  test("T90-T4 (F-1): a recovery.files whose second iteration differs from its first never reaches the rendered line", () => {
+    const VALID = ".git/agent-pipeline/human-guard-overrides/audit.lock";
+    const HOSTILE_MARKER = "T90-T4-HOSTILE";
+    const HOSTILE = `${VALID}'\necho ${HOSTILE_MARKER}`;
+    // Fresh state per call: the first iterator invocation yields the valid entry, every later
+    // one yields the hostile entry.
+    const flippingIterator = () => {
+      let calls = 0;
+      return function iterator() {
+        calls += 1;
+        return [calls === 1 ? VALID : HOSTILE].values();
+      };
+    };
+    const variants = [
+      ["an array with its own iterator", () => {
+        const files = [VALID];
+        Object.defineProperty(files, Symbol.iterator, { value: flippingIterator(), configurable: true });
+        return files;
+      }],
+      ["a Proxy over an array", () => {
+        const iterator = flippingIterator();
+        return new Proxy([VALID], {
+          get: (target, property, receiver) => (property === Symbol.iterator ? iterator : Reflect.get(target, property, receiver)),
+        });
+      }],
+    ];
+    for (const [label, build] of variants) {
+      // Fixture integrity, so a broken fixture can never be read as a pin result.
+      const probe = build();
+      assert.equal(Array.isArray(probe), true, `(F-1) ${label}: precondition: the fixture must pass Array.isArray`);
+      assert.deepEqual([...probe], [VALID], `(F-1) ${label}: precondition: the first iteration must yield the valid entry`);
+      assert.deepEqual([...probe], [HOSTILE], `(F-1) ${label}: precondition: the second iteration must yield the hostile entry`);
+      for (const platform of ["linux", "win32"]) {
+        const where = `(F-1) ${label}, platform ${platform}`;
+        const error = { code: AMBIGUOUS, recovery: { files: build(), command: "unused" } };
+        const rendered = humanGuardRouteUnavailableReason("command", { error }, { platform });
+        assert.ok(!rendered.includes(HOSTILE_MARKER),
+          `${where}: the rendered route text contains the hostile text the validator never saw: ${JSON.stringify(rendered)}`);
+        const lines = rendered.split("\n");
+        assert.ok(lines.length === 2 || lines.length === 3,
+          `${where}: the route text must be today's two lines (fail closed) or three (validated entries only), but it is ${JSON.stringify(rendered)}`);
+        if (lines.length === 3) {
+          assert.deepEqual(lines[2].match(/'[^']*'/gu), [`'${VALID}'`],
+            `${where}: a rendered recovery line may name only the validated entry '${VALID}': ${JSON.stringify(lines[2])}`);
+        }
+      }
     }
   });
 
