@@ -27,16 +27,34 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import test from "node:test";
+import { basename, join } from "node:path";
+import test, { after } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-clone-provisioning.mjs";
-import { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } from "./clone-hook-readiness.mjs";
-import { applyInstall as installPreCommit } from "./pre-commit-hook-install.mjs";
-import { applyInstall as installCommitMsg } from "./commit-msg-hook-install.mjs";
-import { refreshMandatoryHooks } from "./refresh-mandatory-hooks.mjs";
+// TR-J-T3e (TOILRES T44/T58, Ruling 116): applyInstall inventories the plugin tree twice (publishGitHookRuntimeSnapshot)
+// and the stale-marker currentness check reads it again, so a parallel writer into the LIVE plugin tree turned the
+// install and refresh cases red with GHS-SOURCE-DRIFT. The scripts under test are therefore loaded from a frozen copy
+// of the plugin root, made once at load and removed in after(). The coordinator, refresh and provisioning scripts take
+// no lib-dir option and default to the lib dir next to themselves, so EVERY script imported here must come from the
+// same copy: a mix would make each freshly installed hook read as stale against a differently inventoried lib dir.
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const FROZEN_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "clone-hook-readiness-plugin-"));
+after(() => { rmSync(FROZEN_PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
+cpSync(LIVE_PLUGIN_ROOT, FROZEN_PLUGIN_ROOT, { recursive: true });
+const FROZEN_LIB_DIR = join(FROZEN_PLUGIN_ROOT, "lib");
+// Proof that the copy, not the live tree, is what the cases below run against (the per-fixture half is in withRepository).
+assert.notEqual(realpathSync.native(FROZEN_PLUGIN_ROOT), realpathSync.native(LIVE_PLUGIN_ROOT), "the plugin copy must not be the live plugin root");
+assert.ok(existsSync(join(FROZEN_LIB_DIR, "git-hook-runtime-snapshot.mjs")), "the frozen copy must carry the snapshot module");
+process.stderr.write(`# frozen plugin copy in use: ${basename(FROZEN_PLUGIN_ROOT)}\n`);
+const frozenModule = (name) => import(pathToFileURL(join(FROZEN_PLUGIN_ROOT, "scripts", name)).href);
+
+const { applyMandatoryHookGate, assessMandatoryHookReadiness, checkCloneProvisioning } = await frozenModule("check-clone-provisioning.mjs");
+const { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } = await frozenModule("clone-hook-readiness.mjs");
+const { applyInstall: installPreCommit, planInstall: planPreCommit } = await frozenModule("pre-commit-hook-install.mjs");
+const { applyInstall: installCommitMsg, planInstall: planCommitMsg } = await frozenModule("commit-msg-hook-install.mjs");
+const { refreshMandatoryHooks } = await frozenModule("refresh-mandatory-hooks.mjs");
 
 const AMBIENT_GIT_VARIABLES = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"];
 const COORDINATOR_EXPECTED = Object.freeze({ schema: "pipeline.mandatory-hook-readiness.v1", status: "ready" });
@@ -53,6 +71,10 @@ function withRepository(run) {
     execFileSync("git", ["-C", root, "init", "-q"], { stdio: "ignore" });
     const gitDir = join(realpathSync.native(root), ".git");
     execFileSync("git", ["-C", root, "config", "--local", "core.hooksPath", join(gitDir, "hooks").replaceAll("\\", "/")], { stdio: "ignore" });
+    // TR-J-T3e: per-fixture proof that both installers default their lib dir to the frozen copy, not the live tree.
+    for (const plan of [planPreCommit({ rootDir: root }), planCommitMsg({ rootDir: root })]) {
+      assert.equal(realpathSync.native(plan.pluginLibDir), realpathSync.native(FROZEN_LIB_DIR), "the installers must resolve their lib dir inside the frozen plugin copy");
+    }
     return run({ root, gitDir, hookFile: (name) => join(gitDir, "hooks", name) });
   } finally {
     for (const [name, value] of previous) {

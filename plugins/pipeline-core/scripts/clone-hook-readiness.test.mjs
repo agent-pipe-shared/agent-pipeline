@@ -1,11 +1,30 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
-import { mkdtempSync, openSync as openCompletionDescriptor, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, openSync as openCompletionDescriptor, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
-import { dirname, join } from "node:path";
-import { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } from "./clone-hook-readiness.mjs";
-import { applyMandatoryHookGate, assessMandatoryHookReadiness } from "./check-clone-provisioning.mjs";
+import { basename, dirname, join } from "node:path";
+import { after } from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+// TR-J-T3e (TOILRES T44/T58, Ruling 116): the scripts under test are loaded from a frozen copy of the plugin root, made
+// once at load and removed in after(), so a parallel writer into the LIVE plugin tree cannot change what this suite
+// runs against. Both imports must come from the same copy (see clone-hook-readiness.partial.test.mjs). The completion
+// registration below stays on the live lib: it is the harness, not the code under test.
+const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const FROZEN_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "clone-hook-readiness-plugin-"));
+after(() => { rmSync(FROZEN_PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
+cpSync(LIVE_PLUGIN_ROOT, FROZEN_PLUGIN_ROOT, { recursive: true });
+// Proof that the copy, not the live tree, is what the case below runs against.
+assert.notEqual(realpathSync.native(FROZEN_PLUGIN_ROOT), realpathSync.native(LIVE_PLUGIN_ROOT), "the plugin copy must not be the live plugin root");
+for (const name of ["clone-hook-readiness.mjs", "check-clone-provisioning.mjs"]) {
+  assert.ok(existsSync(join(FROZEN_PLUGIN_ROOT, "scripts", name)), `the frozen copy must carry ${name}`);
+}
+process.stderr.write(`# frozen plugin copy in use: ${basename(FROZEN_PLUGIN_ROOT)}\n`);
+const frozenModule = (name) => import(pathToFileURL(join(FROZEN_PLUGIN_ROOT, "scripts", name)).href);
+
+const { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } = await frozenModule("clone-hook-readiness.mjs");
+const { applyMandatoryHookGate, assessMandatoryHookReadiness } = await frozenModule("check-clone-provisioning.mjs");
 const completionCases = [];
 function test(name, optionsOrRun, possibleRun) {
   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
