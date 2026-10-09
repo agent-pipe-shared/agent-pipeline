@@ -1793,12 +1793,30 @@ const pushGate = gateConfig(manifest, "push");
 const guardActive = hasRelease || declaresPushDestinationPolicy || (pushGate && pushGate.mode !== "off");
 if (!guardActive) allowExit();
 
+// TR-C-F2 (TR-C Critic F3; Ruling 159): the Why line below explains a refusal that a marker caused, so it is keyed by marker
+// PRESENCE in the command, never by the reason string: a marker-caused refusal keeps it whichever reason fires first (a `git grep`
+// with a parenthesis is refused with a global-option reason), and a refusal with no marker in the command (a push option, a
+// refspec count) does not carry it. Only the markers the Why line itself names are tested: ( ) { $ backtick, and a nested shell
+// with -c. The two nested-shell patterns are copied byte for byte from `lib/git-cmd.mjs` (NESTED_POSIX_SHELL_RE and
+// NESTED_WINDOWS_SHELL_RE, where the full marker rule lives and `hasFailClosedMarker` is not exported); a backslash outside a
+// path token, a typographic quote and a here-document handed to a shell are markers there that this test does not repeat, and
+// the Why line does not name them.
+const WHY_MARKER_RE = /[$`{()]/u;
+const WHY_NESTED_POSIX_SHELL_RE =
+  /(?:^|[\s;&|(`'"/\\])(?:ba|z|da|k|c|fi|tc|a)?sh(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+-[A-Za-z]*c[A-Za-z]*(?![\w-])/iu;
+const WHY_NESTED_WINDOWS_SHELL_RE =
+  /(?:^|[\s;&|(`'"/\\])(?:cmd(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+\/[ck]|(?:pwsh|powershell)(?:\.exe)?(?:\s+[^\s;&|]+){0,8}?\s+-c[A-Za-z]*)(?![\w-])/iu;
+const commandCarriesNamedMarker = (text) =>
+  WHY_MARKER_RE.test(text) || WHY_NESTED_POSIX_SHELL_RE.test(text) || WHY_NESTED_WINDOWS_SHELL_RE.test(text);
+
 if (!pushBinding.ok) {
   emit(2, [
     "BLOCKED (guard-push, plugin pipeline-core): push target is not unambiguous.",
     `Reason: ${pushBinding.reason}.`,
     // TR-C-F (toil T38, T42, T80, T82; Ruling 81): the fail-closed marker rule is kept (option B); the relief is procedural text.
-    "Why: a command that names git together with a ( ) { $ backtick or a nested shell -c is refused as a possible hidden push, even when it only reads or commits.",
+    ...(commandCarriesNamedMarker(cmd)
+      ? ["Why: a command that names git together with a ( ) { $ backtick or a nested shell -c is refused as a possible hidden push, even when it only reads or commits."]
+      : []),
     "Instead: commit with `git commit -F scratch/commit-msg/<slice>.txt -- <paths>` (message in a file, paths after the double dash), and for a search use rg -n <pattern> <file> rather than git grep.",
   ]);
 }

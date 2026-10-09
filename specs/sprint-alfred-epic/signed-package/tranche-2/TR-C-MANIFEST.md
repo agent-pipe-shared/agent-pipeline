@@ -18,7 +18,7 @@ rule is KEPT, relief is procedural) and Ruling 80 (contract tests land as tranch
 - Base blob: `17d4313347a0f869031a450a70db0aba279b2abe` (live file at the dispatch; 2385 lines). Post-image: 2456 lines (71 inserted: the 70-line block plus one blank separator).
 - sha256: `6c6b153faba1da5032536a7f4b3241cd229c0fefa4a699b8b5b7a6c7127023a1` (123784 bytes; after the declared substitution of TR-C-T3, TR-C-T4 amendment)
 - Insertion: one block (18 cases, ids `PGC-*`) directly before the `// ---- Cleanup` comment. No import changes.
-- WSL command (run on the scratch copy, see Evidence): `wsl.exe -e bash -lc "cd /mnt/d/Dev/agent-pipeline-share; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-T-20261009/red.txt --label red -- node --test scratch/dispatch-wip/TR-C-T/guard-push.test.mjs scratch/dispatch-wip/TR-C-T/guard-git.test.mjs"`
+- WSL command (run on the scratch copy, see Evidence): `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-T-20261009/red.txt --label red -- node --test scratch/dispatch-wip/TR-C-T/guard-push.test.mjs scratch/dispatch-wip/TR-C-T/guard-git.test.mjs"`
 - Ceremony command after placement: `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node --test plugins/pipeline-core/hooks/guard-push.test.mjs"`
 
 ### 2. guard-git.test.mjs (TP-1)
@@ -166,5 +166,5 @@ loads ...)` and `TRCT5-REDIRECT-FIRED guard-push.mjs (203 guard-process loads ..
   (GIT-01, reasoned, not measured) answers first for `x`, which would make a block pin pass for the wrong rule.
 - The F4 pins are GREEN by construction (the behaviour exists and was unpinned), so the goal's "RED pins" framing holds for F1 and F3 only.
 - Not changed: `TR-C-F-MANIFEST.md` (forbidden) still records the pre-T5 test digests (`6c6b153f...`, `05e6d7a2...`), now stale for the ceremony copy; section 1 and 2 lines above and the absolute path
-  on line 21 (the Critic's F5) are left as they were.
+  on line 21 (the Critic's F5) are left as they were. Update (TR-C-F2-20261009): line 21 now reads `<repo-root-in-wsl>`, and `TR-C-F-MANIFEST.md` records these TR-C-T5 test digests.
 - Independent review: pending.

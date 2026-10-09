@@ -1302,10 +1302,19 @@ if (inspection.message !== null) {
         const PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS = new Set(["--author", "--date", "--trailer"]);
         const PATHSPEC_EXCLUSIVE_SAFE_VALUE_PREFIXES = ["--author=", "--date=", "--gpg-sign=", "--trailer="];
         let pathspecIsExclusive = separatorIndex !== -1;
+        // TR-C-F2 (TR-C Critic F1): a token that was itself consumed as the value of a value-taking flag is a value, never a flag.
+        // git reads the second `-m` of `-m <s> -m -m -i` and the second `--trailer` of `--trailer --trailer -i` as the VALUE of the
+        // one before it, so the `-i` that follows is a real `--include`. `consumedAsValue` records that the previous token was
+        // skipped as a value, and the look-behind below then does not apply to the token after it.
+        let consumedAsValue = false;
         for (let idx = 0; pathspecIsExclusive && idx < separatorIndex; idx += 1) {
           const token = commitTokens[idx];
           const prevToken = idx > 0 ? commitTokens[idx - 1] : undefined;
-          if (prevToken !== undefined && (PATHSPEC_VALUE_CONSUMING_FLAGS.has(prevToken) || PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS.has(prevToken))) continue;
+          if (!consumedAsValue && prevToken !== undefined && (PATHSPEC_VALUE_CONSUMING_FLAGS.has(prevToken) || PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS.has(prevToken))) {
+            consumedAsValue = true;
+            continue;
+          }
+          consumedAsValue = false;
           if (token === "git" || token === "commit") continue;
           if (PATHSPEC_VALUE_CONSUMING_FLAGS.has(token) || PATHSPEC_EXCLUSIVE_SAFE_FLAGS.has(token) || PATHSPEC_EXCLUSIVE_SAFE_VALUE_FLAGS.has(token)) continue;
           if (token.startsWith("--message=") || token.startsWith("--file=")) continue;

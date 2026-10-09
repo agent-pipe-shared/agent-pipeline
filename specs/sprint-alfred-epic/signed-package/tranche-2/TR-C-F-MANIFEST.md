@@ -1,6 +1,6 @@
 # TR-C-F manifest: tranche-2 post-images for the push relief text and the GG-22 `--trailer` scoping, plus the `git --version` admission (class G)
 
-Dispatch: TR-C-F-20261009 (goldfish-deep, `claude-sonnet-5-5` / `xhigh`), the fix half of slice TR-C. It turns the 8 RED pins of
+Dispatch: TR-C-F-20261009, the fix half of slice TR-C. It turns the 8 RED pins of
 `TR-C-MANIFEST.md` GREEN without editing either test post-image, and keeps the 16 GREEN pins and every pre-existing case at their
 baseline. Requirement: `specs/sprint-alfred-epic/design/toil-resolution-2026-10-08.md` section 2 rows T38, T42, T51, T80, T82, T85
 (section 5 row 6), read with Ruling 81 (GREP-PUSH, a PO decision: option B of the fail-closed marker rule is KEPT, the relief is
@@ -12,17 +12,20 @@ procedural text). No marker rule is widened. Independent review: pending.
 to the live path by an agent. No earlier tranche-2 post-image of either file existed, so each post-image is the live file plus the
 edit below. Digests are over the LF bytes (both live files are LF).
 
-| Install target | Post-image | Live pre-image sha256 (bytes) | Post-image sha256 (bytes) |
-|---|---|---|---|
-| `plugins/pipeline-core/hooks/guard-push.mjs` | `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs` | `dae247a0fee62b2eda87935f1863e0f7516f7ade61e11239bffc8f83e8ae8ace` (147847; 2676 lines) | `dda3322df765e0e4315645dfac8506e62eeaf993b4b5ec829cb2e14adce2f2de` (148345; 2679 lines) |
-| `plugins/pipeline-core/hooks/guard-git.mjs` | `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs` | `c19f36a057f5c6710300c77593f5e92950295401f7fcc9fc006650d62a79ed44` (89017; 1490 lines) | `115ccc729bdb2a7d90f0f2ec270b53eb4e73f76f2d4875365db7fb76b1a397dd` (89198; 1491 lines) |
+| Install target | Post-image | Live pre-image sha256 (bytes) | Live pre-image git blob id (`git hash-object`) | Post-image sha256 (bytes) |
+|---|---|---|---|---|
+| `plugins/pipeline-core/hooks/guard-push.mjs` | `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs` | `dae247a0fee62b2eda87935f1863e0f7516f7ade61e11239bffc8f83e8ae8ace` (147847; 2676 lines) | `c37d8cc9c5fdeb79d9e77e38d4afc7301bebea49` | `dda3322df765e0e4315645dfac8506e62eeaf993b4b5ec829cb2e14adce2f2de` (148345; 2679 lines) |
+| `plugins/pipeline-core/hooks/guard-git.mjs` | `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs` | `c19f36a057f5c6710300c77593f5e92950295401f7fcc9fc006650d62a79ed44` (89017; 1490 lines) | `363a46a27a92482b57830f10f2d62abda09c40ac` | `115ccc729bdb2a7d90f0f2ec270b53eb4e73f76f2d4875365db7fb76b1a397dd` (89198; 1491 lines) |
+
+The post-image digests in this table are the TR-C-F ones. The TR-C-F2 section at the end supersedes them for the ceremony copy; the pre-image blob ids stay the stale-base check.
 
 In place, committed with the post-images (it is outside `hooks/` and `lib/guard/`): `plugins/pipeline-core/lib/git-cmd.mjs`. The
 `git --version` whitelist (the global-option list behind fail-closed check #2 of `commandIsGitPush`) lives there, not in either hook.
 
-The two test post-images (`hooks/guard-push.test.mjs` sha256 `6c6b153faba1da5032536a7f4b3241cd229c0fefa4a699b8b5b7a6c7127023a1`,
-`hooks/guard-git.test.mjs` sha256 `05e6d7a23f618323d408709fefc0c541ed572a12c8c46a1f9e8409d531589fdc`) are untouched; the build
-script asserts both digests before using them.
+The two test post-images are untouched by this slice. Their digests are the TR-C-T5 post-images (`TR-C-MANIFEST.md`, TR-C-T5 section):
+`hooks/guard-push.test.mjs` sha256 `f6ebe7a92c349650f23500190b141ef7c255a334bc5bda29f6aeb09039210152` (125779 bytes), `hooks/guard-git.test.mjs` sha256
+`8838587afbec84775bf929a73fd8d81cf6e339cbd7845bbce7d56cb0b985dfd5` (84514 bytes). The TR-C-F run itself used the earlier pre-T5 test post-images (`6c6b153f...`, `05e6d7a2...`),
+which its build script asserted before using them.
 
 ## The edits (each anchor matched exactly once; nothing else differs from the pre-image)
 
@@ -107,4 +110,49 @@ and not part of this commit.
 2. `--help` was added next to `--version` because the briefing named it when it sits in the same list; no pin covers it.
 3. If `verify-suites` pins a case count for either guard test file or for `git-cmd.test.mjs`, it needs the matching refresh (not
    checked here); the install of the two post-images is the ceremony's step, with the base-blob check `git hash-object <target>`
-   against the pre-image digests above.
+   against the pre-image git blob ids in the Targets table.
+
+## TR-C-F2 (dispatch TR-C-F2-20261009): the TR-C Critic's minors F1, F2, F3, F5 and the model line
+
+Guard-only follow-up to TR-C-F. It answers the TR-C minors of `specs/sprint-alfred-epic/evidence/critic-tr-c-and-win-harden-opus-partial-2026-10-09.md`
+and turns the four RED pins of TR-C-T5 (`TR-C-MANIFEST.md`, TR-C-T5 section) GREEN without editing either test post-image. No live `hooks/` or
+`lib/` file and not the tranche README is touched. Independent review: pending.
+
+### The edits (each anchor matched exactly once; nothing else differs from the TR-C-F post-images)
+
+| # | File and place | Edit |
+|---|---|---|
+| 1 | `guard-git.mjs`, the GG-22 look-behind loop (post-image lines 1309-1317) | F1. A token that was itself skipped as the value of a value-taking flag is a value, never a flag: `consumedAsValue` records the skip and the look-behind does not apply to the token after it. `-m <s> -m -m -i` and `--trailer --trailer -i` therefore keep `-i` as `--include`, the pathspec stops being "exclusive", and GG-22 answers. Ordinary `-m a -m b` and `--trailer v --trailer w` commits are unchanged |
+| 2 | `guard-push.mjs`, before the `!pushBinding.ok` refusal (post-image lines 1804-1822) | F3 / Ruling 159. The `Why:` line is emitted only when the command carries a marker the line itself names (`(` `)` `{` `$` backtick, a nested shell with `-c`). The test is on the command text, not on `pushBinding.reason`, so a marker-caused refusal keeps the line whichever reason fires first. The two nested-shell patterns are copied byte for byte from `lib/git-cmd.mjs` (`NESTED_POSIX_SHELL_RE`, `NESTED_WINDOWS_SHELL_RE`) |
+
+Manifest edits of this slice: F2 (the Targets table records the git blob ids of both guard pre-images; the ceremony base check now compares like with like),
+the implementor model/effort line of line 3 dropped, the stale test digests of the paragraph under the table refreshed to the TR-C-T5 post-images, and
+`TR-C-MANIFEST.md` line 21 (F5) now reads `<repo-root-in-wsl>` instead of a host path.
+
+### Post-image digests (supersede the Targets table; LF bytes)
+
+| Post-image | TR-C-F sha256 (bytes) | TR-C-F2 sha256 (bytes; lines) |
+|---|---|---|
+| `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-push.mjs` | `dda3322df765e0e4315645dfac8506e62eeaf993b4b5ec829cb2e14adce2f2de` (148345) | `9686bbec296411e480a72bc4f0ae49600e452b413370f88ecc8319b3b5dfee49` (149849; 2697) |
+| `specs/sprint-alfred-epic/signed-package/tranche-2/hooks/guard-git.mjs` | `115ccc729bdb2a7d90f0f2ec270b53eb4e73f76f2d4875365db7fb76b1a397dd` (89198) | `a57566f883aa48dd4566e6ea377f14cef4c45e92e0b95a41c08770571e4b863e` (89845; 1500) |
+
+Install targets and base blobs are unchanged (`plugins/pipeline-core/hooks/guard-push.mjs` blob `c37d8cc9c5fdeb79d9e77e38d4afc7301bebea49`, `plugins/pipeline-core/hooks/guard-git.mjs` blob `363a46a27a92482b57830f10f2d62abda09c40ac`).
+
+### Evidence (machine-written by `capture-evidence.mjs`, not part of this commit)
+
+- `evidence/TR-C-F2-20261009/green.txt`, wrapped exit code 1. Command (WSL, run in the background and awaited): `wsl.exe -e bash -lc "cd <repo-root-in-wsl>; node plugins/pipeline-core/scripts/capture-evidence.mjs --out evidence/TR-C-F2-20261009/green.txt --label green -- node --test scratch/dispatch-wip/TR-C-T5/guard-push.trc.test.mjs scratch/dispatch-wip/TR-C-T5/guard-git.trc.test.mjs"`.
+  The load-hook redirect of TR-C-T5 serves the tranche-2 guard post-images directly (the entries print `TRCT5-REDIRECT-FIRED`): guard-git.mjs (243 loads), guard-push.mjs (203 loads).
+- Result: guard-git 258/258, guard-push 200/202. The only failing cases are `PG-CHECKPOINT` and `PG-CHECKPOINT-WORKTREE` (exit 2, "signature mode requires a current approval"), failing the same way in every earlier capture.
+
+| Pin | TR-C-T5 | TR-C-F2 |
+|---|---|---|
+| GG22-T5F1a, GG22-T5F1b | RED | GREEN (edit 1) |
+| PGC-T5F3b, PGC-T5F3c | RED | GREEN (edit 2) |
+| GG22-T5F1c, GG22-T5F4a/b, PGC-T5F3a, PGC-T5F4a/b | GREEN | GREEN |
+| every other case | TR-C-T5 result | unchanged (258/258 and 200/202, the two `PG-CHECKPOINT*` failures only) |
+
+### Readings for the Critic and the PO
+
+1. The Why test repeats a subset of the marker rule. `hasFailClosedMarker` in `lib/git-cmd.mjs` is not exported and `lib/` is outside this slice, so `guard-push.mjs` carries its own test for exactly the markers its Why line names. A refusal caused only by a backslash outside a path token, a typographic quote or a here-document handed to a shell therefore carries no Why line (the line would not name its cause either). Exporting `hasFailClosedMarker` and calling it from the guard is the drift-free form; that is a `lib/` change for a later slice.
+2. The `Instead:` line is still emitted on every `!pushBinding.ok` refusal; only the `Why:` line is marker-keyed, as briefed.
+3. Edit 1 leaves the separator finder alone: a `--` that follows a consumed `-m`/`--trailer` value is still read as message content, which can only keep the conservative full-index check, never widen the fast path.
