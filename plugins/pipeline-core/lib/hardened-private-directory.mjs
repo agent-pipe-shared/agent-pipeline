@@ -168,6 +168,29 @@ export const AGENT_PIPELINE_ROOT_INSECURE_OWNED_POSTURE = "repair";
 /** Typed advisory carried in the return value when a root was repaired in place. */
 export const AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY = "PB-ROOT-REPAIRED";
 
+/**
+ * D1 (Ruling 156/157; signature ruled in Ruling 159): what a root OWNED BY THE CURRENT USER that
+ * reads exactly 0o777 and still reads 0o777 after a chmod that reported success means to
+ * `ensureAgentPipelineRoot` on POSIX. That is the signature of a filesystem that records no mode bits
+ * (a DrvFs mount without `metadata`, vfat): every directory there reads 0o777 and no chmod can change
+ * it, so the mode says nothing about who can read the directory. It holds for an existing root and
+ * for one this call just created alike.
+ *
+ * - "accept": keep the root as found and report `advisory: "PB-ROOT-MODE-UNRECORDED"` (and emit one
+ *   warning with that code). This is the Elephant default, used until the PO rules otherwise:
+ *   "refuse" would make the repository-private root unusable on such a host for good.
+ * - "refuse": treat it like any other root whose chmod did not take: `PB-ROOT-INSECURE`.
+ *
+ * The signature is deliberately narrow. Any other non-private mode whose chmod has no effect, and
+ * any root owned by anyone else, stays `PB-ROOT-INSECURE` under EITHER posture. This constant is the
+ * only place the posture is decided, so a PO "refuse" ruling is a one-line change here. Any value
+ * other than "accept" is read as "refuse": an unrecognised posture never widens what is accepted.
+ */
+export const AGENT_PIPELINE_ROOT_MODE_UNRECORDED_POSTURE = "accept";
+
+/** Typed advisory carried in the return value when a root was accepted because its filesystem records no mode bits. */
+export const AGENT_PIPELINE_ROOT_MODE_UNRECORDED_ADVISORY = "PB-ROOT-MODE-UNRECORDED";
+
 const isPrivateMode = (mode) => (mode & 0o077) === 0;
 const modeText = (mode) => `0o${(mode & 0o777).toString(8).padStart(3, "0")}`;
 const currentUid = () => (typeof process.getuid === "function" ? process.getuid() : null);
@@ -195,7 +218,19 @@ function chmodPhysicalDirectory(path, mode, expected) {
   }
 }
 
-function ensureWindowsRoot({ anchorPath, root, existing, repairing, delegate, observe }) {
+/** The permission bits as `lstat` reports them, setuid, setgid and sticky included: "exactly 0o777" excludes 0o1777 and 0o2777. */
+const permissionBits = (mode) => mode & 0o7777;
+const OPEN_MODE = 0o777;
+
+/**
+ * One typed process warning: `emitWarning(message, { code })`, the shape of `process.emitWarning`. The
+ * message names the segment and never a host path; callers pass only text this module produced.
+ */
+function warnRoot(emitWarning, code, text) {
+  emitWarning(`private-state directory ${AGENT_PIPELINE_ROOT_SEGMENT} ${text}`, { code });
+}
+
+function ensureWindowsRoot({ anchorPath, root, existing, repairing, delegate, observe, emitWarning }) {
   if (existing !== null && repairing && existing.isDirectory() && !existing.isSymbolicLink()) {
     const seen = observe(root);
     const observation = seen?.status ? null : (seen?.observation ?? null);
@@ -214,6 +249,8 @@ function ensureWindowsRoot({ anchorPath, root, existing, repairing, delegate, ob
           const reason = typeof after?.reason === "string" && after.reason.length > 0 ? after.reason : "no reason reported";
           fail("PB-WINDOWS-ASSURANCE", `private-state directory Windows assurance is ${status} for ${AGENT_PIPELINE_ROOT_SEGMENT}: ${reason}. An in-place repair reset its DACL to the current principal, but it did not end secure.\n${remedyFor(false, false, status)}`);
         }
+        // Exactly one warning per repaired result, after the re-assessment above ended secure.
+        warnRoot(emitWarning, AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, "was repaired in place: an owner-only protected DACL replaced the previous one.");
         return { path: root, created: false, repaired: true, advisory: AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, detail: verdict.reason };
       }
     }
@@ -224,24 +261,40 @@ function ensureWindowsRoot({ anchorPath, root, existing, repairing, delegate, ob
   return { path: root, created: existing === null, repaired: false, advisory: null, detail: null };
 }
 
-function ensurePosixRoot({ anchorPath, root, existing, repairing, delegate, chmod, getuid }) {
+function ensurePosixRoot({ anchorPath, root, existing, repairing, unrecordedPosture, delegate, chmod, getuid, emitWarning }) {
   // Creates the segment with mode 0o700 when absent and proves it is a physical directory. It does
-  // not assess the mode of an existing segment off win32, so that is done here.
+  // not assess the mode or the owner of an existing segment off win32, so that is done here.
   ensureHardenedPrivateDirectory(anchorPath, root, delegate);
   const info = lstatSync(root);
-  if (isPrivateMode(info.mode)) return { path: root, created: existing === null, repaired: false, advisory: null, detail: null };
+  const created = existing === null;
   const uid = getuid();
+  // An owner that cannot be proven (no uid, NaN, not an integer) is read as "not ours".
   const owned = Number.isInteger(uid) && info.uid === uid;
+  if (isPrivateMode(info.mode)) {
+    if (owned) return { path: root, created, repaired: false, advisory: null, detail: null };
+    // A private mode is not a private directory when somebody else owns it: its owner can reopen it
+    // at any time. Refused and left exactly as found, under either posture.
+    fail("PB-ROOT-INSECURE", `private-state directory ${AGENT_PIPELINE_ROOT_SEGMENT} is not owned by the current user (mode ${modeText(info.mode)}). It was left untouched.\n${OWNER_REMEDY}`);
+  }
   if (!owned || !repairing) {
     const disposition = owned ? "It is owned by the current user and was left untouched (refuse posture)." : "It is not owned by the current user and was left untouched.";
     fail("PB-ROOT-INSECURE", `private-state directory ${AGENT_PIPELINE_ROOT_SEGMENT} is insecure (mode ${modeText(info.mode)}). ${disposition}\n${OWNER_REMEDY}`);
   }
   chmod(root, AGENT_PIPELINE_ROOT_MODE, info);
   const after = lstatSync(root);
-  if (!after.isDirectory() || after.isSymbolicLink() || !isPrivateMode(after.mode)) {
-    fail("PB-ROOT-INSECURE", `private-state directory ${AGENT_PIPELINE_ROOT_SEGMENT} did not end private after an in-place repair (mode ${modeText(after.mode)}).\n${OWNER_REMEDY}`);
+  const physical = after.isDirectory() && !after.isSymbolicLink();
+  if (physical && isPrivateMode(after.mode)) {
+    warnRoot(emitWarning, AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, `was repaired in place: mode ${modeText(info.mode)} was reset to ${modeText(after.mode)}.`);
+    return { path: root, created: false, repaired: true, advisory: AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, detail: `mode ${modeText(info.mode)} reset to ${modeText(after.mode)}` };
   }
-  return { path: root, created: false, repaired: true, advisory: AGENT_PIPELINE_ROOT_REPAIRED_ADVISORY, detail: `mode ${modeText(info.mode)} reset to ${modeText(after.mode)}` };
+  // D1: the narrow "records no mode bits" signature. Owned by the current user (proven above), exactly
+  // 0o777 before, and still exactly 0o777 after a chmod that returned without throwing. Anything else
+  // that stays non-private after the chmod, e.g. a 0o755 root, remains PB-ROOT-INSECURE below.
+  if (physical && unrecordedPosture === "accept" && permissionBits(info.mode) === OPEN_MODE && permissionBits(after.mode) === OPEN_MODE && after.uid === info.uid) {
+    warnRoot(emitWarning, AGENT_PIPELINE_ROOT_MODE_UNRECORDED_ADVISORY, `reads mode ${modeText(after.mode)} and a chmod to ${modeText(AGENT_PIPELINE_ROOT_MODE)} took no effect, so this filesystem appears to record no POSIX mode bits. The directory was accepted as found; its privacy cannot be shown from its mode here.`);
+    return { path: root, created, repaired: false, advisory: AGENT_PIPELINE_ROOT_MODE_UNRECORDED_ADVISORY, detail: `mode ${modeText(after.mode)} unchanged after a chmod to ${modeText(AGENT_PIPELINE_ROOT_MODE)}` };
+  }
+  fail("PB-ROOT-INSECURE", `private-state directory ${AGENT_PIPELINE_ROOT_SEGMENT} did not end private after an in-place repair (mode ${modeText(after.mode)}).\n${OWNER_REMEDY}`);
 }
 
 /**
@@ -249,20 +302,34 @@ function ensurePosixRoot({ anchorPath, root, existing, repairing, delegate, chmo
  * `{ path, created, repaired, advisory, detail }`. Implemented on `ensureHardenedPrivateDirectory`.
  *
  * - Absent: created hardened (owner-only; win32 protected DACL, POSIX mode 0o700).
- * - Present and secure: returned as found.
+ * - Present and secure: returned as found. On POSIX that includes the owner: a root with a private
+ *   mode that the current user does not own is refused with `PB-ROOT-INSECURE` and left untouched,
+ *   under either posture, and so is a root whose owner cannot be proven (no `getuid`).
  * - Present, insecure, owned by the current user: repaired in place under the D0 posture
  *   (`AGENT_PIPELINE_ROOT_INSECURE_OWNED_POSTURE`), re-assessed, and reported with
  *   `repaired: true`, `advisory: "PB-ROOT-REPAIRED"` and the pre-repair finding in `detail`. A repair
  *   that does not end secure is refused, never reported as repaired. On win32 the repair is the
  *   module's own owner-only protected DACL, which resets inherited and current-user entries; an
  *   explicit foreign entry on the directory itself survives it and the call then refuses.
+ * - POSIX, owned by the current user, reading exactly 0o777 before and after a chmod that returned
+ *   without throwing (existing root, or one this call just created): the filesystem records no mode
+ *   bits. Under the D1 posture (`AGENT_PIPELINE_ROOT_MODE_UNRECORDED_POSTURE`) the root is kept as
+ *   found and reported with `repaired: false` and `advisory: "PB-ROOT-MODE-UNRECORDED"`. Every other
+ *   non-private mode that survives the chmod, e.g. 0o755, is still refused with `PB-ROOT-INSECURE`.
  * - Present, insecure, owned by anyone else, a reparse point or not a physical directory: refused
  *   with the family's typed errors (`PB-WINDOWS-ASSURANCE` on win32, `PB-ROOT-INSECURE` elsewhere,
  *   `PB-DIRECTORY` for a non-directory or link) and left untouched.
  *
+ * Warnings: every result with `repaired: true` emits exactly one warning with code `PB-ROOT-REPAIRED`
+ * (win32 and POSIX alike), and a `PB-ROOT-MODE-UNRECORDED` result emits exactly one with that code,
+ * through `emitWarning(message, { code })`. A created root, an already-secure root and a refusal emit
+ * none. The message names the segment, never a host path.
+ *
  * Plus the codes of `ensureHardenedPrivateDirectory` (`PB-ANCHOR` when `common` is not an existing
  * directory). Every option is an injection seam for tests; `chmod(path, mode, expectedStat)` and
- * `getuid()` are the POSIX seams, `observe` the win32 ownership probe.
+ * `getuid()` are the POSIX seams, `observe` the win32 ownership probe, `emitWarning` the warning
+ * channel (default `process.emitWarning`, so a caller that passes nothing still surfaces the
+ * advisory as a typed process warning), `unrecordedPosture` the per-call D1 posture.
  */
 export function ensureAgentPipelineRoot(common, {
   platform = process.platform,
@@ -274,6 +341,8 @@ export function ensureAgentPipelineRoot(common, {
   rmdir = rmdirSync,
   chmod = chmodPhysicalDirectory,
   getuid = currentUid,
+  emitWarning = (message, options) => process.emitWarning(message, options),
+  unrecordedPosture = AGENT_PIPELINE_ROOT_MODE_UNRECORDED_POSTURE,
 } = {}) {
   if (typeof common !== "string" || common.length === 0) fail("PB-ANCHOR", "private directory anchor is unavailable");
   const anchorPath = resolve(common);
@@ -291,8 +360,9 @@ export function ensureAgentPipelineRoot(common, {
     existing,
     repairing: posture === "repair",
     delegate: { platform, harden, assess, mkdir, rmdir },
+    emitWarning,
   };
   return platform === "win32"
     ? ensureWindowsRoot({ ...context, observe })
-    : ensurePosixRoot({ ...context, chmod, getuid });
+    : ensurePosixRoot({ ...context, unrecordedPosture, chmod, getuid });
 }
