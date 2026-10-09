@@ -162,3 +162,110 @@ test("pin (e): D0 default - ensureAgentPipelineRoot repairs a pre-existing insec
     assert.ok(isPrivate, `pin (e): the entry point left the pre-existing insecure "${SEGMENT}" segment insecure (${detail})`);
   });
 });
+
+// WIN-AP-S6-T (Ruling 162, slice S6 of the WIN-AP-D note): the two shared
+// private-directory helpers must go through the hardened entry point
+// `ensureAgentPipelineRoot` for the `agent-pipeline` segment, so that their many
+// callers need no edit:
+//
+//   private-boundary.ensurePrivateDirectory
+//   human-guard-override.secureDirectory (exposed as humanGuardOverrideInternals.secureDirectory)
+//
+// Each helper is called on a path ONE level below the segment, as production
+// does. The helpers expose no injection seam for the entry point, so "went
+// through it" is observed through its two visible effects: the in-place repair
+// of a pre-existing insecure segment (Ruling 157 D0) and the typed
+// PB-ROOT-REPAIRED process warning. Three pins per helper:
+//
+//   pin (f) fresh repository: the segment ends private
+//   pin (g) pre-existing insecure segment owned by the current user: it ends private
+//   pin (h) that repair is reported as exactly one PB-ROOT-REPAIRED warning
+const S6_HELPERS = [
+  {
+    name: "private-boundary.ensurePrivateDirectory",
+    child: "s6-probe",
+    load: async () => (await import("./private-boundary.mjs")).ensurePrivateDirectory,
+  },
+  {
+    name: "human-guard-override.secureDirectory",
+    child: "human-guard-overrides",
+    load: async () => (await import("./human-guard-override.mjs")).humanGuardOverrideInternals?.secureDirectory,
+  },
+];
+
+const NOT_VIA_ENTRY_POINT = "the helper did not route the agent-pipeline segment through ensureAgentPipelineRoot (Ruling 141 slice S6)";
+
+async function loadS6Helper(helper) {
+  const fn = await helper.load();
+  assert.equal(typeof fn, "function", `${helper.name} is not reachable as a function`);
+  return fn;
+}
+
+/**
+ * Runs `call` and returns what it threw (or null) together with every process
+ * warning delivered while it ran. `process.emitWarning` delivers on nextTick, so
+ * one setImmediate turn flushes it before the listener is removed.
+ */
+async function callCapturingWarnings(call) {
+  const warnings = [];
+  const listener = (warning) => warnings.push({ code: warning?.code, message: String(warning?.message ?? "") });
+  process.on("warning", listener);
+  let error = null;
+  try {
+    try {
+      call();
+    } catch (caught) {
+      error = caught;
+    }
+    await new Promise((done) => setImmediate(done));
+  } finally {
+    process.off("warning", listener);
+  }
+  return { error, warnings };
+}
+
+for (const helper of S6_HELPERS) {
+  test(`pin (f) ${helper.name}: leaves the agent-pipeline segment private on a fresh repository`, async () => {
+    const fn = await loadS6Helper(helper);
+    await withRepository(async ({ segment }) => {
+      const probe = join(segment, helper.child);
+      fn(probe);
+      assertCreatorRanThenSegmentPrivate(`pin (f) ${helper.name}`, segment, probe);
+    });
+  });
+
+  test(`pin (g) ${helper.name}: repairs a pre-existing insecure agent-pipeline segment in place`, async (t) => {
+    const fn = await loadS6Helper(helper);
+    await withRepository(async ({ segment }) => {
+      if (!makeInsecureSegment(segment)) {
+        t.skip(`the host cannot build an insecure "${SEGMENT}" premise, so pin (g) would be vacuous here`);
+        return;
+      }
+      const probe = join(segment, helper.child);
+      const { error } = await callCapturingWarnings(() => fn(probe));
+      assert.equal(error, null, `pin (g) ${helper.name}: the call threw ${error?.code ?? error?.name}: ${error?.message} instead of repairing the segment in place`);
+      assert.ok(existsSync(probe), `pin (g) ${helper.name}: the helper did not create its directory below the segment`);
+      const { isPrivate, detail } = privacyOf(segment);
+      assert.ok(isPrivate, `pin (g) ${helper.name}: the pre-existing insecure "${SEGMENT}" segment is still insecure after the helper ran (${detail}); ${NOT_VIA_ENTRY_POINT}`);
+    });
+  });
+
+  test(`pin (h) ${helper.name}: reports the in-place repair as exactly one PB-ROOT-REPAIRED warning`, async (t) => {
+    const fn = await loadS6Helper(helper);
+    await withRepository(async ({ common, segment }) => {
+      if (!makeInsecureSegment(segment)) {
+        t.skip(`the host cannot build an insecure "${SEGMENT}" premise, so pin (h) would be vacuous here`);
+        return;
+      }
+      const { error, warnings } = await callCapturingWarnings(() => fn(join(segment, helper.child)));
+      assert.equal(error, null, `pin (h) ${helper.name}: the call threw ${error?.code ?? error?.name}: ${error?.message} instead of repairing the segment in place`);
+      const repaired = warnings.filter((warning) => warning.code === "PB-ROOT-REPAIRED");
+      assert.equal(
+        repaired.length,
+        1,
+        `pin (h) ${helper.name}: expected exactly one PB-ROOT-REPAIRED warning, saw ${repaired.length} (codes seen: ${warnings.map((warning) => warning.code ?? "none").join(", ") || "no warning"}); ${NOT_VIA_ENTRY_POINT}`,
+      );
+      assert.ok(!repaired[0].message.includes(common), `pin (h) ${helper.name}: the warning must name the segment, never a host path`);
+    });
+  });
+}
