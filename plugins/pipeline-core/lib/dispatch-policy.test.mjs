@@ -21,7 +21,9 @@ import { tmpdir, devNull } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { dispatchBudgetLineForRole, dispatchFindings } from "./dispatch-policy.mjs";
+import { readAgentMaxTurns } from "./dispatch-budget-binding.mjs";
+import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
+import { dispatchBudgetBinding, dispatchBudgetLineForRole, dispatchFindings } from "./dispatch-policy.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
   ROLE_DISPATCH_REQUEST_SCHEMA,
@@ -685,7 +687,47 @@ const fixtureCheck = (label, run) => check(label, async () => {
     }
   });
 
-assert.equal(cases.length, 38, "the complete dispatch-policy corpus must be registered before execution begins");
+// DP25-DP27 -- the shipped Critic budget contract, pinned to the values of Ruling 98(c)
+// (specs/sprint-alfred-epic/plans/0.7-execution-order.md). The working cap is
+// maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN) = maxTurns - 15, so a Critic base cap of 30 needs
+// a Critic maxTurns of at least 45; the ruling raises it to 50, which gives a working cap of 35.
+// Before that change the Critic shipped base cap 24 under maxTurns 40: working cap 25, a closing
+// end of 29 and 11 turns in reserve. Nothing else in the suites states these numbers: the other
+// maxTurns 40 / 24-tool-use hits are parser fixtures, role-agnostic arithmetic or briefed caps
+// that stay valid under both working caps. The cases are RED until CRITIC-BUDGET-F changes
+// agents/critic.md and DEFAULT_DISPATCH_BASE_CALL_CAP.critic. They read the plugin that ships
+// this file explicitly, so no harness-side definition can stand in for the one F changes.
+const CRITIC_BUDGET_PLUGIN_ROOT = join(repoRoot, "plugins", "pipeline-core");
+
+check("DP25 the default Critic budget line states 30 tool uses (Ruling 98c, was 24)", () => {
+  const line = dispatchBudgetLineForRole("critic");
+  assert.match(line ?? "", /^- \*\*Tool budget \(hard cap, first-class field\):\*\* ≤30 tool uses\.$/u,
+    `Ruling 98(c): the Critic default base cap is 30, got ${JSON.stringify(line)}`);
+});
+
+check("DP26 the shipped Critic definition carries maxTurns 50 (Ruling 98c, was 40)", () => {
+  assert.equal(readAgentMaxTurns("critic", CRITIC_BUDGET_PLUGIN_ROOT), 50,
+    "Ruling 98(c): plugins/pipeline-core/agents/critic.md raises maxTurns to 50");
+});
+
+check("DP27 the default Critic budget binds base 30 under working cap 35 with 15 turns in reserve (Ruling 98c, was 24/40/25/29/11)", () => {
+  const binding = dispatchBudgetBinding({
+    subagentType: "pipeline-core:critic",
+    prompt: dispatchBudgetLineForRole("critic"),
+    pluginRoot: CRITIC_BUDGET_PLUGIN_ROOT,
+  });
+  assert.equal(binding.code, "DBB-PREPARED", JSON.stringify(binding));
+  assert.equal(binding.baseCalls, 30, "default base cap");
+  assert.equal(binding.maxTurns, 50, "maxTurns read from the shipped definition");
+  assert.equal(binding.workingCap, 35, "maxTurns - 15");
+  assert.equal(binding.effectiveCap, 30, "the tier no longer limits the default base cap");
+  assert.equal(binding.tierLimited, false);
+  const closingEnd = binding.baseCalls + CLOSING_ALLOWANCE;
+  assert.equal(closingEnd, 35, "base cap + closing allowance (was 24 + 5 = 29)");
+  assert.equal(binding.maxTurns - closingEnd, 15, "turns left in reserve below maxTurns (was 40 - 29 = 11)");
+});
+
+assert.equal(cases.length, 41, "the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
