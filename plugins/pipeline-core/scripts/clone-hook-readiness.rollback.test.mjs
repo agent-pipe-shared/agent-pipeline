@@ -162,18 +162,26 @@ test("a foreign pre-commit hook that existed before the call is never touched or
   assert.equal(readFileSync(hookFile("pre-commit"), "utf8"), FOREIGN_HOOK);
 }));
 
-test("an already-installed pre-commit hook of ours is never removed when commit-msg is the missing one", () => withRepository(({ root, hookFile }) => {
+test("re-pointed by HOOKREFRESH-T7, Ruling 84: an already-installed pre-commit hook of ours is never touched or removed when the missing commit-msg install fails", () => withRepository(({ root, hookFile }) => {
   const installed = installPreCommitForReal({ rootDir: root });
   assert.equal(installed.status, "installed");
   const hookBytes = readFileSync(hookFile("pre-commit"), "utf8");
   const before = inspectMandatoryHookReadiness(root);
   assert.deepEqual(statuses(before), { "pre-commit-hook": "current", "commit-msg-hook": "install" });
-  const result = applyMandatoryHookReadiness(root, {
+  assert.equal(before.status, "provisioning-required", "Ruling 84: current+install is provisioning-required, not refused/blocked");
+  const fault = simulatedFault();
+  let commitMsgCalls = 0;
+  const error = thrown(() => applyMandatoryHookReadiness(root, {
     applyPreCommit: mustNotRun("applyPreCommit"),
-    applyCommitMsg: mustNotRun("applyCommitMsg"),
     removePreCommit: mustNotRun("removePreCommit"),
-  });
-  assert.equal(result.status, "refused");
+    applyCommitMsg() { commitMsgCalls += 1; throw fault; },
+  }));
+  assert.equal(commitMsgCalls, 1, "only the missing commit-msg hook is attempted");
+  assert.equal(error.code, "HOOK-READINESS-APPLY-FAILED");
+  assert.equal(error.failedHook, "commit-msg-hook");
+  assert.equal(error.cause, fault);
+  assert.equal(error.rollback?.status, "not-needed", "nothing was installed by this call, so nothing is rolled back");
+  assert.equal(existsSync(hookFile("commit-msg")), false, "the failing call leaves no commit-msg hook behind");
   assert.equal(readFileSync(hookFile("pre-commit"), "utf8"), hookBytes);
   assert.equal(statuses(inspectMandatoryHookReadiness(root))["pre-commit-hook"], "current");
 }));
