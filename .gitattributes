@@ -3,6 +3,10 @@
 *.mjs text eol=lf
 *.js text eol=lf
 *.json text eol=lf
+evidence/design-course/sprint-alfred-epic/r5d.package.json -text
+evidence/design-course/sprint-alfred-epic/r5d.readiness.json -text
+evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json -text
+evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json -text
 *.md text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf

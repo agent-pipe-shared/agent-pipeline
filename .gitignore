@@ -49,7 +49,15 @@ tmp-inbounds.txt
 # rules against them, so the rule only ever ate NEW evidence: a closure could
 # cite a file no other checkout can resolve, and the one that got through did so
 # via `git add -f`. Only the machine-generated root directory was ever meant.
-/evidence/
+/evidence/*
+!/evidence/design-course/
+/evidence/design-course/*
+!/evidence/design-course/sprint-alfred-epic/
+/evidence/design-course/sprint-alfred-epic/*
+!/evidence/design-course/sprint-alfred-epic/r5d.package.json
+!/evidence/design-course/sprint-alfred-epic/r5d.readiness.json
+!/evidence/design-course/sprint-alfred-epic/claude-r5d.failure.json
+!/evidence/design-course/sprint-alfred-epic/claude-r5d.initial.json
 
 # Local interruption reporting / store runs (C1 Slice 2)
 /telemetry/interruptions/

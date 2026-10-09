@@ -1,0 +1,38 @@
+{
+  "authoringDispatchId": "ALFRED-REV5C-AUTHOR-20261007",
+  "createdAt": "2026-10-07T06:35:31.698Z",
+  "evidenceSha256": "a3dcb7d1e422cababa2a2db3212157256b58d9fc5c38e33cfc384ee903f5ba7b",
+  "featureId": "sprint-alfred-epic",
+  "initialCandidate": {
+    "commit": "087652e73edc644787185f2a400bd0efadbf2ddf",
+    "tree": "52d5a6ad49a5019eb3a81dad0d82d9f1825b586f"
+  },
+  "questionContract": "initial-five-sources.v1",
+  "questionSha256": "9f6aa2d6fe1a8a1940abca73b48d5807aad6a977800c47b5683b1b7668a81689",
+  "reason": "risk-review",
+  "repoFingerprint": "3752bc3d65b0cce61a8d7b2ac3a5b4f3f1e4939e5a9f38dde52a8a235ae01eff",
+  "routePolicySha256": "f45d7dac060f70028e3b8790d1fc7c6f22470b0d821615d9241d1f02306820a3",
+  "schema": "pipeline.design-advisor-initial-context.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design.md",
+      "sha256": "8ac80ba2336e47bd8ec7a9a6cb72970ecb9fc8238ec2a872740856bc75080a8b"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design-input.md",
+      "sha256": "6d65cbbf323965537b7540b2a7b183d82721e14e434bdeacfe4a6a80fc85b7e7"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/traceability.md",
+      "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d"
+    }
+  }
+}

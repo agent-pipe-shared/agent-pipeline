@@ -1,0 +1,28 @@
+{
+  "attemptCount": 0,
+  "childStarted": false,
+  "code": "native-initial-answer-provenance-unavailable",
+  "courseBinding": {
+    "courseId": "dac_029719691f9e4c365daa1824e9c271654175bc61",
+    "initialContextSha256": "c6d40554e3e4a8ca7eefd4af0ebf912cd4e1798badcdf5a8fad376689e084955",
+    "reservationId": "dacr_a1bf969a-aefc-4399-9cf7-8eea76195661",
+    "routeStepSha256": "d3ca5a386a81c1cda78334a2a08e448bda395daf722f077e336e80805b98ad81",
+    "slot": 0
+  },
+  "inputSubmitted": false,
+  "observation": {
+    "attemptCount": 0,
+    "childStarted": false,
+    "code": "native-initial-answer-provenance-unavailable",
+    "courseBinding": {
+      "courseId": "dac_029719691f9e4c365daa1824e9c271654175bc61",
+      "initialContextSha256": "c6d40554e3e4a8ca7eefd4af0ebf912cd4e1798badcdf5a8fad376689e084955",
+      "reservationId": "dacr_a1bf969a-aefc-4399-9cf7-8eea76195661"
+    },
+    "inputSubmitted": false,
+    "outcome": "unavailable"
+  },
+  "outcome": "unavailable",
+  "phase": "preparation",
+  "schema": "pipeline.design-advisor-failure.v1"
+}
