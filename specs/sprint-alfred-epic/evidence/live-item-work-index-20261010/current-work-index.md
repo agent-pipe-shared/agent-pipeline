@@ -1,6 +1,8 @@
 # Current Alfred work index
 
 **Current view:** [all 176 items with stages, work locations and next actions](consolidated/current-work-index.md).
+Read [subsequent assignments and returned packets](current-followthrough.json)
+alongside that snapshot; they record the next concrete owner and work location.
 The [matching machine index](consolidated/live-work-index.json) joins all recorded
 updates and retains the original item bodies and history. Read that view before
 the historical snapshots below. Later events must update this current pointer.
