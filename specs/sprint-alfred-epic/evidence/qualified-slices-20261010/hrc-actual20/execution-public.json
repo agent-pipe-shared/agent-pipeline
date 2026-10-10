@@ -1,0 +1,246 @@
+{
+  "schema": "alfred.hrc.focused-execution-public.v1",
+  "originalExecutionSha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+  "launcherSha256": "2c0649417211ef06b7a0a56cda18f6ea46182fa2d847951dbfb7540099782a75",
+  "qualificationFreezeSha256": "eb38d44d4207edb172e25ee5a409551336968155e662da2aa27c516fc08d6453",
+  "results": [
+    {
+      "name": "baseline",
+      "argv": [
+        "node",
+        "--trace-exit",
+        "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/baseline-graph/plugins/pipeline-core/lib/guard/resource-headroom-command-route.test.mjs"
+      ],
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "transportComplete": true,
+      "successful": false,
+      "fd3": {
+        "sha256": "523628887d4b44182fb73fd2b8e0bea6dbc39c344af388eb73cdb5fdfa081515",
+        "bytes": 3119
+      },
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+        "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+        "dispositionsSha256": "76cb8fc191ae6c6ca06bdda5a3822869e6d134260e1f2bd4bfb50020bad74429",
+        "declaredCount": 20,
+        "disposedCount": 20,
+        "counts": {
+          "pass": 15,
+          "fail": 5,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parserError": null,
+      "dispositions": [
+        {
+          "id": "HRC001",
+          "disposition": "fail"
+        },
+        {
+          "id": "HRC002",
+          "disposition": "fail"
+        },
+        {
+          "id": "HRC003",
+          "disposition": "fail"
+        },
+        {
+          "id": "HRC004",
+          "disposition": "fail"
+        },
+        {
+          "id": "HRC005",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC006",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC007",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC008",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC009",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC010",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC011",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC012",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC013",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC014",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC015",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC016",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC017",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC018",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC019",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC020",
+          "disposition": "fail"
+        }
+      ]
+    },
+    {
+      "name": "fixed",
+      "argv": [
+        "node",
+        "--trace-exit",
+        "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/fixed-graph/plugins/pipeline-core/lib/guard/resource-headroom-command-route.test.mjs"
+      ],
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "transportComplete": true,
+      "successful": true,
+      "fd3": {
+        "sha256": "741eae738695802407044a98474e23a57619422d3f22752bc9cc2fdb08c80aa7",
+        "bytes": 3119
+      },
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+        "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+        "dispositionsSha256": "7fe0c367e0b4167fa03b93506f9a65e3bd76ba412ccb1729280f5a8dd3862249",
+        "declaredCount": 20,
+        "disposedCount": 20,
+        "counts": {
+          "pass": 20,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "parserError": null,
+      "dispositions": [
+        {
+          "id": "HRC001",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC002",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC003",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC004",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC005",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC006",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC007",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC008",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC009",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC010",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC011",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC012",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC013",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC014",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC015",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC016",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC017",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC018",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC019",
+          "disposition": "pass"
+        },
+        {
+          "id": "HRC020",
+          "disposition": "pass"
+        }
+      ]
+    }
+  ],
+  "graphConserved": true,
+  "nativeClaim": false,
+  "reporterExecuted": false,
+  "scope": "command grammar and genuine default devplan shell consumer; full READY host enforcement not established"
+}

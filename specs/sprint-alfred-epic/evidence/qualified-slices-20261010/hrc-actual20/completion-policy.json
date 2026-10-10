@@ -1,0 +1,26 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "HRC001",
+    "HRC002",
+    "HRC003",
+    "HRC004",
+    "HRC005",
+    "HRC006",
+    "HRC007",
+    "HRC008",
+    "HRC009",
+    "HRC010",
+    "HRC011",
+    "HRC012",
+    "HRC013",
+    "HRC014",
+    "HRC015",
+    "HRC016",
+    "HRC017",
+    "HRC018",
+    "HRC019",
+    "HRC020"
+  ],
+  "maxBytes": 32768
+}

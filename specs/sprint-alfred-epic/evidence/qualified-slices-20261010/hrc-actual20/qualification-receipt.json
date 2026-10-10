@@ -1,0 +1,92 @@
+{
+  "schema": "alfred.hrc.focused-source-qualification.v1",
+  "status": "focused-qualified",
+  "qualificationGroup": 16,
+  "source": {
+    "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+    "preSha256": "1c08d20586b9191c2a67d1e7d749b2ed8ba4ff0d5e4b8996ad9530a534cb8163",
+    "postSha256": "446baf21925a616274632227254e7470c25227b51096a8b2afbebdc2bc2646b8",
+    "sourceManifestSha256": "0500a2be3eb59014ab87739784e2fb01e328689b4dd9b684a32025985688996e"
+  },
+  "test": {
+    "path": "plugins/pipeline-core/lib/guard/resource-headroom-command-route.test.mjs",
+    "sha256": "ae67f669d58c844a7aecad755ec7977ecd876e964e16f23d436335d65b451e86"
+  },
+  "assertionFreezeSha256": "5d5dcb4949f617ebe14f710142cafe3f4a66a24c2fc6f60e6d0f9fa2539c5c65",
+  "policy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "HRC001",
+      "HRC002",
+      "HRC003",
+      "HRC004",
+      "HRC005",
+      "HRC006",
+      "HRC007",
+      "HRC008",
+      "HRC009",
+      "HRC010",
+      "HRC011",
+      "HRC012",
+      "HRC013",
+      "HRC014",
+      "HRC015",
+      "HRC016",
+      "HRC017",
+      "HRC018",
+      "HRC019",
+      "HRC020"
+    ],
+    "maxBytes": 32768,
+    "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9"
+  },
+  "baseline": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+    "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+    "dispositionsSha256": "76cb8fc191ae6c6ca06bdda5a3822869e6d134260e1f2bd4bfb50020bad74429",
+    "declaredCount": 20,
+    "disposedCount": 20,
+    "counts": {
+      "pass": 15,
+      "fail": 5,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "fixed": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+    "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+    "dispositionsSha256": "7fe0c367e0b4167fa03b93506f9a65e3bd76ba412ccb1729280f5a8dd3862249",
+    "declaredCount": 20,
+    "disposedCount": 20,
+    "counts": {
+      "pass": 20,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "streams": [
+    {
+      "name": "baseline",
+      "sha256": "523628887d4b44182fb73fd2b8e0bea6dbc39c344af388eb73cdb5fdfa081515",
+      "bytes": 3119
+    },
+    {
+      "name": "fixed",
+      "sha256": "741eae738695802407044a98474e23a57619422d3f22752bc9cc2fdb08c80aa7",
+      "bytes": 3119
+    }
+  ],
+  "executionSha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+  "graphFilesEach": 586,
+  "graphConserved": true,
+  "completionSignal": "explicit FD3=3 and maxBytes32768",
+  "native": false,
+  "reporterExecuted": false,
+  "fullItemClosure": false
+}

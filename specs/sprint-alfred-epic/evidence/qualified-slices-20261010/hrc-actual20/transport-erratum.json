@@ -1,0 +1,12 @@
+{
+  "schema": "alfred.hrc.transport-erratum.v1",
+  "preservedPrior": [
+    "execution.json",
+    "resource-successor/execution.json"
+  ],
+  "firstFailure": "module-init bundled runner registry absent; no case record; preparation failure",
+  "secondFailure": "unannounced FD3 made recorder inert; silent status1 has unknown callback execution; not zero executed or product RED",
+  "final": "declared FD3/default production parser gave complete20 baseline15/5 and fixed20/0; both stdout/stderr remain empty, case disposition authority is actual FD3",
+  "sourceAssertionsUnchanged": true,
+  "noRerunByWorker": true
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "alfred.hrc.versioned-public-proof.v1",
+  "status": "focused-qualified-public-archive-ready",
+  "parentManifestSha256": "17b02224813c530a1151547a101d5233e556580c72120f186410e94adf27e8f1",
+  "qualificationGroup": 16,
+  "files": [
+    {
+      "path": "baseline.fd3.jsonl",
+      "sha256": "523628887d4b44182fb73fd2b8e0bea6dbc39c344af388eb73cdb5fdfa081515",
+      "bytes": 3119,
+      "mode": "100644"
+    },
+    {
+      "path": "fixed.fd3.jsonl",
+      "sha256": "741eae738695802407044a98474e23a57619422d3f22752bc9cc2fdb08c80aa7",
+      "bytes": 3119,
+      "mode": "100644"
+    },
+    {
+      "path": "qualification-receipt.json",
+      "sha256": "9928b691acb9c5cbd7009a8fb36f04c2a3e7d519c109f58c1749132aeee1c059",
+      "bytes": 2901,
+      "mode": "100644"
+    },
+    {
+      "path": "execution-public.json",
+      "sha256": "b44a98a20c168250e1cbc30b17af40d483a5618c4833421e9c0293c144f3bac5",
+      "bytes": 6424,
+      "mode": "100644"
+    },
+    {
+      "path": "transport-erratum.json",
+      "sha256": "7a935258f229d973ecbe2f60b63a79faeea2b572f24431437a90cfa5560cff80",
+      "bytes": 614,
+      "mode": "100644"
+    },
+    {
+      "path": "assertions/resource-headroom-command-route.test.mjs",
+      "sha256": "ae67f669d58c844a7aecad755ec7977ecd876e964e16f23d436335d65b451e86",
+      "bytes": 6450,
+      "mode": "100644"
+    },
+    {
+      "path": "completion-policy.json",
+      "sha256": "9bcf1e341e278f62c531e711c5b6c34b35092d102fa9826637566b1e0f66cded",
+      "bytes": 380,
+      "mode": "100644"
+    },
+    {
+      "path": "assertion-binding.json",
+      "sha256": "2eeee2523ce4c4ebbc0721f95922927ab9e0fa1e3d7535c9a09e6c6bbc765b71",
+      "bytes": 970,
+      "mode": "100644"
+    },
+    {
+      "path": "report.md",
+      "sha256": "ebedb341f2123be138b0ed6b606639383aee6a249b72ebed9184e517d2c6c98a",
+      "bytes": 1197,
+      "mode": "100644"
+    }
+  ],
+  "whitelist": [
+    "baseline.fd3.jsonl",
+    "fixed.fd3.jsonl",
+    "qualification-receipt.json",
+    "execution-public.json",
+    "transport-erratum.json",
+    "assertions/resource-headroom-command-route.test.mjs",
+    "completion-policy.json",
+    "assertion-binding.json",
+    "report.md"
+  ],
+  "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+  "native": false,
+  "reporterExecuted": false,
+  "fullItemClosure": false
+}
