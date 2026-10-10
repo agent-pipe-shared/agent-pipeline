@@ -1,0 +1,66 @@
+{
+  "schema": "alfred.live-item-work-index-public-manifest.v2",
+  "version": 2,
+  "status": "frozen-public-metadata-proposal",
+  "pathBasis": "repository-relative",
+  "files": [
+    {
+      "path": "scratch/alfred-live-item-work-index-20261010/public-v2/current-work-index.md",
+      "sha256": "b865587aaad23b492d5564cdd22d6f691a43534eef0cfcd13b8699e737f10243",
+      "bytes": 26936,
+      "mode": 420,
+      "nlink": 1,
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-work-index.md"
+    },
+    {
+      "path": "scratch/alfred-live-item-work-index-20261010/public-v2/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+      "bytes": 1924395,
+      "mode": 420,
+      "nlink": 1,
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json"
+    },
+    {
+      "path": "scratch/alfred-live-item-work-index-20261010/public-v2/validation.json",
+      "sha256": "803a810aa7f2ece718bf3d01e310e52797bc20d145290c33e6ab883cd06926c1",
+      "bytes": 533,
+      "mode": 420,
+      "nlink": 1,
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/validation.json"
+    },
+    {
+      "path": "scratch/alfred-live-item-work-index-20261010/public-v2/report.md",
+      "sha256": "8a57621cae4b986c91b6d50bd7c305ce763d704bad639967c417a698780cd7d7",
+      "bytes": 975,
+      "mode": 420,
+      "nlink": 1,
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/report.md"
+    }
+  ],
+  "projection": {
+    "pathBasis": "repository-relative",
+    "source": "scratch/alfred-live-item-work-index-20261010/live-work-index.json",
+    "sourceSha256": "9c23c200b2a300702997eec57cd9115e656336eb32a69155f736ec480a62475c",
+    "rawV1Preserved": true,
+    "inheritedRecords": "exact metadata-value path projection; not byte-identical to raw originals",
+    "sourceDigestsAltered": false,
+    "normalizations": 25,
+    "rawV1ManifestSha256": "686db9fadd54405364e4b91b3d9f622b8458ec289556eda0d7fdb7fc2fc68157"
+  },
+  "inputs": [
+    {
+      "path": "scratch/alfred-old41-completion-reconciliation-20261010/matrix.json",
+      "sha256": "4a2e2dab8e78f0303777f5dd74efdb7ca7c5e7a6ea8a45d09343b8caeda0b934"
+    },
+    {
+      "path": "scratch/alfred-auth-i08-domain-lifetimes-source-20261010/source-manifest.json",
+      "sha256": "c94650f42a0ed65eca541272b7a42cc709136c7b3db8d71613477c3a313361fd"
+    }
+  ],
+  "canonicalItems": 176,
+  "old41Joined": 41,
+  "officialClosures": 0,
+  "GitWrites": 0,
+  "sourceWrites": 0,
+  "semanticRuns": 0
+}

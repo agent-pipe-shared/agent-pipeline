@@ -7,7 +7,7 @@
 
 **Register 2026-10-09:** Critic tier per the ADR-0014 amendment (Rulings 156, 158).
 
-**Current 2026-10-09:** START HERE — [bootstrap recovery and continuation](../specs/sprint-alfred-epic/plans/handover-2026-10-09-bootstrap-resume.md). Implementation active; nothing PO-accepted.
+**Current 2026-10-10:** [Work index and resume](../specs/sprint-alfred-epic/plans/handover-2026-10-10-live-work-index.md). Implementation active; nothing PO-accepted.
 
 **WSL:** [intake](../specs/sprint-alfred-epic/plans/handover-2026-10-09-wsl-intake.md).
 

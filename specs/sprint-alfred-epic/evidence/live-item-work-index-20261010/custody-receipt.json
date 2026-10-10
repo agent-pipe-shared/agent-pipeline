@@ -1,0 +1,33 @@
+{
+  "schema": "alfred.live-work-index-public-custody.v2",
+  "manifestSha256": "c8494042f8482f1c4706dcc7ee9f89115e45e9f7aabdf299149eaa8a1c0d7abc",
+  "rawV1ManifestSha256": "686db9fadd54405364e4b91b3d9f622b8458ec289556eda0d7fdb7fc2fc68157",
+  "rawV1PreservedAt": "scratch/alfred-live-item-work-index-20261010/",
+  "canonicalItems": 176,
+  "old41Joined": 41,
+  "productSourceWrites": 0,
+  "businessRuns": 0,
+  "gitWrites": 0,
+  "files": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-work-index.md",
+      "sha256": "b865587aaad23b492d5564cdd22d6f691a43534eef0cfcd13b8699e737f10243"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/validation.json",
+      "sha256": "803a810aa7f2ece718bf3d01e310e52797bc20d145290c33e6ab883cd06926c1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/report.md",
+      "sha256": "8a57621cae4b986c91b6d50bd7c305ce763d704bad639967c417a698780cd7d7"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/manifest.json",
+      "sha256": "c8494042f8482f1c4706dcc7ee9f89115e45e9f7aabdf299149eaa8a1c0d7abc"
+    }
+  ]
+}

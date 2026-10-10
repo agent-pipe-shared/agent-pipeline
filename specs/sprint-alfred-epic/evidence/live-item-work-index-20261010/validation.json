@@ -1,0 +1,18 @@
+{
+  "schema": "alfred.public-live-index-validation.v2",
+  "canonicalItems": 176,
+  "uniqueIds": 176,
+  "old41Joined": 41,
+  "old41Unmapped": 0,
+  "rawV1Preserved": true,
+  "inheritedRecordsByteIdentical": false,
+  "inheritedRecordsPathProjected": true,
+  "sourceHashesChanged": 0,
+  "allStageFields": true,
+  "homePathsInPublicOutputs": 0,
+  "semanticRuns": 0,
+  "sourceWrites": 0,
+  "GitWrites": 0,
+  "rawV1ManifestSha256": "686db9fadd54405364e4b91b3d9f622b8458ec289556eda0d7fdb7fc2fc68157",
+  "latestNamedOwnerAssignments": true
+}
