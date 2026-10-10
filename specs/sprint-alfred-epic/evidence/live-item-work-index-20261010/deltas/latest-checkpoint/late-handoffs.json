@@ -1,0 +1,47 @@
+{
+  "schema": "alfred.current-work-late-handoffs.v1",
+  "parentCheckpointSha256": "93909a05d2cb260b3e7e14706aa963f9ee7cd3c25ceff65d9db4507d1d668823",
+  "canonicalItemsRetained": 176,
+  "officialClosures": 0,
+  "events": [
+    {
+      "component": "I03 empty onboarding baseline",
+      "stage": "frozen-source-not-qualified",
+      "sourceOwner": "/root/alfred_obl013_override_digest_regression",
+      "currentOwner": "/root/agy_greenfield_intake_package",
+      "manifestPath": "scratch/alfred-i03-empty-greenfield-onboarding-baseline-source-20261010/manifest.json",
+      "manifestSha256": "7d75fe400e5f1ddce2dbbca562839b4502db9431599e965ce940277760656d28",
+      "selectedSourceSha256": "5ce630e2f5170b222d82923eddd334a27a1d89758f6a9932800fd26db17ddde5",
+      "workLocation": "scratch/alfred-stb12-approved-onboarding-successor-source-graph-20261010",
+      "nextAction": "Prepare the new graph with the genuine approved fixture erratum; Root runs the second STB12 attempt once ready.",
+      "assertionsChanged": false,
+      "semanticRuns": 0
+    },
+    {
+      "component": "State14 transient journal contract",
+      "stage": "static-interface-compatible-not-qualified",
+      "sourceOwner": "/root/alfred_reader_2plus1_docs_r2",
+      "currentOwner": "/root",
+      "manifestPath": "scratch/alfred-state14-registry-contract-followthrough-20261010/manifest.json",
+      "manifestSha256": "bcb8e174cf03dba52985aab907affa274da3a15df822900c3b06de1b5096649a",
+      "sourcePath": "scratch/alfred-obl047-state-bootstrap-result-companion-source-successor-20261010/manifest.json",
+      "sourceManifestSha256": "eb2c3c4447c24a906e2542a3bed354f70f6cee26e197ee8ac27ea274a432a318",
+      "nextAction": "Complete admitted operational conservation and qualify the actual paired lifecycle; inverse and physical-mode certificates remain unmeasured.",
+      "semanticRuns": 0
+    }
+  ],
+  "versionedProofs": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/hrc-actual20/manifest.json",
+      "sha256": "a618c76883be86f44579d6c1b274383754e61ac9b67a44595749f475fbd23f3b",
+      "fixedPass": 20
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/manifest.json",
+      "sha256": "58b1ce5c219a48441870220f2ef4479e4997cc94c05ba196ae0a56274db8f97d",
+      "fixedPass": 22
+    }
+  ],
+  "nativeClaims": false,
+  "stamped": false
+}

@@ -1,5 +1,13 @@
 # Alfred current work and continuity — 2026-10-10
 
+Begin with the [newest checkpoint](../evidence/live-item-work-index-20261010/deltas/latest-checkpoint/report.md)
+and [late handoffs](../evidence/live-item-work-index-20261010/deltas/latest-checkpoint/late-handoffs.json).
+They supersede historical owner/stage rows below. HRC20 and OSE22 have actual
+versioned passing focused evidence; OSE22 source integration remains pending.
+State14 is statically compatible with its paired Registry but not yet qualified.
+The next STB12 graph retains the original assertions and corrects two evidenced
+prerequisites. No official item closure or candidate stamp is implied.
+
 This is the current operational entry. The older 2026-10-09 handover remains
 history and must not be used as the current work queue. Implementation remains
 approved at continuity revision 32; this handover grants no new authority.

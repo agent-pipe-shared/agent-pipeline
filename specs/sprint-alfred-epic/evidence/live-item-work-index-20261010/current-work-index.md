@@ -1,5 +1,12 @@
 # Current Alfred work index
 
+Start with the [current checkpoint](deltas/latest-checkpoint/report.md), its
+[item and owner routes](deltas/latest-checkpoint/checkpoint.json), and the
+[subsequent handoffs](deltas/latest-checkpoint/late-handoffs.json). These append
+the newer source locations and executed HRC20/OSE22 proofs. Returned source
+owners do not imply an active assignment. The tables below are historical v2;
+apply the checkpoint and journal updates before selecting any work.
+
 Read the [latest journal](deltas/source-and-qualification/report.md) and its
 [item updates](deltas/source-and-qualification/current-delta.json) before the
 historical tables below. The subsequent [actual integration receipt](deltas/source-and-qualification/headroom-actual-integration.json)

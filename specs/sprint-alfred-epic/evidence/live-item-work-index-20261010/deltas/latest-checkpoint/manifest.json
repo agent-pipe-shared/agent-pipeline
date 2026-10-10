@@ -1,0 +1,116 @@
+{
+  "schema": "alfred.live-work-latest-checkpoint-manifest.v1",
+  "frozen": true,
+  "outputs": [
+    {
+      "path": "checkpoint.json",
+      "sha256": "93909a05d2cb260b3e7e14706aa963f9ee7cd3c25ceff65d9db4507d1d668823",
+      "bytes": 57162
+    },
+    {
+      "path": "report.md",
+      "sha256": "ead2f08d5a01ab188e730eabccb0d1573d71218b5bf3a4a9fb4e603f5eef9c63",
+      "bytes": 1551
+    }
+  ],
+  "inputs": [
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+      "bytes": 1924395
+    },
+    {
+      "path": "scratch/alfred-live-work-index-current-delta-20261010/current-delta.json",
+      "sha256": "3b47dcf3089d2abbd58c7a8fd70b4c480bb39dc448bdb54761e9b38070e29473",
+      "bytes": 63215
+    },
+    {
+      "path": "scratch/alfred-live-work-index-current-delta-20261010/manifest.json",
+      "sha256": "737d9aeba2ca88c5310ddd15c9d37f2567e645c14a631542e9f1847d0eec62c4",
+      "bytes": 6569
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/parent-successor/execution-resource-terminal.json",
+      "sha256": "e804b9c2ff5b3ca8821ef36f726964f0f7c07f5f6d099ef85ef695725480571b",
+      "bytes": 892
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/manifest.json",
+      "sha256": "58b1ce5c219a48441870220f2ef4479e4997cc94c05ba196ae0a56274db8f97d",
+      "bytes": 4508
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/source-bindings.json",
+      "sha256": "d29f4ba2d240d30c0d832cd4e342fe09dfdc4e302ef4a49294929cc2c51f5b91",
+      "bytes": 2029
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/integration-plan.json",
+      "sha256": "8b3d7e37f4ae747fc7763a8b0f54ab3cb9b2dff4b307ca05540532d849d5495a",
+      "bytes": 2874
+    },
+    {
+      "path": "scratch/alfred-stb12-empty-worker-successor-source-graph-20261010/qualification-root/execution.json",
+      "sha256": "48b83f0f4557c39b448c0c30c05e2cbb6200b952eb09aa6dd43ab7b0d9e4eab5",
+      "bytes": 1058
+    },
+    {
+      "path": "scratch/alfred-stb12-approval-source-diagnostic-20261010/manifest.json",
+      "sha256": "a55f2a6af158a0f15649b6c5682275ae0f831219c251cdb8cf51b68c3ec00de5",
+      "bytes": 4986
+    },
+    {
+      "path": "scratch/alfred-stb12-approved-fixture-erratum-20261010/manifest.json",
+      "sha256": "fe67d0a22d3cff243d75056069600bd99aab675ab3dadbdfcf1ac67fdc07ab21",
+      "bytes": 4128
+    },
+    {
+      "path": "scratch/alfred-stb12-baseline-source-diagnostic-20261010/manifest.json",
+      "sha256": "4aef32bb563649dda00eecdbaa0789086b3a4cbf1f957f0786e8e351987087d9",
+      "bytes": 6234
+    },
+    {
+      "path": "scratch/alfred-i08-empty-greenfield-worker-baseline-source-20261010/source-manifest.json",
+      "sha256": "ebba4daaabc72476f57442048998a267cc56df71e596781a1878fc8d3c712cac",
+      "bytes": 3374
+    },
+    {
+      "path": "scratch/alfred-obl047-state-bootstrap-result-companion-source-successor-20261010/manifest.json",
+      "sha256": "eb2c3c4447c24a906e2542a3bed354f70f6cee26e197ee8ac27ea274a432a318",
+      "bytes": 976
+    },
+    {
+      "path": "scratch/alfred-registry-retired-terminal-guard-source-20261010/manifest.json",
+      "sha256": "40412b5c6c36b51fad7086192f64f87469d9cdb104fc9b3cfbbfe288d9472a36",
+      "bytes": 3904
+    },
+    {
+      "path": "scratch/alfred-obl047-onboarding-controlled-cleanup-constructor-source-20261010/carrier-invocation-readback-source-successor/manifest.json",
+      "sha256": "24f1559c47a0ea5fe5c3ec40aaa13cc45c454eb08696eaf5bbb00f7c1de30429",
+      "bytes": 1938
+    },
+    {
+      "path": "scratch/alfred-old-hook-provisioning-followthrough-20261010/manifest.json",
+      "sha256": "1ce75cd116fafaaa3ed97660e5413a2072c06fcadb299a21b626b719ded1e6a7",
+      "bytes": 6692
+    }
+  ],
+  "publicWhitelist": [
+    "checkpoint.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "touchedItems": 8,
+  "routes": 9,
+  "officialClosures": 0,
+  "sourceWrites": 0,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "privacy": {
+    "repoRelativePublicMetadata": true,
+    "rawCaptures": false,
+    "runtimeRoots": false,
+    "keys": false,
+    "privateGraphs": false
+  }
+}
