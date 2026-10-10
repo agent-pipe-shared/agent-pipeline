@@ -1,0 +1,44 @@
+{
+  "schema": "alfred.focused-metadata-preparation-cause.v1",
+  "originalComposer": "prepare.py",
+  "terminalCause": "Current body CAS mismatch; no frozen plan/manifest existed at failure",
+  "firstId": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+  "drifts": [
+    {
+      "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "path": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+      "expectedSha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+      "observedSha256": "6a8375093e2e86f022d1139d192d3045e792dafbed3b1476dd3493fb075b6183",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "path": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+      "expectedSha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+      "observedSha256": "bd8c02353bc7c72c310bc6ffbdba0d5d1f8fe93b4fa53585f9deb1e1e845bd47",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+      "expectedSha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+      "observedSha256": "d301ec3095b9043425bbba2aea1572c05c6812bc38e3c00f979cbd68a1ce5235",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.security-scanner-failure-provenance",
+      "path": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+      "expectedSha256": "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f",
+      "observedSha256": "5b98c73de7f455aac9b3a9d02beb59783c6da5941af4e681f4dd6afdfd9a889f",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    }
+  ],
+  "repeatedComposerRuns": 0,
+  "closureClaims": 0,
+  "State3b69": "missing exact source locator, not copied",
+  "failedOriginalPreserved": true
+}

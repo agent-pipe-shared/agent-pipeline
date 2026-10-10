@@ -1,0 +1,78 @@
+{
+  "schema": "alfred.latest-focused-proof-events.v1",
+  "parentManifestSha256": "0a8bb8f193e397b5156f12dab50feb21707b8db10cfcebacdf1280889805d9a8",
+  "sourceCount": 111,
+  "sourceInventorySha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb",
+  "retainedScopedStageTally": {
+    "75": 7,
+    "50": 4,
+    "25": 2,
+    "unknown": 163
+  },
+  "events": [
+    {
+      "slice": "OAC12",
+      "kind": "existing-FD3-policy-reparse",
+      "receipt": {
+        "path": "scratch/alfred-ac04-05-10-existing-fd3-policy-reparse-20261010/reparse-execution.json",
+        "sha256": "82209ce1093471d2d62d2526d0d1420f3779ffdf5b5975cf476f1e95e3a1ae69",
+        "bytes": 1388
+      },
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "businessReruns": 0,
+      "wholeACAcceptance": false
+    },
+    {
+      "slice": "Scratch18",
+      "kind": "focused-qualification",
+      "receipt": {
+        "path": "scratch/alfred-scratch-durability-index-fix-replay-preparation-20261010/root-receipt.json",
+        "sha256": "47c3307d2804df5f24fb866c51898fba6fabe3e64ab9d8808d2e822ca89f896b",
+        "bytes": 4238
+      },
+      "FD3Sha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+      "counts": {
+        "pass": 18,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "currentGuardIntegrationQualified": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "slice": "Gitleaks-independent10",
+      "receipt": {
+        "path": "scratch/alfred-gitleaks-recomputed-entry-independent-20261010/execution.json",
+        "sha256": "26cb6e34a477c22cd6e3399f90b7da6baec14a25002386527d3b51f14b72a914",
+        "bytes": 2030
+      },
+      "counts": {
+        "pass": 8,
+        "fail": 2,
+        "skip": 0,
+        "todo": 0
+      },
+      "FD3Sha256": "655804790aeec2f931b02a9a915dd5bd4eeb39463b5c61ad29011a8bffe63a01",
+      "original18": "setup-unavailable, dispositions unknown",
+      "wholeItemAcceptance": false
+    },
+    {
+      "slice": "GSC21",
+      "state": "Root process PTY77629 started; latest outcome awaiting same-handle Root poll",
+      "toolHandleIsNotDigest": true
+    },
+    {
+      "slice": "OA21",
+      "state": "Root planned; not run at briefing checkpoint"
+    }
+  ],
+  "newOfficialClosures": 0,
+  "businessRuns": 0,
+  "nativeClaim": false
+}

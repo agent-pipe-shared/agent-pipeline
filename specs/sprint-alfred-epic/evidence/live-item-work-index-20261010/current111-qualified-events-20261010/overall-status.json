@@ -1,0 +1,89 @@
+{
+  "schema": "alfred.current111-status.v1",
+  "selectedCanonicalSources": 111,
+  "prior110ByteExact": true,
+  "officialItemsOpen": 176,
+  "wholeCriteriaAccepted": 0,
+  "scopedStages": {
+    "unknown": 163,
+    "50": 5,
+    "75": 6,
+    "25": 2
+  },
+  "newActualProofGroups": [
+    {
+      "name": "HGL12",
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "proofs/HGL12.json",
+        "sha256": "d8d126194066dc554bbf015c437628fa49b52ded25bfcf75107e4ad8c7c8a672",
+        "bytes": 1160,
+        "mode": 420
+      },
+      "originalExecution": {
+        "path": "scratch/alfred-hgl-complete-plugin-identity-resources-20261010/execution-terminal.json",
+        "sha256": "b377b662655cd49d52ae05cd818ddf2a73f82887f62a2db311dff1491c04f649",
+        "bytes": 967
+      },
+      "FD3Sha256": "f7d0edc7155a0db00608a61a7fc4897ddfaba0e94aa5d086e2d261c8fd0c69d7"
+    },
+    {
+      "name": "CHP8",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "proofs/CHP8.json",
+        "sha256": "e4cb4b2543f037a09aa137e2661f2beb77c6e5a9d03f7f701bc55ada301e33aa",
+        "bytes": 1128,
+        "mode": 420
+      },
+      "originalExecution": {
+        "path": "scratch/alfred-commit-hint-protocol-complete-assets-independent-20261010/execution.json",
+        "sha256": "2ca2f883dad0da69e46b2ee61d129e65c8f20017f5582574c7f3154f38eec2a3",
+        "bytes": 1137
+      },
+      "FD3Sha256": "2cbe8e3d3fa6d6789c6d3cf2782746c7c6d0e6a344bb4a4dc33dac8dd10d20a8"
+    },
+    {
+      "name": "Generator20",
+      "counts": {
+        "pass": 13,
+        "fail": 7,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "proofs/Generator20.json",
+        "sha256": "7ea56238b97cacd42eb5ffcbee4d06a94fd2258d3ab83c6676354ec17fb99f48",
+        "bytes": 1160,
+        "mode": 420
+      },
+      "originalExecution": {
+        "path": "scratch/alfred-generator-compaction-independent-20261010/execution-terminal.json",
+        "sha256": "52c7c8f26b4e6352a4046eb81dc39ea055208dc057eeb97e39769e35c0aae6f0",
+        "bytes": 975
+      },
+      "FD3Sha256": "f92617943bf806959049e6ded95b35806647a548baca22d1684b854e8e188486"
+    }
+  ],
+  "unavailableOAChildren": 2,
+  "OACounts": null,
+  "canonicalBodyBindingsReconciled": 3,
+  "canonicalBodyWrites": 0,
+  "remainingReadyUnrun": {
+    "STBDescriptorParentSource": "5743 exact closed manifest not supplied here"
+  },
+  "sourceFixCount": "unknown; source paths/dispositions/stages are different subjects",
+  "nativeClaim": false,
+  "newBusinessRuns": 0,
+  "GitOperations": 0
+}

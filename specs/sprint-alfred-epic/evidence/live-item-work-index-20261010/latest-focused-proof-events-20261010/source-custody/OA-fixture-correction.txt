@@ -1,0 +1,187 @@
+// Independently authored finite qualification. Root executes; author did not.
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, chmodSync, fstatSync, renameSync, mkdirSync, rmSync, linkSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { registerTestCaseCompletion } from './graph/plugins/pipeline-core/lib/test-case-completion.mjs';
+import { advisorHostFixture } from './graph/plugins/pipeline-core/lib/codex-advisor-host.fixture.mjs';
+import { createCodexAdvisorHostStore, verifyCodexAdvisorInitialExecution } from './graph/plugins/pipeline-core/lib/codex-advisor-host-store.mjs';
+import { inspectFinalizedAdvisorObservation, readFinalizedAdvisorObservation, validateAdvisorHostFinalization, ADVISOR_FINALIZATION_FILENAME } from './graph/plugins/pipeline-core/lib/codex-advisor-host-record.mjs';
+import { inspectRegisteredCodexOwnership, verifyRegisteredCodexOwnership } from './graph/plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs';
+import { createAdvisorBindingDiagnosticRecorder, projectAdvisorBindingDiagnostic } from './graph/plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs';
+import { canonicalJson } from './graph/plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs';
+import { hostDigest } from './graph/plugins/pipeline-core/lib/codex-host-process-journal.mjs';
+import { readAdvisorPhysicalBytes, reobserveAdvisorPhysicalDrift } from './graph/plugins/pipeline-core/lib/design-advisor-provenance.mjs';
+import { loadAdvisoryLifecycleV2Policy, preflightAdvisoryCapability } from './graph/plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs';
+assert.equal(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD, '3');
+assert.equal(fstatSync(3).isFile(), true, 'Root FD3 must be a regular file');
+assert.equal(process.env.OA_INDEPENDENT_ROOT_LAUNCH, 'one-use');
+const cases = [];
+const add = (id, name, run, mode = 'run') => cases.push({ id, name, run, ...(mode === 'run' ? {} : { mode }) });
+const initial = (f) => Object.fromEntries(['initialContext', 'dispatch', 'profile', 'route', 'courseBinding'].map((name) => [name, f.args[name]]));
+const directory = (f, result) => join(f.root, '.git', 'agent-pipeline', 'advisor-codex', f.repoFingerprint, 'processes', 'codex-host-' + result.hostReceipt.id);
+async function valid(t) {
+  const f = advisorHostFixture(t);
+  const prepared = await f.execution.prepareInitial(f.args);
+  assert.equal(prepared.ok, true, prepared.code);
+  const result = await f.execution.executeInitial(f.args, prepared.preparedRequest);
+  assert.equal(result.ok, true, result.code);
+  assert.equal(verifyCodexAdvisorInitialExecution({ repoRoot: f.root, ...initial(f), hostReceipt: result.hostReceipt,
+    report: result.report, receipt: result.receipt, trustedExecutablePath: process.execPath }).ok, true);
+  const store = createCodexAdvisorHostStore({ repoRoot: f.root, trustedExecutablePath: process.execPath, initialBinding: initial(f) });
+  return { f, result, prepared, store, dir: directory(f, result) };
+}
+const verify = ({ f, result }, patch = {}) => verifyCodexAdvisorInitialExecution({ repoRoot: f.root, ...initial(f),
+  hostReceipt: result.hostReceipt, report: result.report, receipt: result.receipt, trustedExecutablePath: process.execPath, ...patch });
+function closedDiagnostic(diagnostic, subcheck) {
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.subcheck, subcheck);
+  assert.deepEqual(Object.keys(diagnostic).sort(), ['cause', 'repair', 'schema', 'subcheck']);
+  assert.deepEqual(Object.keys(diagnostic.repair).sort(), ['authority', 'automatic', 'kind']);
+  assert.equal(diagnostic.repair.automatic, false);
+  assert.equal(diagnostic.repair.authority, 'diagnostic-only');
+  assert.equal(Buffer.byteLength(JSON.stringify(diagnostic)) <= 512, true);
+  assert.equal(Object.isFrozen(diagnostic), true);
+}
+function mutate(path, change) {
+  const original = readFileSync(path);
+  const value = JSON.parse(original);
+  change(value);
+  writeFileSync(path, canonicalJson(value));
+  return () => writeFileSync(path, original);
+}
+const ownershipExpected = ({ f, result }) => ({ receiptId: result.hostReceipt.id, repoFingerprint: f.repoFingerprint,
+  dispatchId: f.args.dispatch.dispatchId, candidateCommit: f.candidate.commit,
+  requestSha256: result.projection.requestSha256, executableSha256: JSON.parse(readFileSync(join(directory(f, result), 'intent.json'))).executable.sha256 });
+
+add('OA-DIAG01', 'genuine initial answer succeeds without stale diagnostics and replay stays refused', async (t) => {
+  const v = await valid(t);
+  const result = verify(v);
+  assert.equal(Object.hasOwn(result, 'diagnostic'), false);
+  assert.equal((await v.f.execution.executeInitial(v.f.args, v.prepared.preparedRequest)).code, 'advisor-prepared-request-required');
+  assert.equal(result.code, 'advisor-private-execution-bound');
+});
+add('OA-DIAG02', 'later actual executable preserves historical sealed answer and success shape', async (t) => {
+  const v = await valid(t);
+  const executable = join(v.f.root, 'synthetic-later-codex');
+  writeFileSync(executable, '#!/bin/sh\nexit 0\n'); chmodSync(executable, 0o700);
+  const result = verify(v, { trustedExecutablePath: executable });
+  assert.equal(result.ok, true, result.code);
+  assert.equal(Object.hasOwn(result, 'diagnostic'), false);
+});
+add('OA-DIAG03', 'canonical historical intent tampering retains finalization-intent first cause', async (t) => {
+  const v = await valid(t);
+  const restore = mutate(join(v.dir, 'intent.json'), (value) => { value.executable.sha256 = '0'.repeat(64); });
+  try { const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-intent'); }
+  finally { restore(); }
+  assert.equal(verify(v).ok, true);
+});
+add('OA-DIAG04', 'finalization contract and unsafe identity stay null in legacy reader', async (t) => {
+  const v = await valid(t), path = join(v.dir, ADVISOR_FINALIZATION_FILENAME);
+  const restore = mutate(path, (value) => { value.outputCustody.stdout.ended = false; });
+  try { const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-contract'); }
+  finally { restore(); }
+  chmodSync(path, 0o644);
+  try {
+    const executable = { path: process.execPath, sha256: ownershipExpected(v).executableSha256, repoRoot: v.f.root };
+    assert.equal(readFinalizedAdvisorObservation(v.dir, initial(v.f), executable), null);
+    const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-file-identity');
+  } finally { chmodSync(path, 0o600); }
+  assert.equal(verify(v).ok, true);
+});
+add('OA-DIAG05', 'structurally valid recipe drift is rejected at finalization-request', async (t) => {
+  const v = await valid(t), path = join(v.dir, ADVISOR_FINALIZATION_FILENAME);
+  const restore = mutate(path, (value) => {
+    value.recipeSha256 = value.recipeSha256 === '0'.repeat(64) ? '1'.repeat(64) : '0'.repeat(64);
+    value.inputDisposition.recipeSha256 = value.recipeSha256;
+  });
+  try {
+    assert.equal(validateAdvisorHostFinalization(JSON.parse(readFileSync(path))), true, 'request mutation must satisfy the existing finalization contract first');
+    const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-request');
+  }
+  finally { restore(); }
+});
+add('OA-DIAG06', 'forged public receipt digest preserves store-finalization-readback generic rejection', async (t) => {
+  const v = await valid(t), result = verify(v, { hostReceipt: { ...v.result.hostReceipt, sha256: '0'.repeat(64) } });
+  assert.equal(result.ok, false); assert.equal(result.code, 'advisor-private-execution-binding-invalid');
+  assert.equal(result.observation, null); assert.equal(result.projection, null);
+  closedDiagnostic(result.diagnostic, 'store-finalization-readback');
+});
+add('OA-DIAG07', 'worker argv, child execution and terminal predicates remain active', async (t) => {
+  const v = await valid(t), expected = ownershipExpected(v);
+  for (const [name, check, mutation] of [
+    ['worker', 'ownership-worker', (value) => { value.process.argvSha256 = '0'.repeat(64); }],
+    ['execution', 'ownership-child-execution', (value) => { value.process.argvSha256 = '0'.repeat(64); }],
+    ['terminal', 'ownership-terminal', (value) => { value.exitCode = 7; }],
+  ]) {
+    const restore = mutate(join(v.dir, name + '.json'), mutation);
+    try {
+      assert.equal(verifyRegisteredCodexOwnership(v.dir, expected), null);
+      const own = inspectRegisteredCodexOwnership(v.dir, expected); assert.equal(own.ownership, null); closedDiagnostic(own.diagnostic, check);
+      const outer = verify(v); assert.equal(outer.ok, false); closedDiagnostic(outer.diagnostic, check);
+    } finally { restore(); }
+  }
+  assert.equal(verify(v).ok, true);
+});
+add('OA-DIAG08', 'missing execution and noncanonical/unsafe journals keep fixed first journal causes', async (t) => {
+  const v = await valid(t), path = join(v.dir, 'execution.json'), held = join(v.dir, 'execution.saved');
+  renameSync(path, held);
+  try { closedDiagnostic(verify(v).diagnostic, 'ownership-journal-execution'); } finally { renameSync(held, path); }
+  const worker = join(v.dir, 'worker.json'), original = readFileSync(worker);
+  writeFileSync(worker, JSON.stringify(JSON.parse(original)));
+  try { const result = verify(v); closedDiagnostic(result.diagnostic, 'ownership-journal-worker'); assert.equal(result.diagnostic.cause, 'host-journal-noncanonical'); }
+  finally { writeFileSync(worker, original); }
+  chmodSync(worker, 0o644);
+  try { const result = verify(v); closedDiagnostic(result.diagnostic, 'ownership-journal-worker'); assert.equal(result.diagnostic.cause, 'host-journal-file-unsafe'); }
+  finally { chmodSync(worker, 0o600); }
+});
+add('OA-DIAG09', 'first cause is deterministic across repeated operation and resets after independent success', async (t) => {
+  const v = await valid(t), restoreA = mutate(join(v.dir, 'intent.json'), (value) => { value.executable.sha256 = '0'.repeat(64); }),
+    restoreB = mutate(join(v.dir, 'worker.json'), (value) => { value.process.argvSha256 = '0'.repeat(64); });
+  try {
+    const first = verify(v); closedDiagnostic(first.diagnostic, 'finalization-intent');
+    assert.deepEqual(verify(v).diagnostic, first.diagnostic);
+  } finally { restoreA(); restoreB(); }
+  const success = verify(v); assert.equal(success.ok, true); assert.equal(Object.hasOwn(success, 'diagnostic'), false);
+});
+add('OA-DIAG10', 'closed recorder strips arbitrary private sentinels and accepts only exact known causes', () => {
+  const sentinel = '/home/synthetic-private/secret-report-token';
+  for (const error of [new Error(sentinel), { code: 'DAP-' + sentinel, report: sentinel, secret: sentinel }, { message: 'DAP-PHYSICAL-PARENT-DRIFT ' + sentinel }, { get code() { throw Error(sentinel); } }]) {
+    const recorder = createAdvisorBindingDiagnosticRecorder(); recorder.record('ownership-worker', error); recorder.record('source-provenance', 'DAP-UTF8');
+    const result = recorder.snapshot(); closedDiagnostic(result, 'ownership-worker');
+    assert.equal(result.cause, 'advisor-binding-ownership-worker'); assert.equal(JSON.stringify(result).includes(sentinel), false);
+    assert.deepEqual(projectAdvisorBindingDiagnostic(result), result);
+  }
+  const recorder = createAdvisorBindingDiagnosticRecorder(); recorder.record('source-provenance', 'DAP-PHYSICAL-PARENT-DRIFT');
+  assert.equal(recorder.snapshot().repair.kind, 'repeat-bounded-read');
+  assert.equal(projectAdvisorBindingDiagnostic({ ...recorder.snapshot(), cause: 'DAP-ARBITRARY' }), null);
+  assert.equal(projectAdvisorBindingDiagnostic({ ...recorder.snapshot(), subcheck: 'unknown' }), null);
+});
+add('OA-DIAG11', 'opaque observation and report/receipt forgery confer no binding authority', async (t) => {
+  const v = await valid(t), handle = v.store.readForBinding(v.result.hostReceipt);
+  assert.ok(handle); assert.equal(v.store.project({ ...handle }), null); assert.equal(v.store.project(JSON.parse(JSON.stringify(handle))), null);
+  const report = { ...v.result.report, answer: 'synthetic forged report' };
+  const result = verify(v, { report }); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'report-digest');
+  const receipt = { ...v.result.receipt, emittedAtMs: v.result.receipt.emittedAtMs + 1 };
+  const forged = verify(v, { receipt }); assert.equal(forged.ok, false); closedDiagnostic(forged.diagnostic, 'receipt-binding');
+});
+add('OA-DIAG12', 'unsupported: declared primary fixture has no retained answered-package constructor', () => {}, 'skip');
+add('OA-DIAG13', 'existing physical predicates and bounded retry are conserved; no sibling-churn fix claim', () => {
+  let attempts = 0; const waits = [];
+  assert.throws(() => reobserveAdvisorPhysicalDrift(() => { attempts++; throw Error('DAP-PHYSICAL-PARENT-DRIFT'); },
+    { sleep: (ms) => waits.push(ms) }), { message: 'DAP-PHYSICAL-PARENT-DRIFT' });
+  assert.equal(attempts, 3); assert.deepEqual(waits, [50, 100]);
+  const root = join(tmpdir(), 'oa-physical-synthetic'); mkdirSync(root, { mode: 0o700 });
+  try {
+    writeFileSync(join(root, 'source.md'), 'synthetic');
+    linkSync(join(root, 'source.md'), join(root, 'alias.md'));
+    assert.throws(() => readAdvisorPhysicalBytes(root, 'source.md'), { message: 'DAP-PHYSICAL-FILE' });
+    rmSync(join(root, 'alias.md'));
+    symlinkSync(join(root, 'source.md'), join(root, 'alias.md'));
+    assert.throws(() => readAdvisorPhysicalBytes(root, 'alias.md'), { message: 'DAP-PHYSICAL-FILE' });
+    writeFileSync(join(root, 'source.md'), Buffer.from([0xff]));
+    assert.throws(() => readAdvisorPhysicalBytes(root, 'source.md'), { message: 'DAP-UTF8' });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+add('OA-DIAG14', 'unsupported: ordinary ADR0085 finished-design command is not a declared primary constructor', () => {}, 'skip');
+registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

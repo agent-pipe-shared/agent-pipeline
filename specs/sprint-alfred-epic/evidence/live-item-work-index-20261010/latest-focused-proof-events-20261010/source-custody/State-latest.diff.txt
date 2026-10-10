@@ -1,0 +1,19 @@
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12737,6 +12737,16 @@
+ }
+ export function run(argv = process.argv.slice(2), deps = {}) {
+   const sub = argv[0];
++  // This read-only command owns its exact explicit root; ambient projectDir
++  // discovery must not replace the target before its existing journal checks.
++  if (sub === "inspect-enrollment-retirement") {
++    const exact = parseExactFlags(argv.slice(1), new Set(["root"]));
++    if (!exact.ok || Object.keys(exact.value).length !== 1) return 2;
++    try {
++      const root = resolve(exact.value.root);
++      return runStateSource(argv, { ...deps, dir: root });
++    } catch { return 2; }
++  }
+   // Read-only and the State-read-only P16 twin writer retain their exact routes.
+   if (["inspect","help","-h","--help","configure-verify"].includes(sub)) return runStateSource(argv,deps);
+   const dir = deps.dir ?? projectDir();

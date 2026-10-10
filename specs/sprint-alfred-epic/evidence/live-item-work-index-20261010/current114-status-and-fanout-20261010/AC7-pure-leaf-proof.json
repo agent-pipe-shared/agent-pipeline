@@ -1,0 +1,46 @@
+{
+  "schema": "alfred.ac07-rigor-binding-actual-qualification.v1",
+  "sourceGraphSha256": "74e331a45e264d8f314fdc06a19e515929ed0d2c2f9e19609672771f0292a026",
+  "child": {
+    "status": 0,
+    "signal": null,
+    "error": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "3c4861db8c92cc47b7a433a0b61fb2a7a27fbe41a6675e75ec50031ee957e578",
+    "caseSetSha256": "5dcd23abee5269d2fe3e71b29ea2e349ab6511b48f8806665e5380e5f18bf558",
+    "dispositionsSha256": "be898a53d541e43d5fab573639271ddab6b110309ac0fca65e3fe1fced8d230c",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionError": null,
+  "completionFile": {
+    "path": "qualification/rigor.completion.fd3.jsonl",
+    "sha256": "78ef07adc51a41fd81757c48d2a8a83d30475610d5738341a1b2beba2609d088",
+    "bytes": 2071
+  },
+  "graphConserved": true,
+  "conservationError": null,
+  "pureLeafOnly": true,
+  "missingDurableIntegration": [
+    "D2",
+    "D3",
+    "C1"
+  ],
+  "nativeClaim": false,
+  "wholeAC7": false,
+  "itemClosure": false,
+  "originalReceipt": {
+    "path": "scratch/alfred-ac07-rigor-binding-independent-20261010/execution.json",
+    "sha256": "e40386f2a535fde2f00f18471dc33d4de615536544fd3c251d5c89cd07169034",
+    "bytes": 1463
+  }
+}

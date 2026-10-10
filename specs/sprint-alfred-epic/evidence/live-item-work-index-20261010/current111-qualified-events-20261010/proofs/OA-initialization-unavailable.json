@@ -1,0 +1,74 @@
+{
+  "schema": "alfred.optional-advisor-init-unavailable-public-proof.v1",
+  "originalReceipt": {
+    "path": "scratch/alfred-optional-advisor-diagnostics-launch-successor-20261010/root-receipt.json",
+    "sha256": "a71e17aa952cda00c5cc21fb7c7564579818e6da5a7236047e2b76b8a5f31664",
+    "bytes": 4390
+  },
+  "status": "not-qualified",
+  "suites": [
+    {
+      "name": "original-rc06c",
+      "exitCode": 1,
+      "signal": null,
+      "spawnError": false,
+      "timedOut": false,
+      "outputOverflow": false,
+      "parserStatus": "production-parser-refused",
+      "attestation": null,
+      "caseIds": [
+        "RC06C001",
+        "RC06C002",
+        "RC06C003",
+        "RC06C004",
+        "RC06C005",
+        "RC06C006",
+        "RC06C007"
+      ],
+      "maxCompletionBytes": 65536,
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "not-qualified"
+    },
+    {
+      "name": "independent-diagnostics",
+      "exitCode": 1,
+      "signal": null,
+      "spawnError": false,
+      "timedOut": false,
+      "outputOverflow": false,
+      "parserStatus": "production-parser-refused",
+      "attestation": null,
+      "caseIds": [
+        "OA-DIAG01",
+        "OA-DIAG02",
+        "OA-DIAG03",
+        "OA-DIAG04",
+        "OA-DIAG05",
+        "OA-DIAG06",
+        "OA-DIAG07",
+        "OA-DIAG08",
+        "OA-DIAG09",
+        "OA-DIAG10",
+        "OA-DIAG11",
+        "OA-DIAG12",
+        "OA-DIAG13",
+        "OA-DIAG14"
+      ],
+      "maxCompletionBytes": 65536,
+      "completionSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "status": "not-qualified",
+      "unsupportedSkipIds": [
+        "OA-DIAG12",
+        "OA-DIAG14"
+      ]
+    }
+  ],
+  "actualCaseCounts": null,
+  "FD3Observed": "both streams empty; exact producer empty SHA retained per child",
+  "semanticRED": false,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "nextOwner": "/root/alfred_optional_advisor_source_followthrough",
+  "nextAction": "Prepare separately reviewed direct Node transport successor; do not retry old launch or synthesize callbacks",
+  "environmentAndExecArgvExcluded": true
+}

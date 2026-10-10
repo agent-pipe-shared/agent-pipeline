@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.current111-focused-public-proof.v1",
+  "name": "HGL12",
+  "originalExecution": {
+    "path": "scratch/alfred-hgl-complete-plugin-identity-resources-20261010/execution-terminal.json",
+    "sha256": "b377b662655cd49d52ae05cd818ddf2a73f82887f62a2db311dff1491c04f649",
+    "bytes": 967
+  },
+  "status": 0,
+  "signal": null,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "08c51c8c02d8c5294e4f1c899abb538e32d7efed639e64ecd00e196d2dfb9a27",
+    "caseSetSha256": "6d055395283c091e85224575584bdf780c376ceb4aa132d04d9cacc1512bda50",
+    "dispositionsSha256": "1d0bd20ca34570d77e2f1e920cfca3a268ae4f3030d119be77919451f338db7b",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "FD3Sha256": "f7d0edc7155a0db00608a61a7fc4897ddfaba0e94aa5d086e2d261c8fd0c69d7",
+  "rawRuntimeRootExcluded": true,
+  "setupAndRawStreamsExcluded": true,
+  "nativeClaim": false,
+  "wholeItemAcceptance": false,
+  "newSemanticRuns": 0,
+  "graphCheckError": false,
+  "parentCheckError": false
+}

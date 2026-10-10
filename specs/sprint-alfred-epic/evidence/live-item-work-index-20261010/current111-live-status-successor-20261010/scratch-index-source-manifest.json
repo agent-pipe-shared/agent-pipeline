@@ -1,0 +1,537 @@
+{
+  "schema": "pipeline.isolated-source-proposal.v1",
+  "status": "git-index-mode-source-correction-frozen-semantics-unexecuted",
+  "ownership": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "taskMeaning": "correct genuine Git index mode observation after actual four-case RED",
+  "calibration": "SourceProposal",
+  "duty": "Source author",
+  "method": "methodology-only; native/model route unverified",
+  "briefing": "Root operational briefing, not runtime authority",
+  "files": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "originalSourceParent": "scratch/alfred-scratch-durability-report-source-20261010/postimages/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "parentPath": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/parents/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "parentSha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "parentBytes": 10746,
+      "postimagePath": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/postimages/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "postimageSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "postimageBytes": 11408,
+      "inversePath": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/inverse/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "inverseSha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "allOtherBytesConserved": true
+    }
+  ],
+  "inputs": [
+    {
+      "path": "scratch/alfred-scratch-durability-report-source-20261010/postimages/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "bytes": 10746,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3694982",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10746",
+        "mtimeNs": "1791630418589508737",
+        "ctimeNs": "1791630418589508737"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-report-source-20261010/implementation-record.md",
+      "sha256": "508c0aba1fbe6e7833247e2de875433d9e535146b2c5b3a57cfd59a9df8a1e5f",
+      "bytes": 5800,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3696655",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "5800",
+        "mtimeNs": "1791630428452925939",
+        "ctimeNs": "1791630428452925939"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/root-receipt.json",
+      "sha256": "851c071c5c769fd1a298e2f1da7b970d6a8fb95580a43298465290f0952d50ee",
+      "bytes": 3211,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3773903",
+        "mode": "33152",
+        "nlink": "1",
+        "size": "3211",
+        "mtimeNs": "1791634543302003115",
+        "ctimeNs": "1791634543302003115"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/completion.private.jsonl",
+      "sha256": "786d5cc51daeaf8d96480fc10d518dd90cc3b8d9d3cf63017212fee1f48b2a59",
+      "bytes": 2965,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3774069",
+        "mode": "33152",
+        "nlink": "1",
+        "size": "2965",
+        "mtimeNs": "1791634543278003647",
+        "ctimeNs": "1791634543278003647"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/output.private.txt",
+      "sha256": "c32a2c8616ae6caadf1d60f29f9c64bd2f28f1a3137fed4b62339668806add53",
+      "bytes": 6921,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3773902",
+        "mode": "33152",
+        "nlink": "1",
+        "size": "6921",
+        "mtimeNs": "1791634543290003381",
+        "ctimeNs": "1791634543290003381"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/ready-run-manifest.json",
+      "sha256": "1ee328fea8cc798295ce830f9ade871b4b845205856e7dce8e1e83a147fa81e7",
+      "bytes": 10270,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769372",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10270",
+        "mtimeNs": "1791634136333989081",
+        "ctimeNs": "1791634136333989081"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/source-graph.json",
+      "sha256": "6c25f3bc459bfa9956a48061f940d534aa978bbe47e38078b012349c3a7987d7",
+      "bytes": 9281,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769320",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "9281",
+        "mtimeNs": "1791634034573049025",
+        "ctimeNs": "1791634034573049025"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/integration/edits.json",
+      "sha256": "05770926295e364a6dcfb2f984b1ba452180bb54ede91b8088a7df60d6f97ed9",
+      "bytes": 2635,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769284",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "2635",
+        "mtimeNs": "1791634034566568198",
+        "ctimeNs": "1791634034566568198"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/integration/parents/plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "9686bbec296411e480a72bc4f0ae49600e452b413370f88ecc8319b3b5dfee49",
+      "bytes": 149849,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769295",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "149849",
+        "mtimeNs": "1791634034567933943",
+        "ctimeNs": "1791634034567933943"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/integration/parents/plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316",
+      "bytes": 40303,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769298",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "40303",
+        "mtimeNs": "1791634034568704271",
+        "ctimeNs": "1791634034568704271"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/integration/postimages/plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "3eee437b457138c7f71499205d851a69ee5ffd6efc25eb57082cf997f4868381",
+      "bytes": 150589,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769303",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "150589",
+        "mtimeNs": "1791634034570069076",
+        "ctimeNs": "1791634034570069076"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/integration/postimages/plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "0731b5a57b05756c0f895ac998e8a1b0122a9303d495e44b0e947fdcf555792a",
+      "bytes": 40704,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769306",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "40704",
+        "mtimeNs": "1791634034570834293",
+        "ctimeNs": "1791634034570834293"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "bytes": 10746,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769310",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10746",
+        "mtimeNs": "1791634034571813290",
+        "ctimeNs": "1791634034571813290"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/plugins/pipeline-core/lib/test-case-completion.mjs",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "bytes": 10816,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769311",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10816",
+        "mtimeNs": "1791634034571948979",
+        "ctimeNs": "1791634034571948979"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "bytes": 5517,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769312",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "5517",
+        "mtimeNs": "1791634034572050819",
+        "ctimeNs": "1791634034572050819"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/graph/plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "sha256": "65275ee4adb9db869bae6fd19c4cbff902d7f717690b6fcff0aa7c1116ea65f9",
+      "bytes": 1997,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769314",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "1997",
+        "mtimeNs": "1791634034572398837",
+        "ctimeNs": "1791634034572398837"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/custody.test.mjs",
+      "sha256": "c14e7937da9c65d8eccec146240dd9f3a27f469afe4adde78a5b3497e2a8361c",
+      "bytes": 16821,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769315",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "16821",
+        "mtimeNs": "1791634034572495407",
+        "ctimeNs": "1791634034572495407"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/assertion-freeze.json",
+      "sha256": "52290db7ac5bb1f43a093056dc2501d75e9272f1a73b2ddef0f37d23c2892399",
+      "bytes": 3912,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769316",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "3912",
+        "mtimeNs": "1791634034572574487",
+        "ctimeNs": "1791634034572574487"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/suite-policy.json",
+      "sha256": "b9f584fd9abac786573b2bae73a0d9d3b3f21d69de5e4dbc3d98f2af5db98c75",
+      "bytes": 388,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3769317",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "388",
+        "mtimeNs": "1791634034572678446",
+        "ctimeNs": "1791634034572678446"
+      }
+    }
+  ],
+  "packetFiles": [
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/prepare.py",
+      "sha256": "b63cd44a7eab4167faa39fc2702fccb507448348fcbda858c75b9529bad019e5",
+      "bytes": 4551,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807341",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "4551",
+        "mtimeNs": "1791634981812268618",
+        "ctimeNs": "1791634981812268618"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/freeze.py",
+      "sha256": "ed19ca9cd08a566a46085e3b8e5b93b11a3c75f8546c406a7f6656596901b481",
+      "bytes": 7595,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811749",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "7595",
+        "mtimeNs": "1791635057858581169",
+        "ctimeNs": "1791635057858581169"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/edits.json",
+      "sha256": "ab2a150acc179f86558ba55149973f3f2c968f995643b16f69338c7f6fa86fd6",
+      "bytes": 2661,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807403",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "2661",
+        "mtimeNs": "1791634900322803147",
+        "ctimeNs": "1791634900322803147"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/final-edits.json",
+      "sha256": "e3000210b974731c809d3d6473deee85c6523cc94b5edfe357a9d6ac5dea3f64",
+      "bytes": 2645,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811751",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "2645",
+        "mtimeNs": "1791635058938152470",
+        "ctimeNs": "1791635058938152470"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/source.patch",
+      "sha256": "cc1eef25efaab2a90ca54915b0aaefa1f598e30245ce10592496b326ae0f4929",
+      "bytes": 1626,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811756",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "1626",
+        "mtimeNs": "1791635058938360069",
+        "ctimeNs": "1791635058938360069"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/inverse.patch",
+      "sha256": "dbfb81ce94bfa0bc48f9305848ea8691c7496eedb796c5fea8ff5d1d5fd0ab4d",
+      "bytes": 1626,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811757",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "1626",
+        "mtimeNs": "1791635058938526818",
+        "ctimeNs": "1791635058938526818"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/regression-brief.json",
+      "sha256": "de832fc9d0dff44a305e065f316214e9615ca95d358b2424df81d0faae1c94dd",
+      "bytes": 2574,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807342",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "2574",
+        "mtimeNs": "1791634981896266755",
+        "ctimeNs": "1791634981896266755"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/report.md",
+      "sha256": "06b771297b09aa16cf95c9a2b6d98f1b0cf4a4eead606149022d08574ba96e32",
+      "bytes": 2898,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807343",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "2898",
+        "mtimeNs": "1791634981868267376",
+        "ctimeNs": "1791634981868267376"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/syntax-check.json",
+      "sha256": "714e24510e4dcac696d922c58d39f5ba10540ebe9b4d21b832050525c4f3ea36",
+      "bytes": 225,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811750",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "225",
+        "mtimeNs": "1791635057890580459",
+        "ctimeNs": "1791635057890580459"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/executed-proof-projection.json",
+      "sha256": "19eabc1fcd0dc0326b6c65f38900e22e460b6d990f0c5c5bc41934c83a81f098",
+      "bytes": 1677,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3811758",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "1677",
+        "mtimeNs": "1791635058942394236",
+        "ctimeNs": "1791635058942394236"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/parents/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "bytes": 10746,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807386",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10746",
+        "mtimeNs": "1791634900320382365",
+        "ctimeNs": "1791634900320382365"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/postimages/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "bytes": 11408,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807397",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "11408",
+        "mtimeNs": "1791634981840267997",
+        "ctimeNs": "1791634981840267997"
+      }
+    },
+    {
+      "path": "scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/inverse/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "bytes": 10746,
+      "fullRead": true,
+      "physical": {
+        "dev": "2096",
+        "ino": "3807402",
+        "mode": "33188",
+        "nlink": "1",
+        "size": "10746",
+        "mtimeNs": "1791634900322703127",
+        "ctimeNs": "1791634900322703127"
+      }
+    }
+  ],
+  "syntax": {
+    "command": "node --check scratch/alfred-scratch-durability-git-index-mode-fix-source-20261010/postimages/plugins/pipeline-core/lib/scratch-custody-report.mjs",
+    "exitCode": 0,
+    "productImport": false,
+    "semanticRuns": 0
+  },
+  "checks": {
+    "fullParentPostInverseRead": true,
+    "forwardInverseExact": true,
+    "unchangedOriginal18Assertions": true,
+    "actualPrivateNineGraphBound": true,
+    "pythonASTFiles": 2,
+    "semanticRunsByAuthor": 0,
+    "productImportsByAuthor": false,
+    "gitCommandsByAuthor": 0
+  },
+  "scope": "one private gitMode function; Source CLI/integrations/all other library bytes unchanged",
+  "proof": "Root genuine18 declared/disposed;14PASS4FAIL; four index observations; all48bindings/two graphs CAS matched",
+  "independentReplay": "unchanged18 plus finite genuine supplemental brief, not run by Source author",
+  "newProductImportOrAPI": false,
+  "reportOnlyPolicyPreserved": true,
+  "privacyProjectionPreserved": true,
+  "candidateSemanticsPreserved": true,
+  "MainAuditWrites": 0,
+  "nativeQualification": false,
+  "fullItemQualification": false,
+  "extraCritic": false
+}

@@ -1,0 +1,181 @@
+{
+  "schema": "alfred.current114.events.v1",
+  "events": [
+    {
+      "slice": "Scratch qualified helper/CLI source integration",
+      "receipt": {
+        "path": "scratch/alfred-qualified-scratch-durability-assembly-20261010/actual-receipt.json",
+        "sha256": "3d5ead3e7d800aa911e36950fd2fa26520275b63951b53909158f0808201092b",
+        "bytes": 3533
+      },
+      "selectedCount": 114,
+      "physicalReplacements": 2,
+      "newPhysicalFiles": 2,
+      "membershipAdditions": 3,
+      "other110ByteExact": true,
+      "proof": {
+        "rootReceiptPath": "scratch/alfred-scratch-durability-index-fix-replay-preparation-20261010/root-receipt.json",
+        "rootReceiptSha256": "47c3307d2804df5f24fb866c51898fba6fabe3e64ab9d8808d2e822ca89f896b",
+        "completionSha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+        "caseIds": [
+          "SC-DUR01",
+          "SC-DUR02",
+          "SC-DUR03",
+          "SC-DUR04",
+          "SC-DUR05",
+          "SC-DUR06",
+          "SC-DUR07",
+          "SC-DUR08",
+          "SC-DUR09",
+          "SC-DUR10",
+          "SC-DUR11",
+          "SC-DUR12",
+          "SC-DUR13",
+          "SC-DUR14",
+          "SC-DUR15",
+          "SC-DUR16",
+          "SC-DUR17",
+          "SC-DUR18"
+        ],
+        "counts": {
+          "pass": 18,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "beforeAfter88BindingsMatched": true,
+        "sourceCorrectionManifestSha256": "8d62368babf44e980b045525c4d172666cd3e0ae91d7c723d3c2eb04ff2f4d7b",
+        "correctedHelperSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+        "integrationRebaseManifestSha256": "fb202b668b03df01d55567719c14a086f8f1ee0cb54a3d6a08744b02a363872a",
+        "scope": "Original eighteen read-only custody library/CLI callbacks plus old frozen WARN-only static integration assertions; current rebased guard and composed close instructions not executed",
+        "additional10": "independently authored, unexecuted; not included in proof",
+        "native": false,
+        "pushExecuted": false,
+        "closeExecuted": false,
+        "currentGuardHookExecuted": false,
+        "closure": false
+      },
+      "itemClosure": false
+    },
+    {
+      "slice": "OA original7 plus independent14",
+      "receipt": {
+        "path": "scratch/alfred-optional-advisor-two-failure-replay-preparation-20261010/root-receipt.json",
+        "sha256": "047c170dc3fab294b73c05b125b2a264470e0f4d5cd9c59601e310178bb2cbbb",
+        "bytes": 5840
+      },
+      "counts": {
+        "pass": 19,
+        "fail": 0,
+        "skip": 2,
+        "todo": 0
+      },
+      "twoActualParserPolicies": true,
+      "wholeItemQualification": false
+    },
+    {
+      "slice": "AC7 pure leaf12",
+      "receipt": {
+        "path": "scratch/alfred-ac07-rigor-binding-independent-20261010/execution.json",
+        "sha256": "e40386f2a535fde2f00f18471dc33d4de615536544fd3c251d5c89cd07169034",
+        "bytes": 1463
+      },
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "missingDurableIntegration": [
+        "D2",
+        "D3",
+        "C1"
+      ],
+      "wholeAC7": false
+    }
+  ],
+  "otherProofLocators": [
+    {
+      "receipt": {
+        "path": "scratch/alfred-generator-gsc014-validated-public-intent-fixture-20261010/execution-terminal.json",
+        "sha256": "7a03f4e817f491ccb333ff83e901e16114f572d6f486e3834579bb2d28ab4dea",
+        "bytes": 975
+      },
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "0317c17814b43687f87d3faa6bee02be264ec2f646b8d2c9f60f9e15cdb3e1f0",
+        "caseSetSha256": "49d1674c699dddac4114837531ba66fd06419a5965f16db875cced25266f718f",
+        "dispositionsSha256": "0110401bf0281913d2b3f2b2feba574057efed99f816c9fa5b08d87fc237dd73",
+        "declaredCount": 21,
+        "disposedCount": 21,
+        "counts": {
+          "pass": 21,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+      "businessReruns": null,
+      "scope": "Separate actual receipt; no aggregate qualification or whole criterion claim"
+    },
+    {
+      "receipt": {
+        "path": "scratch/alfred-scratch-durability-index-fix-replay-preparation-20261010/root-receipt.json",
+        "sha256": "47c3307d2804df5f24fb866c51898fba6fabe3e64ab9d8808d2e822ca89f896b",
+        "bytes": 4238
+      },
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "474b59062de958225b9d8a339e78e5ad03e16102589ce7091efe94b3a69953cf",
+        "caseSetSha256": "e5c617d8b3927f3ddb01959a8b7cb542e9380a658472019f1872d7cc2f3701dd",
+        "dispositionsSha256": "15e1d41bf47dc83d1408dfc5d8681fe584d1613308893896097ea1d113b40ba7",
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "counts": {
+          "pass": 18,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+      "businessReruns": null,
+      "scope": "Separate actual receipt; no aggregate qualification or whole criterion claim"
+    },
+    {
+      "receipt": {
+        "path": "scratch/alfred-ac04-05-10-existing-fd3-policy-reparse-20261010/reparse-execution.json",
+        "sha256": "82209ce1093471d2d62d2526d0d1420f3779ffdf5b5975cf476f1e95e3a1ae69",
+        "bytes": 1388
+      },
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "138e1560f7eaaabaaa5fe4d5c08468f7d679cf3fa641032acf8d42a5edfa14aa",
+        "caseSetSha256": "e745efeb890ab25b017f70e7c6a2fecfbc9f7ee2516c77d9de1c495b3978d4fd",
+        "dispositionsSha256": "006c83e4ef940ca3bd9e17b9bdf55081ac405e42e11e2e12104c0e270eac4916",
+        "declaredCount": 12,
+        "disposedCount": 12,
+        "counts": {
+          "pass": 12,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": null,
+      "businessReruns": 0,
+      "scope": "Separate actual receipt; no aggregate qualification or whole criterion claim"
+    }
+  ],
+  "parentFocusedManifestSha256": "74ff709e9f802f88135f79b07a729a80cc109c2148898b5933b96f625f1c84cd",
+  "priorFocusedArchive": "Root unexecuted at new briefing",
+  "businessRuns": 0,
+  "GitOperations": 0,
+  "nativeClaim": false
+}

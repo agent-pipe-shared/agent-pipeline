@@ -1,0 +1,222 @@
+{
+  "schema": "alfred.latest-focused-proof-preparation-successor.v1",
+  "parentManifestSha256": "a9c192e3a9e40a23cafc8c3ba9189ea86b28b584a198b37a649c1fcc7db2a101",
+  "inputs": [
+    {
+      "path": "scratch/alfred-latest-focused-proof-events-20261010/manifest.json",
+      "sha256": "a9c192e3a9e40a23cafc8c3ba9189ea86b28b584a198b37a649c1fcc7db2a101",
+      "bytes": 54399
+    },
+    {
+      "path": "scratch/alfred-latest-focused-proof-events-20261010/archive-plan.json",
+      "sha256": "e29dd2103ed8dc0e325ed488d7037130cf68f73e37e4abb2034ae79a985cc692",
+      "bytes": 3117
+    },
+    {
+      "path": "scratch/alfred-latest-focused-proof-events-20261010/manifest.json",
+      "sha256": "a9c192e3a9e40a23cafc8c3ba9189ea86b28b584a198b37a649c1fcc7db2a101",
+      "bytes": 54399
+    },
+    {
+      "path": "scratch/alfred-latest-focused-proof-events-20261010/archive-plan.json",
+      "sha256": "e29dd2103ed8dc0e325ed488d7037130cf68f73e37e4abb2034ae79a985cc692",
+      "bytes": 3117
+    },
+    {
+      "path": "scratch/alfred-state-explicit-root-readonly-source-20261010/manifest.json",
+      "sha256": "3b69f31328b4d601d24f4c1c137bdfe216420e1224212532b7e1c9bb7d150fcf",
+      "bytes": 4696
+    },
+    {
+      "path": "scratch/alfred-obl047-state-bootstrap-result-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "8357ba41f4c48174862cea66c9fbe3306f600fda64e380ab65994ed469e794d9",
+      "bytes": 793942
+    },
+    {
+      "path": "scratch/alfred-state-explicit-root-readonly-source-20261010/postimages/latest/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+      "bytes": 794431
+    },
+    {
+      "path": "scratch/alfred-generator-gsc014-validated-public-intent-fixture-20261010/execution-terminal.json",
+      "sha256": "7a03f4e817f491ccb333ff83e901e16114f572d6f486e3834579bb2d28ab4dea",
+      "bytes": 975
+    }
+  ],
+  "publicWhitelist": [
+    {
+      "path": "proofs/OAC12-reparse.json",
+      "sha256": "82209ce1093471d2d62d2526d0d1420f3779ffdf5b5975cf476f1e95e3a1ae69",
+      "bytes": 1388,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Scratch18.json",
+      "sha256": "62448e0fcad2bf035edd8bb7710c65125a4b658575ce90e1e50597b02f2918e9",
+      "bytes": 3420,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Gitleaks.json",
+      "sha256": "4eff92a14cc7a9595495ae8a8d3be8cfd1cc6fedb296e3be19ea287e5a2d68da",
+      "bytes": 2249,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "bf03f6cf5f98bf6519a9492def436c69a39d6aa39ff191c6859428c0b3e041b4",
+      "bytes": 2377,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/scratch-custody-report.mjs.txt",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "bytes": 11408,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/scratch-index.source.patch.txt",
+      "sha256": "cc1eef25efaab2a90ca54915b0aaefa1f598e30245ce10592496b326ae0f4929",
+      "bytes": 1626,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-source.txt",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-source.diff.txt",
+      "sha256": "5c3841309827e910497d6726a26de7245852b08c357dc6a7d81133a50607fb4c",
+      "bytes": 1426,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-fixture-correction.txt",
+      "sha256": "031e8e13138238d46b2dc2e75545865f52ea0529cf2afc09f45af858e4b75ff4",
+      "bytes": 14013,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-fixture-correction.diff.txt",
+      "sha256": "a8f6caec3d50657190bea79deb8430827abbd96218c1a2df8f8a2862d92b70e9",
+      "bytes": 2338,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/index.json",
+      "sha256": "99209dd687ad8f7167119e6d87aa6f930d9f1f5a584584babfa7323de1f04c33",
+      "bytes": 1738,
+      "mode": 420
+    },
+    {
+      "path": "next-crosswalk-batches.json",
+      "sha256": "4f02a73717055082a4f095291cdabae8f03159e7d636f9e43cf16168e6c8a690",
+      "bytes": 453233,
+      "mode": 420
+    },
+    {
+      "path": "preparation-cause.json",
+      "sha256": "378ef260aa3d70632ad396ce898ed70455adda22c041b0a53f153f73d41828e9",
+      "bytes": 2374,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "bf79fac71b53631d324f2e4f81259d65492e55be6ed61bcbd6bb08f58c19973b",
+      "bytes": 1067,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "a9c192e3a9e40a23cafc8c3ba9189ea86b28b584a198b37a649c1fcc7db2a101",
+      "bytes": 54399,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan.json",
+      "sha256": "e29dd2103ed8dc0e325ed488d7037130cf68f73e37e4abb2034ae79a985cc692",
+      "bytes": 3117,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/State-latest.mjs.txt",
+      "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+      "bytes": 794431,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/State-latest.diff.txt",
+      "sha256": "def75e5603340405eb96ed44d39f3ef7dedb658926135826b2fb20cee8b96326",
+      "bytes": 957,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/State-binding.json",
+      "sha256": "622f73a962757bc1547f93a7adf837c1ba08ecf71934c36a946f09c2eecdba59",
+      "bytes": 953,
+      "mode": 420
+    },
+    {
+      "path": "proofs/GSC21.json",
+      "sha256": "6a8e2860777f3165c635c30745b93e06aae366fd21c520f728028099a3867611",
+      "bytes": 1107,
+      "mode": 420
+    },
+    {
+      "path": "late-events.json",
+      "sha256": "e41505c93e8d2c63f016f064c116061971407e8286673a78d8dfd5e87ad9298e",
+      "bytes": 873,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan-successor.json",
+      "sha256": "a832fa0890d17a4e795191f4266e11a01fad5f6a1091e6670ebffa0e51e4ecac",
+      "bytes": 4362,
+      "mode": 420
+    }
+  ],
+  "planSha256": "a832fa0890d17a4e795191f4266e11a01fad5f6a1091e6670ebffa0e51e4ecac",
+  "payloads": 21,
+  "bodyDrifts": [
+    {
+      "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "path": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+      "expectedSha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+      "observedSha256": "6a8375093e2e86f022d1139d192d3045e792dafbed3b1476dd3493fb075b6183",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "path": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+      "expectedSha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+      "observedSha256": "bd8c02353bc7c72c310bc6ffbdba0d5d1f8fe93b4fa53585f9deb1e1e845bd47",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+      "expectedSha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+      "observedSha256": "d301ec3095b9043425bbba2aea1572c05c6812bc38e3c00f979cbd68a1ce5235",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.security-scanner-failure-provenance",
+      "path": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+      "expectedSha256": "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f",
+      "observedSha256": "5b98c73de7f455aac9b3a9d02beb59783c6da5941af4e681f4dd6afdfd9a889f",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    }
+  ],
+  "stateSourceAdded": true,
+  "businessRuns": 0,
+  "GitOperations": 0,
+  "archiveExecuted": false,
+  "officialClosures": 0,
+  "nativeClaim": false
+}

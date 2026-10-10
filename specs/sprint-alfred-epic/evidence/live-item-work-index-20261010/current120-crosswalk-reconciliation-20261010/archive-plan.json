@@ -1,0 +1,132 @@
+{
+  "schema": "alfred.current120-public-archive-plan.v1",
+  "payloads": [
+    {
+      "path": "crosswalk-current.json",
+      "sha256": "3d764cb6df29ff364d0b24223bd1f1e2ef83b85848eaf48729dff94c13ec8f79",
+      "bytes": 671666,
+      "mode": 420
+    },
+    {
+      "path": "overview.json",
+      "sha256": "ef2b7f3458c2057e6f7b9b0bb5ac90328bdb4ee4494effa1bfafeed0f93fbad6",
+      "bytes": 11729,
+      "mode": 420
+    },
+    {
+      "path": "current-source-manifest.json",
+      "sha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+      "bytes": 35112,
+      "mode": 420
+    },
+    {
+      "path": "integration-receipt.json",
+      "sha256": "d3b88525ac2c088f417664d4bd6fc6c161ad67c70967c366304d645e6c4b94ca",
+      "bytes": 7324,
+      "mode": 420
+    },
+    {
+      "path": "focused-proofs.json",
+      "sha256": "917a3be0ce516c15acd3099991665c9378d9e6bf855a7e0730b27a4a83659c50",
+      "bytes": 12378,
+      "mode": 420
+    },
+    {
+      "path": "pending-design-reference.json",
+      "sha256": "48757a64766362a59c471c38b3c0eade713d295f2d6e12c7b03decdd6b159a62",
+      "bytes": 1768,
+      "mode": 420
+    },
+    {
+      "path": "sources/01.mjs.txt",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "bytes": 3622,
+      "mode": 420
+    },
+    {
+      "path": "sources/01.patch.txt",
+      "sha256": "89407d14cca90ceaa8c6c89adc8234ba2d17411a35f03bb27ba20bf7eef30cea",
+      "bytes": 3821,
+      "mode": 420
+    },
+    {
+      "path": "sources/02.mjs.txt",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "bytes": 6494,
+      "mode": 420
+    },
+    {
+      "path": "sources/02.patch.txt",
+      "sha256": "a04fe420955b376547e12e86f038eae5c8febab269db26fc58149ae0a6807478",
+      "bytes": 7842,
+      "mode": 420
+    },
+    {
+      "path": "sources/03.mjs.txt",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "bytes": 17680,
+      "mode": 420
+    },
+    {
+      "path": "sources/03.patch.txt",
+      "sha256": "994b1b159cc00f0a86016620efe62ffcb7bff8a952d17fab9d01b4f18b5b1084",
+      "bytes": 8181,
+      "mode": 420
+    },
+    {
+      "path": "sources/04.mjs.txt",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "bytes": 8734,
+      "mode": 420
+    },
+    {
+      "path": "sources/04.patch.txt",
+      "sha256": "f4295ff5408c413500f1ea34c3f8cc5a849c9844567b2a2f6ab4790b0e66aac1",
+      "bytes": 11407,
+      "mode": 420
+    },
+    {
+      "path": "sources/05.mjs.txt",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "bytes": 31644,
+      "mode": 420
+    },
+    {
+      "path": "sources/05.patch.txt",
+      "sha256": "2a9c599d37925ba118e4f5fd02ade9f3fed202578b8ee80f57ecc8d9d183574c",
+      "bytes": 8398,
+      "mode": 420
+    },
+    {
+      "path": "sources/06.mjs.txt",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306,
+      "mode": 420
+    },
+    {
+      "path": "sources/06.patch.txt",
+      "sha256": "5c3841309827e910497d6726a26de7245852b08c357dc6a7d81133a50607fb4c",
+      "bytes": 1426,
+      "mode": 420
+    },
+    {
+      "path": "source-custody-index.json",
+      "sha256": "6d60cacbeaf14618bf65ec7d673e3df176fd9b0976c4b16009e13313939fd32d",
+      "bytes": 4381,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "1b987aff29a4f3df26583a9b8be9cb0464e57d40f75292e8761e26688a37e2dd",
+      "bytes": 1730,
+      "mode": 420
+    }
+  ],
+  "noOverwrite": true,
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/actual-source-manifest.json",
+    "sha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c"
+  },
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010"
+}

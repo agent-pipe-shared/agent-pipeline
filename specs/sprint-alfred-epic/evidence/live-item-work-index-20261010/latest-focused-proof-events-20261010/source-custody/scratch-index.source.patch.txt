@@ -1,0 +1,34 @@
+--- a/plugins/pipeline-core/lib/scratch-custody-report.mjs
++++ b/plugins/pipeline-core/lib/scratch-custody-report.mjs
+@@ -33,6 +33,7 @@
+ }
+ 
+ function gitMode(root, path, view) {
++  if (typeof path !== "string" || !SAFE_PATH.test(path)) return null;
+   try {
+     const args = view === ":"
+       ? ["ls-files", "--stage", "-z", "--", path]
+@@ -41,10 +42,19 @@
+       cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+       timeout: 5000, maxBuffer: 16 * 1024, windowsHide: true,
+     });
+-    const record = output.split("\0").find(Boolean);
+-    const match = view === ":" ? /^(100644|100755) [0-9]+ [0-9a-f]+\t/u.exec(record ?? "")
+-      : /^(100644|100755) blob [0-9a-f]+\t/u.exec(record ?? "");
+-    return match?.[1] ?? null;
++    // -z gives an unquoted path and a terminal NUL. One exact stage-zero
++    // index entry is required: conflicts, aliases and extra records cannot
++    // supply a regular-file mode for the requested path.
++    const records = output.split("\0");
++    if (records.length !== 2 || records[1] !== "" || records[0] === "") return null;
++    const record = records[0];
++    const match = view === ":"
++      ? /^(100644|100755) ([0-9a-f]{40}|[0-9a-f]{64}) 0\t([^\0\t\r\n]+)$/u.exec(record)
++      : /^(100644|100755) blob ([0-9a-f]{40}|[0-9a-f]{64})\t([^\0\t\r\n]+)$/u.exec(record);
++    // Require the entire canonical record, including its exact path. Null
++    // OIDs, nonregular modes and unresolved stages are held.
++    if (!match || match[0] !== record || match[3] !== path || /^0+$/u.test(match[2])) return null;
++    return match[1];
+   } catch { return null; }
+ }
+ 

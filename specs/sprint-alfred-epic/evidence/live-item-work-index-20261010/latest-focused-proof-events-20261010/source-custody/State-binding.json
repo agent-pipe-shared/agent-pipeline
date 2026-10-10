@@ -1,0 +1,23 @@
+{
+  "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+  "variant": "latest",
+  "parent": {
+    "path": "scratch/alfred-obl047-state-bootstrap-result-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "sha256": "8357ba41f4c48174862cea66c9fbe3306f600fda64e380ab65994ed469e794d9",
+    "byteLength": 793942,
+    "mode": 420,
+    "nlink": 1
+  },
+  "postimage": {
+    "path": "scratch/alfred-state-explicit-root-readonly-source-20261010/postimages/latest/plugins/pipeline-core/scripts/pipeline-state.mjs",
+    "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+    "byteLength": 794431,
+    "mode": 420,
+    "nlink": 1
+  },
+  "sourceManifestSha256": "3b69f31328b4d601d24f4c1c137bdfe216420e1224212532b7e1c9bb7d150fcf",
+  "originalMode": 420,
+  "archiveNonExecutable": true,
+  "qualification": "source-only; semantic0",
+  "historicalLatestChainIncomplete": true
+}

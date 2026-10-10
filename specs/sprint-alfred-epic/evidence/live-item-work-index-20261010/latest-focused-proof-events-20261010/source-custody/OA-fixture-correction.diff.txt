@@ -1,0 +1,28 @@
+--- a/diagnostics.test.mjs
++++ b/diagnostics.test.mjs
+@@ -6,7 +6,7 @@
+ import { registerTestCaseCompletion } from './graph/plugins/pipeline-core/lib/test-case-completion.mjs';
+ import { advisorHostFixture } from './graph/plugins/pipeline-core/lib/codex-advisor-host.fixture.mjs';
+ import { createCodexAdvisorHostStore, verifyCodexAdvisorInitialExecution } from './graph/plugins/pipeline-core/lib/codex-advisor-host-store.mjs';
+-import { inspectFinalizedAdvisorObservation, readFinalizedAdvisorObservation, ADVISOR_FINALIZATION_FILENAME } from './graph/plugins/pipeline-core/lib/codex-advisor-host-record.mjs';
++import { inspectFinalizedAdvisorObservation, readFinalizedAdvisorObservation, validateAdvisorHostFinalization, ADVISOR_FINALIZATION_FILENAME } from './graph/plugins/pipeline-core/lib/codex-advisor-host-record.mjs';
+ import { inspectRegisteredCodexOwnership, verifyRegisteredCodexOwnership } from './graph/plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs';
+ import { createAdvisorBindingDiagnosticRecorder, projectAdvisorBindingDiagnostic } from './graph/plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs';
+ import { canonicalJson } from './graph/plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs';
+@@ -91,8 +91,14 @@
+ });
+ add('OA-DIAG05', 'structurally valid recipe drift is rejected at finalization-request', async (t) => {
+   const v = await valid(t), path = join(v.dir, ADVISOR_FINALIZATION_FILENAME);
+-  const restore = mutate(path, (value) => { value.recipeSha256 = '0'.repeat(64); });
+-  try { const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-request'); }
++  const restore = mutate(path, (value) => {
++    value.recipeSha256 = value.recipeSha256 === '0'.repeat(64) ? '1'.repeat(64) : '0'.repeat(64);
++    value.inputDisposition.recipeSha256 = value.recipeSha256;
++  });
++  try {
++    assert.equal(validateAdvisorHostFinalization(JSON.parse(readFileSync(path))), true, 'request mutation must satisfy the existing finalization contract first');
++    const result = verify(v); assert.equal(result.ok, false); closedDiagnostic(result.diagnostic, 'finalization-request');
++  }
+   finally { restore(); }
+ });
+ add('OA-DIAG06', 'forged public receipt digest preserves store-finalization-readback generic rejection', async (t) => {

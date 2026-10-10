@@ -1,0 +1,67 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "Scratch18",
+  "originalReceipt": {
+    "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/root-receipt.json",
+    "sha256": "851c071c5c769fd1a298e2f1da7b970d6a8fb95580a43298465290f0952d50ee",
+    "bytes": 3211
+  },
+  "suites": [
+    {
+      "name": "Scratch18",
+      "status": "not-qualified",
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "474b59062de958225b9d8a339e78e5ad03e16102589ce7091efe94b3a69953cf",
+        "caseSetSha256": "e5c617d8b3927f3ddb01959a8b7cb542e9380a658472019f1872d7cc2f3701dd",
+        "dispositionsSha256": "397e8f459992772756f5252a45f16db78fb7f336c572b2855c027094dfa46fb9",
+        "declaredCount": 18,
+        "disposedCount": 18,
+        "counts": {
+          "pass": 14,
+          "fail": 4,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "786d5cc51daeaf8d96480fc10d518dd90cc3b8d9d3cf63017212fee1f48b2a59",
+      "counts": {
+        "pass": 14,
+        "fail": 4,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": [
+        "SC-DUR01",
+        "SC-DUR02",
+        "SC-DUR03",
+        "SC-DUR04",
+        "SC-DUR05",
+        "SC-DUR06",
+        "SC-DUR07",
+        "SC-DUR08",
+        "SC-DUR09",
+        "SC-DUR10",
+        "SC-DUR11",
+        "SC-DUR12",
+        "SC-DUR13",
+        "SC-DUR14",
+        "SC-DUR15",
+        "SC-DUR16",
+        "SC-DUR17",
+        "SC-DUR18"
+      ],
+      "unsupportedSkipIds": []
+    }
+  ],
+  "sourceGraphSha256": null,
+  "graphConserved": null,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

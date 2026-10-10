@@ -1,0 +1,12 @@
+{
+  "schema": "alfred.original41-criteria-retained-reference.v1",
+  "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/total-status-and-events-20261010/criteria-current.json",
+  "sha256": "a73e20ddfb55759b63caa68770f39c9271a33f1acb9c3172b72a416723a104dd",
+  "rows": 41,
+  "originalAC": 37,
+  "originalIR": 4,
+  "originalWholeCriteriaAccepted": 0,
+  "newWholeCriteriaAccepted": 0,
+  "currentSourceCount": 111,
+  "nativeClaim": false
+}

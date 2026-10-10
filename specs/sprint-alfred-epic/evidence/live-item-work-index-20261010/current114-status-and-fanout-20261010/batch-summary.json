@@ -1,0 +1,1269 @@
+{
+  "schema": "alfred.current114.crosswalk-batch-summary.v1",
+  "batches": [
+    {
+      "batchId": "CROSSWALK-01",
+      "count": 14,
+      "primaryTheme": "Read-only recovery, authority/admission, bootstrap and catalogue",
+      "owner": "/root/agy_greenfield_design_audit",
+      "workLocation": "scratch/alfred-current114-crosswalk-01-02-20261010",
+      "items": [
+        {
+          "id": "pipeline.a-read-only-probe-can-dump-the-process-environment-into-a-transcript",
+          "bodyFile": "backlog/items/2026-10-07-a-read-only-probe-can-dump-the-process-environment-into-a-transcript.md",
+          "expectedCurrentBodySha256": "775c4ba06d069b47e93995d0afe93610fc9dd457ac25d711e787587772418623",
+          "observedBodySha256": "775c4ba06d069b47e93995d0afe93610fc9dd457ac25d711e787587772418623",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.advertised-git-to-head-pipeline-is-refused",
+          "bodyFile": "backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+          "expectedCurrentBodySha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "observedBodySha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.advisor-demand-reuse-has-no-design-course-bound",
+          "bodyFile": "backlog/items/2026-09-28-advisor-demand-reuse-has-no-design-course-bound.md",
+          "expectedCurrentBodySha256": "5c721a9e998226fc812d19a2a01b53ae5f9693b68d2275e89407f562e6dd62f2",
+          "observedBodySha256": "5c721a9e998226fc812d19a2a01b53ae5f9693b68d2275e89407f562e6dd62f2",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.advisor-question-contract-and-final-source-binding-conflict",
+          "bodyFile": "backlog/items/2026-09-28-advisor-question-contract-and-final-source-binding-conflict.md",
+          "expectedCurrentBodySha256": "5205b5399d20a5a53297723e5412df0bb163fe2dbb4a8da771b288cbf634bdd2",
+          "observedBodySha256": "5205b5399d20a5a53297723e5412df0bb163fe2dbb4a8da771b288cbf634bdd2",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses",
+          "bodyFile": "backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md",
+          "expectedCurrentBodySha256": "29cd61635a8da9f6bef4b97880f2feac361500ebfce289efed9cf7beda3e18be",
+          "observedBodySha256": "29cd61635a8da9f6bef4b97880f2feac361500ebfce289efed9cf7beda3e18be",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agent-obligations-says-no-and-and-while-the-guard-admits-six-segments",
+          "bodyFile": "backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md",
+          "expectedCurrentBodySha256": "658764caf1e03625d56a4a7a73ecff2a06fdd77f6287ac3e7027c999d2d77af5",
+          "observedBodySha256": "658764caf1e03625d56a4a7a73ecff2a06fdd77f6287ac3e7027c999d2d77af5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+          "bodyFile": "backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+          "expectedCurrentBodySha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "observedBodySha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agy-el01-write-authorization-gap",
+          "bodyFile": "backlog/items/2026-10-09-agy-el01-write-authorization-gap.md",
+          "expectedCurrentBodySha256": "33c44104accb1d446f2b093e37e84cc845da212ac894974f3cfb273bbee88f8f",
+          "observedBodySha256": "33c44104accb1d446f2b093e37e84cc845da212ac894974f3cfb273bbee88f8f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agy-imported-plugin-snapshot-shadows-registered-plugin",
+          "bodyFile": "backlog/items/2026-09-28-agy-imported-plugin-snapshot-shadows-registered-plugin.md",
+          "expectedCurrentBodySha256": "8ded99a2f2096edb0d737c40f4bd7d3baf88316483a330a550bf867205e72df6",
+          "observedBodySha256": "8ded99a2f2096edb0d737c40f4bd7d3baf88316483a330a550bf867205e72df6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.agy-managed-copy-first-start-lacks-attestation",
+          "bodyFile": "backlog/items/2026-09-29-agy-managed-copy-first-start-lacks-attestation.md",
+          "expectedCurrentBodySha256": "b401f3fd44217f7273ec299a0a2829b9718666300df1189bef7ee0825164ed49",
+          "observedBodySha256": "b401f3fd44217f7273ec299a0a2829b9718666300df1189bef7ee0825164ed49",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.antigravity-1-2-13-blocks-managed-refresh",
+          "bodyFile": "backlog/items/2026-09-29-antigravity-1-2-13-blocks-managed-refresh.md",
+          "expectedCurrentBodySha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+          "observedBodySha256": "a31faebfd202e541189574161b11485687a19f4dbc9fb865d40d6ff872f867b5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.approval-bound-design-package-lives-in-an-ignored-directory",
+          "bodyFile": "backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+          "expectedCurrentBodySha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+          "observedBodySha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.approval-verification-demands-head-equals-candidate",
+          "bodyFile": "backlog/items/2026-10-08-approval-verification-demands-head-equals-candidate.md",
+          "expectedCurrentBodySha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "observedBodySha256": "558a37cabb9add7261b21fb273b2976a58f6bdf60c8047c35e332f0a11cfa086",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes",
+          "bodyFile": "backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md",
+          "expectedCurrentBodySha256": "7b38f2789c2e3a93fbee6e11a29ca663e891c11dd57c4fcc65a91a90215b1756",
+          "observedBodySha256": "7b38f2789c2e3a93fbee6e11a29ca663e891c11dd57c4fcc65a91a90215b1756",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-02",
+      "count": 14,
+      "primaryTheme": "Read-only recovery, authority/admission, bootstrap and catalogue",
+      "owner": "/root/agy_greenfield_design_audit",
+      "workLocation": "scratch/alfred-current114-crosswalk-01-02-20261010",
+      "items": [
+        {
+          "id": "pipeline.auto-install-pre-push-hook-with-the-plugin",
+          "bodyFile": "backlog/items/2026-10-08-auto-install-pre-push-hook-with-the-plugin.md",
+          "expectedCurrentBodySha256": "b8c658eed4e89c89b136a96d767a4fe873285927ddddf133c9ef338b4af2d784",
+          "observedBodySha256": "b8c658eed4e89c89b136a96d767a4fe873285927ddddf133c9ef338b4af2d784",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.bootstrap-should-refresh-hooks-when-the-plugin-updated",
+          "bodyFile": "backlog/items/2026-10-05-bootstrap-should-refresh-hooks-when-the-plugin-updated.md",
+          "expectedCurrentBodySha256": "60bb24fca0448db604323300345908562b967611fb5a4ea3e68b4b038c43076a",
+          "observedBodySha256": "60bb24fca0448db604323300345908562b967611fb5a4ea3e68b4b038c43076a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.bounded-reader-terminal-binding",
+          "bodyFile": "backlog/items/2026-09-27-bounded-reader-terminal-binding.md",
+          "expectedCurrentBodySha256": "945803369c365d209df83a06b165aa65b1c327f98817083bfb3ba2b2c421c57e",
+          "observedBodySha256": "945803369c365d209df83a06b165aa65b1c327f98817083bfb3ba2b2c421c57e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
+          "bodyFile": "backlog/items/2026-10-04-brownfield-implementation-entry-demands-a-greenfield-design-block.md",
+          "expectedCurrentBodySha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "observedBodySha256": "7e83f703b204b0228ec3001c97bf75d8e98b005f48eb2d98dd28a393607bde8c",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.budget-checkpoint-fires-below-the-briefed-cap",
+          "bodyFile": "backlog/items/2026-10-05-budget-checkpoint-fires-below-the-briefed-cap.md",
+          "expectedCurrentBodySha256": "4de25e1110e18486e44ff5df3c4ffbad4e81643828f649d52c9236daf21c02c5",
+          "observedBodySha256": "4de25e1110e18486e44ff5df3c4ffbad4e81643828f649d52c9236daf21c02c5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.capability-inventory-checker-is-red-at-head",
+          "bodyFile": "backlog/items/2026-10-05-capability-inventory-checker-is-red-at-head.md",
+          "expectedCurrentBodySha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "observedBodySha256": "d7ddb1e0d8627b058ea03f5e6c8066deb0f63b60ef91ee1f4607f8f5a5665bdb",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.capture-evidence-does-not-normalize-windows-npm-launch",
+          "bodyFile": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-capture-evidence-does-not-normalize-windows-npm-launch.md",
+          "expectedCurrentBodySha256": "b74012aa04ab1605ce3cf8d1a48f32a40b9077437394afcdfcc8a9b80876ee69",
+          "observedBodySha256": "b74012aa04ab1605ce3cf8d1a48f32a40b9077437394afcdfcc8a9b80876ee69",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+          "bodyFile": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+          "expectedCurrentBodySha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+          "observedBodySha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.claude-design-readiness-cannot-start-on-windows",
+          "bodyFile": "backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md",
+          "expectedCurrentBodySha256": "649a165d68b106c0156500878e4c48cee37f912286ed572cdb51c9c18e4debe4",
+          "observedBodySha256": "649a165d68b106c0156500878e4c48cee37f912286ed572cdb51c9c18e4debe4",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.claude-greenfield-seeds-unselected-codex-targets",
+          "bodyFile": "backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md",
+          "expectedCurrentBodySha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "observedBodySha256": "b290b380364e5e58f3a5348ae7975d72fadf387bb3f03c41c64b86c701b0dc02",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.claude-session-start-emits-codex-transcript-recovery-hint",
+          "bodyFile": "backlog/items/2026-10-03-claude-session-start-emits-codex-transcript-recovery-hint.md",
+          "expectedCurrentBodySha256": "6a14b634a1e207ea7dd6331b54a7890a6c71bcb34fa0c61bb0ba2fc775ecd32b",
+          "observedBodySha256": "6a14b634a1e207ea7dd6331b54a7890a6c71bcb34fa0c61bb0ba2fc775ecd32b",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+          "bodyFile": "backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+          "expectedCurrentBodySha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+          "observedBodySha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.claude-windows-guard-refuses-every-in-repo-read",
+          "bodyFile": "backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+          "expectedCurrentBodySha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+          "observedBodySha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+          "bodyFile": "backlog/items/2026-09-28-codex-advisor-shared-namespace-rejects-fresh-repository-identity.md",
+          "expectedCurrentBodySha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+          "observedBodySha256": "c1953268b51ad1659956ce0cd7c521964da365db5ceb8f16b4026dfa4c0746b2",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-03",
+      "count": 14,
+      "primaryTheme": "Codex/critic prerequisites, declared criteria, design and dispatch budget",
+      "owner": "/root/r10_reader_budget_fix",
+      "workLocation": "scratch/alfred-current114-crosswalk-03-04-20261010",
+      "items": [
+        {
+          "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+          "bodyFile": "backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md",
+          "expectedCurrentBodySha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "observedBodySha256": "0f78733285129d625c11a21df37d6cd5b789fbb4ac2ade6d1abf142691633669",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+          "bodyFile": "backlog/items/2026-09-28-codex-design-readiness-child-rejects-valid-review.md",
+          "expectedCurrentBodySha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+          "observedBodySha256": "bffd844c1ecc3ffcf63adc2c87932cfd29eb3f49ecc0f5b7ba7828e691a99b9a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.codex-readiness-private-receipt-omits-output-custody",
+          "bodyFile": "backlog/items/2026-09-28-prepared-codex-readiness-receipt-does-not-bind-finalized-output.md",
+          "expectedCurrentBodySha256": "146b0ecb9c3b43b4f2e1e7400a3fd9f26d633d32d656e4a2d3940b232530317a",
+          "observedBodySha256": "146b0ecb9c3b43b4f2e1e7400a3fd9f26d633d32d656e4a2d3940b232530317a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+          "bodyFile": "backlog/items/2026-09-27-codex-wsl-required-advisor-has-no-completable-route.md",
+          "expectedCurrentBodySha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+          "observedBodySha256": "502bebf32289bc2e6c1585a48f1981c52d809251fec995608397c9789e5f618f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.commit-producer-path-order-failures-count-against-the-tool-cap",
+          "bodyFile": "backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md",
+          "expectedCurrentBodySha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+          "observedBodySha256": "ec78d35d337742f899ad0e89ea79e1c80d7e83a967371d2c3c5c7ae24760a48f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.completion-fd-suites-cannot-run-as-single-files",
+          "bodyFile": "backlog/items/2026-10-05-completion-fd-suites-cannot-run-as-single-files.md",
+          "expectedCurrentBodySha256": "e7d18e20cc7884fe6f1cfeb35e20a32f987fdc70c4d22aa77918f69e1bf11799",
+          "observedBodySha256": "e7d18e20cc7884fe6f1cfeb35e20a32f987fdc70c4d22aa77918f69e1bf11799",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.concurrent-session-warning-never-fires-on-native-windows",
+          "bodyFile": "backlog/items/2026-10-09-concurrent-session-warning-never-fires-on-native-windows.md",
+          "expectedCurrentBodySha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+          "observedBodySha256": "c8374bd7c6082ff219c6ea49efc886c788b67319318e45997e7c9ed9d7777513",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+          "bodyFile": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-configure-verify-output-lacks-a-walkable-commit-route.md",
+          "expectedCurrentBodySha256": "4de5a17c0d61b4059366356a0a521a86ebcf008eeb4c576bea8664ab650d3dd9",
+          "observedBodySha256": "4de5a17c0d61b4059366356a0a521a86ebcf008eeb4c576bea8664ab650d3dd9",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
+          "bodyFile": "backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md",
+          "expectedCurrentBodySha256": "e6248906519a7293dd277391f6ba97e358c87ef4f2f0b1453758faea812e836a",
+          "observedBodySha256": "e6248906519a7293dd277391f6ba97e358c87ef4f2f0b1453758faea812e836a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.critic-round-cap-and-delta-scope-are-not-enforced",
+          "bodyFile": "backlog/items/2026-10-07-critic-round-cap-and-delta-scope-are-not-enforced.md",
+          "expectedCurrentBodySha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+          "observedBodySha256": "9902bbf50e5adbf70a050b5a4ebc2fb995ae1095d87e469112dc12a6efa3e86f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
+          "bodyFile": "backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md",
+          "expectedCurrentBodySha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+          "observedBodySha256": "1844826ef26e0e5e780846049d864f33adb7bd7ac0c8c296dd2ad6a5970d14e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.critic-scratch-notes-write-is-refused-again",
+          "bodyFile": "backlog/items/2026-10-06-critic-scratch-notes-write-is-refused-again.md",
+          "expectedCurrentBodySha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+          "observedBodySha256": "1e05defaa8783e708372ed5c2bf39a80dd2e3677ee92c908b2a1db44794943e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.cross-runner-chat-intake-reference-needs-host-capture",
+          "bodyFile": "backlog/items/2026-09-29-cross-runner-chat-intake-reference-needs-host-capture.md",
+          "expectedCurrentBodySha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+          "observedBodySha256": "3764e98348ae4ac91010b98c0eed66f81f9af7a0e7070ab02e7d615d643a47c4",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+          "bodyFile": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+          "expectedCurrentBodySha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+          "observedBodySha256": "6a8375093e2e86f022d1139d192d3045e792dafbed3b1476dd3493fb075b6183",
+          "currentBodyCAS": false
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-04",
+      "count": 14,
+      "primaryTheme": "Codex/critic prerequisites, declared criteria, design and dispatch budget",
+      "owner": "/root/r10_reader_budget_fix",
+      "workLocation": "scratch/alfred-current114-crosswalk-03-04-20261010",
+      "items": [
+        {
+          "id": "pipeline.declared-system-skill-read-requires-human-override",
+          "bodyFile": "backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md",
+          "expectedCurrentBodySha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+          "observedBodySha256": "e7b41017ccebcf99996f4728b10c6a9b13d173aecc99acac83d075913f425aad",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.denial-names-a-diagnosis-it-refuses",
+          "bodyFile": "backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md",
+          "expectedCurrentBodySha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+          "observedBodySha256": "733ee0fe268a4804d2b9606d1312ee98708d20c99085499871e20b6f34582c87",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-approval-validator-rejects-json-key-reordering",
+          "bodyFile": "backlog/items/2026-09-28-design-approval-validator-rejects-json-key-reordering.md",
+          "expectedCurrentBodySha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+          "observedBodySha256": "8cd34d32ca207cd54ff90bd6507d25356617f3acc68b5c11290cf65c1e8644e3",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+          "bodyFile": "backlog/items/2026-09-27-design-bootstrap-verify-state-contradicts-deferred-contract.md",
+          "expectedCurrentBodySha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+          "observedBodySha256": "7289e7117fa060c1e0395123f7b407316e2672ee2d4f1ed4a045cc4a200e52e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+          "bodyFile": "backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+          "expectedCurrentBodySha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+          "observedBodySha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-intake-generator-omits-question-answers",
+          "bodyFile": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-design-intake-generator-omits-question-answers.md",
+          "expectedCurrentBodySha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099",
+          "observedBodySha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-package-parent-metadata-false-drift",
+          "bodyFile": "backlog/items/2026-09-29-unrelated-directory-entry-changes-reject-approved-design-package.md",
+          "expectedCurrentBodySha256": "c4c5abcdde60d56440f019ae16cb5a952821341602218ea3fdd0ce19706ac1e5",
+          "observedBodySha256": "c4c5abcdde60d56440f019ae16cb5a952821341602218ea3fdd0ce19706ac1e5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+          "bodyFile": "backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+          "expectedCurrentBodySha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+          "observedBodySha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-trailer-verifier-lost-after-closure",
+          "bodyFile": "backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md",
+          "expectedCurrentBodySha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+          "observedBodySha256": "4c5ecfea1efcec86ad8bbad4dcb91b07408419d8d66edd1c1a5de2b0ee4f8204",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-workflow-package-omits-contract",
+          "bodyFile": "backlog/items/2026-09-28-design-workflow-package-omits-contract.md",
+          "expectedCurrentBodySha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+          "observedBodySha256": "ccd389af04c143e239a3b529ac41e20dadb63f73fbf5f57a1e6ded666df44764",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.design-workflow-package-v2-readiness-fixture-fails-on-windows",
+          "bodyFile": "backlog/items/2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows.md",
+          "expectedCurrentBodySha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "observedBodySha256": "b2bb3c70dff2d02f6c2319808f86b78a891a1896216dcf72b8ca076c3a398479",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.desktop-app-support-is-unverified",
+          "bodyFile": "backlog/items/2026-10-07-desktop-app-support-is-unverified.md",
+          "expectedCurrentBodySha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+          "observedBodySha256": "d6059abe31ef6ea8ba7868d9f3057a5bc39d28a6821f04dfbb34a0475cf494f1",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.disjoint-signed-hgo-actions-invalidate-one-another",
+          "bodyFile": "backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md",
+          "expectedCurrentBodySha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "observedBodySha256": "18555dbf1ece8a233354c4759033f7a9fd1a58061d548217de2b0c851ac2da06",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.dispatch-budget-lock-refuses-every-subagent-call-on-windows",
+          "bodyFile": "backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+          "expectedCurrentBodySha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+          "observedBodySha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-05",
+      "count": 14,
+      "primaryTheme": "Dispatch, FD3, forensics, delivery and greenfield design",
+      "owner": "/root/alfred_role_fallback_independent",
+      "workLocation": "scratch/alfred-current114-crosswalk-05-06-20261010",
+      "items": [
+        {
+          "id": "pipeline.dispatch-guard-rejects-built-in-capitalized-agent-types",
+          "bodyFile": "backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+          "expectedCurrentBodySha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+          "observedBodySha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
+          "bodyFile": "backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md",
+          "expectedCurrentBodySha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+          "observedBodySha256": "26e8a52017698b47281510a88bd3c8a1114f5e2bdb9fb5e4f6d2bec3e0d9a225",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.dispatch-record-ownership-binds-an-attempted-creation",
+          "bodyFile": "backlog/items/2026-10-05-dispatch-record-ownership-binds-an-attempted-creation.md",
+          "expectedCurrentBodySha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+          "observedBodySha256": "965b26a1ddad50fd6c35129e1be985c1f937fd1c39c40f1297b13f199e1be582",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.dispatch-records-land-under-specs-evidence",
+          "bodyFile": "backlog/items/2026-10-05-dispatch-records-land-under-specs-evidence.md",
+          "expectedCurrentBodySha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+          "observedBodySha256": "967fad3dca7987083be6f3ba5b5102bde841115396f031b1f04e2de3a734f114",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.domain-scanner-findings-need-reproduction-before-remedy",
+          "bodyFile": "backlog/items/2026-10-09-domain-scanner-findings-need-reproduction-before-remedy.md",
+          "expectedCurrentBodySha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+          "observedBodySha256": "9a65266594f0dd5686f486678d45e5c39374e9945b09fab7d76a78e5de017ea5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.draft-phase-guard-blocks-mandatory-bootstrap-preflight",
+          "bodyFile": "backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+          "expectedCurrentBodySha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+          "observedBodySha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads",
+          "bodyFile": "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md",
+          "expectedCurrentBodySha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+          "observedBodySha256": "b023654546b97b18ebaf5b2ad8d5e5ac7492bf61d39db14cc315235b0e554453",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.every-dispatch-pays-a-bootstrap-receipt-detour",
+          "bodyFile": "backlog/items/2026-10-05-every-dispatch-pays-a-bootstrap-receipt-detour.md",
+          "expectedCurrentBodySha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+          "observedBodySha256": "10643def2c741552c7150bd4738c859b9db1ec5d0d07a1d71b5f267679db3dfc",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.evidence-artifacts-carry-no-commit-identity",
+          "bodyFile": "backlog/items/2026-10-08-evidence-artifacts-carry-no-commit-identity.md",
+          "expectedCurrentBodySha256": "cbf0732122c1387abe68b8cc588d7dba92c9b385dd49cada0d4914a1be0b6815",
+          "observedBodySha256": "cbf0732122c1387abe68b8cc588d7dba92c9b385dd49cada0d4914a1be0b6815",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.existing-signing-key-reuse-deadlocks-onboarding",
+          "bodyFile": "backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+          "expectedCurrentBodySha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+          "observedBodySha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.feature-branch-push-admitted-without-signature-approval",
+          "bodyFile": "backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+          "expectedCurrentBodySha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+          "observedBodySha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.first-enrollment-enters-retirement-before-consent",
+          "bodyFile": "backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md",
+          "expectedCurrentBodySha256": "178e806e3b888644be771ca73197f29cd399c86ac5362c0e2515e172e75a7cce",
+          "observedBodySha256": "178e806e3b888644be771ca73197f29cd399c86ac5362c0e2515e172e75a7cce",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.foreign-worktree-closes-the-implementation-gate",
+          "bodyFile": "backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md",
+          "expectedCurrentBodySha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+          "observedBodySha256": "f3999c47e1f56e70ac226a508f911818d4e960f56399d86e0999312a9018471f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+          "bodyFile": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "expectedCurrentBodySha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+          "observedBodySha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-06",
+      "count": 14,
+      "primaryTheme": "Dispatch, FD3, forensics, delivery and greenfield design",
+      "owner": "/root/alfred_role_fallback_independent",
+      "workLocation": "scratch/alfred-current114-crosswalk-05-06-20261010",
+      "items": [
+        {
+          "id": "pipeline.gh-delivery-classifier-is-not-wired",
+          "bodyFile": "backlog/items/2026-10-08-gh-delivery-classifier-is-not-wired.md",
+          "expectedCurrentBodySha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "observedBodySha256": "293f5636a4e7b8129700dc831f1a4de00f3689162cf25f886427e32ca0bcc79a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+          "bodyFile": "backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+          "expectedCurrentBodySha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+          "observedBodySha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
+          "bodyFile": "backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md",
+          "expectedCurrentBodySha256": "0dbc98748ef47df3f3cc97f8ee99c4c29cba4daef58f008c625976b53ee22324",
+          "observedBodySha256": "0dbc98748ef47df3f3cc97f8ee99c4c29cba4daef58f008c625976b53ee22324",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.git-hook-runtime-snapshots-go-stale-after-plugin-changes",
+          "bodyFile": "backlog/items/2026-10-04-git-hook-runtime-snapshots-go-stale-after-plugin-changes.md",
+          "expectedCurrentBodySha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+          "observedBodySha256": "5f4446d22e09a3270689a0c9846f3d13cf52c602901b57680abe33e71df131e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.git-push-classifier-misses-env-s-and-editor-bang",
+          "bodyFile": "backlog/items/2026-10-08-git-push-classifier-misses-env-s-and-editor-bang.md",
+          "expectedCurrentBodySha256": "79daa455d33635fefc5a9711dc93fa2406eb51ea09e8a2e8aa124049c397051e",
+          "observedBodySha256": "79daa455d33635fefc5a9711dc93fa2406eb51ea09e8a2e8aa124049c397051e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.git-stash-list-classified-as-working-tree-write",
+          "bodyFile": "backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md",
+          "expectedCurrentBodySha256": "29d7567ec44486b684570d40029c00d6d1e8229464eaecc558e469212c283b6e",
+          "observedBodySha256": "29d7567ec44486b684570d40029c00d6d1e8229464eaecc558e469212c283b6e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.gitleaks-content-suppression-does-not-match-on-windows",
+          "bodyFile": "backlog/items/2026-10-05-gitleaks-content-suppression-does-not-match-on-windows.md",
+          "expectedCurrentBodySha256": "18571ff078dc529d7c782309a8bd6d708f85d589fb049a6b599b8a6e923ff709",
+          "observedBodySha256": "18571ff078dc529d7c782309a8bd6d708f85d589fb049a6b599b8a6e923ff709",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one",
+          "bodyFile": "backlog/items/2026-10-06-gitleaks-repair-does-not-check-that-the-moved-value-is-the-reviewed-one.md",
+          "expectedCurrentBodySha256": "08d50dff7797dafe4850ccc92573a93be1e34b30b4182b31e5f8fd3f8c3d5cec",
+          "observedBodySha256": "08d50dff7797dafe4850ccc92573a93be1e34b30b4182b31e5f8fd3f8c3d5cec",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.gitleaks-repair-ignore-cli-is-a-no-op-on-windows",
+          "bodyFile": "backlog/items/2026-10-05-gitleaks-repair-ignore-cli-is-a-no-op-on-windows.md",
+          "expectedCurrentBodySha256": "e64046fe9fd69016b1615679bf19f51a61eff96c941b46e16055486e743d3f4e",
+          "observedBodySha256": "e64046fe9fd69016b1615679bf19f51a61eff96c941b46e16055486e743d3f4e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+          "bodyFile": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+          "expectedCurrentBodySha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+          "observedBodySha256": "bd8c02353bc7c72c310bc6ffbdba0d5d1f8fe93b4fa53585f9deb1e1e845bd47",
+          "currentBodyCAS": false
+        },
+        {
+          "id": "pipeline.goldfish-bugfix-module-conflicts-with-qg-04",
+          "bodyFile": "backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md",
+          "expectedCurrentBodySha256": "74cf933c951d38189b3a97a0755abd435bcf08ea19ba6db28cdd99f5649b4bdc",
+          "observedBodySha256": "74cf933c951d38189b3a97a0755abd435bcf08ea19ba6db28cdd99f5649b4bdc",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.governance-scope-rejects-readonly-host-git-control",
+          "bodyFile": "backlog/items/2026-09-29-governance-scope-rejects-readonly-host-git-control.md",
+          "expectedCurrentBodySha256": "174d6e04aa78aaa21e292d3b0e3405550c1b01e77e4b0685bce25eccaa6abad5",
+          "observedBodySha256": "174d6e04aa78aaa21e292d3b0e3405550c1b01e77e4b0685bce25eccaa6abad5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+          "bodyFile": "backlog/items/2026-09-27-greenfield-approval-policy-applies-after-intake-transition.md",
+          "expectedCurrentBodySha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+          "observedBodySha256": "e0fe1a972cd5dfeb50470416bb0bc351c1623c3f1facf50d8ba407e5ae5948e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.greenfield-design-course-cost-and-proportionality",
+          "bodyFile": "backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+          "expectedCurrentBodySha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+          "observedBodySha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-07",
+      "count": 14,
+      "primaryTheme": "Greenfield budgets, host identity, kernel and onboarding lifecycle",
+      "owner": "/root/agy_greenfield_roles_audit",
+      "workLocation": "scratch/alfred-current114-crosswalk-07-08-20261010",
+      "items": [
+        {
+          "id": "pipeline.greenfield-machine-output-and-skill-budget",
+          "bodyFile": "backlog/items/2026-09-29-greenfield-machine-output-and-skill-budget.md",
+          "expectedCurrentBodySha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+          "observedBodySha256": "2d5579581ab886e21ba92409318259fc04c343a0c4cebe7badc8b64b79beebc6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+          "bodyFile": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+          "expectedCurrentBodySha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+          "observedBodySha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target",
+          "bodyFile": "backlog/items/2026-10-05-guard-push-refuses-a-read-only-git-grep-no-index-as-ambiguous-push-target.md",
+          "expectedCurrentBodySha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+          "observedBodySha256": "882aad4c80f31716aeb1e9729e8bb0e330532e8d6dc28d74c5da4e603d319529",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.guard-push-refuses-read-only-git-without-push",
+          "bodyFile": "backlog/items/2026-10-09-guard-push-refuses-read-only-git-without-push.md",
+          "expectedCurrentBodySha256": "4690c05e8f039d5ee30cad8a53bd8bdb4d775a4d31df0e49252987cf7d019120",
+          "observedBodySha256": "4690c05e8f039d5ee30cad8a53bd8bdb4d775a4d31df0e49252987cf7d019120",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.guard-push-treats-gitleaks-as-a-git-command",
+          "bodyFile": "backlog/items/2026-10-05-guard-push-treats-gitleaks-as-a-git-command.md",
+          "expectedCurrentBodySha256": "133beaa77554a123bc2e39c4e8a1c09c605502f6f1a16d403631dbe8812638f8",
+          "observedBodySha256": "133beaa77554a123bc2e39c4e8a1c09c605502f6f1a16d403631dbe8812638f8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.guard-suite-fails-60-tests-on-native-windows",
+          "bodyFile": "backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md",
+          "expectedCurrentBodySha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+          "observedBodySha256": "91587203452e42a0a71871425899375db5359505be5561aca8d0dab7503694d6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.handover-doc-committed-without-governance-classification",
+          "bodyFile": "backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+          "expectedCurrentBodySha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+          "observedBodySha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
+          "bodyFile": "backlog/items/2026-10-07-heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.md",
+          "expectedCurrentBodySha256": "b25facc5185da9499432d6fb3d3a1a07cba3c166ee3bfecf1242a79de19b4a50",
+          "observedBodySha256": "b25facc5185da9499432d6fb3d3a1a07cba3c166ee3bfecf1242a79de19b4a50",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+          "bodyFile": "backlog/items/2026-10-09-a-dead-owner-audit-lock-is-permanently-ambiguous-on-windows.md",
+          "expectedCurrentBodySha256": "89233587365e2ad51d15b887b42536ba2f35e95217fecc5fd1fb04c76302ffdd",
+          "observedBodySha256": "89233587365e2ad51d15b887b42536ba2f35e95217fecc5fd1fb04c76302ffdd",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.hgo-patch-preflight-before-signature",
+          "bodyFile": "backlog/items/2026-09-27-hgo-patch-preflight-before-signature.md",
+          "expectedCurrentBodySha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+          "observedBodySha256": "b62f1fe22cd3861340093c5ad1c2be75b5bd2514d0ba6cab0dc2885a3cedddf0",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.hgo-stale-capability-shadows-current-authorization",
+          "bodyFile": "backlog/items/2026-09-28-stale-hgo-capability-shadows-current-authorization.md",
+          "expectedCurrentBodySha256": "fb5191c9ece5ce049b49eb132d51884163cfe3f36ec74b2abc147c9486f9f771",
+          "observedBodySha256": "fb5191c9ece5ce049b49eb132d51884163cfe3f36ec74b2abc147c9486f9f771",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.implementation-without-dispatch-escapes-review-coverage",
+          "bodyFile": "backlog/items/2026-10-09-implementation-without-dispatch-escapes-review-coverage.md",
+          "expectedCurrentBodySha256": "f859ed29ffbb04f81d07dd990d5e5da071ecf4e7f8c21540a5fa8bd17ab4fd5c",
+          "observedBodySha256": "f859ed29ffbb04f81d07dd990d5e5da071ecf4e7f8c21540a5fa8bd17ab4fd5c",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+          "bodyFile": "backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md",
+          "expectedCurrentBodySha256": "2db1d79416dd18bbfe07a9e8ee8ebd44bd1afc7bb692121a2bba657dba6e5b0e",
+          "observedBodySha256": "2db1d79416dd18bbfe07a9e8ee8ebd44bd1afc7bb692121a2bba657dba6e5b0e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.kernel-closure-check-masks-violations-after-the-first",
+          "bodyFile": "backlog/items/2026-10-05-kernel-closure-check-masks-violations-after-the-first.md",
+          "expectedCurrentBodySha256": "f7aff936f73def74cf91fd4eb07a5f9bcb91d0980763d93a2c1d12c9cefae6b2",
+          "observedBodySha256": "f7aff936f73def74cf91fd4eb07a5f9bcb91d0980763d93a2c1d12c9cefae6b2",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-08",
+      "count": 14,
+      "primaryTheme": "Greenfield budgets, host identity, kernel and onboarding lifecycle",
+      "owner": "/root/agy_greenfield_roles_audit",
+      "workLocation": "scratch/alfred-current114-crosswalk-07-08-20261010",
+      "items": [
+        {
+          "id": "pipeline.lifecycle-coordination-commands-refused-as-implementation-writes",
+          "bodyFile": "backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+          "expectedCurrentBodySha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+          "observedBodySha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.lifecycle-inspect-omits-current-plan-spec-digests",
+          "bodyFile": "backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+          "expectedCurrentBodySha256": "41c6867860580b2d4d96517455345e87cefd01261fc044de777d704d204f994b",
+          "observedBodySha256": "41c6867860580b2d4d96517455345e87cefd01261fc044de777d704d204f994b",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill",
+          "bodyFile": "backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md",
+          "expectedCurrentBodySha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+          "observedBodySha256": "4f7bc8c7cbd6d63b8a2a7b2d5a613e6961aa8c24d2885aa5a4a7c9451c5aaaed",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.machine-wide-key-directory-resolution",
+          "bodyFile": "backlog/items/2026-10-08-machine-wide-key-directory-resolution.md",
+          "expectedCurrentBodySha256": "c6642b811980a118917bf22546670ce393e9348ba9a742717e1bf6352c9d268f",
+          "observedBodySha256": "c6642b811980a118917bf22546670ce393e9348ba9a742717e1bf6352c9d268f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.mandatory-hook-readiness-returned-refusal-skips-rollback",
+          "bodyFile": "backlog/items/2026-10-06-mandatory-hook-readiness-returned-refusal-skips-rollback.md",
+          "expectedCurrentBodySha256": "3522e4621e0246a8d69b56d096ad98756c564b6ede9d4a2a59f07be832da48a8",
+          "observedBodySha256": "3522e4621e0246a8d69b56d096ad98756c564b6ede9d4a2a59f07be832da48a8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.merge-commit-message-skips-conventional-type-check",
+          "bodyFile": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-merge-commit-message-skips-conventional-type-check.md",
+          "expectedCurrentBodySha256": "915f249d3665f2c4f11cd941375e67f51928dc5f60afba8ba8bcc2681f96148a",
+          "observedBodySha256": "915f249d3665f2c4f11cd941375e67f51928dc5f60afba8ba8bcc2681f96148a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.model-family-approval-with-automatic-version-upgrades",
+          "bodyFile": "backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md",
+          "expectedCurrentBodySha256": "241d32ed22c27521c161df682580a722b394723f74d921d603c3104073ce90ac",
+          "observedBodySha256": "241d32ed22c27521c161df682580a722b394723f74d921d603c3104073ce90ac",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.model-role-bootstrap-is-always-unavailable-on-native-windows",
+          "bodyFile": "backlog/items/2026-10-08-model-role-bootstrap-is-always-unavailable-on-native-windows.md",
+          "expectedCurrentBodySha256": "8b5fbaa1eefa716041dcf3a37a2e4466dcaef63d6fb6467fbec14b58ba2c1941",
+          "observedBodySha256": "8b5fbaa1eefa716041dcf3a37a2e4466dcaef63d6fb6467fbec14b58ba2c1941",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.model-role-confirmation-prompt-obscures-required-digest",
+          "bodyFile": "backlog/items/2026-09-28-model-role-confirmation-prompt-obscures-required-digest.md",
+          "expectedCurrentBodySha256": "ab00cad73174c3a6480c4e3d29c6a125c30d91c641768b894a22ab534e31df35",
+          "observedBodySha256": "ab00cad73174c3a6480c4e3d29c6a125c30d91c641768b894a22ab534e31df35",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.native-patch-rename-drops-protected-content-markers",
+          "bodyFile": "backlog/items/2026-09-29-native-patch-rename-drops-protected-content-markers.md",
+          "expectedCurrentBodySha256": "2d1c1da41c19511ea133f22e433161b9054dcd88badbb962eb223ed43a13e0eb",
+          "observedBodySha256": "2d1c1da41c19511ea133f22e433161b9054dcd88badbb962eb223ed43a13e0eb",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.node-v24-on-windows-creates-a-real-nul-file",
+          "bodyFile": "backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md",
+          "expectedCurrentBodySha256": "886c6875baf84a45278a5fa1d4661c213d98c460b0ae80db4742ce31d4082f77",
+          "observedBodySha256": "886c6875baf84a45278a5fa1d4661c213d98c460b0ae80db4742ce31d4082f77",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
+          "bodyFile": "backlog/items/2026-09-29-nongit-retirement-reader-calls-inaccessible-controller-helper.md",
+          "expectedCurrentBodySha256": "7c6cfca086ba408002bcbf81cb15528ec251da8fac2cea04d3d7cd533aaabc11",
+          "observedBodySha256": "7c6cfca086ba408002bcbf81cb15528ec251da8fac2cea04d3d7cd533aaabc11",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.onboarding-home-override-does-not-bind-machine-plane",
+          "bodyFile": "backlog/items/2026-09-28-onboarding-home-override-does-not-bind-machine-plane.md",
+          "expectedCurrentBodySha256": "7dc25e182b9ce61158c0820f0adffec90b1a324d34d18e8dc5040d508770422a",
+          "observedBodySha256": "7dc25e182b9ce61158c0820f0adffec90b1a324d34d18e8dc5040d508770422a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow",
+          "bodyFile": "backlog/items/2026-09-29-onboarding-init-greenfield-matrix-is-serial-and-slow.md",
+          "expectedCurrentBodySha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+          "observedBodySha256": "b0bd22b0cb4e1f2d5b62b2ed678f2852b445acbdce0947c16e2b8bf56d7d2bee",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-09",
+      "count": 14,
+      "primaryTheme": "Onboarding settlements, plan provenance, push parsing and scanner coverage",
+      "owner": "/root/alfred_reader_2plus1_docs_r2",
+      "workLocation": "scratch/alfred-current114-crosswalk-09-10-20261010",
+      "items": [
+        {
+          "id": "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
+          "bodyFile": "backlog/items/2026-09-29-onboarding-test-runner-reports-async-pass-before-settlement.md",
+          "expectedCurrentBodySha256": "c9bdc02219343ac90e459b4d3c465ab03f4293a1445341e91dc428a763637bab",
+          "observedBodySha256": "c9bdc02219343ac90e459b4d3c465ab03f4293a1445341e91dc428a763637bab",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.opus-critic-only-batched-for-architecture-and-security",
+          "bodyFile": "backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md",
+          "expectedCurrentBodySha256": "aeb37a32fff0132526d274d497b3d91b642be75d5715850d1fbef1a2a2428fdf",
+          "observedBodySha256": "aeb37a32fff0132526d274d497b3d91b642be75d5715850d1fbef1a2a2428fdf",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
+          "bodyFile": "backlog/items/2026-10-05-outside-root-read-label-skips-option-value-file-tokens.md",
+          "expectedCurrentBodySha256": "44c5b214dfd33ca087ab08f4d72a0fffaf2edb43228a388cbc7bfc57f8fe3e7d",
+          "observedBodySha256": "44c5b214dfd33ca087ab08f4d72a0fffaf2edb43228a388cbc7bfc57f8fe3e7d",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+          "bodyFile": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+          "expectedCurrentBodySha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+          "observedBodySha256": "d301ec3095b9043425bbba2aea1572c05c6812bc38e3c00f979cbd68a1ce5235",
+          "currentBodyCAS": false
+        },
+        {
+          "id": "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
+          "bodyFile": "backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+          "expectedCurrentBodySha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "observedBodySha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.pipeline-hooks-act-in-repositories-that-never-opted-in",
+          "bodyFile": "backlog/items/2026-09-28-pipeline-hooks-act-in-repositories-that-never-opted-in.md",
+          "expectedCurrentBodySha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+          "observedBodySha256": "f66799f0d8c7c9720b67e27071751ee9fc5a53005b4f70bd5fabf8b5e620f3a9",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.plan-submission-must-not-require-separate-po-approval",
+          "bodyFile": "backlog/items/2026-09-28-plan-submission-must-not-require-separate-po-approval.md",
+          "expectedCurrentBodySha256": "ef754db1578305fe6fd96edf691a6230c32a47534545d38cd37fdc84dfd99cb5",
+          "observedBodySha256": "ef754db1578305fe6fd96edf691a6230c32a47534545d38cd37fdc84dfd99cb5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+          "bodyFile": "backlog/items/2026-09-27-powershell-bypasses-onboarding-read-boundary.md",
+          "expectedCurrentBodySha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+          "observedBodySha256": "a2e2fbb3b955625a7758fc320b2bf5d3d4754751de194d82d47f7c8b70ea1775",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
+          "bodyFile": "backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md",
+          "expectedCurrentBodySha256": "d004f3fd834bd9a4c33443575529d07f20d3d07dd3c0d27b890701061ca3e2f7",
+          "observedBodySha256": "d004f3fd834bd9a4c33443575529d07f20d3d07dd3c0d27b890701061ca3e2f7",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+          "bodyFile": "backlog/items/2026-10-05-preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.md",
+          "expectedCurrentBodySha256": "55ceaf1b4eec17a7f1c4839e0c46b70ecd2716cc80249e7a02cb2f844c49eef5",
+          "observedBodySha256": "55ceaf1b4eec17a7f1c4839e0c46b70ecd2716cc80249e7a02cb2f844c49eef5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+          "bodyFile": "backlog/items/2026-10-07-private-temp-root-not-secure-branch-has-no-test-seam.md",
+          "expectedCurrentBodySha256": "18af92514b323bf2f38910e0e7f23ac8026d590df28f19c37bd1493c69aa5db8",
+          "observedBodySha256": "18af92514b323bf2f38910e0e7f23ac8026d590df28f19c37bd1493c69aa5db8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.project-calibration-retains-new-project-placeholder",
+          "bodyFile": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-project-calibration-retains-new-project-placeholder.md",
+          "expectedCurrentBodySha256": "f4ab876dec60efc9cdd776b2d90540d70733a79763f245d8c770e7845712ad94",
+          "observedBodySha256": "f4ab876dec60efc9cdd776b2d90540d70733a79763f245d8c770e7845712ad94",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.protected-baseline-rejects-canonical-discarded-idle-state",
+          "bodyFile": "backlog/items/2026-09-29-protected-baseline-rejects-canonical-discarded-idle-state.md",
+          "expectedCurrentBodySha256": "20faa16cd7ee4faf7706b72c40188b1b1c59e3ea7dfb8f4080108a12f55c1665",
+          "observedBodySha256": "20faa16cd7ee4faf7706b72c40188b1b1c59e3ea7dfb8f4080108a12f55c1665",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.push-classifier-deny-list-does-not-converge",
+          "bodyFile": "backlog/items/2026-10-06-push-classifier-deny-list-does-not-converge.md",
+          "expectedCurrentBodySha256": "f8b421a273d3c553bc6703867931e4fa9e3dc96829fd102deaf760ed14b3ae39",
+          "observedBodySha256": "f8b421a273d3c553bc6703867931e4fa9e3dc96829fd102deaf760ed14b3ae39",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-10",
+      "count": 14,
+      "primaryTheme": "Onboarding settlements, plan provenance, push parsing and scanner coverage",
+      "owner": "/root/alfred_reader_2plus1_docs_r2",
+      "workLocation": "scratch/alfred-current114-crosswalk-09-10-20261010",
+      "items": [
+        {
+          "id": "pipeline.push-classifier-does-not-model-powershell-backtick-escapes",
+          "bodyFile": "backlog/items/2026-10-06-push-classifier-does-not-model-powershell-backtick-escapes.md",
+          "expectedCurrentBodySha256": "39ba0b3a2998378badf615e8c0341195c373aeb0d60d2eaaf7ab8f6c91836c64",
+          "observedBodySha256": "39ba0b3a2998378badf615e8c0341195c373aeb0d60d2eaaf7ab8f6c91836c64",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.push-classifier-misreads-backslash-escaped-quotes",
+          "bodyFile": "backlog/items/2026-10-05-push-classifier-misreads-backslash-escaped-quotes.md",
+          "expectedCurrentBodySha256": "09d07d66f49f3d7e6ed75a5f99bad1cc131307f263119d5484cb1106328fa8f6",
+          "observedBodySha256": "09d07d66f49f3d7e6ed75a5f99bad1cc131307f263119d5484cb1106328fa8f6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push",
+          "bodyFile": "backlog/items/2026-10-06-push-classifier-misses-nested-quotes-and-redirect-before-push.md",
+          "expectedCurrentBodySha256": "7d5599588be99f2480f6595c9194e361f4d5c8decfa8a41c128325fb9fc27db6",
+          "observedBodySha256": "7d5599588be99f2480f6595c9194e361f4d5c8decfa8a41c128325fb9fc27db6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+          "bodyFile": "backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md",
+          "expectedCurrentBodySha256": "c45590ae6c71961262f2036ddc4e9439c1343db360b2f7919da3e93955c0b591",
+          "observedBodySha256": "c45590ae6c71961262f2036ddc4e9439c1343db360b2f7919da3e93955c0b591",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.read-only-guard-admits-execution-and-output-options",
+          "bodyFile": "backlog/items/2026-09-30-read-only-guard-admits-execution-and-output-options.md",
+          "expectedCurrentBodySha256": "b8b90ded3071e53a544969980e7ce42b726c3b598e9dc9a9a7e6ee5a02d758a5",
+          "observedBodySha256": "b8b90ded3071e53a544969980e7ce42b726c3b598e9dc9a9a7e6ee5a02d758a5",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.readiness-input-omits-current-advisor-observation",
+          "bodyFile": "backlog/items/2026-09-28-readiness-input-omits-current-advisor-observation.md",
+          "expectedCurrentBodySha256": "49d8425d687df36f27d5633f379c9ba3e17564af21bb782d534dfb3f142c0aee",
+          "observedBodySha256": "49d8425d687df36f27d5633f379c9ba3e17564af21bb782d534dfb3f142c0aee",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.reconnect-sandbox-empty-child-output-breaks-bootstrap",
+          "bodyFile": "backlog/items/2026-09-29-reconnect-sandbox-empty-child-output-breaks-bootstrap.md",
+          "expectedCurrentBodySha256": "00079cd396e5191e2da96a44048c998a2aa775f99b965d64f6ca4bbc6b9c016a",
+          "observedBodySha256": "00079cd396e5191e2da96a44048c998a2aa775f99b965d64f6ca4bbc6b9c016a",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
+          "bodyFile": "backlog/items/2026-09-29-retirement-reader-masks-typed-unsafe-layout-inspection.md",
+          "expectedCurrentBodySha256": "3f86b5fbaba344474930360c6f3a0cd8e19fc86385f6f40be4b32a05921bb442",
+          "observedBodySha256": "3f86b5fbaba344474930360c6f3a0cd8e19fc86385f6f40be4b32a05921bb442",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.revised-native-design-cannot-reach-a-new-advisor-course",
+          "bodyFile": "backlog/items/2026-10-04-revised-native-design-cannot-reach-a-new-advisor-course.md",
+          "expectedCurrentBodySha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586",
+          "observedBodySha256": "3223d2671bdd488c9c8cb5ffb854297a226b629030b32b7d013755de1fc54586",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.scratch-has-no-retention-and-no-durability-check",
+          "bodyFile": "backlog/items/2026-10-05-scratch-has-no-retention-and-no-durability-check.md",
+          "expectedCurrentBodySha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180",
+          "observedBodySha256": "70c82ba3de815edfca42bdc74dfe66859063e2aa83113a24d76109b7207d5180",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+          "bodyFile": "backlog/items/2026-09-27-scratch-must-remain-writable-across-lifecycle-states.md",
+          "expectedCurrentBodySha256": "700055aed5299473e88b87c1086dac2909983155da1661262c26be5db63f7376",
+          "observedBodySha256": "700055aed5299473e88b87c1086dac2909983155da1661262c26be5db63f7376",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.script-mediated-writes-bypass-protected-test-paths",
+          "bodyFile": "backlog/items/2026-10-05-script-mediated-writes-bypass-protected-test-paths.md",
+          "expectedCurrentBodySha256": "6939ae43ec6a9890fa9525cd0148bc6013aa2f55c0b795c5c7d8a3b2989b7d25",
+          "observedBodySha256": "6939ae43ec6a9890fa9525cd0148bc6013aa2f55c0b795c5c7d8a3b2989b7d25",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.security-scanner-failure-provenance",
+          "bodyFile": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+          "expectedCurrentBodySha256": "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f",
+          "observedBodySha256": "5b98c73de7f455aac9b3a9d02beb59783c6da5941af4e681f4dd6afdfd9a889f",
+          "currentBodyCAS": false
+        },
+        {
+          "id": "pipeline.semgrep-console-coverage-note-has-no-test",
+          "bodyFile": "backlog/items/2026-10-07-semgrep-console-coverage-note-has-no-test.md",
+          "expectedCurrentBodySha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+          "observedBodySha256": "3488e8ae6dca2cd8a365177a446e36b2eccd41411a7aae7df7ddef9fcf87cf0d",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-11",
+      "count": 14,
+      "primaryTheme": "Scanner provenance, tools, typed recovery, Verify and worktree state",
+      "owner": "/root/alfred_reader_controller_independent_tests",
+      "workLocation": "scratch/alfred-current114-crosswalk-11-12-20261010",
+      "items": [
+        {
+          "id": "pipeline.semgrep-offline-default-version-check",
+          "bodyFile": "backlog/items/2026-09-29-semgrep-default-version-check-blocks-offline-local-rules-scan.md",
+          "expectedCurrentBodySha256": "fec0e688c2ee11af89bb5d09cb2681badefee6960371cfa4355b5b6f8ab8ee6f",
+          "observedBodySha256": "fec0e688c2ee11af89bb5d09cb2681badefee6960371cfa4355b5b6f8ab8ee6f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.semgrep-partial-parsing-warnings-fail-the-whole-scan",
+          "bodyFile": "backlog/items/2026-10-06-semgrep-partial-parsing-warnings-fail-the-whole-scan.md",
+          "expectedCurrentBodySha256": "b0a6ae962927943f60c35008cfb219a95028e85241d2196a0a0d0032ea0bffd4",
+          "observedBodySha256": "b0a6ae962927943f60c35008cfb219a95028e85241d2196a0a0d0032ea0bffd4",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.session-readiness-drops-to-partial-after-bootstrap-ready",
+          "bodyFile": "backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+          "expectedCurrentBodySha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+          "observedBodySha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.shell-classifier-faults-on-heredoc-body-text",
+          "bodyFile": "backlog/items/2026-10-05-shell-classifier-faults-on-heredoc-body-text.md",
+          "expectedCurrentBodySha256": "0db7189bc3fe2e6f7fe1a28e7effb1bfc0feeae938779a331cda24e4bbbdeb10",
+          "observedBodySha256": "0db7189bc3fe2e6f7fe1a28e7effb1bfc0feeae938779a331cda24e4bbbdeb10",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows",
+          "bodyFile": "backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+          "expectedCurrentBodySha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+          "observedBodySha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.sign-intent-disclosure-scan-blocks-for-minutes",
+          "bodyFile": "backlog/items/2026-10-08-sign-intent-disclosure-scan-blocks-for-minutes.md",
+          "expectedCurrentBodySha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1",
+          "observedBodySha256": "f5821326de25faf9ad97c78bfbd427fe497e6b20bee14152366f1bd0f89c0dc1",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+          "bodyFile": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+          "expectedCurrentBodySha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+          "observedBodySha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.signed-quality-package-route-is-not-agent-operable-on-windows",
+          "bodyFile": "backlog/items/2026-10-04-signed-quality-package-route-is-not-agent-operable-on-windows.md",
+          "expectedCurrentBodySha256": "c609e29f4f2fd943791a7fc621196981a2a068b74b2b8f96e34ef2dd0d4c917e",
+          "observedBodySha256": "c609e29f4f2fd943791a7fc621196981a2a068b74b2b8f96e34ef2dd0d4c917e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.signing-default-test-fixture-root-escapes-the-repository",
+          "bodyFile": "backlog/items/2026-10-07-signing-default-test-fixture-root-escapes-the-repository.md",
+          "expectedCurrentBodySha256": "91aa7275971ee47198642729b93e69fb8bcc373fe6a782adb0bd0b39fa409ea9",
+          "observedBodySha256": "91aa7275971ee47198642729b93e69fb8bcc373fe6a782adb0bd0b39fa409ea9",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.signing-prompt-prints-the-whole-review-package",
+          "bodyFile": "backlog/items/2026-10-04-signing-prompt-prints-the-whole-review-package.md",
+          "expectedCurrentBodySha256": "c64ef2691bae5bbc0707ff0685b146baa3affda795d491cb47af9064e56221a0",
+          "observedBodySha256": "c64ef2691bae5bbc0707ff0685b146baa3affda795d491cb47af9064e56221a0",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.signing-toolchain-readiness",
+          "bodyFile": "backlog/items/2026-10-08-signing-toolchain-readiness.md",
+          "expectedCurrentBodySha256": "ce18f70dfcb7367cc08fe7d627276ee36ba05799e86fa6b7cc3535e128f841b2",
+          "observedBodySha256": "ce18f70dfcb7367cc08fe7d627276ee36ba05799e86fa6b7cc3535e128f841b2",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.source-agent-definition-change-locks-that-agent-until-install",
+          "bodyFile": "backlog/items/2026-10-05-source-agent-definition-change-locks-that-agent-until-install.md",
+          "expectedCurrentBodySha256": "1275061a160fd0d4414c0468762f85953fd8bf77a61ec7ce8f336457c032f0c6",
+          "observedBodySha256": "1275061a160fd0d4414c0468762f85953fd8bf77a61ec7ce8f336457c032f0c6",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.three-runner-happy-path-with-two-po-approvals",
+          "bodyFile": "backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md",
+          "expectedCurrentBodySha256": "be7223b78fc14d727ee3621ad9586c0aba3c43b1185f3180562d4b323bf5705e",
+          "observedBodySha256": "be7223b78fc14d727ee3621ad9586c0aba3c43b1185f3180562d4b323bf5705e",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.typed-plugin-update-next-action",
+          "bodyFile": "backlog/items/2026-10-08-typed-plugin-update-next-action.md",
+          "expectedCurrentBodySha256": "9b6419208a250e9be2f441d7978711d7ee32552e6511340bbedf1865b4416751",
+          "observedBodySha256": "9b6419208a250e9be2f441d7978711d7ee32552e6511340bbedf1865b4416751",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    },
+    {
+      "batchId": "CROSSWALK-12",
+      "count": 9,
+      "primaryTheme": "Scanner provenance, tools, typed recovery, Verify and worktree state",
+      "owner": "/root/alfred_reader_controller_independent_tests",
+      "workLocation": "scratch/alfred-current114-crosswalk-11-12-20261010",
+      "items": [
+        {
+          "id": "pipeline.unasked-advisor-export-consent-in-fresh-seed",
+          "bodyFile": "backlog/items/2026-09-29-unasked-advisor-export-consent-in-fresh-seed.md",
+          "expectedCurrentBodySha256": "226f9811d496f84003dc7eb5a5348ed9bd8a2756ea342e9aae79fa95cfc97b1d",
+          "observedBodySha256": "226f9811d496f84003dc7eb5a5348ed9bd8a2756ea342e9aae79fa95cfc97b1d",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.verify-on-a-wsl-mnt-drive-checkout-hides-its-reason",
+          "bodyFile": "backlog/items/2026-10-05-verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.md",
+          "expectedCurrentBodySha256": "cdbb7719958f6803d84684b86d1364d8120607089769401c28f5e60ed6e029e8",
+          "observedBodySha256": "cdbb7719958f6803d84684b86d1364d8120607089769401c28f5e60ed6e029e8",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier",
+          "bodyFile": "backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md",
+          "expectedCurrentBodySha256": "9284cb7f3228767b26e596ba3c7a3ca9c25a29af0800fbf5362ce4877de902d1",
+          "observedBodySha256": "9284cb7f3228767b26e596ba3c7a3ca9c25a29af0800fbf5362ce4877de902d1",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.windows-greenfield-scratch-write-denied",
+          "bodyFile": "backlog/items/2026-09-29-windows-greenfield-scratch-write-denied.md",
+          "expectedCurrentBodySha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935",
+          "observedBodySha256": "4f0ba42f3a082ec76cfe036fdeb9f25963fa6450d5e8d99de5a571815c4e9935",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+          "bodyFile": "backlog/items/2026-10-05-windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.md",
+          "expectedCurrentBodySha256": "5a9ec602187f7e5a8ab06833d68f949040cbd3f9427cfb69a91ac2c9947c6f36",
+          "observedBodySha256": "5a9ec602187f7e5a8ab06833d68f949040cbd3f9427cfb69a91ac2c9947c6f36",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.windows-portable-seed-rolls-back-with-hidden-worktree-error",
+          "bodyFile": "backlog/items/2026-09-29-windows-portable-seed-rolls-back-with-hidden-worktree-error.md",
+          "expectedCurrentBodySha256": "97011a4fbc40b872388f5f57248cc6795c63183da5dbf163914ecbdb3b87dfa2",
+          "observedBodySha256": "97011a4fbc40b872388f5f57248cc6795c63183da5dbf163914ecbdb3b87dfa2",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+          "bodyFile": "backlog/items/2026-09-29-windows-pre-push-installer-fsync-and-relative-action.md",
+          "expectedCurrentBodySha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+          "observedBodySha256": "3e0fb5d931a0d04fb4750fd53cba39c35c49e66244b2e6c3788ad5dc9f38cb75",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.worktree-process-start-parser-misreads-spaced-comm",
+          "bodyFile": "backlog/items/2026-09-28-worktree-process-start-parser-misreads-spaced-comm.md",
+          "expectedCurrentBodySha256": "e394a14bc6a3f26d23ff3fc6033f60b0695fe3e713f2e377bc6817215071eaf7",
+          "observedBodySha256": "e394a14bc6a3f26d23ff3fc6033f60b0695fe3e713f2e377bc6817215071eaf7",
+          "currentBodyCAS": true
+        },
+        {
+          "id": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+          "bodyFile": "backlog/items/2026-09-29-worktrees-share-onboarding-private-state-with-root-bound-intake.md",
+          "expectedCurrentBodySha256": "93a0e50737c7364a8f6a35757a69d4056c3d2fe945d81e5a01a5b6ad205f6085",
+          "observedBodySha256": "93a0e50737c7364a8f6a35757a69d4056c3d2fe945d81e5a01a5b6ad205f6085",
+          "currentBodyCAS": true
+        }
+      ],
+      "assignmentBasis": "Root explicit dispatch; no completion/productivity inferred"
+    }
+  ],
+  "total": 163,
+  "noOverlaps": true,
+  "stageOrClosureChange": false
+}

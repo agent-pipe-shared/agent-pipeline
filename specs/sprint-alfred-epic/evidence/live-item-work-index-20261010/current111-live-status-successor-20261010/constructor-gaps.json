@@ -1,0 +1,23 @@
+{
+  "schema": "alfred.real-positive-constructor-gaps.v1",
+  "total": 26,
+  "groups": [
+    {
+      "component": "State route constructors",
+      "count": 14,
+      "state": "genuine positive constructors not qualified",
+      "owner": "/root",
+      "currentMeasurementLocation": "scratch/alfred-state-remaining-namespace-inherited-start-options-successor-20261010"
+    },
+    {
+      "component": "I08 domain constructors",
+      "count": 12,
+      "state": "genuine positive constructors not qualified",
+      "owner": "/root",
+      "currentCarrierWorkLocation": "scratch/alfred-i03-genuine-carrier-wiring-source-20261010"
+    }
+  ],
+  "actual23passingStateAssertionsDoNotCloseConstructors": true,
+  "sourceBugCount": null,
+  "nativeClaim": false
+}

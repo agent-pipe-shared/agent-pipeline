@@ -1,0 +1,103 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "OptionalAdvisor",
+  "originalReceipt": {
+    "path": "scratch/alfred-optional-advisor-direct-node-launch-successor-20261010/root-receipt.json",
+    "sha256": "1693c5ad0f8a933cf0563874e90efce93fa67779b95305c1ce533f736214aa28",
+    "bytes": 5642
+  },
+  "suites": [
+    {
+      "name": "original-rc06c",
+      "status": "finite-scope-qualified",
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "2e43543da0924c3c52d8086e6d1a12700143e9eebdd7aabf4401031610d0e2b9",
+        "caseSetSha256": "176f7c5e71ef51ab501a87822d6627c045f3c18debed8d399da869f84636d5d8",
+        "dispositionsSha256": "e7c601800142f877b88aaed435bb94cf0b54af5131f5b18dccf11883d6e5cdb5",
+        "declaredCount": 7,
+        "disposedCount": 7,
+        "counts": {
+          "pass": 7,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "74753805a2d88fc2bd01cc8f76e8c28a40a59bae756d11d6408cccfbb05aa56a",
+      "counts": {
+        "pass": 7,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": [
+        "RC06C001",
+        "RC06C002",
+        "RC06C003",
+        "RC06C004",
+        "RC06C005",
+        "RC06C006",
+        "RC06C007"
+      ],
+      "unsupportedSkipIds": []
+    },
+    {
+      "name": "independent-diagnostics",
+      "status": "not-qualified",
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "d22b648599fa91275295df63f6b41de45d65c18fc2cfd73b4e45fb304668ac13",
+        "caseSetSha256": "91a0d9d83fa2ad146a79af0af773b08d9a7e190dbe354e580052ef513d9f0840",
+        "dispositionsSha256": "5b1cc6b935cfaa319e9cdbceebe396b1bdc333f8e6c74bf6888df4ca33f248cb",
+        "declaredCount": 14,
+        "disposedCount": 14,
+        "counts": {
+          "pass": 10,
+          "fail": 2,
+          "skip": 2,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "930719ef19b102ff666d453adf22c9ad65b04c3b52bd5e6d892cccefd53e855f",
+      "counts": {
+        "pass": 10,
+        "fail": 2,
+        "skip": 2,
+        "todo": 0
+      },
+      "caseIds": [
+        "OA-DIAG01",
+        "OA-DIAG02",
+        "OA-DIAG03",
+        "OA-DIAG04",
+        "OA-DIAG05",
+        "OA-DIAG06",
+        "OA-DIAG07",
+        "OA-DIAG08",
+        "OA-DIAG09",
+        "OA-DIAG10",
+        "OA-DIAG11",
+        "OA-DIAG12",
+        "OA-DIAG13",
+        "OA-DIAG14"
+      ],
+      "unsupportedSkipIds": [
+        "OA-DIAG12",
+        "OA-DIAG14"
+      ]
+    }
+  ],
+  "sourceGraphSha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+  "graphConserved": null,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

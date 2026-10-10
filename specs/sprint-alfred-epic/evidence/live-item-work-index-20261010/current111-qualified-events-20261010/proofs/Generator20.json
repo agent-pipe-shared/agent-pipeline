@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.current111-focused-public-proof.v1",
+  "name": "Generator20",
+  "originalExecution": {
+    "path": "scratch/alfred-generator-compaction-independent-20261010/execution-terminal.json",
+    "sha256": "52c7c8f26b4e6352a4046eb81dc39ea055208dc057eeb97e39769e35c0aae6f0",
+    "bytes": 975
+  },
+  "status": 1,
+  "signal": null,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "a0712b5dac8bdd97d2b2b554e313b7d4f6851e12c4971bae82df13bd21ec48ed",
+    "caseSetSha256": "1f5b2552fc4ad786832912ad952213bdcfdda9657dfcc1de3c8156b0e6d457c8",
+    "dispositionsSha256": "b8940a2673d1891f369d94cfd66d489d45649f7802bf10f0e9e43403b02b7071",
+    "declaredCount": 20,
+    "disposedCount": 20,
+    "counts": {
+      "pass": 13,
+      "fail": 7,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "FD3Sha256": "f92617943bf806959049e6ded95b35806647a548baca22d1684b854e8e188486",
+  "rawRuntimeRootExcluded": true,
+  "setupAndRawStreamsExcluded": true,
+  "nativeClaim": false,
+  "wholeItemAcceptance": false,
+  "newSemanticRuns": 0,
+  "graphCheckError": false,
+  "parentCheckError": false
+}

@@ -1,0 +1,254 @@
+{
+  "schema": "alfred.current120.overview.v1",
+  "canonicalSourcePaths": 120,
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "accepted": 0,
+  "mappedCrosswalkRows": 163,
+  "retainedPreviouslyAssessedRows": [
+    {
+      "id": "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write",
+      "officialStatus": "open",
+      "historicalBodySha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+      "expectedCurrentBodySha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+      "observedBodySha256": "0b452ee003de2dd268f3b841bbeddc1dc65ed8a496eaa6c829553d063c998f26",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 50,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.codex-advisor-evidence-fails-after-host-update",
+      "officialStatus": "open",
+      "historicalBodySha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+      "expectedCurrentBodySha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+      "observedBodySha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 50,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.codex-own-session-audit-export-missing",
+      "officialStatus": "open",
+      "historicalBodySha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "expectedCurrentBodySha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "observedBodySha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.commit-grammar-hint-still-requires-scratch-message-file",
+      "officialStatus": "open",
+      "historicalBodySha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+      "expectedCurrentBodySha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+      "observedBodySha256": "bd6c57d0490ed5033a96becca308fca3c2ab52c02aac9e6f6f8bc51b5abf487a",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.design-generator-repeats-large-source-material",
+      "officialStatus": "open",
+      "historicalBodySha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+      "expectedCurrentBodySha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+      "observedBodySha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 50,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.greenfield-comparisons-need-reproducible-public-evidence",
+      "officialStatus": "open",
+      "historicalBodySha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+      "expectedCurrentBodySha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+      "observedBodySha256": "39eb93d4a6fa0b5d3f737f8fe4791e417f735ffd879b680aea520fcd7146af6e",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "officialStatus": "open",
+      "historicalBodySha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "expectedCurrentBodySha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "observedBodySha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 25,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "officialStatus": "open",
+      "historicalBodySha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+      "expectedCurrentBodySha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+      "observedBodySha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 25,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "officialStatus": "open",
+      "historicalBodySha256": "46cbd6502fe091a27a2ec4a5af79d94190b99ac53efe0d4566ba51ee03f795dd",
+      "expectedCurrentBodySha256": "46cbd6502fe091a27a2ec4a5af79d94190b99ac53efe0d4566ba51ee03f795dd",
+      "observedBodySha256": "46cbd6502fe091a27a2ec4a5af79d94190b99ac53efe0d4566ba51ee03f795dd",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement",
+      "officialStatus": "open",
+      "historicalBodySha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+      "expectedCurrentBodySha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+      "observedBodySha256": "4157fdc52a2371691d8451f2d130ea321922d63b0a4434a1942c44d1a9c845f6",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 50,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.transfer-redaction-alters-digest-bound-files",
+      "officialStatus": "open",
+      "historicalBodySha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "expectedCurrentBodySha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "observedBodySha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.project-resource-budget-headroom-is-not-reported",
+      "officialStatus": "open",
+      "historicalBodySha256": "dc5c10386742ef16d32cf5903f264ed700266fb4b43d234407e1e6e55f234028",
+      "expectedCurrentBodySha256": "dc5c10386742ef16d32cf5903f264ed700266fb4b43d234407e1e6e55f234028",
+      "observedBodySha256": "dc5c10386742ef16d32cf5903f264ed700266fb4b43d234407e1e6e55f234028",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    },
+    {
+      "id": "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes",
+      "officialStatus": "open",
+      "historicalBodySha256": "0f942f9a630b0f1230425e1849da1756544abdab666b828ab6ff8f2420dce136",
+      "expectedCurrentBodySha256": "0f942f9a630b0f1230425e1849da1756544abdab666b828ab6ff8f2420dce136",
+      "observedBodySha256": "0f942f9a630b0f1230425e1849da1756544abdab666b828ab6ff8f2420dce136",
+      "currentBodyCAS": true,
+      "retainedStageSnapshot": 75,
+      "currentOwner": "/root",
+      "workLocation": null,
+      "assignmentStage": "retained-focused-scope",
+      "accepted": false,
+      "closureProof": null
+    }
+  ],
+  "retainedScopedStageSnapshot": {
+    "75": 7,
+    "50": 4,
+    "25": 2,
+    "unknown": 163
+  },
+  "stageSnapshotIsNotGlobalCompletion": true,
+  "unknownMeansFullItemProofGapNotMissingAssessmentOrImplementation": true,
+  "bodyDrifts": [
+    {
+      "id": "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+      "path": "backlog/items/2026-10-09-declared-product-criteria-need-matching-acceptance-evidence.md",
+      "expectedSha256": "f0f9ba2bf9b79d7e993cfbe37aaae326f1f6779df765f5fbd31792f09a448379",
+      "observedSha256": "6a8375093e2e86f022d1139d192d3045e792dafbed3b1476dd3493fb075b6183",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.goldfish-budgets-omit-the-closing-ceremony",
+      "path": "backlog/items/2026-10-09-goldfish-budgets-omit-the-closing-ceremony.md",
+      "expectedSha256": "ac988e33b4e1744f7fdb278cca5f052ecf75fe2efd7404c2948d6fd1a39e8823",
+      "observedSha256": "bd8c02353bc7c72c310bc6ffbdba0d5d1f8fe93b4fa53585f9deb1e1e845bd47",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.parallel-work-in-one-checkout-is-unsafe",
+      "path": "backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md",
+      "expectedSha256": "20d0bd1e7c2ddb50a0e1d337dec05eb17d68247a48f644855a3aedb7ddc25d53",
+      "observedSha256": "d301ec3095b9043425bbba2aea1572c05c6812bc38e3c00f979cbd68a1ce5235",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    },
+    {
+      "id": "pipeline.security-scanner-failure-provenance",
+      "path": "backlog/items/2026-09-29-security-scanner-failures-lose-executable-and-timeout-provenance.md",
+      "expectedSha256": "de4d7af94ac0a8a3244ac820a852f40c1cb30815983a7777355854cfc05e2a1f",
+      "observedSha256": "5b98c73de7f455aac9b3a9d02beb59783c6da5941af4e681f4dd6afdfd9a889f",
+      "approvedSuccessor": false,
+      "next": "Root supplies commit-backed successor binding; no body/ledger mutation"
+    }
+  ],
+  "currentOwner": "Root",
+  "pendingDesignDecision": "scratch/alfred-controlled-method-review-target-source-design-20261010/manifest.json",
+  "latestReturnedProposals": [
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/manifest.json",
+      "sha256": "a30a97202b1f46d3cdf86b1a8822911f5a1a8ef4fb0dd5ed94511fa9da98ab8f",
+      "status": "returned-unapplied-proposed122"
+    },
+    {
+      "path": "scratch/alfred-stb-safe-home-root-and-seed-identity-successor-preparation-20261010/manifest.json",
+      "sha256": "0803e0445fe7c70c895cbec3241c0d2b7647657fd9ab238efd6ed5df12298078",
+      "status": "static-ready-unexecuted"
+    },
+    {
+      "path": "scratch/alfred-command-admission-placement-source-composition-20261010/manifest.json",
+      "sha256": "65b5e0e38b154a07d204d66d75a31b9dac966d24e71e4fc70f9493c0c46c398d",
+      "status": "composed-unqualified-not-current120"
+    }
+  ]
+}

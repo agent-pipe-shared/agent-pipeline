@@ -1,0 +1,120 @@
+{
+  "schema": "alfred.current120.source-custody.v1",
+  "rows": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "preSha256": null,
+      "postSha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/01.mjs.txt",
+        "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+        "bytes": 3622,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/01.patch.txt",
+        "sha256": "89407d14cca90ceaa8c6c89adc8234ba2d17411a35f03bb27ba20bf7eef30cea",
+        "bytes": 3821,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "preSha256": "4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00",
+      "postSha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/02.mjs.txt",
+        "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+        "bytes": 6494,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/02.patch.txt",
+        "sha256": "a04fe420955b376547e12e86f038eae5c8febab269db26fc58149ae0a6807478",
+        "bytes": 7842,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "preSha256": "6a2c33073813368eff1bf4a28d8d41a5a74d8c92c09e2f92721bc760be1fbce0",
+      "postSha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/03.mjs.txt",
+        "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+        "bytes": 17680,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/03.patch.txt",
+        "sha256": "994b1b159cc00f0a86016620efe62ffcb7bff8a952d17fab9d01b4f18b5b1084",
+        "bytes": 8181,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "preSha256": "2997328b06173126f0e8a51d1df831cece1d2dcabdee52832948482666d600c7",
+      "postSha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/04.mjs.txt",
+        "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+        "bytes": 8734,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/04.patch.txt",
+        "sha256": "f4295ff5408c413500f1ea34c3f8cc5a849c9844567b2a2f6ab4790b0e66aac1",
+        "bytes": 11407,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "preSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "postSha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/05.mjs.txt",
+        "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+        "bytes": 31644,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/05.patch.txt",
+        "sha256": "2a9c599d37925ba118e4f5fd02ade9f3fed202578b8ee80f57ecc8d9d183574c",
+        "bytes": 8398,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "preSha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52",
+      "postSha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "originalMode": 420,
+      "artifact": {
+        "path": "sources/06.mjs.txt",
+        "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+        "bytes": 8306,
+        "mode": 420
+      },
+      "diff": {
+        "path": "sources/06.patch.txt",
+        "sha256": "5c3841309827e910497d6726a26de7245852b08c357dc6a7d81133a50607fb4c",
+        "bytes": 1426,
+        "mode": 420
+      },
+      "appliedByThisPacket": false
+    }
+  ],
+  "sourceChanges": 0
+}

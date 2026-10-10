@@ -1,0 +1,50 @@
+--- a/plugins/pipeline-core/lib/codex-advisor-host-record.mjs
++++ b/plugins/pipeline-core/lib/codex-advisor-host-record.mjs
+@@ -5,7 +5,8 @@
+ import {canonicalJson} from './codex-sandbox-compatibility.mjs';
+ import {parseStrictJson} from './governance-event.mjs';
+ import {hostDigest,hostFault,checkedHostDirectory,readHostJournal} from './codex-host-process-journal.mjs';
+-import {verifyRegisteredCodexOwnership} from './codex-readiness-ownership-verifier.mjs';
++import {inspectRegisteredCodexOwnership} from './codex-readiness-ownership-verifier.mjs';
++import {createAdvisorBindingDiagnosticRecorder} from './codex-advisor-binding-diagnostic.mjs';
+ import {validateReadinessOutputCustody} from './codex-readiness-finalization.mjs';
+ import {validateAdvisoryReceipt} from './advisory-receipt.mjs';
+ import {advisorExact,advisorSha,readAdvisorInitialInput,buildCodexAdvisorInitialRequest,validateCodexAdvisorInitialAnswer,advisorProposalSetSha256} from './codex-advisor-request.mjs';
+@@ -39,14 +40,30 @@
+   return advisorExact(v.ownership,['intentReceiptSha256','boundProcessReceiptSha256','terminalReceiptSha256','status'])&&v.ownership.status==='closed'&&['intentReceiptSha256','boundProcessReceiptSha256','terminalReceiptSha256'].every(k=>advisorSha(v.ownership[k]))&&same(v.isolation,{class:'host-observed-tool-free',nativeSubagent:false,osSandboxAttestation:false,providerAttestation:false});
+  }catch{return false;}
+ }
+-function readPrivate(path){let fd;try{const b=lstatSync(path,{bigint:true});if(!b.isFile()||b.isSymbolicLink()||b.nlink!==1n||b.uid!==BigInt(process.getuid())||(b.mode&0o077n)!==0n||b.size>65536n)return null;fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW);const keys=['dev','ino','mode','uid','nlink','size','mtimeNs','ctimeNs'],same=s=>keys.every(k=>s[k]===b[k]);if(!same(fstatSync(fd,{bigint:true})))return null;const buffer=Buffer.alloc(65537);let n=0,c;while(n<buffer.length&&(c=readSync(fd,buffer,n,buffer.length-n,null))>0)n+=c;if(n>65536||BigInt(n)!==b.size||![fstatSync(fd,{bigint:true}),lstatSync(path,{bigint:true})].every(same))return null;const bytes=buffer.subarray(0,n),value=parseStrictJson(bytes);if(canonicalJson(value)!==bytes.toString('utf8'))return null;return {value,sha256:hostDigest(bytes)};}catch{return null;}finally{if(fd!==undefined)closeSync(fd);}}
+-export function readFinalizedAdvisorObservation(directory,initialBinding,executable){
+- try{checkedHostDirectory(directory);const first=readPrivate(join(directory,ADVISOR_FINALIZATION_FILENAME)),second=readPrivate(join(directory,ADVISOR_FINALIZATION_FILENAME));if(!first||!second||first.sha256!==second.sha256||!(validateAdvisorHostFinalization(first.value)||validateAdvisorFailedFinalization(first.value))||!same(first.value.initialBinding,initialBinding))return null;
+-  const v=first.value,intent=readHostJournal(directory,'intent');if(!intent||intent.sha256!==v.intentSha256||intent.value.receiptId!==v.receiptId||intent.value.runId!==v.runId||intent.value.executable.path!==executable.path||intent.value.executable.sha256!==executable.sha256||v.executableSha256!==executable.sha256)return null;
+-  const input=readAdvisorInitialInput({...initialBinding,repoRoot:executable.repoRoot,requireCurrentPhysical:false}),request=buildCodexAdvisorInitialRequest({...initialBinding,input});if(request.requestSha256!==v.requestSha256||request.recipeSha256!==v.recipeSha256||intent.value.binding.repoFingerprint!==v.repoFingerprint||intent.value.binding.dispatchId!==initialBinding.dispatch.dispatchId||intent.value.binding.candidateCommit!==initialBinding.initialContext.initialCandidate.commit)return null;
+-  const ownership=verifyRegisteredCodexOwnership(directory,{receiptId:v.receiptId,repoFingerprint:v.repoFingerprint,dispatchId:initialBinding.dispatch.dispatchId,candidateCommit:initialBinding.initialContext.initialCandidate.commit,requestSha256:v.requestSha256,executableSha256:executable.sha256});if(!ownership||!same(ownership,v.ownership))return null;
++function readPrivate(path,diagnostics){let fd,subcheck='finalization-file-identity';try{
++ const b=lstatSync(path,{bigint:true});if(!b.isFile()||b.isSymbolicLink()||b.nlink!==1n||b.uid!==BigInt(process.getuid())||(b.mode&0o077n)!==0n||b.size>65536n)return diagnostics.record(subcheck);
++ subcheck='finalization-file-open';fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW);const keys=['dev','ino','mode','uid','nlink','size','mtimeNs','ctimeNs'],same=s=>keys.every(k=>s[k]===b[k]);if(!same(fstatSync(fd,{bigint:true})))return diagnostics.record(subcheck);
++ subcheck='finalization-file-readback';const buffer=Buffer.alloc(65537);let n=0,c;while(n<buffer.length&&(c=readSync(fd,buffer,n,buffer.length-n,null))>0)n+=c;if(n>65536||BigInt(n)!==b.size||![fstatSync(fd,{bigint:true}),lstatSync(path,{bigint:true})].every(same))return diagnostics.record(subcheck);
++ subcheck='finalization-file-json';const bytes=buffer.subarray(0,n),value=parseStrictJson(bytes);if(canonicalJson(value)!==bytes.toString('utf8'))return diagnostics.record(subcheck);return {value,sha256:hostDigest(bytes)};
++ }catch(error){return diagnostics.record(subcheck,error);}finally{if(fd!==undefined)closeSync(fd);}}
++export function readFinalizedAdvisorObservation(directory,initialBinding,executable){return inspectFinalizedAdvisorObservation(directory,initialBinding,executable).observation;}
++export function inspectFinalizedAdvisorObservation(directory,initialBinding,executable){
++ const diagnostics=createAdvisorBindingDiagnosticRecorder(),observation=readFinalizedAdvisorBinding(directory,initialBinding,executable,diagnostics);
++ return {observation,diagnostic:diagnostics.snapshot()};
++}
++function readFinalizedAdvisorBinding(directory,initialBinding,executable,diagnostics){
++ let subcheck='finalization-directory';try{checkedHostDirectory(directory);
++ subcheck='finalization-readback';const first=readPrivate(join(directory,ADVISOR_FINALIZATION_FILENAME),diagnostics),second=readPrivate(join(directory,ADVISOR_FINALIZATION_FILENAME),diagnostics);if(!first||!second||first.sha256!==second.sha256)return diagnostics.record(subcheck);
++ subcheck='finalization-contract';if(!(validateAdvisorHostFinalization(first.value)||validateAdvisorFailedFinalization(first.value)))return diagnostics.record(subcheck);
++ subcheck='finalization-initial-binding';if(!same(first.value.initialBinding,initialBinding))return diagnostics.record(subcheck);
++ subcheck='finalization-intent';
++  const v=first.value,intent=readHostJournal(directory,'intent');if(!intent||intent.sha256!==v.intentSha256||intent.value.receiptId!==v.receiptId||intent.value.runId!==v.runId||intent.value.executable.path!==executable.path||intent.value.executable.sha256!==executable.sha256||v.executableSha256!==executable.sha256)return diagnostics.record(subcheck);
++  subcheck='finalization-request';
++  const input=readAdvisorInitialInput({...initialBinding,repoRoot:executable.repoRoot,requireCurrentPhysical:false}),request=buildCodexAdvisorInitialRequest({...initialBinding,input});if(request.requestSha256!==v.requestSha256||request.recipeSha256!==v.recipeSha256||intent.value.binding.repoFingerprint!==v.repoFingerprint||intent.value.binding.dispatchId!==initialBinding.dispatch.dispatchId||intent.value.binding.candidateCommit!==initialBinding.initialContext.initialCandidate.commit)return diagnostics.record(subcheck);
++  subcheck='finalization-ownership';
++  const inspected=inspectRegisteredCodexOwnership(directory,{receiptId:v.receiptId,repoFingerprint:v.repoFingerprint,dispatchId:initialBinding.dispatch.dispatchId,candidateCommit:initialBinding.initialContext.initialCandidate.commit,requestSha256:v.requestSha256,executableSha256:executable.sha256}),ownership=inspected.ownership;if(!ownership){diagnostics.record(inspected.diagnostic?.subcheck??subcheck,inspected.diagnostic?.cause);return null;}if(!same(ownership,v.ownership))return diagnostics.record(subcheck);
+   return first;
+- }catch{return null;}
++ }catch(error){return diagnostics.record(subcheck,error);}
+ }
+ export const ADVISOR_FAILED_FINALIZATION_SCHEMA='pipeline.codex-advisor-failed-finalization.v1';
+ /** Only an actual acknowledged, closed owned turn with parsed bound output may

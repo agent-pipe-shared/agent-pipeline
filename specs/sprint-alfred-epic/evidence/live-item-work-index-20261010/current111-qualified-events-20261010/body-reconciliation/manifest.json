@@ -1,0 +1,320 @@
+{
+  "schema": "alfred.body-drift-reconciliation-manifest.v1",
+  "frozen": true,
+  "outputs": [
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/findings.json",
+      "sha256": "391ad06c66bb75446993ab0279df316d8615a07aa2671e1316aa80433debaf5c",
+      "bytes": 36263,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/tracking-repair-proposal.json",
+      "sha256": "a2c20a49e430773d3042de2f8cd294f8336af8f9b62a96f23a4949e3c92c05a2",
+      "bytes": 12468,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/report.md",
+      "sha256": "a30bbb96ba1fe3a887d64e358c0a428252a82f7a6d7a880d9172508436f1abdf",
+      "bytes": 2438,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/git-body-reads.json",
+      "sha256": "99497adab537fbf5d72bae552ccdd3ea047a8455dc1118d1637ab3d2beb7aa4a",
+      "bytes": 1613,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/git-history-evidence.json",
+      "sha256": "12d4ddc9c07674cad7031a25a0ca85170676785c287c0ac1ae8fb2eac1621b68",
+      "bytes": 4764,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/reconcile.mjs",
+      "sha256": "70715415d8e5418833f010871104aa38fa5318725f368480ed40b0a9536ce9ff",
+      "bytes": 12491,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+      "bytes": 1413,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+      "bytes": 2403,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+      "bytes": 3645,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+      "bytes": 4606,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+      "bytes": 3470,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bytes": 4527,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "inputBindings": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/transfer-receipt.json",
+      "sha256": "ae6ba140b357811a49270321edeb7ad51c717a9aa7d3366bf96cb35d47dd13eb",
+      "bytes": 24729,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/registration-receipt.json",
+      "sha256": "e31cec4cfe4e9746b990049695d41a4f3bb9e55bc6462e4932fd65b9a53bb89e",
+      "bytes": 2417,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/existing-item-addenda.json",
+      "sha256": "413a7b8c58ba7aabf2682970a3e4a0386c985b1f8a9fdcdf860f284e785edbd1",
+      "bytes": 5572,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/git-history-evidence.json",
+      "sha256": "12d4ddc9c07674cad7031a25a0ca85170676785c287c0ac1ae8fb2eac1621b68",
+      "bytes": 4764,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/git-body-reads.json",
+      "sha256": "99497adab537fbf5d72bae552ccdd3ea047a8455dc1118d1637ab3d2beb7aa4a",
+      "bytes": 1613,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.json",
+      "sha256": "62837016491b38c274cbfb69464565f36e6a7ef579eacb427471b0eb18de430f",
+      "bytes": 412831,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/original-intake-manifest.json",
+      "sha256": "862ebddf5420af36b5f05d950467d8e1f17942250637cf2f8e45d72077dd7f3c",
+      "bytes": 11721,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/intake-matrix.md",
+      "sha256": "fd601661c3f0f316f3c11396e53b5bb48f55c2971828994cdbf23c03bcba0a02",
+      "bytes": 19042,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/code-audit-report.md",
+      "sha256": "ada9135b029ca4b94fbebd5ab7376a8cffe950e52dae4b9de62d74d139e617b6",
+      "bytes": 9560,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/code-audit-manifest.json",
+      "sha256": "943553976f115aed3dbb990edcac27b8d42a1de8af02a767f97612a97788223e",
+      "bytes": 22206,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+      "bytes": 1413,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+      "bytes": 2403,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+      "bytes": 2403,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+      "bytes": 1413,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "sha256": "b8444707124eb122757643646c6f2c9383acba7ee83f673f4a83cc3ba23081f4",
+      "bytes": 27733,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+      "bytes": 39861,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+      "bytes": 19968,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+      "bytes": 3645,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+      "bytes": 4606,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+      "bytes": 4606,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "20ed5d496cb2d27fb0387917f7e5f66cc9564f16f9525dd777a265f82f349750",
+      "bytes": 2674,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+      "bytes": 176415,
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+      "bytes": 728628,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/before/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+      "bytes": 3470,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-three-backlog-body-drift-reconciliation-20261010/committed/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bytes": 4527,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bytes": 4527,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "3b98d882612220ea6b935571f26040e29bdd09f1b799d801b456b0b76efc3c2c",
+      "bytes": 2402,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+      "bytes": 7902,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+      "bytes": 15099,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/audit-pack.mjs",
+      "sha256": "b727dec4502baf35c162134c92e2208591acf3a86402d2238ff3d9f3998ce555",
+      "bytes": 22126,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/audit-bundle.mjs",
+      "sha256": "debef5a4eb22fef20d5b1b76d7e11230670c0a54411ff69d98b0c7fadd568c95",
+      "bytes": 18450,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "rows": 3,
+  "canonicalWrites": 0,
+  "semanticRuns": 0,
+  "GitMutations": 0
+}

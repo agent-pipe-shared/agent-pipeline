@@ -1,0 +1,13 @@
+--- a/plugins/pipeline-core/lib/design-advisor-provenance.mjs
++++ b/plugins/pipeline-core/lib/design-advisor-provenance.mjs
+@@ -35,7 +35,9 @@
+   const buffer=Buffer.alloc(maxBytes+1);let offset=0;while(offset<buffer.length){const n=readSync(fd,buffer,offset,buffer.length-offset,null);if(n===0)break;offset+=n;}if(offset>maxBytes)throw Error('DAP-PHYSICAL-BOUND');
+   const after=fstatSync(fd,{bigint:true}),pathAfter=lstatSync(target,{bigint:true});if(!identity(opened,after)||!identity(after,pathAfter)||BigInt(offset)!==after.size||realpathSync(target)!==target)throw Error('DAP-PHYSICAL-DRIFT');
+   for(const parent of parents){const now=lstatSync(parent.path,{bigint:true});if(!identity(parent.st,now)||!now.isDirectory()||now.isSymbolicLink()||realpathSync(parent.path)!==parent.path)throw Error('DAP-PHYSICAL-PARENT-DRIFT');}
+-  const bytes=Buffer.from(buffer.subarray(0,offset));if(!Buffer.from(decode.decode(bytes),'utf8').equals(bytes))throw Error('DAP-UTF8');return bytes;
++  const bytes=Buffer.from(buffer.subarray(0,offset));let text;
++  try{text=decode.decode(bytes);}catch{throw Error('DAP-UTF8');}
++  if(!Buffer.from(text,'utf8').equals(bytes))throw Error('DAP-UTF8');return bytes;
+  }finally{if(fd!==undefined)closeSync(fd);}
+ }
+ function git(repoRoot,args,maxBuffer=1048577){return execFileSync('git',['-C',resolve(repoRoot),...args],{encoding:null,maxBuffer,timeout:10000,stdio:['ignore','pipe','pipe']});}

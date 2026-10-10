@@ -1,0 +1,110 @@
+{
+  "schema": "alfred.current111-live-public-archive-plan.v1",
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current111-live-status-successor-20261010",
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "payloads": [
+    {
+      "path": "proofs/State24.json",
+      "sha256": "d3a4192dcb0235e4d0a7587fcf0289d7f1560f00e37505da5e093728f2995b62",
+      "bytes": 1543,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Generator20.json",
+      "sha256": "28827e28151d5e5181822933fc8390afe931611b4dd81baad424bed3f591088b",
+      "bytes": 1498,
+      "mode": 420
+    },
+    {
+      "path": "proofs/OptionalAdvisor.json",
+      "sha256": "2f2310f9988b58efa4de98ab1cb7f7c83d973724d594620c4a474bc1d801f968",
+      "bytes": 3011,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Scratch18.json",
+      "sha256": "40dfe3fe535cbb3a0aee7397e8212cdc1e0de0d91e916760ba7c5e2d6820fad0",
+      "bytes": 1866,
+      "mode": 420
+    },
+    {
+      "path": "proofs/STB.json",
+      "sha256": "b04f99ba4c200f28c5b42a7114b646f0c6a7d0c35b7addf646e7125a7823f2a4",
+      "bytes": 2398,
+      "mode": 420
+    },
+    {
+      "path": "proofs/RGGRAM4.json",
+      "sha256": "df53db58926546ed97c3b574fd21832b54c241d5caa9711a4a7f5da7e5d13f84",
+      "bytes": 1488,
+      "mode": 420
+    },
+    {
+      "path": "generator-fixture-diagnosis-manifest.json",
+      "sha256": "c6a59d0e21912644e636d8f53aca4907f90bc6b7128d8c2cd91d265f138afebf",
+      "bytes": 3324,
+      "mode": 420
+    },
+    {
+      "path": "scratch-index-source-manifest.json",
+      "sha256": "8d62368babf44e980b045525c4d172666cd3e0ae91d7c723d3c2eb04ff2f4d7b",
+      "bytes": 18675,
+      "mode": 420
+    },
+    {
+      "path": "current-source-manifest.json",
+      "sha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb",
+      "bytes": 30008,
+      "mode": 420
+    },
+    {
+      "path": "integration-receipt.json",
+      "sha256": "e7cf995731dc57dc8f8f81eba17f39216668e0ef41cf47f46be88de5e9f2c18d",
+      "bytes": 3020,
+      "mode": 420
+    },
+    {
+      "path": "owner-matrix.json",
+      "sha256": "8fd158d81e343a10439a5366f96967831e5b3325bed73e45fa7206283a37797d",
+      "bytes": 9257,
+      "mode": 420
+    },
+    {
+      "path": "constructor-gaps.json",
+      "sha256": "b346f2c6bca86b6172b6ca49a35a9a5d1005b643f9d348f4c140ecdcad306b1a",
+      "bytes": 753,
+      "mode": 420
+    },
+    {
+      "path": "items-current.json",
+      "sha256": "c6af2dc3d9a9946907c4330d4fd5d75dcfd786cfc464a7549f77d04ff64bf00c",
+      "bytes": 272479,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "360bd9ccde620cc8f6eae78ac77769405257d4bc3423328473b47df517637a52",
+      "bytes": 31061,
+      "mode": 420
+    },
+    {
+      "path": "overall-status.json",
+      "sha256": "4b0f17c839ab4472d7171a25c8c1533b97d9cbdb69636aec22a7e86de769efcc",
+      "bytes": 13494,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "c1924f3cfd8a42e587eaaf1664634fc911d746b1d2d2c890bbacec6b839207ce",
+      "bytes": 1338,
+      "mode": 420
+    }
+  ],
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-qualified-commit-hint-assembly-20261010/actual-source-manifest.json",
+    "sha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb"
+  },
+  "noOverwrite": true,
+  "GitOperations": 0,
+  "businessRuns": 0
+}

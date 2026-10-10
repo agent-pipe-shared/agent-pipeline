@@ -1,0 +1,191 @@
+{
+  "schema": "alfred.optional-advisor-current114-assembly-receipt.v1",
+  "status": "actual-six-source-CAS-integrated-not-stamped",
+  "manifestSha256": "422271fe0c9dba2eb82609c0a87101c5d96aea4f35fe2f5512efaedccb44083b",
+  "actualInventorySha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+  "parentInventorySha256": "a83f2bbf5b8456a354ed12bd6e9f6a207a8caab612e6170e8c079cd2e0c26963",
+  "parentSelectedSourceCount": 114,
+  "resultSelectedSourceCount": 120,
+  "physicalReplacements": 5,
+  "newPhysicalFiles": 1,
+  "selectedMembershipAdditions": 6,
+  "all114ExistingMembersByteExact": true,
+  "proof": {
+    "rootReceiptPath": "scratch/alfred-optional-advisor-two-failure-replay-preparation-20261010/root-receipt.json",
+    "rootReceiptSha256": "047c170dc3fab294b73c05b125b2a264470e0f4d5cd9c59601e310178bb2cbbb",
+    "sourceManifestSha256": "1209684493b918c9ba5fe2304958d12fe2aafe05766a34af579fd2de54b656c6",
+    "originalDiagnosticsSourceManifestSha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+    "successorManifestSha256": "c04faa29bfd7dc9d809028308826fff637774d70a27b9adc7949661df4eb3846",
+    "suites": [
+      {
+        "name": "original-rc06c",
+        "caseIds": [
+          "RC06C001",
+          "RC06C002",
+          "RC06C003",
+          "RC06C004",
+          "RC06C005",
+          "RC06C006",
+          "RC06C007"
+        ],
+        "completionSha256": "74753805a2d88fc2bd01cc8f76e8c28a40a59bae756d11d6408cccfbb05aa56a",
+        "attestation": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "2e43543da0924c3c52d8086e6d1a12700143e9eebdd7aabf4401031610d0e2b9",
+          "caseSetSha256": "176f7c5e71ef51ab501a87822d6627c045f3c18debed8d399da869f84636d5d8",
+          "dispositionsSha256": "e7c601800142f877b88aaed435bb94cf0b54af5131f5b18dccf11883d6e5cdb5",
+          "declaredCount": 7,
+          "disposedCount": 7,
+          "counts": {
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          }
+        },
+        "maxCompletionBytes": 65536
+      },
+      {
+        "name": "independent-diagnostics",
+        "caseIds": [
+          "OA-DIAG01",
+          "OA-DIAG02",
+          "OA-DIAG03",
+          "OA-DIAG04",
+          "OA-DIAG05",
+          "OA-DIAG06",
+          "OA-DIAG07",
+          "OA-DIAG08",
+          "OA-DIAG09",
+          "OA-DIAG10",
+          "OA-DIAG11",
+          "OA-DIAG12",
+          "OA-DIAG13",
+          "OA-DIAG14"
+        ],
+        "completionSha256": "7ed59c84475e80d4a29c267b9310ccdcb317783c01458c0d7ba324b9ffb16375",
+        "attestation": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "d22b648599fa91275295df63f6b41de45d65c18fc2cfd73b4e45fb304668ac13",
+          "caseSetSha256": "91a0d9d83fa2ad146a79af0af773b08d9a7e190dbe354e580052ef513d9f0840",
+          "dispositionsSha256": "4c602f9c9a35ee8ef8e237d5471ebb538030bb2fac978099961efd6af7d6a81c",
+          "declaredCount": 14,
+          "disposedCount": 14,
+          "counts": {
+            "pass": 12,
+            "fail": 0,
+            "skip": 2,
+            "todo": 0
+          }
+        },
+        "maxCompletionBytes": 65536
+      }
+    ],
+    "aggregateCounts": {
+      "pass": 19,
+      "fail": 0,
+      "skip": 2,
+      "todo": 0
+    },
+    "aggregateMembership": 21,
+    "aggregateParserClaim": "none; separate actual production parser attestations7+14",
+    "unsupportedSkipIds": [
+      "OA-DIAG12",
+      "OA-DIAG14"
+    ],
+    "unsupportedCoverage": [
+      {
+        "id": "OA-DIAG04",
+        "mode": "run",
+        "uncovered": "finalization hardlink/alias and concurrent file identity fault"
+      },
+      {
+        "id": "OA-DIAG05",
+        "mode": "run",
+        "uncovered": "exact advisor-initial-input-invalid host fault during historical reconstruction"
+      },
+      {
+        "id": "OA-DIAG08",
+        "mode": "run",
+        "uncovered": "concurrent unstable journal two-read mutation"
+      },
+      {
+        "id": "OA-DIAG11",
+        "mode": "run",
+        "uncovered": "selected current executable/root topology drift during read"
+      },
+      {
+        "id": "OA-DIAG12",
+        "mode": "skip",
+        "reason": "unsupported genuine answered-package preparation/inline constructor in declared primary input set; no permissive verifier double"
+      },
+      {
+        "id": "OA-DIAG13",
+        "mode": "run",
+        "uncovered": "actual concurrent sustained sibling churn/ancestor replacement scheduling; no churn fix claim"
+      },
+      {
+        "id": "OA-DIAG14",
+        "mode": "skip",
+        "reason": "ordinary ADR0085 completed-design/model-free bootstrap command not present as declared primary constructor; no false retirement-flow qualification"
+      }
+    ],
+    "beforeBetweenAfter258Bindings65GraphMatched": true,
+    "scope": "finite diagnostics and decoder typed refusal; no constructor, churn/native/installed/retirement whole-item qualification",
+    "fullItemQualification": false,
+    "nativeQualification": false,
+    "installedReplay": "not-run",
+    "ancestorSecurityChange": false
+  },
+  "integrationScope": "OA finite diagnostics and typed decoder source; two explicit unsupported skips; all current114 sibling files unchanged; no whole-item/native/installed acceptance",
+  "nativePASS": false,
+  "itemClosure": false,
+  "GitOperations": 0,
+  "productExecutions": 0,
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "bytes": 3622,
+      "mode": 420,
+      "parentSha256": null
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "bytes": 6494,
+      "mode": 420,
+      "parentSha256": "4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "bytes": 17680,
+      "mode": 420,
+      "parentSha256": "6a2c33073813368eff1bf4a28d8d41a5a74d8c92c09e2f92721bc760be1fbce0"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "bytes": 8734,
+      "mode": 420,
+      "parentSha256": "2997328b06173126f0e8a51d1df831cece1d2dcabdee52832948482666d600c7"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "bytes": 31644,
+      "mode": 420,
+      "parentSha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306,
+      "mode": 420,
+      "parentSha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52"
+    }
+  ]
+}

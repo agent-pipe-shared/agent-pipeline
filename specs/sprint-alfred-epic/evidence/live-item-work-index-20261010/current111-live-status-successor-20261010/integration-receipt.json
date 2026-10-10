@@ -1,0 +1,81 @@
+{
+  "schema": "alfred.qualified-commit-hint-integration-receipt.v1",
+  "status": "actual-one-source-CAS-integrated-not-stamped",
+  "sourceWrites": 1,
+  "physicalReplacements": 1,
+  "selectedMembershipAdditions": 0,
+  "parentSelectedSourceCount": 111,
+  "resultSelectedSourceCount": 111,
+  "other110SelectedByteExact": true,
+  "parent111MemberMapSha256": "40721506b7409142f3c0bbec57a883c868fcfd49a7e28e210c4edb9d1630fd4f",
+  "parent111MemberMapAfterSha256": "29f8c090752d3e9287c995ee26c3fb892a1e22a9a1d4e72072746ad399dae2e7",
+  "proof": {
+    "sourcePackageManifestSha256": "66ddc11c2802ca6155d2d72d0056da64fc658d25eae3101a118b6867ae44a3cc",
+    "hintSpliceSha256": "5e3c61dd39e2d5afcf6697f3d561accee926c93a0acad97f77e22402347b9bb6",
+    "assertionFreezeSha256": "cdc1df31404692e3cd5290653ed5780b1d0ca2ef0b3419468fabf5be69b43ed2",
+    "sourceClosureSha256": "2cd05b9ec5f2c9eec399a837f9bf87836c44d0a52dbb2910fd3bccbab84e9f99",
+    "executionSha256": "2ca2f883dad0da69e46b2ee61d129e65c8f20017f5582574c7f3154f38eec2a3",
+    "completionSha256": "2cbe8e3d3fa6d6789c6d3cf2782746c7c6d0e6a344bb4a4dc33dac8dd10d20a8",
+    "caseIds": [
+      "CHP001",
+      "CHP002",
+      "CHP003",
+      "CHP004",
+      "CHP005",
+      "CHP006",
+      "CHP007",
+      "CHP008"
+    ],
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "sourceConserved": true,
+    "inheritedPreloadPreserved": true,
+    "native": false,
+    "historicalM6ThirtyFiveExecution": "unknown"
+  },
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+    "sourcePath": "scratch/alfred-commit-hint-protocol-independent-20261010/graph/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+    "postSha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+    "postBytes": 67834,
+    "mode": 420,
+    "parentSha256": "446baf21925a616274632227254e7470c25227b51096a8b2afbebdc2bc2646b8",
+    "parentBytes": 67539,
+    "parentMode": 420,
+    "parentNlink": 1,
+    "postNlink": 1,
+    "preState": "selected-and-physical-parent-present"
+  },
+  "retainedPublicParents": [
+    {
+      "path": "retained-public-parents/actual-source-manifest.json",
+      "sha256": "6978242e26832777d1eab50aa8b4bf2e42235272c83a2a7109e5e1aebb78c54a",
+      "bytes": 29755
+    },
+    {
+      "path": "retained-public-parents/actual-receipt.json",
+      "sha256": "a8b63c51ffa0f58245765082efe04ffa4d92117c24a594f4aa5eba772609a2f5",
+      "bytes": 6536
+    }
+  ],
+  "inventoryExclusiveCreate": true,
+  "inventoryMode": "0600",
+  "scope": "one shell-grammar commit-hint string replacement only",
+  "excluded": [
+    "all other source files",
+    "historical M6-35 result",
+    "native Git or commit authority",
+    "full guard hook invocation",
+    "course acceptance or closure"
+  ],
+  "nativePASS": false,
+  "itemClosure": false,
+  "GitOperations": 0,
+  "productTestsRunByAssembler": 0,
+  "integrated": true,
+  "actualInventorySha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb"
+}

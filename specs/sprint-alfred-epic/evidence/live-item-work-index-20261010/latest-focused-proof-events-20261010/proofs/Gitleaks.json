@@ -1,0 +1,64 @@
+{
+  "schema": "alfred.gitleaks-recomputed-entry-actual-qualification.v1",
+  "sourceGraphSha256": "e29923e79c8e23b429b3f111eaf3e22b9dec29951c67460a471ba9cdef1f5112",
+  "children": [
+    {
+      "file": "route.test.mjs",
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "completion": null,
+      "completionError": {
+        "code": null,
+        "message": "VERIFY-CASE-COMPLETION-BOUNDS"
+      },
+      "completionFile": {
+        "path": "qualification/route.completion.fd3.jsonl",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "declaredCaseCount": 18
+    },
+    {
+      "file": "gitleaks-strong.test.mjs",
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "completion": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "5252c0602bd78922caad1c785864feb0a4cec3ede7ad2b6ed7126a7a66f1f9a9",
+        "caseSetSha256": "1a2e3f41bc0f0dfceda99515a00f97db5416052310a4312bd7902da2fcd4a512",
+        "dispositionsSha256": "9da840ceef50e239c0dfb30476ccd8f7543b4a9da903c8faf333d0f146fa179e",
+        "declaredCount": 10,
+        "disposedCount": 10,
+        "counts": {
+          "pass": 8,
+          "fail": 2,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "completionError": null,
+      "completionFile": {
+        "path": "qualification/gitleaks-strong.completion.fd3.jsonl",
+        "sha256": "655804790aeec2f931b02a9a915dd5bd4eeb39463b5c61ad29011a8bffe63a01",
+        "bytes": 1808
+      },
+      "declaredCaseCount": 10
+    }
+  ],
+  "graphConserved": true,
+  "conservationError": null,
+  "assurance": "controlled-method-and-public-source-apis-only",
+  "realGitleaks": false,
+  "nativeClaim": false,
+  "wholeAC11": false,
+  "itemClosure": false,
+  "originalReceipt": {
+    "path": "scratch/alfred-gitleaks-recomputed-entry-independent-20261010/execution.json",
+    "sha256": "26cb6e34a477c22cd6e3399f90b7da6baec14a25002386527d3b51f14b72a914",
+    "bytes": 2030
+  },
+  "original18Classification": "Module initialization prerequisite missing codex-host-process-launcher.mjs, zero FD3 bytes; not18 semantic failures. Root cause declaration retained."
+}

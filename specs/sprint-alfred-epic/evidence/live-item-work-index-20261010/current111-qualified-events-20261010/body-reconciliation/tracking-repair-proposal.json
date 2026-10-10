@@ -1,0 +1,228 @@
+{
+  "schema": "alfred.three-body-current-tracking-successor-proposal.v1",
+  "applyAuthority": "Root/tracking owner; proposal only",
+  "parent": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+    "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+    "bytes": 3329793,
+    "mode": 420,
+    "nlink": 1
+  },
+  "rows": [
+    {
+      "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "operation": "Successor tracking overlay only; no edit proposed to frozen ancestor, canonical item body, ledger or acceptance text",
+      "retainHistory": {
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+          "canonicalPath": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+          "sha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+          "bytes": 1413,
+          "parentSha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+          "assignmentChanged": false
+        },
+        "source": "consolidated176 frozen ancestor",
+        "receipt": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/transfer-receipt.json",
+          "sha256": "ae6ba140b357811a49270321edeb7ad51c717a9aa7d3366bf96cb35d47dd13eb",
+          "bytes": 24729,
+          "mode": 384,
+          "nlink": 1
+        },
+        "commit": "5853febc50702465aadc861be437f2eed50e9570"
+      },
+      "currentBody": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+        "canonicalPath": "backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+        "sha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+        "bytes": 2403,
+        "parentSha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+        "assignmentChanged": false
+      },
+      "currentSourceWorkBindings": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+          "sha256": "b8444707124eb122757643646c6f2c9383acba7ee83f673f4a83cc3ba23081f4",
+          "bytes": 27733,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+          "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+          "bytes": 39861,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+          "sha256": "cf7c94467a85b9f82b95c2a592858628c0e4d52c30bebcc427da82d95de4c141",
+          "bytes": 19968,
+          "priorMapperHashMatches": null,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        }
+      ],
+      "currentResponsible": "/root",
+      "exactExistingWorkLocation": "scratch/alfred-commit-hint-admission-source-20261010",
+      "nextAction": "Join this current-body version to existing finite work and actual scoped proof bindings; preserve earlier acceptance and exclusions. Qualify only uncovered/changed-source clauses. Do not mark full acceptance or rerun because OPEN.",
+      "preserve": [
+        "id",
+        "officialStatus",
+        "currentOwner",
+        "assignment",
+        "all inherited evidence/source history",
+        "scope exclusions",
+        "accepted original AC/IR",
+        "officialClosures=0"
+      ]
+    },
+    {
+      "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "operation": "Successor tracking overlay only; no edit proposed to frozen ancestor, canonical item body, ledger or acceptance text",
+      "retainHistory": {
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+          "canonicalPath": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+          "sha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+          "bytes": 3645,
+          "parentSha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+          "assignmentChanged": false
+        },
+        "source": "consolidated176 frozen ancestor",
+        "receipt": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/transfer-receipt.json",
+          "sha256": "ae6ba140b357811a49270321edeb7ad51c717a9aa7d3366bf96cb35d47dd13eb",
+          "bytes": 24729,
+          "mode": 384,
+          "nlink": 1
+        },
+        "commit": "5853febc50702465aadc861be437f2eed50e9570"
+      },
+      "currentBody": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+        "canonicalPath": "backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+        "sha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+        "bytes": 4606,
+        "parentSha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+        "assignmentChanged": false
+      },
+      "currentSourceWorkBindings": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+          "sha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+          "bytes": 176415,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+          "bytes": 728628,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        }
+      ],
+      "currentResponsible": "/root",
+      "exactExistingWorkLocation": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010",
+      "nextAction": "Join this current-body version to existing finite work and actual scoped proof bindings; preserve earlier acceptance and exclusions. Qualify only uncovered/changed-source clauses. Do not mark full acceptance or rerun because OPEN.",
+      "preserve": [
+        "id",
+        "officialStatus",
+        "currentOwner",
+        "assignment",
+        "all inherited evidence/source history",
+        "scope exclusions",
+        "accepted original AC/IR",
+        "officialClosures=0"
+      ]
+    },
+    {
+      "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "target": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "operation": "Successor tracking overlay only; no edit proposed to frozen ancestor, canonical item body, ledger or acceptance text",
+      "retainHistory": {
+        "body": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "canonicalPath": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+          "sha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+          "bytes": 3470,
+          "parentSha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+          "assignmentChanged": false
+        },
+        "source": "consolidated176 frozen ancestor",
+        "receipt": {
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/claude-greenfield-intake-20261010/transfer-receipt.json",
+          "sha256": "ae6ba140b357811a49270321edeb7ad51c717a9aa7d3366bf96cb35d47dd13eb",
+          "bytes": 24729,
+          "mode": 384,
+          "nlink": 1
+        },
+        "commit": "5853febc50702465aadc861be437f2eed50e9570"
+      },
+      "currentBody": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "canonicalPath": "backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+        "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+        "bytes": 4527,
+        "parentSha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+        "assignmentChanged": false
+      },
+      "currentSourceWorkBindings": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+          "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+          "bytes": 7902,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+          "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+          "bytes": 15099,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/audit-pack.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/audit-pack.mjs",
+          "sha256": "b727dec4502baf35c162134c92e2208591acf3a86402d2238ff3d9f3998ce555",
+          "bytes": 22126,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/audit-bundle.mjs",
+          "currentPath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/audit-bundle.mjs",
+          "sha256": "debef5a4eb22fef20d5b1b76d7e11230670c0a54411ff69d98b0c7fadd568c95",
+          "bytes": 18450,
+          "priorMapperHashMatches": true,
+          "assurance": "Actual current source bytes only; no behavioral/native/closure claim"
+        }
+      ],
+      "currentResponsible": "/root",
+      "exactExistingWorkLocation": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor",
+      "nextAction": "Join this current-body version to existing finite work and actual scoped proof bindings; preserve earlier acceptance and exclusions. Qualify only uncovered/changed-source clauses. Do not mark full acceptance or rerun because OPEN.",
+      "preserve": [
+        "id",
+        "officialStatus",
+        "currentOwner",
+        "assignment",
+        "all inherited evidence/source history",
+        "scope exclusions",
+        "accepted original AC/IR",
+        "officialClosures=0"
+      ]
+    }
+  ],
+  "officialClosures": 0,
+  "canonicalWrites": 0
+}

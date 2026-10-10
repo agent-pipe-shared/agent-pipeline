@@ -1,0 +1,48 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "State24",
+  "originalReceipt": {
+    "path": "scratch/alfred-state-i08-real-initializer-fix-independent-20261010/execution.json",
+    "sha256": "021677d6dc37da3b2178233a4f11fff8d7e6deaf73ba6ef32f7da8fd1e343cdd",
+    "bytes": 1234
+  },
+  "suites": [
+    {
+      "name": "State24",
+      "status": 1,
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "e15221857cc80542a64bd1db10c66d5f0040bec0fa48259ff0271c07a1e973d4",
+        "caseSetSha256": "5c9f1e285f7386c3b9f9ed35d3cdfc6a027a3ecb24903fc1ac3c3236603b7b60",
+        "dispositionsSha256": "d896b8730cfc3ccdc74109a567a47517f13bb7a8568384066763784ff9b4bf44",
+        "declaredCount": 24,
+        "disposedCount": 24,
+        "counts": {
+          "pass": 23,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "9504e328c9fb497974b392c5669c424df48a80c8862840ac98bedf9833f591f1",
+      "counts": {
+        "pass": 23,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": null,
+      "unsupportedSkipIds": []
+    }
+  ],
+  "sourceGraphSha256": "a4356127e5623c3a56faed44ed62d4bef99f7b75af3c4709fc90b3f17961ecfe",
+  "graphConserved": true,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

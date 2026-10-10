@@ -1,0 +1,131 @@
+{
+  "schema": "alfred.current114.actual-fanout.v1",
+  "Root": "/root",
+  "capacity": 16,
+  "workers": [
+    {
+      "agent": "/root/agy_greenfield_design_audit",
+      "slice": "Current114 item crosswalk 01-02",
+      "location": "scratch/alfred-current114-crosswalk-01-02-20261010",
+      "state": "DISPATCHED",
+      "count": 28,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/r10_reader_budget_fix",
+      "slice": "Current114 item crosswalk 03-04",
+      "location": "scratch/alfred-current114-crosswalk-03-04-20261010",
+      "state": "DISPATCHED",
+      "count": 28,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/alfred_role_fallback_independent",
+      "slice": "Current114 item crosswalk 05-06",
+      "location": "scratch/alfred-current114-crosswalk-05-06-20261010",
+      "state": "DISPATCHED",
+      "count": 28,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/agy_greenfield_roles_audit",
+      "slice": "Current114 item crosswalk 07-08",
+      "location": "scratch/alfred-current114-crosswalk-07-08-20261010",
+      "state": "DISPATCHED",
+      "count": 28,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/alfred_reader_2plus1_docs_r2",
+      "slice": "Current114 item crosswalk 09-10",
+      "location": "scratch/alfred-current114-crosswalk-09-10-20261010",
+      "state": "DISPATCHED",
+      "count": 28,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/alfred_reader_controller_independent_tests",
+      "slice": "Current114 item crosswalk 11-12",
+      "location": "scratch/alfred-current114-crosswalk-11-12-20261010",
+      "state": "DISPATCHED",
+      "count": 23,
+      "next": "Return exact requirement/source/case/actual proof/integration/owner bindings; unknown is not missing implementation"
+    },
+    {
+      "agent": "/root/alfred_r10_integration_inventory",
+      "slice": "Current114 metadata",
+      "location": "scratch/alfred-current114-status-and-fanout-20261010",
+      "state": "PREPARING",
+      "next": "Root archive review",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/agy_greenfield_intake_package",
+      "slice": "Command-admission placement Source composition",
+      "location": null,
+      "state": "DISPATCHED",
+      "next": "Exact new work location pending owner declaration",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/agy_greenfield_acceptance_audit",
+      "slice": "CMO Source qualification preparation",
+      "location": "scratch/alfred-controlled-method-observation-independent-20261010",
+      "state": "PREPARING",
+      "next": "Root fullread/freeze and sole qualification",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/alfred_obl013_override_digest_regression",
+      "slice": "Genuine consumed-review producer availability",
+      "location": "scratch/alfred-i03-genuine-carrier-wiring-source-20261010",
+      "state": "UPSTREAM-HOLD",
+      "next": "Actual same-task authored binding/default consumed C1 representation unavailable; latest frozen1dd17 proposal alone grants none",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/alfred_obl016_heredoc_extractor_regression",
+      "slice": "Original18 Gitleaks resource qualification preparation",
+      "location": "scratch/alfred-gitleaks-actual-two-failure-diagnostic-preparation-20261010",
+      "state": "FROZEN-RETURNED",
+      "next": "Root actual diagnostic launch; GLR006 Source defect and GLR010 unknown cause retained",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/alfred_optional_advisor_source_followthrough",
+      "slice": "Privacy-corrected ten preparation",
+      "location": null,
+      "state": "DISPATCHED",
+      "next": "Exact new location pending owner declaration; old OA19/0/2 receipt retained",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/alfred_state_i08_invariant_assertions",
+      "slice": "STB20 explicit-root plus seed-fixture preparation",
+      "location": "scratch/alfred-stb-explicit-root-and-seed-fixture-successor-preparation-20261010",
+      "state": "WAITING-DECLARED-PARENTS",
+      "next": "c157e/99bd exact primary locators required; State3b69 declared",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/alfred_transfer_integrity_source_actor",
+      "slice": "OA current114 assembly preparation",
+      "location": null,
+      "state": "DISPATCHED",
+      "next": "Exact new location pending owner declaration; current Scratch114 integration is returned prior work",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    },
+    {
+      "agent": "/root/quality_inline_coordinator_audit",
+      "slice": "HGL current114 coherent Source qualification preparation",
+      "location": "scratch/alfred-hgl-two-endpoint-source-adoption-20261010",
+      "state": "RETURNED-SOURCE",
+      "next": "Prospective26 Sourcebindings; historical2chains unresolved; actual new coherent114 graph qualification pending",
+      "locationLimit": "Latest observed location or explicit unknown; Root new brief is not proof prior packet still active"
+    }
+  ],
+  "platformObservation": "Root+15 running at checkpoint; no productivity inference",
+  "RootQualificationProcessesLive": 0,
+  "assignedUnknownCrosswalkRows": 163,
+  "nativeDispatchAuthority": false
+}

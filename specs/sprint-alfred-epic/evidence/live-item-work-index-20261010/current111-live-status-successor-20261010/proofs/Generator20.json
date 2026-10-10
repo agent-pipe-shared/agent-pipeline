@@ -1,0 +1,48 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "Generator20",
+  "originalReceipt": {
+    "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/execution-terminal.json",
+    "sha256": "30b7b1175219ff40c25ef1371c6eb425e788f60ce0df8066a1169bedd90cfbd8",
+    "bytes": 975
+  },
+  "suites": [
+    {
+      "name": "Generator20",
+      "status": 1,
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "a0712b5dac8bdd97d2b2b554e313b7d4f6851e12c4971bae82df13bd21ec48ed",
+        "caseSetSha256": "1f5b2552fc4ad786832912ad952213bdcfdda9657dfcc1de3c8156b0e6d457c8",
+        "dispositionsSha256": "dccadb768cdd93fc507a713cd361d2be07bce3ae36451ea91ba7d620b2b24ae6",
+        "declaredCount": 20,
+        "disposedCount": 20,
+        "counts": {
+          "pass": 19,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "64e95fdb3682d236b7955743861051654c86e537f3dc226a025885658b6a82da",
+      "counts": {
+        "pass": 19,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": null,
+      "unsupportedSkipIds": []
+    }
+  ],
+  "sourceGraphSha256": null,
+  "graphConserved": null,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

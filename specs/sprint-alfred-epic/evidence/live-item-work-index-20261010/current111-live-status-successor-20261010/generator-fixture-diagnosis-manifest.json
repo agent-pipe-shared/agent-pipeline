@@ -1,0 +1,67 @@
+{
+  "schema": "alfred.gsc014-context-diagnosis-manifest.v1",
+  "status": "closed-static-diagnosis",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "assurance": "methodological-source-read-only; native/model unverified",
+  "ownedRoot": "scratch/alfred-generator-gsc014-actual-context-diagnosis-20261010",
+  "outputs": [
+    {
+      "path": "scratch/alfred-generator-gsc014-actual-context-diagnosis-20261010/diagnosis.json",
+      "sha256": "b5d742d6b9042181cdb5a099a42b2bed9cae121ee166d5a231fc407361c12217"
+    },
+    {
+      "path": "scratch/alfred-generator-gsc014-actual-context-diagnosis-20261010/report.md",
+      "sha256": "3bcc81b34416d4f939909c1cf94caf3a3273f625064d7ea40c1bf15daf6a96d1"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/manifest.json",
+      "sha256": "d98779196334b042865bdf09dcc73639c5f1d212d234c58e05c6cd1de353c950",
+      "binding": "previous frozen custody preparation; not fully reread in this diagnosis"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/execution-terminal.json",
+      "sha256": "30b7b1175219ff40c25ef1371c6eb425e788f60ce0df8066a1169bedd90cfbd8",
+      "binding": "actual complete20/19pass1fail, full read"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/qualification-output/stdout.txt",
+      "sha256": "5feacf5068b13fe040a48e03e4d05b4c771f178d2d5167fc1be671bbe99b9025",
+      "binding": "actual TAP first failed assertion, full read"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/fixture.mjs",
+      "sha256": "39de7dd703f34a22d535f0755baf4c627e2a34554fba8c173d66a9e13cef0a16",
+      "binding": "actual constructive Codex-only scaffold; full read"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/assertions.mjs",
+      "sha256": "84e1f76102ca05053206558e48326e7f7bdc59ca23e54d952e1d07bc8bd59c45",
+      "binding": "unchanged20 callbacks; relevant GSC010–016 fully reread"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/resource-graph/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "binding": "unchanged qualified frozen graph library, relevant source ranges read"
+    },
+    {
+      "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/resource-graph/plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "fe34ba55ffaf8ef26a1ee8a3a94a10a4d4e86e22eb380ab13b30a2fb83599189",
+      "binding": "unchanged qualified frozen graph CLI, relevant parser/projection/return ranges read"
+    }
+  ],
+  "execution": {
+    "newChildren": 0,
+    "tests": 0,
+    "productImports": 0,
+    "readonlyDiagnosticNeeded": false,
+    "reason": "First failed variant is fully attributable to actual source runner admission and CLI exit contract; no runtime output invented."
+  },
+  "claimLimits": [
+    "No actual captured invalid output beyond exit1 assertion.",
+    "No bootstrap-intent iteration qualification.",
+    "No source or fixture edits.",
+    "No technical review/native/PO/item closure claim."
+  ]
+}

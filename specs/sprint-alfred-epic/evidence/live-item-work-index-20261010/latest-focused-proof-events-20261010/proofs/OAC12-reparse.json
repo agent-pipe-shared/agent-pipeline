@@ -1,0 +1,49 @@
+{
+  "schema": "alfred.ac04-05-10.existing-fd3-reparse.v1",
+  "capturedAt": "2026-10-10T12:44:28.241Z",
+  "bindingsSha256": "e1356b7296f165ea7b047c59e772224c29b58b1dd0a55fcf6113947c9d191402",
+  "normalizedPolicy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "OAC0401",
+      "OAC0402",
+      "OAC0403",
+      "OAC0404",
+      "OAC0501",
+      "OAC0502",
+      "OAC0503",
+      "OAC0504",
+      "OAC0505",
+      "OAC1001",
+      "OAC1002",
+      "OAC1003"
+    ],
+    "maxBytes": 16384
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "138e1560f7eaaabaaa5fe4d5c08468f7d679cf3fa641032acf8d42a5edfa14aa",
+    "caseSetSha256": "e745efeb890ab25b017f70e7c6a2fecfbc9f7ee2516c77d9de1c495b3978d4fd",
+    "dispositionsSha256": "006c83e4ef940ca3bd9e17b9bdf55081ac405e42e11e2e12104c0e270eac4916",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "conservationError": null,
+  "sourceFixtureExecutionConserved": true,
+  "originalChildStatus": 0,
+  "originalParserFailureRetained": true,
+  "parserInvocations": 1,
+  "businessReruns": 0,
+  "assurance": "controlled-unit-method",
+  "actualHumanApproval": false,
+  "native": false,
+  "wholeACAcceptance": false
+}

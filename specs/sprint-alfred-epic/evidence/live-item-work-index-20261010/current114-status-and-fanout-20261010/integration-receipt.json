@@ -1,0 +1,92 @@
+{
+  "schema": "alfred.qualified-scratch-custody-assembly-receipt.v1",
+  "status": "actual-four-source-CAS-integrated-not-stamped",
+  "manifestSha256": "c5c5ddfc15bd494d0620369f95be905df953cf4fe6a1f3ba87cef13e323ee638",
+  "actualInventorySha256": "a83f2bbf5b8456a354ed12bd6e9f6a207a8caab612e6170e8c079cd2e0c26963",
+  "parentInventorySha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb",
+  "parentSelectedSourceCount": 111,
+  "resultSelectedSourceCount": 114,
+  "physicalReplacements": 2,
+  "newPhysicalFiles": 2,
+  "selectedMembershipAdditions": 3,
+  "other110SelectedByteExact": true,
+  "proof": {
+    "rootReceiptPath": "scratch/alfred-scratch-durability-index-fix-replay-preparation-20261010/root-receipt.json",
+    "rootReceiptSha256": "47c3307d2804df5f24fb866c51898fba6fabe3e64ab9d8808d2e822ca89f896b",
+    "completionSha256": "3a312bd4f5680e56bfd1b7ab15d3eefcff013fe014665491efbc5222f22a4fc1",
+    "caseIds": [
+      "SC-DUR01",
+      "SC-DUR02",
+      "SC-DUR03",
+      "SC-DUR04",
+      "SC-DUR05",
+      "SC-DUR06",
+      "SC-DUR07",
+      "SC-DUR08",
+      "SC-DUR09",
+      "SC-DUR10",
+      "SC-DUR11",
+      "SC-DUR12",
+      "SC-DUR13",
+      "SC-DUR14",
+      "SC-DUR15",
+      "SC-DUR16",
+      "SC-DUR17",
+      "SC-DUR18"
+    ],
+    "counts": {
+      "pass": 18,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "declaredCount": 18,
+    "disposedCount": 18,
+    "beforeAfter88BindingsMatched": true,
+    "sourceCorrectionManifestSha256": "8d62368babf44e980b045525c4d172666cd3e0ae91d7c723d3c2eb04ff2f4d7b",
+    "correctedHelperSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+    "integrationRebaseManifestSha256": "fb202b668b03df01d55567719c14a086f8f1ee0cb54a3d6a08744b02a363872a",
+    "scope": "Original eighteen read-only custody library/CLI callbacks plus old frozen WARN-only static integration assertions; current rebased guard and composed close instructions not executed",
+    "additional10": "independently authored, unexecuted; not included in proof",
+    "native": false,
+    "pushExecuted": false,
+    "closeExecuted": false,
+    "currentGuardHookExecuted": false,
+    "closure": false
+  },
+  "integrationScope": "Current guard WARN-only source integration and composed close instructions; new guard hook and close ritual not executed",
+  "nativePASS": false,
+  "itemClosure": false,
+  "GitOperations": 0,
+  "productExecutions": 0,
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "f757b99128f6e4c96f4db87da3a912dd2aad8e57e7cc33bb2f68c475114909fe",
+      "bytes": 150958,
+      "mode": 420,
+      "parentSha256": "997cdad28bad0952c63ac4705a812208075128231276bf33d3cc8b700c8a3176"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "sha256": "e6101c86ceda0458930a7c27bf1a27212d12c67a138aa32854f4ff9012908333",
+      "bytes": 42932,
+      "mode": 420,
+      "parentSha256": "82299c1ae805bc890e47b750c88369593a1aad6e4f7a03c68f808ffc3b9f4316"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "bytes": 11408,
+      "mode": 420,
+      "parentSha256": null
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/scratch-custody-check.mjs",
+      "sha256": "65275ee4adb9db869bae6fd19c4cbff902d7f717690b6fcff0aa7c1116ea65f9",
+      "bytes": 1997,
+      "mode": 420,
+      "parentSha256": null
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "alfred.focused-proof-late-events.v1",
+  "GSC21": {
+    "receipt": {
+      "path": "scratch/alfred-generator-gsc014-validated-public-intent-fixture-20261010/execution-terminal.json",
+      "sha256": "7a03f4e817f491ccb333ff83e901e16114f572d6f486e3834579bb2d28ab4dea",
+      "bytes": 975
+    },
+    "counts": {
+      "pass": 21,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    },
+    "FD3Sha256": "a319821508f7bad54841aa38dd2754a7d52efdec22773e19fc504fd59b70b0fa",
+    "old19/1": "preserved legitimate prerequisite diagnosis"
+  },
+  "OA21": "Root live PTY13359, outcome awaiting Root poll",
+  "State3b69": "latest variant source custody added, not qualified",
+  "bodyDiagnosis": "4 new mismatches distinct from3 earlier authorized successors; no Git committed-body observation or new authorization inferred",
+  "stageChanges": 0,
+  "nativeClaim": false
+}

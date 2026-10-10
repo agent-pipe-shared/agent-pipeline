@@ -1,0 +1,33 @@
+{
+  "schema": "alfred.current111-focused-public-proof.v1",
+  "name": "CHP8",
+  "originalExecution": {
+    "path": "scratch/alfred-commit-hint-protocol-complete-assets-independent-20261010/execution.json",
+    "sha256": "2ca2f883dad0da69e46b2ee61d129e65c8f20017f5582574c7f3154f38eec2a3",
+    "bytes": 1137
+  },
+  "status": 0,
+  "signal": null,
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "bb5ab2a72a807df887224f8a780357c72c79568d6e01907b707b1198d6eb648d",
+    "caseSetSha256": "a75c288b92213e309b00c02beb51dcfa3021d0abf02c161ae8378d5e31b90a7f",
+    "dispositionsSha256": "874c83fe4e00642b14d583d6af8b43a610e6b1fe9103878198824a46aab19d7f",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "FD3Sha256": "2cbe8e3d3fa6d6789c6d3cf2782746c7c6d0e6a344bb4a4dc33dac8dd10d20a8",
+  "rawRuntimeRootExcluded": true,
+  "setupAndRawStreamsExcluded": true,
+  "nativeClaim": false,
+  "wholeItemAcceptance": false,
+  "newSemanticRuns": 0,
+  "sourceConserved": true
+}

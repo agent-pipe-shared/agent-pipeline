@@ -1,0 +1,851 @@
+{
+  "schema": "alfred.progress-stage-current-events-successor.v1",
+  "parentManifestSha256": "947950067cd572b51d64e62c8cac245c39a86b25da931c1a45a2391ae7bd13f4",
+  "scope": "workflow stages and scoped actual execution; no whole-item acceptance",
+  "events": [
+    {
+      "kind": "qualified-integration",
+      "slice": "OSE22",
+      "stage": 75,
+      "receipt": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/actual-receipt.json",
+      "receiptSha256": "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939",
+      "selectedSourceCount": 106,
+      "inventorySha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "officialClosure": false,
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "STB12-third-attempt",
+      "receipt": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/qualification-root/execution.json",
+      "receiptSha256": "3b0100412131eb7a06ad4e240a29ba1670e7a5514f72eb2f1e560de02731ea42",
+      "counts": {
+        "pass": 3,
+        "fail": 9,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "source-owned namespace checkpoint diagnosis before changing predicates",
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "HGL12-current-source",
+      "receipt": "scratch/alfred-hgl-current-source-independent-20261010/execution-terminal.json",
+      "receiptSha256": "0baacd7fd213a93912285627e80853c6aff9fb97cd91c190e708a143df0713b2",
+      "counts": {
+        "pass": 8,
+        "fail": 4,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "separate plugin-manifest fixture and unavailable-Git source diagnosis",
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "I07 joint authority bounded12",
+      "executionSha256": "fbf9b99ebc3a1c4951d51228cf52932bbb2cffdf7a9d35036664e69b4ea8f498",
+      "publicProofManifest": {
+        "path": "i07-public-proof/manifest.json",
+        "sha256": "857313b596871909ef2cb1abd569eea7facdcce63e8786157e76e4438f15e9f9",
+        "bytes": 1568,
+        "mode": "0644"
+      },
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "FD3Sha256": "2d2276b61b4e35b7ceedc8a520cec3d2ea45613d4541dffede0b586d124ebba8",
+      "graphConserved": true,
+      "integration": "not established by this run",
+      "stageUpgrade": null,
+      "remaining": "Full positive native course/lifecycle and acceptance remain unqualified"
+    },
+    {
+      "kind": "assignment-checkpoint",
+      "workers": [
+        {
+          "agent": "/root/alfred_r10_integration_inventory",
+          "slice": "Operational current events and I07 proof",
+          "location": "scratch/alfred-all-slots-current-events-successor-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_r10_integration_inventory",
+          "itemIDs": []
+        },
+        {
+          "agent": "/root/agy_greenfield_intake_package",
+          "slice": "RGGRAM independent stopped partial: wrong graph prefix",
+          "location": "scratch/alfred-shell-grammar-capability-placement-independent-20261010",
+          "dispatchState": "STOPPED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_roles_audit",
+          "slice": "Public comparison independent; returned prepared Root metadata",
+          "location": "scratch/alfred-greenfield-public-comparison-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.greenfield-comparisons-need-reproducible-public-evidence"
+          ]
+        },
+        {
+          "agent": "/root/alfred_role_fallback_independent",
+          "slice": "Role fallback independent",
+          "location": "scratch/alfred-role-fallback-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_role_fallback_independent",
+          "itemIDs": [
+            "pipeline.role-route-preflight-with-self-dispatch-fallback"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_acceptance_audit",
+          "slice": "Commit hint protocol independent",
+          "location": "scratch/alfred-commit-hint-protocol-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/agy_greenfield_acceptance_audit",
+          "itemIDs": [
+            "pipeline.commit-grammar-hint-still-requires-scratch-message-file"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_design_audit",
+          "slice": "Generator compaction genuine fixture",
+          "location": "scratch/alfred-generator-compaction-genuine-fixture-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/agy_greenfield_design_audit",
+          "itemIDs": [
+            "pipeline.design-generator-repeats-large-source-material"
+          ]
+        },
+        {
+          "agent": "/root/alfred_obl013_override_digest_regression",
+          "slice": "I03 genuine METHOD dispatch source: partial",
+          "location": "scratch/alfred-i03-genuine-method-dispatch-source-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_obl013_override_digest_regression",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_obl016_heredoc_extractor_regression",
+          "slice": "STB native namespace diagnosis returned; Root next launch",
+          "location": "scratch/alfred-stb-native-namespace-current-diagnosis-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_reader_2plus1_docs_r2",
+          "slice": "Scratch durability integration source returned",
+          "location": "scratch/alfred-scratch-durability-integration-source-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.scratch-has-no-retention-and-no-durability-check"
+          ]
+        },
+        {
+          "agent": "/root/alfred_reader_controller_independent_tests",
+          "slice": "Generator compaction independent; resource closure pending",
+          "location": "scratch/alfred-generator-compaction-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_reader_controller_independent_tests",
+          "itemIDs": [
+            "pipeline.design-generator-repeats-large-source-material"
+          ]
+        },
+        {
+          "agent": "/root/quality_inline_coordinator_audit",
+          "slice": "HGL diagnosis completed; new resource successor location unknown",
+          "location": null,
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/r10_reader_budget_fix",
+          "slice": "Current106 returned package integration plan",
+          "location": "scratch/alfred-current106-returned-package-integration-plan-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/r10_reader_budget_fix",
+          "itemIDs": []
+        },
+        {
+          "agent": "/root/alfred_optional_advisor_source_followthrough",
+          "slice": "Transfer integrity independent returned; Root next launch",
+          "location": "scratch/alfred-transfer-integrity-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.transfer-redaction-alters-digest-bound-files"
+          ]
+        },
+        {
+          "agent": "/root/alfred_state_i08_invariant_assertions",
+          "slice": "State I08 actual resources independent: fresh rebrief",
+          "location": "scratch/alfred-state-i08-actual-resources-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_state_i08_invariant_assertions",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_transfer_integrity_source_actor",
+          "slice": "Optional Advisor diagnostics independent returned",
+          "location": "scratch/alfred-optional-advisor-diagnostics-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.codex-advisor-evidence-fails-after-host-update",
+            "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write"
+          ]
+        }
+      ],
+      "source": "Root finite current assignments; previous assignments retained in matrix",
+      "newAuthority": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "Transfer",
+      "counts": {
+        "pass": 16,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+        "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "Comparison",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+        "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "RoleFallback",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+        "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "StateI08",
+      "counts": {
+        "pass": 2,
+        "fail": 22,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-state-i08-actual-resources-independent-20261010/execution.json",
+        "sha256": "2482a409b14cfd419b1da8cf59f03efdc626c7a60c646cd7175939553b969b5c"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-integration",
+      "selectedCanonicalPathCount": 110,
+      "previous106Conserved": true,
+      "sourceInventorySha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+      "receiptSha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+      "scopes": [
+        "Transfer library/CLI",
+        "Comparison library/CLI"
+      ],
+      "nativeClaim": false,
+      "officialClosure": false
+    },
+    {
+      "kind": "actual-qualified-integration",
+      "slice": "Role fallback runtime METHOD eight cases",
+      "selectedCanonicalPaths": 111,
+      "retained110ByteExact": true,
+      "receiptSha256": "a8b63c51ffa0f58245765082efe04ffa4d92117c24a594f4aa5eba772609a2f5",
+      "sourceInventorySha256": "6978242e26832777d1eab50aa8b4bf2e42235272c83a2a7109e5e1aebb78c54a",
+      "counts": {
+        "fail": 0,
+        "pass": 8,
+        "skip": 0,
+        "todo": 0
+      },
+      "FD3Sha256": "b1753fc4e8241c9b9fd7c585be8f4fc8b79f47b2bf0d3d578378547bb6a13b24",
+      "nativeClaim": false,
+      "courseAcceptance": false,
+      "itemClosure": false
+    },
+    {
+      "kind": "authorized-current-body-binding-successor",
+      "ids": [
+        "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+        "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+        "pipeline.forensics-and-audit-evidence-not-reconstructable"
+      ],
+      "sourceCommit": "5853febc50702465aadc861be437f2eed50e9570",
+      "reconciliationManifestSha256": "f2e5e360eea1ed4f972a8036d6f0ee913be0fb0c4936e727428336ac007d22ba",
+      "originalBodiesRetained": true,
+      "ledgerWrites": 0,
+      "itemClosure": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "HGL12",
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "execution": {
+        "path": "scratch/alfred-hgl-complete-plugin-identity-resources-20261010/execution-terminal.json",
+        "sha256": "b377b662655cd49d52ae05cd818ddf2a73f82887f62a2db311dff1491c04f649",
+        "bytes": 967
+      },
+      "FD3Sha256": "f7d0edc7155a0db00608a61a7fc4897ddfaba0e94aa5d086e2d261c8fd0c69d7",
+      "parserStatus": "complete",
+      "nativeClaim": false,
+      "integration": "not inferred from this focused run"
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "CHP8",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "execution": {
+        "path": "scratch/alfred-commit-hint-protocol-complete-assets-independent-20261010/execution.json",
+        "sha256": "2ca2f883dad0da69e46b2ee61d129e65c8f20017f5582574c7f3154f38eec2a3",
+        "bytes": 1137
+      },
+      "FD3Sha256": "2cbe8e3d3fa6d6789c6d3cf2782746c7c6d0e6a344bb4a4dc33dac8dd10d20a8",
+      "parserStatus": "complete",
+      "nativeClaim": false,
+      "integration": "not inferred from this focused run"
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "Generator20",
+      "counts": {
+        "pass": 13,
+        "fail": 7,
+        "skip": 0,
+        "todo": 0
+      },
+      "execution": {
+        "path": "scratch/alfred-generator-compaction-independent-20261010/execution-terminal.json",
+        "sha256": "52c7c8f26b4e6352a4046eb81dc39ea055208dc057eeb97e39769e35c0aae6f0",
+        "bytes": 975
+      },
+      "FD3Sha256": "f92617943bf806959049e6ded95b35806647a548baca22d1684b854e8e188486",
+      "parserStatus": "complete",
+      "nativeClaim": false,
+      "integration": "not inferred from this focused run"
+    },
+    {
+      "kind": "unavailable-initialization",
+      "slice": "Optional Advisor two children",
+      "receipt": {
+        "path": "scratch/alfred-optional-advisor-diagnostics-launch-successor-20261010/root-receipt.json",
+        "sha256": "a71e17aa952cda00c5cc21fb7c7564579818e6da5a7236047e2b76b8a5f31664",
+        "bytes": 4390
+      },
+      "disposedCounts": null,
+      "emptyFD3": true,
+      "semanticRED": false,
+      "nextOwner": "/root/alfred_optional_advisor_source_followthrough"
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "State24",
+      "receipt": {
+        "path": "scratch/alfred-state-i08-real-initializer-fix-independent-20261010/execution.json",
+        "sha256": "021677d6dc37da3b2178233a4f11fff8d7e6deaf73ba6ef32f7da8fd1e343cdd",
+        "bytes": 1234
+      },
+      "suites": [
+        {
+          "name": "State24",
+          "status": 1,
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "e15221857cc80542a64bd1db10c66d5f0040bec0fa48259ff0271c07a1e973d4",
+            "caseSetSha256": "5c9f1e285f7386c3b9f9ed35d3cdfc6a027a3ecb24903fc1ac3c3236603b7b60",
+            "dispositionsSha256": "d896b8730cfc3ccdc74109a567a47517f13bb7a8568384066763784ff9b4bf44",
+            "declaredCount": 24,
+            "disposedCount": 24,
+            "counts": {
+              "pass": 23,
+              "fail": 1,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "9504e328c9fb497974b392c5669c424df48a80c8862840ac98bedf9833f591f1",
+          "counts": {
+            "pass": 23,
+            "fail": 1,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": null,
+          "unsupportedSkipIds": []
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "Generator20",
+      "receipt": {
+        "path": "scratch/alfred-generator-frozen-resource-custody-successor-20261010/execution-terminal.json",
+        "sha256": "30b7b1175219ff40c25ef1371c6eb425e788f60ce0df8066a1169bedd90cfbd8",
+        "bytes": 975
+      },
+      "suites": [
+        {
+          "name": "Generator20",
+          "status": 1,
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "a0712b5dac8bdd97d2b2b554e313b7d4f6851e12c4971bae82df13bd21ec48ed",
+            "caseSetSha256": "1f5b2552fc4ad786832912ad952213bdcfdda9657dfcc1de3c8156b0e6d457c8",
+            "dispositionsSha256": "dccadb768cdd93fc507a713cd361d2be07bce3ae36451ea91ba7d620b2b24ae6",
+            "declaredCount": 20,
+            "disposedCount": 20,
+            "counts": {
+              "pass": 19,
+              "fail": 1,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "64e95fdb3682d236b7955743861051654c86e537f3dc226a025885658b6a82da",
+          "counts": {
+            "pass": 19,
+            "fail": 1,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": null,
+          "unsupportedSkipIds": []
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "OptionalAdvisor",
+      "receipt": {
+        "path": "scratch/alfred-optional-advisor-direct-node-launch-successor-20261010/root-receipt.json",
+        "sha256": "1693c5ad0f8a933cf0563874e90efce93fa67779b95305c1ce533f736214aa28",
+        "bytes": 5642
+      },
+      "suites": [
+        {
+          "name": "original-rc06c",
+          "status": "finite-scope-qualified",
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "2e43543da0924c3c52d8086e6d1a12700143e9eebdd7aabf4401031610d0e2b9",
+            "caseSetSha256": "176f7c5e71ef51ab501a87822d6627c045f3c18debed8d399da869f84636d5d8",
+            "dispositionsSha256": "e7c601800142f877b88aaed435bb94cf0b54af5131f5b18dccf11883d6e5cdb5",
+            "declaredCount": 7,
+            "disposedCount": 7,
+            "counts": {
+              "pass": 7,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "74753805a2d88fc2bd01cc8f76e8c28a40a59bae756d11d6408cccfbb05aa56a",
+          "counts": {
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": [
+            "RC06C001",
+            "RC06C002",
+            "RC06C003",
+            "RC06C004",
+            "RC06C005",
+            "RC06C006",
+            "RC06C007"
+          ],
+          "unsupportedSkipIds": []
+        },
+        {
+          "name": "independent-diagnostics",
+          "status": "not-qualified",
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "d22b648599fa91275295df63f6b41de45d65c18fc2cfd73b4e45fb304668ac13",
+            "caseSetSha256": "91a0d9d83fa2ad146a79af0af773b08d9a7e190dbe354e580052ef513d9f0840",
+            "dispositionsSha256": "5b1cc6b935cfaa319e9cdbceebe396b1bdc333f8e6c74bf6888df4ca33f248cb",
+            "declaredCount": 14,
+            "disposedCount": 14,
+            "counts": {
+              "pass": 10,
+              "fail": 2,
+              "skip": 2,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "930719ef19b102ff666d453adf22c9ad65b04c3b52bd5e6d892cccefd53e855f",
+          "counts": {
+            "pass": 10,
+            "fail": 2,
+            "skip": 2,
+            "todo": 0
+          },
+          "caseIds": [
+            "OA-DIAG01",
+            "OA-DIAG02",
+            "OA-DIAG03",
+            "OA-DIAG04",
+            "OA-DIAG05",
+            "OA-DIAG06",
+            "OA-DIAG07",
+            "OA-DIAG08",
+            "OA-DIAG09",
+            "OA-DIAG10",
+            "OA-DIAG11",
+            "OA-DIAG12",
+            "OA-DIAG13",
+            "OA-DIAG14"
+          ],
+          "unsupportedSkipIds": [
+            "OA-DIAG12",
+            "OA-DIAG14"
+          ]
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "Scratch18",
+      "receipt": {
+        "path": "scratch/alfred-scratch-durability-direct-node-independent-20261010/root-receipt.json",
+        "sha256": "851c071c5c769fd1a298e2f1da7b970d6a8fb95580a43298465290f0952d50ee",
+        "bytes": 3211
+      },
+      "suites": [
+        {
+          "name": "Scratch18",
+          "status": "not-qualified",
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "474b59062de958225b9d8a339e78e5ad03e16102589ce7091efe94b3a69953cf",
+            "caseSetSha256": "e5c617d8b3927f3ddb01959a8b7cb542e9380a658472019f1872d7cc2f3701dd",
+            "dispositionsSha256": "397e8f459992772756f5252a45f16db78fb7f336c572b2855c027094dfa46fb9",
+            "declaredCount": 18,
+            "disposedCount": 18,
+            "counts": {
+              "pass": 14,
+              "fail": 4,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "786d5cc51daeaf8d96480fc10d518dd90cc3b8d9d3cf63017212fee1f48b2a59",
+          "counts": {
+            "pass": 14,
+            "fail": 4,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": [
+            "SC-DUR01",
+            "SC-DUR02",
+            "SC-DUR03",
+            "SC-DUR04",
+            "SC-DUR05",
+            "SC-DUR06",
+            "SC-DUR07",
+            "SC-DUR08",
+            "SC-DUR09",
+            "SC-DUR10",
+            "SC-DUR11",
+            "SC-DUR12",
+            "SC-DUR13",
+            "SC-DUR14",
+            "SC-DUR15",
+            "SC-DUR16",
+            "SC-DUR17",
+            "SC-DUR18"
+          ],
+          "unsupportedSkipIds": []
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "STB",
+      "receipt": {
+        "path": "scratch/alfred-stb-inherited-environment-launch-successor-20261010/execution-terminal.json",
+        "sha256": "be181226d7ca9c44c49cceb81779e95d0f17e9bee80b96e54708ae3588f707d3",
+        "bytes": 2043
+      },
+      "suites": [
+        {
+          "name": "original12",
+          "status": 1,
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549",
+            "caseSetSha256": "48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634",
+            "dispositionsSha256": "c83946a63734b20e9387e9e70db23382bc0a78b94f838c5fb97e0be5f00aad4f",
+            "declaredCount": 12,
+            "disposedCount": 12,
+            "counts": {
+              "pass": 0,
+              "fail": 12,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "3b5c03800a01d194da2028abb810c9ef117ca2458137f178655ca3eddb8bb49f",
+          "counts": {
+            "pass": 0,
+            "fail": 12,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": null,
+          "unsupportedSkipIds": []
+        },
+        {
+          "name": "independent8",
+          "status": 1,
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "d7024f15dfbbbcbf8f2b7c7a2c30332b253e8f7a6c30bdb6c870fc29da4479bf",
+            "caseSetSha256": "bc5c0e0e9413374f9e56da1280e1dbecdeab8bfe1a523528f99d8e8ee8331f13",
+            "dispositionsSha256": "a570f22f73d95adc081442d490a179ef350e666eba4f9c9f83f5959778b68627",
+            "declaredCount": 8,
+            "disposedCount": 8,
+            "counts": {
+              "pass": 5,
+              "fail": 3,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "19f5d440ef5c55696aa840aadb10e66e023fc53f9cb954404afc554bb83f72d4",
+          "counts": {
+            "pass": 5,
+            "fail": 3,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": null,
+          "unsupportedSkipIds": []
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-focused-terminal-result",
+      "slice": "RGGRAM4",
+      "receipt": {
+        "path": "scratch/alfred-rggram-inherited-environment-launch-successor-20261010/runtime/execution.json",
+        "sha256": "09341c50f21553c05a1f4334c3168ea4ed2fa8b422280a0c66cfe425c2952d00",
+        "bytes": 1596
+      },
+      "suites": [
+        {
+          "name": "RGGRAM4",
+          "status": 1,
+          "signal": null,
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "efc0e6bf0d09130630f59c5716b1594ec5bf59664b7cae386bafddfb4d2e28da",
+            "caseSetSha256": "bf214a66e54e85f96d1c1f13d0c4e5ae508dd6ddbe5156bfba9f2291623acfaa",
+            "dispositionsSha256": "ec471d2711aba2e8502745eaa3d91be03c6b777c35077bd60e7a0b3b0a6a1ee0",
+            "declaredCount": 4,
+            "disposedCount": 4,
+            "counts": {
+              "pass": 3,
+              "fail": 1,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "FD3Sha256": "2b48969db982eda649a79950345b026fc9783786ed133e594ef4dab3e0f9042b",
+          "counts": {
+            "pass": 3,
+            "fail": 1,
+            "skip": 0,
+            "todo": 0
+          },
+          "caseIds": null,
+          "unsupportedSkipIds": []
+        }
+      ],
+      "nativeClaim": false,
+      "wholeItemAcceptance": false
+    },
+    {
+      "kind": "actual-qualified-integration",
+      "slice": "CHP commit-hint string only",
+      "receipt": {
+        "path": "scratch/alfred-qualified-commit-hint-assembly-20261010/actual-receipt.json",
+        "sha256": "e7cf995731dc57dc8f8f81eba17f39216668e0ef41cf47f46be88de5e9f2c18d",
+        "bytes": 3020
+      },
+      "selectedSourceCount": 111,
+      "membershipAdditions": 0,
+      "physicalReplacements": 1,
+      "other110ByteExact": true,
+      "proof": {
+        "sourcePackageManifestSha256": "66ddc11c2802ca6155d2d72d0056da64fc658d25eae3101a118b6867ae44a3cc",
+        "hintSpliceSha256": "5e3c61dd39e2d5afcf6697f3d561accee926c93a0acad97f77e22402347b9bb6",
+        "assertionFreezeSha256": "cdc1df31404692e3cd5290653ed5780b1d0ca2ef0b3419468fabf5be69b43ed2",
+        "sourceClosureSha256": "2cd05b9ec5f2c9eec399a837f9bf87836c44d0a52dbb2910fd3bccbab84e9f99",
+        "executionSha256": "2ca2f883dad0da69e46b2ee61d129e65c8f20017f5582574c7f3154f38eec2a3",
+        "completionSha256": "2cbe8e3d3fa6d6789c6d3cf2782746c7c6d0e6a344bb4a4dc33dac8dd10d20a8",
+        "caseIds": [
+          "CHP001",
+          "CHP002",
+          "CHP003",
+          "CHP004",
+          "CHP005",
+          "CHP006",
+          "CHP007",
+          "CHP008"
+        ],
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "sourceConserved": true,
+        "inheritedPreloadPreserved": true,
+        "native": false,
+        "historicalM6ThirtyFiveExecution": "unknown"
+      },
+      "source": {
+        "canonicalPath": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "sourcePath": "scratch/alfred-commit-hint-protocol-independent-20261010/graph/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+        "postSha256": "ab6ce3259b92884398579555c2454c5469228bb08c1327ec8beec1904c212d1f",
+        "postBytes": 67834,
+        "mode": 420,
+        "parentSha256": "446baf21925a616274632227254e7470c25227b51096a8b2afbebdc2bc2646b8",
+        "parentBytes": 67539,
+        "parentMode": 420,
+        "parentNlink": 1,
+        "postNlink": 1,
+        "preState": "selected-and-physical-parent-present"
+      },
+      "sourceInventorySha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb",
+      "wholeItemAcceptance": false,
+      "nativeClaim": false
+    }
+  ],
+  "candidateReady": false,
+  "officialClosures": 0,
+  "globalCompletionPercentage": null,
+  "parentEventsSha256": "a1caf62a3564002a86126cf7d51def1d3d28ae041e0ad8b724a9ee1a045630db",
+  "nativeClaim": false,
+  "currentSelectedSourceCount": 111,
+  "pendingRootDeclaredSources": [
+    {
+      "slice": "STB descriptor-parent repair",
+      "sourcePrefix": "5743",
+      "state": "source ready; unrun; exact closed manifest not supplied here",
+      "currentResponsible": "/root"
+    }
+  ],
+  "currentSourceInventorySha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb",
+  "historicalPendingAt110": [
+    {
+      "slice": "HGL resource successor",
+      "state": "resource complete; not executed; exact successor location unknown at cutoff",
+      "currentResponsible": "/root"
+    },
+    {
+      "slice": "STB descriptor-parent repair",
+      "sourcePrefix": "5743",
+      "state": "source ready; unrun; exact closed manifest not supplied here",
+      "currentResponsible": "/root"
+    }
+  ],
+  "RootQualificationProcessesLive": 0
+}

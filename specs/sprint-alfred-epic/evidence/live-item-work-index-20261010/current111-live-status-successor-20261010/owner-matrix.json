@@ -1,0 +1,181 @@
+{
+  "schema": "alfred.current-live-workflow-owner-matrix.v1",
+  "rows": [
+    {
+      "agent": "/root/alfred_r10_integration_inventory",
+      "slice": "Current111 live-status metadata",
+      "location": "scratch/alfred-current111-live-status-successor-20261010",
+      "workflowState": "AUTHORING",
+      "nextAction": "Root reviews finite metadata and archives once",
+      "currentResponsible": "/root/alfred_r10_integration_inventory",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/agy_greenfield_intake_package",
+      "slice": "TCA resource/launcher preparation",
+      "location": "scratch/alfred-transfer-comparison-command-admission-independent-20261010",
+      "workflowState": "PREPARING",
+      "nextAction": "Consume newly frozen TCA13 manifestcdbc3ce7b3af2b5abde921bdf199482cfe70fdf9b7398ce6e5d0d16786581d3b; resource closure and Root-only launcher",
+      "currentResponsible": "/root/agy_greenfield_intake_package",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/agy_greenfield_roles_audit",
+      "slice": "RGGRAM actual one-failure diagnosis",
+      "location": "scratch/alfred-rggram-actual-one-failure-diagnosis-20261010",
+      "workflowState": "RETURNED",
+      "nextAction": "Root rebase exact c4b surface-order corrections and lawful fixture settings; qualify separately",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_role_fallback_independent",
+      "slice": "AC7 rigor-binding pure-leaf independent12",
+      "location": "scratch/alfred-ac07-rigor-binding-independent-20261010",
+      "workflowState": "FROZEN-READY-RUN",
+      "nextAction": "Root sole12-case pure-leaf run; manifest29499219ac5fe9cf719929c81b3ee6ae6bd6c68aba083b668b684f067b7b5936; durable publication separate",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/agy_greenfield_acceptance_audit",
+      "slice": "Controlled METHOD observation independent CMO12",
+      "location": "scratch/alfred-controlled-method-observation-independent-20261010",
+      "workflowState": "PREPARING",
+      "nextAction": "Root full-read graph/freeze and sole launch; no genuine METHOD positive qualified yet",
+      "currentResponsible": "/root/agy_greenfield_acceptance_audit",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/agy_greenfield_design_audit",
+      "slice": "AC1–3 closed static review",
+      "location": "scratch/alfred-ac01-03-closed-static-review-20261010",
+      "workflowState": "HELD-READ-REFUSAL",
+      "nextAction": "Root finite safety disposition; default model-family entry constructor review incomplete",
+      "currentResponsible": "/root/agy_greenfield_design_audit",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_obl013_override_digest_regression",
+      "slice": "I03 genuine carrier wiring source",
+      "location": "scratch/alfred-i03-genuine-carrier-wiring-source-20261010",
+      "workflowState": "AUTHORING",
+      "nextAction": "Authentic same-feature/task consumed Critic packet remains prerequisite; no synthetic PASS",
+      "currentResponsible": "/root/alfred_obl013_override_digest_regression",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_obl016_heredoc_extractor_regression",
+      "slice": "TCA13 independent command-admission assertions",
+      "location": "scratch/alfred-transfer-comparison-command-admission-assertions-20261010",
+      "workflowState": "FROZEN-RETURNED",
+      "nextAction": "Manifest cdbc3ce7b3af2b5abde921bdf199482cfe70fdf9b7398ce6e5d0d16786581d3b; intake resource preparation then Root sole run",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_reader_2plus1_docs_r2",
+      "slice": "GSC014 validated PUBLIC-intent fixture successor",
+      "location": "scratch/alfred-generator-gsc014-validated-public-intent-fixture-20261010",
+      "workflowState": "FREEZING",
+      "nextAction": "Preserve20 callback bodies; independent GSC021 refusal; Root sole21-case run after review",
+      "currentResponsible": "/root/alfred_reader_2plus1_docs_r2",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_reader_controller_independent_tests",
+      "slice": "Explicit-root readonly State source successor",
+      "location": "scratch/alfred-state-explicit-root-readonly-source-20261010",
+      "workflowState": "AUTHORING",
+      "nextAction": "Confirm latest8357 lineage, freeze two variants, then independent qualification; seed erratum separate",
+      "currentResponsible": "/root/alfred_reader_controller_independent_tests",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/quality_inline_coordinator_audit",
+      "slice": "HGL companion parent lineage successor",
+      "location": "scratch/alfred-hgl-companion-parent-lineage-successor-20261010",
+      "workflowState": "RETURNED-PARTIAL",
+      "nextAction": "Manifest65e160a11b8ba64cb1cbcd55af565173e4152fe0adf6ff238cfbbd96b87501df; Root must supply exact Worktree366→8d and I03 Audit384→95b60 chains; assembly withheld",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/r10_reader_budget_fix",
+      "slice": "Independent Git-index custody additional controls",
+      "location": "scratch/alfred-scratch-durability-index-mode-independent-additional-20261010",
+      "workflowState": "FROZEN-RETURNED",
+      "nextAction": "Three static-only files returned; original18 replay owned by transfer actor; Root qualification",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_optional_advisor_source_followthrough",
+      "slice": "OA two-failure replay infrastructure preparation",
+      "location": "scratch/alfred-optional-advisor-two-failure-replay-preparation-20261010",
+      "workflowState": "FROZEN-READY-RUN",
+      "nextAction": "Root full-read and sole7+14 replay; manifestc04faa29bfd7dc9d809028308826fff637774d70a27b9adc7949661df4eb3846; changed graph unqualified",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_state_i08_invariant_assertions",
+      "slice": "State namespace inherited-start-options measurement preparation",
+      "location": "scratch/alfred-state-remaining-namespace-inherited-start-options-successor-20261010",
+      "workflowState": "PREPARING",
+      "nextAction": "Root reviews mechanical launcher inheritance/confinement then sole measurement;26constructors remain missing",
+      "currentResponsible": "/root/alfred_state_i08_invariant_assertions",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    },
+    {
+      "agent": "/root/alfred_transfer_integrity_source_actor",
+      "slice": "Scratch original18 index-fix replay preparation",
+      "location": "scratch/alfred-scratch-durability-index-fix-replay-preparation-20261010",
+      "workflowState": "FROZEN-READY-RUN",
+      "nextAction": "Root full-read/one-use18 replay; only helperbe0f5d replaced; no semantics by author",
+      "currentResponsible": "/root",
+      "accepted": false,
+      "nativeClaim": false,
+      "basis": "Worker coordination/Root declaration; no production dispatch authority"
+    }
+  ],
+  "Root": "/root",
+  "slotCapacity": 16,
+  "platformObservedSnapshot": {
+    "runningWorkers": 12,
+    "completedWorkers": 3,
+    "runningRoot": 1,
+    "limit": "Observation before subsequent worker messages; self-reported newly rebriefed preparation can differ from platform snapshot"
+  },
+  "RootQualificationProcessesLive": 0,
+  "allWorkersProductiveClaim": false,
+  "historicalOwnersPreservedInParent": true
+}

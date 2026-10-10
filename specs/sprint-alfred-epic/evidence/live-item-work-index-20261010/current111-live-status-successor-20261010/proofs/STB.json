@@ -1,0 +1,77 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "STB",
+  "originalReceipt": {
+    "path": "scratch/alfred-stb-inherited-environment-launch-successor-20261010/execution-terminal.json",
+    "sha256": "be181226d7ca9c44c49cceb81779e95d0f17e9bee80b96e54708ae3588f707d3",
+    "bytes": 2043
+  },
+  "suites": [
+    {
+      "name": "original12",
+      "status": 1,
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549",
+        "caseSetSha256": "48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634",
+        "dispositionsSha256": "c83946a63734b20e9387e9e70db23382bc0a78b94f838c5fb97e0be5f00aad4f",
+        "declaredCount": 12,
+        "disposedCount": 12,
+        "counts": {
+          "pass": 0,
+          "fail": 12,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "3b5c03800a01d194da2028abb810c9ef117ca2458137f178655ca3eddb8bb49f",
+      "counts": {
+        "pass": 0,
+        "fail": 12,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": null,
+      "unsupportedSkipIds": []
+    },
+    {
+      "name": "independent8",
+      "status": 1,
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "d7024f15dfbbbcbf8f2b7c7a2c30332b253e8f7a6c30bdb6c870fc29da4479bf",
+        "caseSetSha256": "bc5c0e0e9413374f9e56da1280e1dbecdeab8bfe1a523528f99d8e8ee8331f13",
+        "dispositionsSha256": "a570f22f73d95adc081442d490a179ef350e666eba4f9c9f83f5959778b68627",
+        "declaredCount": 8,
+        "disposedCount": 8,
+        "counts": {
+          "pass": 5,
+          "fail": 3,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "19f5d440ef5c55696aa840aadb10e66e023fc53f9cb954404afc554bb83f72d4",
+      "counts": {
+        "pass": 5,
+        "fail": 3,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": null,
+      "unsupportedSkipIds": []
+    }
+  ],
+  "sourceGraphSha256": null,
+  "graphConserved": null,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

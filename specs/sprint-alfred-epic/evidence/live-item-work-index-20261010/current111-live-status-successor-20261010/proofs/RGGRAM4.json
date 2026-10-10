@@ -1,0 +1,48 @@
+{
+  "schema": "alfred.current-live-focused-proof.v1",
+  "name": "RGGRAM4",
+  "originalReceipt": {
+    "path": "scratch/alfred-rggram-inherited-environment-launch-successor-20261010/runtime/execution.json",
+    "sha256": "09341c50f21553c05a1f4334c3168ea4ed2fa8b422280a0c66cfe425c2952d00",
+    "bytes": 1596
+  },
+  "suites": [
+    {
+      "name": "RGGRAM4",
+      "status": 1,
+      "signal": null,
+      "attestation": {
+        "schema": "pipeline.verify-case-completion-attestation.v1",
+        "status": "complete",
+        "policySha256": "efc0e6bf0d09130630f59c5716b1594ec5bf59664b7cae386bafddfb4d2e28da",
+        "caseSetSha256": "bf214a66e54e85f96d1c1f13d0c4e5ae508dd6ddbe5156bfba9f2291623acfaa",
+        "dispositionsSha256": "ec471d2711aba2e8502745eaa3d91be03c6b777c35077bd60e7a0b3b0a6a1ee0",
+        "declaredCount": 4,
+        "disposedCount": 4,
+        "counts": {
+          "pass": 3,
+          "fail": 1,
+          "skip": 0,
+          "todo": 0
+        }
+      },
+      "FD3Sha256": "2b48969db982eda649a79950345b026fc9783786ed133e594ef4dab3e0f9042b",
+      "counts": {
+        "pass": 3,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseIds": null,
+      "unsupportedSkipIds": []
+    }
+  ],
+  "sourceGraphSha256": null,
+  "graphConserved": true,
+  "graphErrorPresent": false,
+  "parentErrorPresent": false,
+  "rawRuntimeRootsArgvEnvironmentSetupExcluded": true,
+  "wholeItemQualification": false,
+  "nativeClaim": false,
+  "newBusinessRuns": 0
+}

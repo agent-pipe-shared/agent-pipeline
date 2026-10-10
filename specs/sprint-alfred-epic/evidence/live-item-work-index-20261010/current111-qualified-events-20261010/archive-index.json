@@ -1,0 +1,116 @@
+{
+  "schema": "alfred.current111-archive-index.v1",
+  "target": "main",
+  "sourceManifestSha256": "947950067cd572b51d64e62c8cac245c39a86b25da931c1a45a2391ae7bd13f4",
+  "planSha256": "a7300bc27101263511f7dc17a5d7c90fc06716db62c61ab26552b639c7dd1ccb",
+  "files": [
+    {
+      "path": "retained110-archive-receipt.json",
+      "sha256": "2c586fb2bd92d04a915e392c81bad7625344087964c326e99095e7d4f0e7e36c",
+      "bytes": 483,
+      "mode": 420
+    },
+    {
+      "path": "current-source-manifest.json",
+      "sha256": "6978242e26832777d1eab50aa8b4bf2e42235272c83a2a7109e5e1aebb78c54a",
+      "bytes": 29755,
+      "mode": 420
+    },
+    {
+      "path": "integration-receipt.json",
+      "sha256": "a8b63c51ffa0f58245765082efe04ffa4d92117c24a594f4aa5eba772609a2f5",
+      "bytes": 6536,
+      "mode": 420
+    },
+    {
+      "path": "body-reconciliation/manifest.json",
+      "sha256": "f2e5e360eea1ed4f972a8036d6f0ee913be0fb0c4936e727428336ac007d22ba",
+      "bytes": 12634,
+      "mode": 420
+    },
+    {
+      "path": "body-reconciliation/tracking-repair-proposal.json",
+      "sha256": "a2c20a49e430773d3042de2f8cd294f8336af8f9b62a96f23a4949e3c92c05a2",
+      "bytes": 12468,
+      "mode": 420
+    },
+    {
+      "path": "body-reconciliation/report.md",
+      "sha256": "a30bbb96ba1fe3a887d64e358c0a428252a82f7a6d7a880d9172508436f1abdf",
+      "bytes": 2438,
+      "mode": 420
+    },
+    {
+      "path": "proofs/HGL12.json",
+      "sha256": "d8d126194066dc554bbf015c437628fa49b52ded25bfcf75107e4ad8c7c8a672",
+      "bytes": 1160,
+      "mode": 420
+    },
+    {
+      "path": "proofs/CHP8.json",
+      "sha256": "e4cb4b2543f037a09aa137e2661f2beb77c6e5a9d03f7f701bc55ada301e33aa",
+      "bytes": 1128,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Generator20.json",
+      "sha256": "7ea56238b97cacd42eb5ffcbee4d06a94fd2258d3ab83c6676354ec17fb99f48",
+      "bytes": 1160,
+      "mode": 420
+    },
+    {
+      "path": "proofs/OA-initialization-unavailable.json",
+      "sha256": "991ddc49953bf26308ed944610f44c9f478d472364d1ba620e9bc88c571ff433",
+      "bytes": 2184,
+      "mode": 420
+    },
+    {
+      "path": "items-current.json",
+      "sha256": "7112375d9ff12e682a1afc66737aae8c87601a8a4906bf016d40cd4d1c70c95c",
+      "bytes": 253984,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "021b1feb265a80148fae1c480e97765271ac3651b37177079e696038d41271dc",
+      "bytes": 16846,
+      "mode": 420
+    },
+    {
+      "path": "criteria-parent-reference.json",
+      "sha256": "c25991d5e9d53e3d9d2c9c19405c13841a11fb2111548abeec84d95463435c63",
+      "bytes": 456,
+      "mode": 420
+    },
+    {
+      "path": "overall-status.json",
+      "sha256": "163cca3cadcd263971dda2daaa28ae897b5af2aae78c9f5cfdef2251336e0a7a",
+      "bytes": 2680,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "16d2f1a53005a4c2ec2805c9f118c91ece76b003b9b4ff4914b179cdd4100abd",
+      "bytes": 1587,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan.json",
+      "sha256": "a7300bc27101263511f7dc17a5d7c90fc06716db62c61ab26552b639c7dd1ccb",
+      "bytes": 3252,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "947950067cd572b51d64e62c8cac245c39a86b25da931c1a45a2391ae7bd13f4",
+      "bytes": 9870,
+      "mode": 420
+    }
+  ],
+  "canonicalSourceCount": 111,
+  "officialItemClosures": 0,
+  "wholeCriteriaAccepted": 0,
+  "nativeClaim": false,
+  "GitOperations": 0,
+  "businessRuns": 0
+}

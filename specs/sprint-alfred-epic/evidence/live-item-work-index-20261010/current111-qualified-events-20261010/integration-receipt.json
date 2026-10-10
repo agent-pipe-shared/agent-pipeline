@@ -1,0 +1,149 @@
+{
+  "GitOperations": 0,
+  "actualInventorySha256": "6978242e26832777d1eab50aa8b4bf2e42235272c83a2a7109e5e1aebb78c54a",
+  "courseAcceptance": false,
+  "dependencyPins": [
+    {
+      "bytes": 8003,
+      "mode": 420,
+      "path": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "sha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182"
+    },
+    {
+      "bytes": 9355,
+      "mode": 420,
+      "path": "plugins/pipeline-core/lib/role-route-preflight.mjs",
+      "sha256": "965acac7727d6e1c22ebe8e46b4de4a50cf2b84d2ec3761ca4ec1f4cf838e864"
+    },
+    {
+      "bytes": 12823,
+      "mode": 420,
+      "path": "plugins/pipeline-core/lib/role-route-preflight.test.mjs",
+      "sha256": "000bf8983246fff7bd8b9ac9bcea8800f26a9bb5516d086b0a880e9b598517bc"
+    },
+    {
+      "bytes": 21124,
+      "mode": 420,
+      "path": "plugins/pipeline-core/lib/dispatch-policy.mjs",
+      "sha256": "e260facd903e878acfacf17d2b8afcef7a6e3c896c1c822038c925d233143bef"
+    },
+    {
+      "bytes": 25695,
+      "mode": 420,
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "sha256": "7286eccd7712e6023cc252766a0b5c1e6f2f4db77c77903af4b4d582f7c31066"
+    },
+    {
+      "bytes": 7838,
+      "mode": 420,
+      "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+      "sha256": "2b593b872a69d0d02c42eaace9db650fd16ca1e05c3f509614a045597ba50335"
+    },
+    {
+      "bytes": 57670,
+      "mode": 420,
+      "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "sha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6"
+    },
+    {
+      "bytes": 43361,
+      "mode": 420,
+      "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+      "sha256": "d463b1b92fb7329b3515e47640b2e8e85f85f866c126c137cc716702d1af7f3e"
+    }
+  ],
+  "excluded": [
+    "Goldfish template docs",
+    "plugin template mirror",
+    "architecture maps",
+    "commit-hint source",
+    "other proposed sources"
+  ],
+  "inputBindings": {
+    "scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-receipt.json": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+    "scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-source-manifest.json": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+    "scratch/alfred-role-fallback-independent-20261010/complete-independent-freeze.json": "000e46502e72d5646bf552827fbafe82f64ddbf3eb10b14148e9d783b1819754",
+    "scratch/alfred-role-fallback-independent-20261010/complete-source-graph-freeze.json": "5328d102911116cc94dfb3ebd42f3db2f897d4110b80ef00f91ae2ecb00edd1e",
+    "scratch/alfred-role-fallback-independent-20261010/execution.json": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d",
+    "scratch/alfred-role-fallback-independent-20261010/independent-freeze.json": "137eab61e45b9ce89b3479c4aea5c40e3ae8d38030c2ca588bdd3bd91bee1702",
+    "scratch/alfred-role-fallback-independent-20261010/manifest.json": "2ed02f370e5f9eacaab98d5f9fba3545d2c7f7cee4bffaef86451b3a50ac980b",
+    "scratch/alfred-role-fallback-independent-20261010/qualification/completion.fd3.jsonl": "b1753fc4e8241c9b9fd7c585be8f4fc8b79f47b2bf0d3d578378547bb6a13b24",
+    "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa"
+  },
+  "integrated": true,
+  "inventoryExclusiveCreate": true,
+  "inventoryMode": "0600",
+  "inverseBackupSha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea",
+  "itemClosure": false,
+  "modelIdentity": false,
+  "nativePASS": false,
+  "other110SelectedByteExact": true,
+  "parent110MemberMapAfterSha256": "780ef44c905101d763f7b49c87d5571e62134a86925d72234822d04e62bd1827",
+  "parent110MemberMapSha256": "780ef44c905101d763f7b49c87d5571e62134a86925d72234822d04e62bd1827",
+  "parentSelectedSourceCount": 110,
+  "physicalParentWasUnindexed": true,
+  "physicalReplacements": 1,
+  "productTestsRunByAssembler": 0,
+  "proof": {
+    "caseIds": [
+      "RDFQ001",
+      "RDFQ002",
+      "RDFQ003",
+      "RDFQ004",
+      "RDFQ005",
+      "RDFQ006",
+      "RDFQ007",
+      "RDFQ008"
+    ],
+    "completeSourceGraphSha256": "5328d102911116cc94dfb3ebd42f3db2f897d4110b80ef00f91ae2ecb00edd1e",
+    "completionSha256": "b1753fc4e8241c9b9fd7c585be8f4fc8b79f47b2bf0d3d578378547bb6a13b24",
+    "counts": {
+      "fail": 0,
+      "pass": 8,
+      "skip": 0,
+      "todo": 0
+    },
+    "courseAcceptance": false,
+    "executionSha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d",
+    "graphConserved": true,
+    "independentFreezeSha256": "137eab61e45b9ce89b3479c4aea5c40e3ae8d38030c2ca588bdd3bd91bee1702",
+    "itemClosure": false,
+    "modelIdentity": false,
+    "native": false,
+    "proofManifestSha256": "2ed02f370e5f9eacaab98d5f9fba3545d2c7f7cee4bffaef86451b3a50ac980b",
+    "sourceManifestSha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa"
+  },
+  "resultSelectedSourceCount": 111,
+  "retainedPublicParents": [
+    {
+      "bytes": 29224,
+      "path": "retained-public-parents/public-source-manifest.json",
+      "sha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5"
+    },
+    {
+      "bytes": 6114,
+      "path": "retained-public-parents/actual-receipt.json",
+      "sha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc"
+    }
+  ],
+  "schema": "alfred.qualified-role-fallback-integration-receipt.v1",
+  "scope": "one role-dispatch-preflight library replacement and selected-membership addition only",
+  "selectedMembershipAdditions": 1,
+  "source": {
+    "canonicalPath": "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
+    "mode": 420,
+    "parentBytes": 15628,
+    "parentMode": 420,
+    "parentNlink": 1,
+    "parentSha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea",
+    "postBytes": 23414,
+    "postNlink": 1,
+    "postSha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+    "preState": "physical-parent-present-but-unindexed",
+    "sourcePath": "scratch/alfred-role-route-fallback-runtime-source-20261010/postimages/plugins/pipeline-core/lib/role-dispatch-preflight.mjs"
+  },
+  "sourceWrites": 1,
+  "status": "actual-one-source-CAS-integrated-not-stamped",
+  "unindexedPhysicalParentAfterSha256": "d6976e58e598cd8188674bb6f0d2e82d116eebce4792afb7cdb8273a76c80c56",
+  "unindexedPhysicalParentBeforeSha256": "da4528ec81d39052484ffecf8434369dd192e0cecfa7b580bd632e858fbc46ea"
+}

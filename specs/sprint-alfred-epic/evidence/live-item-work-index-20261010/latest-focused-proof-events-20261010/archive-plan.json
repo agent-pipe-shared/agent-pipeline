@@ -1,0 +1,98 @@
+{
+  "schema": "alfred.latest-focused-public-archive-plan.v1",
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/latest-focused-proof-events-20261010",
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "payloads": [
+    {
+      "path": "proofs/OAC12-reparse.json",
+      "sha256": "82209ce1093471d2d62d2526d0d1420f3779ffdf5b5975cf476f1e95e3a1ae69",
+      "bytes": 1388,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Scratch18.json",
+      "sha256": "62448e0fcad2bf035edd8bb7710c65125a4b658575ce90e1e50597b02f2918e9",
+      "bytes": 3420,
+      "mode": 420
+    },
+    {
+      "path": "proofs/Gitleaks.json",
+      "sha256": "4eff92a14cc7a9595495ae8a8d3be8cfd1cc6fedb296e3be19ea287e5a2d68da",
+      "bytes": 2249,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "bf03f6cf5f98bf6519a9492def436c69a39d6aa39ff191c6859428c0b3e041b4",
+      "bytes": 2377,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/scratch-custody-report.mjs.txt",
+      "sha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "bytes": 11408,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/scratch-index.source.patch.txt",
+      "sha256": "cc1eef25efaab2a90ca54915b0aaefa1f598e30245ce10592496b326ae0f4929",
+      "bytes": 1626,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-source.txt",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-source.diff.txt",
+      "sha256": "5c3841309827e910497d6726a26de7245852b08c357dc6a7d81133a50607fb4c",
+      "bytes": 1426,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-fixture-correction.txt",
+      "sha256": "031e8e13138238d46b2dc2e75545865f52ea0529cf2afc09f45af858e4b75ff4",
+      "bytes": 14013,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/OA-fixture-correction.diff.txt",
+      "sha256": "a8f6caec3d50657190bea79deb8430827abbd96218c1a2df8f8a2862d92b70e9",
+      "bytes": 2338,
+      "mode": 420
+    },
+    {
+      "path": "source-custody/index.json",
+      "sha256": "99209dd687ad8f7167119e6d87aa6f930d9f1f5a584584babfa7323de1f04c33",
+      "bytes": 1738,
+      "mode": 420
+    },
+    {
+      "path": "next-crosswalk-batches.json",
+      "sha256": "4f02a73717055082a4f095291cdabae8f03159e7d636f9e43cf16168e6c8a690",
+      "bytes": 453233,
+      "mode": 420
+    },
+    {
+      "path": "preparation-cause.json",
+      "sha256": "378ef260aa3d70632ad396ce898ed70455adda22c041b0a53f153f73d41828e9",
+      "bytes": 2374,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "bf79fac71b53631d324f2e4f81259d65492e55be6ed61bcbd6bb08f58c19973b",
+      "bytes": 1067,
+      "mode": 420
+    }
+  ],
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-qualified-commit-hint-assembly-20261010/actual-source-manifest.json",
+    "sha256": "10018df4aed68326cc19e05cee7d24bba10abb6198073abf601edb6611e9dafb"
+  },
+  "noOverwrite": true,
+  "businessRuns": 0,
+  "GitOperations": 0
+}

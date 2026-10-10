@@ -1,0 +1,322 @@
+{
+  "schema": "alfred.current120-tracking-manifest.v1",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "SourceProposal operational metadata",
+  "nativeRouteVerified": false,
+  "inputs": [
+    {
+      "path": "scratch/alfred-current114-status-and-fanout-20261010/overview.json",
+      "sha256": "42c4ffcf4511c03921fdd9c1b54f8299410ffd8ddf59bf2a1b6da4f8a4556f2f",
+      "bytes": 128922
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-01-02-20261010/manifest.json",
+      "sha256": "aaf342fa82d9ba9872643c5da777e2e6ea999b944c73a740ae58a58546d8d5e0",
+      "bytes": 6647
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-01-02-20261010/matrix.json",
+      "sha256": "b0ac07bd853d449a9ec9e31f43274cf9b0073ad5c59aa6aea0495c0cbccbc496",
+      "bytes": 130076
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-03-04-20261010/manifest.json",
+      "sha256": "0a4f1ac6c5d6604417f2262bbba0b348abf086c5bf9e26dcb407f75e6adab867",
+      "bytes": 2159
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-03-04-20261010/crosswalk.json",
+      "sha256": "325e7709cdbd6f7aa04645beaf50edc52bcec311b81de8c8a75643c85a48c469",
+      "bytes": 87054
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-05-06-20261010/manifest.json",
+      "sha256": "f1325b3870de8002d63f2a3854c6383cf93e5bdda3c4c0ef4e7fda35d0479011",
+      "bytes": 2016
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-05-06-20261010/matrix.json",
+      "sha256": "da0ad484b56875e323c93ce6411ee22c574326ca12f26c509c789910157d9444",
+      "bytes": 307381
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-07-08-20261010/final-manifest.json",
+      "sha256": "3c16ce9e909fcd37f0ccd769afdea767f3cb5dc6d6da12bc3e3905e863df09bc",
+      "bytes": 645
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-07-08-20261010/matrix.json",
+      "sha256": "66ab33ae9cfcac4fb19b0307c14ae9660021cdb74e2c2f2f0665e72d7e54338f",
+      "bytes": 319988
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-07-08-20261010/manifest.json",
+      "sha256": "81761f13a0860ba44beb499fe3bcdffa8bb172871923420ef03af6ad3461cfcb",
+      "bytes": 7714
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-07-08-20261010/case-receipt-bindings.json",
+      "sha256": "122e77a1e8684aa3891eea9730456adc1dd70825e5edf61704c0f2b466d6af42",
+      "bytes": 26225
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-09-10-20261010/packet-manifest.json",
+      "sha256": "ca14cdf339a2c7b5517e6ebb9089525d308e763b209980b2d93768e42b358846",
+      "bytes": 22851
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-09-10-20261010/matrix.json",
+      "sha256": "e7a16ef7a216750a1196fd80be6482dfc4d7c415fa5d10e1be6b161a383ced97",
+      "bytes": 271483
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-09-10-20261010/reconciliation-addendum.json",
+      "sha256": "939fb9786d055d8f6bed78da72459d3a10a83197e3abad23f19366ef091e2982",
+      "bytes": 4532
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-11-12-20261010/manifest.json",
+      "sha256": "6e3d79ae8d0744b1b4739af96bb619f80d0ec735b4242546dc2f64154ab1a1fb",
+      "bytes": 2387
+    },
+    {
+      "path": "scratch/alfred-current114-crosswalk-11-12-20261010/crosswalk.json",
+      "sha256": "28c035c5bfd87b7eb2d0e0dd1b49cff35fb3985b9043c787e29d5b43aa56d976",
+      "bytes": 222821
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/actual-source-manifest.json",
+      "sha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+      "bytes": 35112
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/actual-receipt.json",
+      "sha256": "d3b88525ac2c088f417664d4bd6fc6c161ad67c70967c366304d645e6c4b94ca",
+      "bytes": 7324
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/manifest.json",
+      "sha256": "422271fe0c9dba2eb82609c0a87101c5d96aea4f35fe2f5512efaedccb44083b",
+      "bytes": 273415
+    },
+    {
+      "path": "scratch/alfred-rggram-sorted-parent-fixture-replay-preparation-20261010/runtime/execution.json",
+      "sha256": "ccc6d6fb2148698be55357fd1dd09b7435ebf0bef90c2a7b64158a4a15522b67",
+      "bytes": 1598
+    },
+    {
+      "path": "scratch/alfred-gitleaks-privacy-corrected-402-ten-replay-preparation-20261010/root-receipt.json",
+      "sha256": "d1ad31f49c095ef25a5a1f777737daeee8c32815b8d82bdc1a3243f5bcddb8d5",
+      "bytes": 3518
+    },
+    {
+      "path": "scratch/alfred-gitleaks-original18-resource-replay-preparation-20261010/execution.json",
+      "sha256": "e12722bbcad5e32bac088d3de551f58d9ceca6ea263e9474c07ca859880e826f",
+      "bytes": 1992
+    },
+    {
+      "path": "scratch/alfred-stb-admissible-temp-root-successor-preparation-20261010/execution-terminal.json",
+      "sha256": "2690b360c982428a178a1ad01f8066495e90236df4521a2df9018a83c1338318",
+      "bytes": 2264
+    },
+    {
+      "path": "scratch/alfred-controlled-method-review-target-source-design-20261010/manifest.json",
+      "sha256": "3d943b0e40ca314c498c9e1db918cb29276abeb893fd695df2d78016e56ea4ba",
+      "bytes": 1484
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/codex-advisor-binding-diagnostic.mjs",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "bytes": 3622
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "bytes": 6494
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/inverse/plugins/pipeline-core/lib/codex-readiness-ownership-verifier.mjs",
+      "sha256": "4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00",
+      "bytes": 5302
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "bytes": 17680
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/inverse/plugins/pipeline-core/lib/codex-advisor-host-record.mjs",
+      "sha256": "6a2c33073813368eff1bf4a28d8d41a5a74d8c92c09e2f92721bc760be1fbce0",
+      "bytes": 16184
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "bytes": 8734
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/inverse/plugins/pipeline-core/lib/codex-advisor-host-store.mjs",
+      "sha256": "2997328b06173126f0e8a51d1df831cece1d2dcabdee52832948482666d600c7",
+      "bytes": 7149
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "bytes": 31644
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/inverse/plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "bytes": 31090
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/inverse/plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "sha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52",
+      "bytes": 8245
+    }
+  ],
+  "payloads": [
+    {
+      "path": "crosswalk-current.json",
+      "sha256": "3d764cb6df29ff364d0b24223bd1f1e2ef83b85848eaf48729dff94c13ec8f79",
+      "bytes": 671666,
+      "mode": 420
+    },
+    {
+      "path": "overview.json",
+      "sha256": "ef2b7f3458c2057e6f7b9b0bb5ac90328bdb4ee4494effa1bfafeed0f93fbad6",
+      "bytes": 11729,
+      "mode": 420
+    },
+    {
+      "path": "current-source-manifest.json",
+      "sha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+      "bytes": 35112,
+      "mode": 420
+    },
+    {
+      "path": "integration-receipt.json",
+      "sha256": "d3b88525ac2c088f417664d4bd6fc6c161ad67c70967c366304d645e6c4b94ca",
+      "bytes": 7324,
+      "mode": 420
+    },
+    {
+      "path": "focused-proofs.json",
+      "sha256": "917a3be0ce516c15acd3099991665c9378d9e6bf855a7e0730b27a4a83659c50",
+      "bytes": 12378,
+      "mode": 420
+    },
+    {
+      "path": "pending-design-reference.json",
+      "sha256": "48757a64766362a59c471c38b3c0eade713d295f2d6e12c7b03decdd6b159a62",
+      "bytes": 1768,
+      "mode": 420
+    },
+    {
+      "path": "sources/01.mjs.txt",
+      "sha256": "c07fdf7ccb8b5e71e9f5d78251c05f5da4ccf13200604236ef83af69fa586917",
+      "bytes": 3622,
+      "mode": 420
+    },
+    {
+      "path": "sources/01.patch.txt",
+      "sha256": "89407d14cca90ceaa8c6c89adc8234ba2d17411a35f03bb27ba20bf7eef30cea",
+      "bytes": 3821,
+      "mode": 420
+    },
+    {
+      "path": "sources/02.mjs.txt",
+      "sha256": "ac8c8e5108792dc221d6cf74088b828e36a671b92d1986bb0484183b3a9ba15d",
+      "bytes": 6494,
+      "mode": 420
+    },
+    {
+      "path": "sources/02.patch.txt",
+      "sha256": "a04fe420955b376547e12e86f038eae5c8febab269db26fc58149ae0a6807478",
+      "bytes": 7842,
+      "mode": 420
+    },
+    {
+      "path": "sources/03.mjs.txt",
+      "sha256": "3e7d8b27828ec056d9ba33cd26be1619b29b44cb1a161c81996b52a1460f2863",
+      "bytes": 17680,
+      "mode": 420
+    },
+    {
+      "path": "sources/03.patch.txt",
+      "sha256": "994b1b159cc00f0a86016620efe62ffcb7bff8a952d17fab9d01b4f18b5b1084",
+      "bytes": 8181,
+      "mode": 420
+    },
+    {
+      "path": "sources/04.mjs.txt",
+      "sha256": "2ec4de110369707fe8e6e6ba231819af3cebff5d09f6795f9acca37522f2a60e",
+      "bytes": 8734,
+      "mode": 420
+    },
+    {
+      "path": "sources/04.patch.txt",
+      "sha256": "f4295ff5408c413500f1ea34c3f8cc5a849c9844567b2a2f6ab4790b0e66aac1",
+      "bytes": 11407,
+      "mode": 420
+    },
+    {
+      "path": "sources/05.mjs.txt",
+      "sha256": "4a28f093ec393a134aa8046e1a49945e247a5ce0d7c0464953685d33ac47beb1",
+      "bytes": 31644,
+      "mode": 420
+    },
+    {
+      "path": "sources/05.patch.txt",
+      "sha256": "2a9c599d37925ba118e4f5fd02ade9f3fed202578b8ee80f57ecc8d9d183574c",
+      "bytes": 8398,
+      "mode": 420
+    },
+    {
+      "path": "sources/06.mjs.txt",
+      "sha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "bytes": 8306,
+      "mode": 420
+    },
+    {
+      "path": "sources/06.patch.txt",
+      "sha256": "5c3841309827e910497d6726a26de7245852b08c357dc6a7d81133a50607fb4c",
+      "bytes": 1426,
+      "mode": 420
+    },
+    {
+      "path": "source-custody-index.json",
+      "sha256": "6d60cacbeaf14618bf65ec7d673e3df176fd9b0976c4b16009e13313939fd32d",
+      "bytes": 4381,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "1b987aff29a4f3df26583a9b8be9cb0464e57d40f75292e8761e26688a37e2dd",
+      "bytes": 1730,
+      "mode": 420
+    }
+  ],
+  "archivePlan": {
+    "path": "archive-plan.json",
+    "sha256": "9fcec1a9e109a48c4d372369f0f7dfbcb8c639d63023af3a1e956b35ee570fda",
+    "bytes": 4017,
+    "mode": 420
+  },
+  "canonicalSourcePaths": 120,
+  "mappedCrosswalkRows": 163,
+  "retainedRows": 13,
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "sourceImplementationChanges": 0,
+  "accepted": 0,
+  "privacyReviewed": true
+}

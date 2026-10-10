@@ -1,0 +1,68 @@
+{
+  "schema": "alfred.current114-public-archive-plan.v1",
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current114-status-and-fanout-20261010",
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "payloads": [
+    {
+      "path": "current-source-manifest.json",
+      "sha256": "a83f2bbf5b8456a354ed12bd6e9f6a207a8caab612e6170e8c079cd2e0c26963",
+      "bytes": 31812,
+      "mode": 420
+    },
+    {
+      "path": "integration-receipt.json",
+      "sha256": "3d5ead3e7d800aa911e36950fd2fa26520275b63951b53909158f0808201092b",
+      "bytes": 3533,
+      "mode": 420
+    },
+    {
+      "path": "OA-actual-proof.json",
+      "sha256": "9fad017afa5e4d439cf801c23bbe62cb10923e751cc688a710b2c31c5edcc28d",
+      "bytes": 5399,
+      "mode": 420
+    },
+    {
+      "path": "AC7-pure-leaf-proof.json",
+      "sha256": "8cc0e69e0df672d8b501ffd09332b7048dc90cf79aa40dc72f7968a153210f07",
+      "bytes": 1394,
+      "mode": 420
+    },
+    {
+      "path": "fanout.json",
+      "sha256": "4b3969761e4fcbc6cba443b296f001d432de38352fb570dd5b4ca07910992333",
+      "bytes": 6564,
+      "mode": 420
+    },
+    {
+      "path": "batch-summary.json",
+      "sha256": "4e3700dd763dd3d138130fc20525c6dc60d96e6b7da25507495ac3359a3097fe",
+      "bytes": 78148,
+      "mode": 420
+    },
+    {
+      "path": "overview.json",
+      "sha256": "42c4ffcf4511c03921fdd9c1b54f8299410ffd8ddf59bf2a1b6da4f8a4556f2f",
+      "bytes": 128922,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "2cf38209518d12b94227b4ca1a2de1ddc0aa92ab266aa8b3b146a0a7f781d4b0",
+      "bytes": 6640,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "426446f44c2f65eee09f53c48ab1c623e9ff7f9717438c32ea78a6299a90c311",
+      "bytes": 1144,
+      "mode": 420
+    }
+  ],
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-qualified-scratch-durability-assembly-20261010/actual-source-manifest.json",
+    "sha256": "a83f2bbf5b8456a354ed12bd6e9f6a207a8caab612e6170e8c079cd2e0c26963"
+  },
+  "noOverwrite": true,
+  "businessRuns": 0,
+  "GitOperations": 0
+}

@@ -1,0 +1,303 @@
+{
+  "schema": "alfred.current120.focused-proofs.v1",
+  "proofs": [
+    {
+      "name": "RG4",
+      "actualReceiptPath": "scratch/alfred-rggram-sorted-parent-fixture-replay-preparation-20261010/runtime/execution.json",
+      "actualReceiptSha256": "ccc6d6fb2148698be55357fd1dd09b7435ebf0bef90c2a7b64158a4a15522b67",
+      "RootObservedAggregateCounts": {
+        "pass": 4,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "schema": "alfred.rggram-independent-execution.v1",
+        "baseline": {
+          "commit": "e40b6ede927cc052be467fb816f98429a3b0164f",
+          "tree": "6f786fd7fe31758dc6dd2db8bab2636bec0c7a53"
+        },
+        "child": {
+          "status": 0,
+          "signal": null,
+          "error": null
+        },
+        "completionSha256": "ddddde8bbbda697f69df90025625eb336af31ba523ce1af4e769701a4c1cbc49",
+        "stdoutSha256": "8d368d3b3204baf2b9a4996546f7585d9a52a74d789263ceebad050b9c783189",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "parsed": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "efc0e6bf0d09130630f59c5716b1594ec5bf59664b7cae386bafddfb4d2e28da",
+          "caseSetSha256": "bf214a66e54e85f96d1c1f13d0c4e5ae508dd6ddbe5156bfba9f2291623acfaa",
+          "dispositionsSha256": "7fb86eb44a5ddcc7e6a47d0044f241f06c98c1c1f079d65b889873b27728abe1",
+          "declaredCount": 4,
+          "disposedCount": 4,
+          "counts": {
+            "pass": 4,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          }
+        },
+        "parseError": null,
+        "graphConserved": true,
+        "graphMembershipConserved": true,
+        "childTimeoutMs": 120000,
+        "allInheritedGitSettingsPreserved": true,
+        "execArgvPreserved": true,
+        "inheritedNodeOptionsPresent": false,
+        "businessRuns": 1,
+        "nativeProof": false,
+        "sourceAuthoredCasesExecuted": false
+      },
+      "businessRerunsHere": 0,
+      "limit": "Separate actual run; not whole-item/native acceptance. GLR18 uses old adapter without privacy overlay; STB20 aggregates separate12+8 suites."
+    },
+    {
+      "name": "GLR10",
+      "actualReceiptPath": "scratch/alfred-gitleaks-privacy-corrected-402-ten-replay-preparation-20261010/root-receipt.json",
+      "actualReceiptSha256": "d1ad31f49c095ef25a5a1f777737daeee8c32815b8d82bdc1a3243f5bcddb8d5",
+      "RootObservedAggregateCounts": {
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "schema": "alfred.gitleaks-privacy-corrected-ten-root-receipt.v1",
+        "status": "finite10-qualified",
+        "manifestSha256": "db99a359ef19273afb0143bc6d200e672846b15bfef1ff240f1fcfcbfc706cf3",
+        "sourceManifestSha256": "d4fe93de7204f0f6dfae168459d2d0bab02cbd1e23dc93d5a34cebebd4ecea55",
+        "sourceGraphSha256": "84d4d69c6e6e14010e816c9129ebdab539fefdf147801e9d6b5962bce1577efe",
+        "adapterSha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+        "assertionSha256": "ff1ccbef461ec23ce94cd0e9e9c32d4709e217327d8d67da0431d3710e87ecad",
+        "checks": [
+          {
+            "stage": "before",
+            "status": "matched",
+            "boundInputs": 1193,
+            "currentResources": 402,
+            "predecessorResources": 343,
+            "diagnosticResources": 402
+          },
+          {
+            "stage": "after",
+            "status": "matched",
+            "boundInputs": 1193,
+            "currentResources": 402,
+            "predecessorResources": 343,
+            "diagnosticResources": 402
+          }
+        ],
+        "child": {
+          "file": "gitleaks-strong.test.mjs",
+          "status": 0,
+          "signal": null,
+          "spawnError": false,
+          "parserStatus": "complete",
+          "completion": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "5252c0602bd78922caad1c785864feb0a4cec3ede7ad2b6ed7126a7a66f1f9a9",
+            "caseSetSha256": "1a2e3f41bc0f0dfceda99515a00f97db5416052310a4312bd7902da2fcd4a512",
+            "dispositionsSha256": "080ee7edcd5cdc284e6a523f846b0964948b45ec02793f815a7f6c02a49cdf05",
+            "declaredCount": 10,
+            "disposedCount": 10,
+            "counts": {
+              "pass": 10,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "completionFile": {
+            "path": "qualification/gitleaks-strong.completion.fd3.jsonl",
+            "sha256": "49263fe5ab17eb86729b5238d98c838165f5368429bb9e8694b154db296efb37",
+            "bytes": 1809
+          }
+        },
+        "originalHistory": {
+          "path": "scratch/alfred-gitleaks-privacy-corrected-402-ten-replay-preparation-20261010/historical-execution.json",
+          "sha256": "26cb6e34a477c22cd6e3399f90b7da6baec14a25002386527d3b51f14b72a914",
+          "counts": {
+            "pass": 8,
+            "fail": 2,
+            "skip": 0,
+            "todo": 0
+          },
+          "attestation": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "5252c0602bd78922caad1c785864feb0a4cec3ede7ad2b6ed7126a7a66f1f9a9",
+            "caseSetSha256": "1a2e3f41bc0f0dfceda99515a00f97db5416052310a4312bd7902da2fcd4a512",
+            "dispositionsSha256": "9da840ceef50e239c0dfb30476ccd8f7543b4a9da903c8faf333d0f146fa179e",
+            "declaredCount": 10,
+            "disposedCount": 10,
+            "counts": {
+              "pass": 8,
+              "fail": 2,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "sourceGraphConserved": true,
+          "original18SetupFailurePreserved": true,
+          "changedSourceProof": false
+        },
+        "fullCaseCountsMatched": true,
+        "original10AssertionsUnchanged": true,
+        "GLR010": {
+          "cause": "Root actual402 diagnosis satisfied all three unchanged CLI gates; actual10 replay disposition retained separately",
+          "fixtureOrAssertionChange": false
+        },
+        "publicOutputProjection": "static summaries plus actual production-parser attestation; no child stdout/stderr/report bytes",
+        "addedResources": 59,
+        "realGitleaks": false,
+        "nativeProof": false,
+        "humanSigning": false,
+        "wholeAC11": false,
+        "itemClosure": false
+      },
+      "businessRerunsHere": 0,
+      "limit": "Separate actual run; not whole-item/native acceptance. GLR18 uses old adapter without privacy overlay; STB20 aggregates separate12+8 suites."
+    },
+    {
+      "name": "GLR18",
+      "actualReceiptPath": "scratch/alfred-gitleaks-original18-resource-replay-preparation-20261010/execution.json",
+      "actualReceiptSha256": "e12722bbcad5e32bac088d3de551f58d9ceca6ea263e9474c07ca859880e826f",
+      "RootObservedAggregateCounts": {
+        "pass": 18,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "schema": "alfred.original18-genuine-resources-actual-qualification.v1",
+        "freezeSha256": "1531c867356a7b881ff8951bb084575cb8f045d4296472eed3ef9f6a5ed627c5",
+        "status": 0,
+        "signal": null,
+        "error": null,
+        "completion": {
+          "schema": "pipeline.verify-case-completion-attestation.v1",
+          "status": "complete",
+          "policySha256": "60f04fb55e2e680ac66159f8d6fc0b83530ef2a9d3c6784605de7eb6535b7159",
+          "caseSetSha256": "80f602792f6fcb8511761780645e558b78686fe52675738d46e940302063314c",
+          "dispositionsSha256": "57f0e4370d9da359a6f6746a47ce8343714daa2c1a8db4b04b7fa0dd65d46fb6",
+          "declaredCount": 18,
+          "disposedCount": 18,
+          "counts": {
+            "pass": 18,
+            "fail": 0,
+            "skip": 0,
+            "todo": 0
+          }
+        },
+        "completionError": null,
+        "completionFile": {
+          "path": "owned-operation/qualification/completion.fd3.jsonl",
+          "sha256": "2b2b6715ca9fce7f2a8558ef25d4eea79665cebe411dd2d8ae01df00c2785b2f",
+          "bytes": 2857,
+          "mode": 384
+        },
+        "graphConserved": true,
+        "conservationError": null,
+        "original18Unchanged": true,
+        "originalSetupFailurePreserved": true,
+        "sourceCount": 402,
+        "sourceAdapterSha256": "0c94377dee06328b1effb0a1f36a93db46e4969897ec54216ec27b5e3e5ebe13",
+        "privacyFixOverlay": false,
+        "inheritedNodeOptionsPreserved": true,
+        "inheritedCodexThreadPreserved": true,
+        "inheritedPoEnvironmentPreserved": true,
+        "inheritedGitConfigEnvironmentPreserved": true,
+        "inheritedExecArgvCount": 0,
+        "nativeClaim": false,
+        "realGitleaks": false,
+        "wholeAC11": false,
+        "actualHumanSigning": false,
+        "itemClosure": false
+      },
+      "businessRerunsHere": 0,
+      "limit": "Separate actual run; not whole-item/native acceptance. GLR18 uses old adapter without privacy overlay; STB20 aggregates separate12+8 suites."
+    },
+    {
+      "name": "STB20",
+      "actualReceiptPath": "scratch/alfred-stb-admissible-temp-root-successor-preparation-20261010/execution-terminal.json",
+      "actualReceiptSha256": "2690b360c982428a178a1ad01f8066495e90236df4521a2df9018a83c1338318",
+      "RootObservedAggregateCounts": {
+        "pass": 8,
+        "fail": 12,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "schema": "alfred.stb-explicit-root-seed.actual.v1",
+        "freezeSha256": "293c0466330d85e4626f0df6620d69ecb2ec1f57aa7b3b818c75213ce2afc6f5",
+        "suites": [
+          {
+            "name": "original12",
+            "status": 1,
+            "signal": null,
+            "spawnError": null,
+            "completion": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549",
+              "caseSetSha256": "48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634",
+              "dispositionsSha256": "6d438de782b67ac2f7ebbd254e59592b45503886c0d6ba34a892939051d9785d",
+              "declaredCount": 12,
+              "disposedCount": 12,
+              "counts": {
+                "pass": 3,
+                "fail": 9,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "parserError": null,
+            "completionSha256": "f9a314d45661fd7c5760ba3b0c0fa6f2885eefa2afa2fa6b0a01017506418269",
+            "inheritedNodeOptions": true,
+            "inheritedThread": true,
+            "inheritedGitLocation": true,
+            "execArgvPassedInOrder": true
+          },
+          {
+            "name": "independent8",
+            "status": 1,
+            "signal": null,
+            "spawnError": null,
+            "completion": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "d7024f15dfbbbcbf8f2b7c7a2c30332b253e8f7a6c30bdb6c870fc29da4479bf",
+              "caseSetSha256": "bc5c0e0e9413374f9e56da1280e1dbecdeab8bfe1a523528f99d8e8ee8331f13",
+              "dispositionsSha256": "a570f22f73d95adc081442d490a179ef350e666eba4f9c9f83f5959778b68627",
+              "declaredCount": 8,
+              "disposedCount": 8,
+              "counts": {
+                "pass": 5,
+                "fail": 3,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "parserError": null,
+            "completionSha256": "19f5d440ef5c55696aa840aadb10e66e023fc53f9cb954404afc554bb83f72d4",
+            "inheritedNodeOptions": true,
+            "inheritedThread": true,
+            "inheritedGitLocation": true,
+            "execArgvPassedInOrder": true
+          }
+        ],
+        "preparationError": null,
+        "conservationError": null,
+        "parentConserved": true,
+        "all20Pass": false,
+        "nativeAssurance": false
+      },
+      "businessRerunsHere": 0,
+      "limit": "Separate actual run; not whole-item/native acceptance. GLR18 uses old adapter without privacy overlay; STB20 aggregates separate12+8 suites."
+    }
+  ]
+}

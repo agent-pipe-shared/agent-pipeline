@@ -1,0 +1,58 @@
+{
+  "manifestSha256": "3d943b0e40ca314c498c9e1db918cb29276abeb893fd695df2d78016e56ea4ba",
+  "status": "architecture-target-decision-pending-no-approval",
+  "declaredManifest": {
+    "schema": "alfred.controlled-method-review-target-design-manifest.v1",
+    "status": "frozen-inert-design-root-policy-resolution-required",
+    "artifacts": [
+      {
+        "path": "design.json",
+        "sha256": "690232424ede543dc0782bdf16dd04e57e6d27af13c618675e3eb5dbe84a24f7",
+        "bytes": 5464,
+        "mode": "0644",
+        "nlink": 1
+      },
+      {
+        "path": "architecture-assessment.json",
+        "sha256": "08ec821d59357dd183097e611bae8a2059c8cb57fefd5f88392ccc7a4b33e443",
+        "bytes": 4321,
+        "mode": "0644",
+        "nlink": 1
+      },
+      {
+        "path": "requirements.json",
+        "sha256": "5b094123e48ce471ef34bb92fbcf6eee63ed8ae65110e86dbbf0fe7f16a3e256",
+        "bytes": 2020,
+        "mode": "0644",
+        "nlink": 1
+      },
+      {
+        "path": "report.md",
+        "sha256": "a2a901a8f2b3f2f2647be5f54b135afcac0e2acc620355f5133268101e15c1b5",
+        "bytes": 4006,
+        "mode": "0644",
+        "nlink": 1
+      },
+      {
+        "path": "source-bindings.json",
+        "sha256": "a877ea1fadc2c027e5666093f99e2ad7b34f4c185b3c273814e0e6da17b301dc",
+        "bytes": 2426,
+        "mode": "0644",
+        "nlink": 1
+      },
+      {
+        "path": "freeze.py",
+        "sha256": "48ed4bb5eff087b454b0430aca7ca7f6c76fb3db43cf6ba2510b456b9c8683cd",
+        "bytes": 3197,
+        "mode": "0644",
+        "nlink": 1
+      }
+    ],
+    "sourceChanges": 0,
+    "semanticRuns": 0,
+    "criticInvocations": 0,
+    "nativeAcceptance": false,
+    "architecturalDecisionSelfApproved": false,
+    "userQuestionCreated": false
+  }
+}

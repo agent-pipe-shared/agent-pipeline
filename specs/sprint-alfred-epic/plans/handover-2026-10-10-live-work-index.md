@@ -1,5 +1,45 @@
 # Alfred current work and continuity — 2026-10-10
 
+**Current actual checkpoint (supersedes the historical snapshots below):**
+The assembly selects **120 source files**. The [durable source inventory](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/current-source-manifest.json)
+has SHA `29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c`.
+Root integrated six optional-Advisor diagnostic sources, preserving all 114
+previous selected members. The [integration receipt](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/integration-receipt.json)
+and exact source postimages are retained outside ignored scratch. Earlier
+commit-hint grammar and scratch custody additions remain selected. The rebased
+WARN-only guard and close ritual have not been executed.
+
+Newest actual focused results: generator **21 PASS / 0 FAIL**; scratch custody
+**18 PASS / 0 FAIL**; AC-04/05/10 subset **12 PASS / 0 FAIL**, obtained by strict
+reparse of the existing completion evidence, with zero business reruns; optional
+Advisor **19 PASS / 0 FAIL / 2 SKIP**; AC-07 pure binding subset **12 PASS / 0 FAIL**.
+These qualify their respective frozen sources, not the whole current assembly.
+State/I08 remains **23 PASS / 1 FAIL**. Placement's actual successor passed
+**4 PASS / 0 FAIL**. Gitleaks privacy-corrected independent ten passed
+**10 PASS / 0 FAIL**; the original eighteen passed **18 PASS / 0 FAIL** on their
+separate older adapter generation. These finite proofs and generation limits
+are retained in the [focused-proof index](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/focused-proofs.json).
+The latest STB safe-home/seed-identity successor subsequently completed with
+original twelve **8 PASS / 4 FAIL**, independent eight **8 PASS / 0 FAIL**;
+all 20 dispositions are complete and the frozen inputs conserved. Its terminal
+is `scratch/alfred-stb-safe-home-root-and-seed-identity-successor-preparation-20261010/execution-terminal.json`.
+The four remaining failures require diagnosis; this result does not qualify
+the separate 26 positive lifecycle constructors. Gitleaks source integration
+is prepared but not yet applied to the selected 120-file assembly.
+
+Scope remains **37 ACs, four IR criteria and 176 selected backlog items**;
+all 176 remain officially OPEN. There is no final signed/stamped local candidate.
+The [joined item inventory](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/crosswalk-current.json)
+retains 13 prior assessments and maps all 163 remaining items to requirements,
+sources, proofs and remaining work. No item lacks a mapping. A mapped partial
+fix does not establish full-item completion or a 25/50/75 stage; those proof
+gaps remain explicit. Six independently owned crosswalk packets cover all
+twelve batches. The [overview](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/overview.json)
+retains current scope, source generation and historical evidence boundaries.
+Returned workers are reassigned; no completed worker is counted as active.
+Root retains final source review, focused execution, integration and candidate
+freeze. No push or installation is authorized by this checkpoint.
+
 **Latest actual checkpoint:** the selected assembly inventory is now **111**.
 Root reviewed and integrated the 8/8-qualified role-fallback library, preserving
 all 110 prior selected members. The physical role parent existed but was previously
@@ -15,10 +55,28 @@ The initializer-fix State/I08 successor completed 23 PASS / 1 FAIL, up from
 `model-family-host:namespace-drift` during reservation, before its target assertion;
 its exact physical cause is being investigated. The 14 owned State positives and
 12 I08 transition positives remain separately unqualified.
-Generator compaction completed 13 PASS / 7 FAIL; all seven failures share a
-fixture prerequisite expecting `planned` where the actual portable plan contract
-returns `ready`. The fixture correction and frozen-resource custody successor
-are separate from any product change; no successor PASS is claimed.
+Generator compaction's fixture-status successor completed **19 PASS / 1 FAIL**
+with the original 20 assertions. The remaining GSC014 fixture enrolls Codex only
+but expects Claude inspection to succeed; actual Source admission correctly
+refuses that runner. An explicitly validated public-source fixture prerequisite
+is being prepared without changing product admission policy.
+Optional Advisor completed its original seven cases with 7 PASS, and its
+independent fourteen cases with 10 PASS / 2 FAIL / 2 SKIP. The two skips remain
+explicit constructor gaps. Scratch durability completed 14 PASS / 4 FAIL;
+the exact Git-index parsing correction is frozen but not yet replayed.
+Placement/grammar completed 3 PASS / 1 FAIL with a conserved resource graph.
+The initializer-fix STB execution completed original12 with 0 PASS / 12 FAIL
+and independent8 with 5 PASS / 3 FAIL. The original twelve fail before their
+target initializer at the State read-only enrollment inspector's wrong-root
+wrapper; two independent failures omit the genuine seed commit prerequisite.
+These are measured causes awaiting separate Source/fixture corrections, not
+successful lifecycle proof. No qualification child remains running at this
+checkpoint. Source assembly remains 111; qualification and Source packets use
+distinct frozen graphs and must not inherit each other's PASS claims.
+Latest actual STB terminal: `scratch/alfred-stb-inherited-environment-launch-successor-20261010/execution-terminal.json`,
+SHA `be181226d7ca9c44c49cceb81779e95d0f17e9bee80b96e54708ae3588f707d3`.
+Latest actual placement terminal: `scratch/alfred-rggram-inherited-environment-launch-successor-20261010/runtime/execution.json`,
+SHA `09341c50f21553c05a1f4334c3168ea4ed2fa8b422280a0c66cfe425c2952d00`.
 The [archived 37-AC/four-IR and 176-item checkpoint](../evidence/live-item-work-index-20261010/total-status-and-events-20261010/report.md)
 retains its earlier source-110 scope and precedes these new events. No final
 signature, stamp, native-host acceptance or whole-item closure is claimed.

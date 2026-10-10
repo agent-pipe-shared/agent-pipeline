@@ -1,0 +1,15 @@
+{
+  "schema": "alfred.total-status-archive-execution.v1",
+  "status": "copied-and-byte-verified",
+  "targets": 2,
+  "payloadsPerTarget": 25,
+  "indexes": 2,
+  "filesCreated": 52,
+  "planSha256": "7762e2a0ce3b94377d96df9a43c22a680f6a459ad8ccecbe72edb1d1e21d4739",
+  "sourceManifestSha256": "52a6433303a90417302bbdc72ef1a428fd0cdd24ab68ab5a526bcd4e28b935e5",
+  "sourceConserved": true,
+  "canonicalSourceCount": 110,
+  "GitOperations": 0,
+  "businessRuns": 0,
+  "nativeClaim": false
+}

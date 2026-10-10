@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.focused-source-custody.v1",
+  "rows": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/scratch-custody-report.mjs",
+      "parentSha256": "d6c3e73366537af1c901a51878c50b8c2078e5dd589db472349fc89f16ec7580",
+      "postSha256": "be0f5d755b14a9780e2d101534c1a5a3b963037da6e958c6db208ea5e40975d2",
+      "originalMode": 420,
+      "archiveNonExecutable": true,
+      "sourceManifestSha256": "8d62368babf44e980b045525c4d172666cd3e0ae91d7c723d3c2eb04ff2f4d7b",
+      "focusedQualification": "Scratch18, current guard parent integration not proven"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/design-advisor-provenance.mjs",
+      "kind": "product-source-fix",
+      "parentSha256": "8514119600f4ad7da165335d5be27df8c56de97fcc4dafaf28e529f9876d7e52",
+      "postSha256": "9a76511618839b5adfd2336daac84a0dc11d4e4fec0aaf3513873bfe1e6e0488",
+      "sourceManifestSha256": "1209684493b918c9ba5fe2304958d12fe2aafe05766a34af579fd2de54b656c6",
+      "archiveNonExecutable": true,
+      "changedGraphQualification": "unrun at checkpoint"
+    },
+    {
+      "canonicalPath": "diagnostics.test.mjs",
+      "kind": "explicit-test-prerequisite-correction; not independent acceptance",
+      "parentSha256": "bd3aa64c0b1ce6f5d3e24e871698ac00920fee71890601282c4afb5b8ec045b6",
+      "postSha256": "031e8e13138238d46b2dc2e75545865f52ea0529cf2afc09f45af858e4b75ff4",
+      "sourceManifestSha256": "1209684493b918c9ba5fe2304958d12fe2aafe05766a34af579fd2de54b656c6",
+      "archiveNonExecutable": true,
+      "changedGraphQualification": "unrun at checkpoint"
+    }
+  ],
+  "State3b69": "Exact source locator pending Root declaration; no guessed input copied",
+  "privateRuntimeGraphsCapturesKeysExcluded": true
+}
