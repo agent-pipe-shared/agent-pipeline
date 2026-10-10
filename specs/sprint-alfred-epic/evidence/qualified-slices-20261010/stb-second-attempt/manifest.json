@@ -1,0 +1,65 @@
+{
+  "schema": "alfred.stb.second-public-proof.v1",
+  "status": "partial-qualified-three-pass-nine-initializer-failures",
+  "canonicalDestination": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/stb-second-attempt/",
+  "files": [
+    {
+      "path": "completion.fd3.jsonl",
+      "sha256": "f9a314d45661fd7c5760ba3b0c0fa6f2885eefa2afa2fa6b0a01017506418269",
+      "bytes": 2070,
+      "mode": "100644"
+    },
+    {
+      "path": "completion-policy.json",
+      "sha256": "ece0c2b74c14f24e69470bec726bd1ecde758e108c472aa5539d3a96897fa166",
+      "bytes": 268,
+      "mode": "100644"
+    },
+    {
+      "path": "assertions/shared-state.test.mjs",
+      "sha256": "4592fbb3d570054efb7af6f6daa5080c1ff6fa91c7ebd5bbb24103c15373f453",
+      "bytes": 7053,
+      "mode": "100644"
+    },
+    {
+      "path": "execution-public.json",
+      "sha256": "25279411810c2eed1cd7e24417795fcf577025877396d387b6eb5725675824ab",
+      "bytes": 1146,
+      "mode": "100644"
+    },
+    {
+      "path": "source-and-assertion-binding.json",
+      "sha256": "7f27affe51a1ad85d7e74b6ebc0d7a18e87c727b9289c51fc863f2d2ab31f874",
+      "bytes": 3034,
+      "mode": "100644"
+    },
+    {
+      "path": "failure-disposition.json",
+      "sha256": "2ffd58281cde51ad4f3d8b15cbdc4ff1e26858954af39451b3e670e85924a57c",
+      "bytes": 751,
+      "mode": "100644"
+    },
+    {
+      "path": "report.md",
+      "sha256": "46788b56747984f31941e2ab254218597f69e9ba1fe19951c8865829a6dc965b",
+      "bytes": 1419,
+      "mode": "100644"
+    }
+  ],
+  "whitelist": [
+    "completion.fd3.jsonl",
+    "completion-policy.json",
+    "assertions/shared-state.test.mjs",
+    "execution-public.json",
+    "source-and-assertion-binding.json",
+    "failure-disposition.json",
+    "report.md"
+  ],
+  "executionSha256": "1106b1274593801111bd5a39fba4e0dca1da2c2fe5a1cd36e46784d6722a77e9",
+  "completionSha256": "f9a314d45661fd7c5760ba3b0c0fa6f2885eefa2afa2fa6b0a01017506418269",
+  "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549",
+  "sourceGraphManifestSha256": "fc7e129a6a124c04ba3f54a18b05ee4510bdbcdfba1858f829394644c3065e4c",
+  "native": false,
+  "fullItemClosure": false,
+  "semanticRunsByWorker": 0
+}

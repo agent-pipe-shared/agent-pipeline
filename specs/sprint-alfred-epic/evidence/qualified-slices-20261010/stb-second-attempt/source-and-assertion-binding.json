@@ -1,0 +1,59 @@
+{
+  "schema": "alfred.stb.second-attempt-binding.v1",
+  "sourceSelection": {
+    "schema": "alfred.stb12-approved-onboarding-source-selection.v1",
+    "parentManifestSHA256": "b2c8237181cd51078d18bb3dd85614c3cba687ba4b136c53991f08baff0ea98c",
+    "priorActualExecutionSHA256": "48b83f0f4557c39b448c0c30c05e2cbb6200b952eb09aa6dd43ab7b0d9e4eab5",
+    "source": {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "preSHA256": "485d7694c43ad78e85ef32090608f17faae2f40e5833ca0feb1561cb60dbb4bd",
+      "postSHA256": "5ce630e2f5170b222d82923eddd334a27a1d89758f6a9932800fd26db17ddde5",
+      "variant": "selected485d",
+      "sourceManifestSHA256": "7d75fe400e5f1ddce2dbbca562839b4502db9431599e965ce940277760656d28",
+      "parentSourceFreezeSHA256": "087ba88f3472a673476bbbaef147c794e8ec8e7cff142de55e22aa80d2c8ce30",
+      "changedSourceFiles": 1
+    },
+    "setup": {
+      "parentAssertionFreezeSHA256": "d016ec97d2b5dab0358d2097825f554ed97f21aa021f331dcecdb0d0115cb0f5",
+      "manifestSHA256": "fe67d0a22d3cff243d75056069600bd99aab675ab3dadbdfcf1ac67fdc07ab21",
+      "onlyChangedArtifact": "p16.fixture.mjs",
+      "preSHA256": "8a5af5c9bcc2eb906350c4aad6266fc38246e04023e8b103ed0c0a8a206c346a",
+      "postSHA256": "9cb2ad9776c63c2f68aa2e036429da79a19b6ec877cc0fb99809e9b85ae55db1",
+      "businessAssertionsUnchanged": true
+    },
+    "worker": {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "preSHA256": "db087102fa3ac1849d2dd3e9a5d51f88c6fd951fb8dbe351bf21caaee971b01a",
+      "postSHA256": "bb88b93125d240b6ec671fb795fc8454435a641306fd10050690186ef72bd262",
+      "source": "scratch/alfred-i08-empty-greenfield-worker-baseline-source-20261010/postimages/old-selected/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "sourceManifestSHA256": "ebba4daaabc72476f57442048998a267cc56df71e596781a1878fc8d3c712cac",
+      "variant": "old-selected",
+      "changedGraphFiles": 1
+    },
+    "current104InventorySHA256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e",
+    "other1633SourcesByteExact": true,
+    "original369ByteExact": true,
+    "originalTwelveAssertionSHA256": "4592fbb3d570054efb7af6f6daa5080c1ff6fa91c7ebd5bbb24103c15373f453",
+    "authorityFixtureSHA256": "fcec6bff524d20eedd54c00bbe145da09b49538b8c8dcb3fecfbe01677edf69e",
+    "semanticRuns": 0
+  },
+  "graphManifestSha256": "fc7e129a6a124c04ba3f54a18b05ee4510bdbcdfba1858f829394644c3065e4c",
+  "graphFreezeSha256": "04f6280de9f06301b0ea26ec1992f7393f78bc7497792c57c3384748edd2207c",
+  "originalAssertionFreezeSha256": "d016ec97d2b5dab0358d2097825f554ed97f21aa021f331dcecdb0d0115cb0f5",
+  "currentSetupFreezeSha256": "406e1856ec0c089d08d59b2666a75e0c2b1398f27cdc955abec8b9084e9a9dfc",
+  "caseIds": [
+    "STB001",
+    "STB002",
+    "STB003",
+    "STB004",
+    "STB005",
+    "STB006",
+    "STB007",
+    "STB008",
+    "STB009",
+    "STB010",
+    "STB011",
+    "STB012"
+  ],
+  "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549"
+}

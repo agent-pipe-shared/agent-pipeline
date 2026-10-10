@@ -1,0 +1,124 @@
+{
+  "schema": "alfred.consolidated-live-index-routing-successor-manifest.v1",
+  "frozen": true,
+  "outputs": [
+    {
+      "path": "live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "current-work-index.md",
+      "sha256": "6f858c66e74ddfd52f1040a8de1d330df03acc5390d6d7358bf8c55ded54c58a",
+      "bytes": 124699,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "validation.json",
+      "sha256": "f6f33bedf3be87cc53520bd5db701992aa521f9ded1435cd8abfdcddab4e64b8",
+      "bytes": 724,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "2ef8576f5a29062b4e8c1f092ab784145be086849410e58f21f6b221ce4c9cef",
+      "bytes": 1917,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "inputs": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+      "bytes": 1924395
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/manifest.json",
+      "sha256": "c8494042f8482f1c4706dcc7ee9f89115e45e9f7aabdf299149eaa8a1c0d7abc",
+      "bytes": 2598
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/current-delta.json",
+      "sha256": "3b47dcf3089d2abbd58c7a8fd70b4c480bb39dc448bdb54761e9b38070e29473",
+      "bytes": 63215
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/latest-checkpoint/checkpoint.json",
+      "sha256": "93909a05d2cb260b3e7e14706aa963f9ee7cd3c25ceff65d9db4507d1d668823",
+      "bytes": 57162
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/latest-checkpoint/late-handoffs.json",
+      "sha256": "f3b2a8e9b462895091e2c9aacee873497c821055a5395f67ba418e41f1d9cb52",
+      "bytes": 2414
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/headroom-actual-integration.json",
+      "sha256": "8ff4f87c66e5aeda60261e90379cdeffb56f32be63a94f3316627f1908471de1",
+      "bytes": 855
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/current-source-manifest.json",
+      "sha256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e",
+      "bytes": 28495
+    },
+    {
+      "path": "scratch/alfred-i03-empty-greenfield-onboarding-baseline-source-20261010/manifest.json",
+      "sha256": "7d75fe400e5f1ddce2dbbca562839b4502db9431599e965ce940277760656d28",
+      "bytes": 4439
+    },
+    {
+      "path": "scratch/alfred-stb12-approved-onboarding-successor-source-graph-20261010/manifest.json",
+      "sha256": "fc7e129a6a124c04ba3f54a18b05ee4510bdbcdfba1858f829394644c3065e4c",
+      "bytes": 5062
+    },
+    {
+      "path": "scratch/alfred-stb12-approved-onboarding-successor-source-graph-20261010/qualification-root/execution.json",
+      "sha256": "1106b1274593801111bd5a39fba4e0dca1da2c2fe5a1cd36e46784d6722a77e9",
+      "bytes": 1064
+    },
+    {
+      "path": "scratch/alfred-stb12-second-public-proof-20261010/manifest.json",
+      "sha256": "bafed0e3378b85deac12a8b5e1b6931aa2b4be1abdae0de301764600a6c480fc",
+      "bytes": 2198
+    }
+  ],
+  "publicWhitelist": [
+    "live-work-index.json",
+    "current-work-index.md",
+    "validation.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "canonicalItems": 176,
+  "officialClosures": 0,
+  "noSourceGitSemanticWrites": true,
+  "privacy": "Public repo-relative metadata; original histories retained; no raw runtime data",
+  "scope": "37AC/4IR and inherited exclusions retained, no new mapping/acceptance",
+  "preparationFailure": {
+    "firstDraft": "build-first-draft.py",
+    "exit": 1,
+    "cause": "Markdown receipt formatter encountered existing null attestation; no output files written",
+    "recovery": "Metadata-only formatter accepts null as absent evidence; no assertion/count/source changes"
+  },
+  "parentManifest": {
+    "path": "scratch/alfred-live-work-index-consolidated-20261010/manifest.json",
+    "sha256": "17093c26cedf1fa91e1307a96f3cfd301f3832fd90dad96c9f83a6ff8293291c"
+  },
+  "navigationOnly": true,
+  "statusChanges": 0,
+  "canonicalDestination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/",
+  "navigation": {
+    "repositoryRootPrefix": "../../../../../",
+    "changedMarkdownTargets": 77,
+    "labelsAndTextUnchanged": true,
+    "inverseExact": true,
+    "jsonValidationReportByteExact": true,
+    "absoluteHomePaths": false
+  }
+}

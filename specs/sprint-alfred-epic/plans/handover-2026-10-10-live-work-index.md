@@ -1,5 +1,13 @@
 # Alfred current work and continuity — 2026-10-10
 
+**Single current work queue:** [consolidated 176-item view](../evidence/live-item-work-index-20261010/consolidated/current-work-index.md)
+and [machine drilldown](../evidence/live-item-work-index-20261010/consolidated/live-work-index.json).
+This joins the prior updates, retains original bodies/history and separates
+current responsibility from source authorship. Second STB12 execution is
+3 PASS/9 prerequisite failures; native namespace drift is being diagnosed.
+OSE22's selected inventory union is 104 to 106; the earlier 105 proposal has a
+recorded accounting erratum. Integration remains pending at this snapshot.
+
 Begin with the [newest checkpoint](../evidence/live-item-work-index-20261010/deltas/latest-checkpoint/report.md)
 and [late handoffs](../evidence/live-item-work-index-20261010/deltas/latest-checkpoint/late-handoffs.json).
 They supersede historical owner/stage rows below. HRC20 and OSE22 have actual

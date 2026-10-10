@@ -1,0 +1,30 @@
+{
+  "schema": "alfred.stb.second-initializer-disposition.v1",
+  "passed": [
+    "STB001",
+    "STB002",
+    "STB008"
+  ],
+  "failedBeforeTargetEffect": [
+    "STB003",
+    "STB004",
+    "STB005",
+    "STB006",
+    "STB007",
+    "STB009",
+    "STB010",
+    "STB011",
+    "STB012"
+  ],
+  "reason": "native-goldfish:namespace-drift",
+  "code": "SDC-AUTHORITY-CAS",
+  "phase": "registry reserve/stateRead after all12 initialization, before target State effect",
+  "rawStdoutSha256": "fb7a291aa591adbe8ac1406bdb40ac1cfda779b22d4d019f140f22b33aabef35",
+  "rawStdoutExported": false,
+  "previous": {
+    "executionSha256": "48b83f0f4557c39b448c0c30c05e2cbb6200b952eb09aa6dd43ab7b0d9e4eab5",
+    "pass": 0,
+    "fail": 12
+  },
+  "targetFailureProof": false
+}

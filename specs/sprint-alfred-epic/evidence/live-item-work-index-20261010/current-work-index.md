@@ -1,5 +1,21 @@
 # Current Alfred work index
 
+**Current view:** [all 176 items with stages, work locations and next actions](consolidated/current-work-index.md).
+The [matching machine index](consolidated/live-work-index.json) joins all recorded
+updates and retains the original item bodies and history. Read that view before
+the historical snapshots below. Later events must update this current pointer.
+
+## Tracking contract
+
+Every assignment, return and integration records the canonical item ID, current
+responsible owner, exact work location, source/proof hashes, remaining dependency
+and next action. Source authors and current owners remain separate. A returned
+packet transfers responsibility to Root; it must not disappear from the queue.
+New facts append to immutable history and enter the consolidated current view.
+Executed public evidence is archived in Git. Implementation, qualification,
+integration, independent review and sanctioned item closure are separate stages;
+an OPEN count must never be presented as a count of missing fixes.
+
 Start with the [current checkpoint](deltas/latest-checkpoint/report.md), its
 [item and owner routes](deltas/latest-checkpoint/checkpoint.json), and the
 [subsequent handoffs](deltas/latest-checkpoint/late-handoffs.json). These append

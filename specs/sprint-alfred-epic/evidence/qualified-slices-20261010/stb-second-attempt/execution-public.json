@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.shared-state-actual-execution.v1",
+  "nodeArgs": [
+    "scratch/alfred-stb12-approved-onboarding-successor-source-graph-20261010/qualification-root/operation-root/shared-state.test.mjs"
+  ],
+  "status": 1,
+  "signal": null,
+  "error": null,
+  "spawnAccepted": true,
+  "parser": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "2b52234d81548b11d604a9964332cc07e965528a16317980d8dc4172dfdf4549",
+    "caseSetSha256": "48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634",
+    "dispositionsSha256": "6d438de782b67ac2f7ebbd254e59592b45503886c0d6ba34a892939051d9785d",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 3,
+      "fail": 9,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completion": {
+    "sha256": "f9a314d45661fd7c5760ba3b0c0fa6f2885eefa2afa2fa6b0a01017506418269",
+    "bytes": 2070
+  },
+  "graphConserved": true,
+  "inheritedPreloadPreserved": true,
+  "nativeClaim": false,
+  "originalExecutionSha256": "1106b1274593801111bd5a39fba4e0dca1da2c2fe5a1cd36e46784d6722a77e9",
+  "rawCaptureExported": false
+}

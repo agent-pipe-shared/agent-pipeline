@@ -1,0 +1,33 @@
+{
+  "schema": "alfred.consolidated-live-index-validation.v1",
+  "canonicalItems": 176,
+  "uniqueIds": 176,
+  "allOfficialOpen": true,
+  "bodyRecordsExact": true,
+  "inheritedRecordsExact": true,
+  "idOrderConserved": true,
+  "priorScopeReferencesConserved": [
+    "AC-13",
+    "AC-14",
+    "AC-22",
+    "AC-26",
+    "AC-27",
+    "AC-28",
+    "AC-29",
+    "AC-30",
+    "AC-32",
+    "AC-36",
+    "AC-37",
+    "AC-6",
+    "AC-7",
+    "IR-4"
+  ],
+  "old41Joined": 41,
+  "currentOwner": "Root for returned packets; no historical author assumed active",
+  "sourceWrites": 0,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "nativeClaims": false,
+  "unknownSourceBindings": 101,
+  "exclusionsPreservedByExactInheritedRecords": true
+}

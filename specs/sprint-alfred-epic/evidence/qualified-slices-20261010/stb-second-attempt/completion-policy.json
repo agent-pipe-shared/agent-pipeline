@@ -1,0 +1,18 @@
+{
+  "schema": "pipeline.verify-case-completion-policy.v1",
+  "caseIds": [
+    "STB001",
+    "STB002",
+    "STB003",
+    "STB004",
+    "STB005",
+    "STB006",
+    "STB007",
+    "STB008",
+    "STB009",
+    "STB010",
+    "STB011",
+    "STB012"
+  ],
+  "maxBytes": 65536
+}

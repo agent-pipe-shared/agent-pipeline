@@ -1,0 +1,14 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["STB001","STB002","STB003","STB004","STB005","STB006","STB007","STB008","STB009","STB010","STB011","STB012"],"caseCount":12,"caseSetSha256":"48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB003","ordinal":2,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB004","ordinal":3,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB005","ordinal":4,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB006","ordinal":5,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB007","ordinal":6,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB008","ordinal":7,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB009","ordinal":8,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB010","ordinal":9,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB011","ordinal":10,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"STB012","ordinal":11,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":12,"disposedCount":12,"caseIds":["STB001","STB002","STB003","STB004","STB005","STB006","STB007","STB008","STB009","STB010","STB011","STB012"],"caseSetSha256":"48815449fdb8ff08aa9ecde8e1ba01a038521d59ba4cf513c2b57fd33280e634","dispositionsSha256":"6d438de782b67ac2f7ebbd254e59592b45503886c0d6ba34a892939051d9785d","counts":{"pass":3,"fail":9,"skip":0,"todo":0}}
