@@ -30,6 +30,28 @@ Both snapshots stay immutable; later handoffs append further entries.
 
 ## Scope and truthful status
 
+### Persistent fanout and progress preference
+
+Use all available concurrency slots for independent, clearly owned Alfred slices.
+The current host offers 16 slots including Root: up to 15 workers. This latest
+user instruction supersedes the previous ten-slot preference. Reassign returned
+workers to the next concrete slice; never count completed or blocked workers as
+active. Record each assignment, returned packet and integration with its exact
+work location before changing ownership. Retain one final technical Critic and
+the correction diff review.
+
+Track item progress separately from official OPEN and PO acceptance:
+
+- 25%: a concrete implementation task is actively being worked.
+- 50%: the full item fix is available in a returned source package.
+- 75%: the item fix has passed relevant focused business checks and is integrated.
+- Accepted: the required review and sanctioned acceptance/closure are complete.
+
+These are workflow stages, not estimated effort percentages. Partial slices do
+not establish a whole-item stage; retain their separate evidence. An unbound or
+historically assessed item remains unknown until its current work is reconciled.
+The next stage overlay must preserve all 176 canonical bodies and history.
+
 Finish Alfred 0.7.0, its 37 ACs and 4 incident criteria, and the selected 176
 open backlog items. Preserve all earlier candidate functionality. Nightwing,
 Batman and explicitly deferred or rejected work remain excluded. The requested

@@ -9,6 +9,14 @@ the historical snapshots below. Later events must update this current pointer.
 
 ## Tracking contract
 
+Persistent user preference: use all available slots for separate owned slices
+(currently Root plus up to 15 workers), refill returned workers, and retain one
+final Critic plus correction diff review. The former ten-slot limit is superseded.
+Report intermediate workflow stages as 25% actively implementing, 50% full fix
+returned, and 75% focused business checks passed and integrated. Acceptance is
+separate. Partial slices and unknown historical bindings do not imply a whole
+item percentage. See the current handover for the durable stage contract.
+
 Every assignment, return and integration records the canonical item ID, current
 responsible owner, exact work location, source/proof hashes, remaining dependency
 and next action. Source authors and current owners remain separate. A returned
