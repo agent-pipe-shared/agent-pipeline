@@ -1,0 +1,117 @@
+{
+  "GitOperations": 0,
+  "actualInventorySha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+  "inputBindings": {
+    "scratch/alfred-greenfield-public-comparison-independent-20261010/comparison.test.mjs": "a3ff8f153f33a3c25d8edb174a49383156e84d2cb7bc1a47f12d0dd08116fa43",
+    "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e",
+    "scratch/alfred-greenfield-public-comparison-independent-20261010/freeze.json": "35fbbf8e3cf194b75a5f93612fd7bbdaae293f44fc6e9315a5eff7a52a2eb6fd",
+    "scratch/alfred-greenfield-public-comparison-independent-20261010/manifest.json": "ccd343ecafa1dcfe0e2954a512d3b44884001543d37b3873218d9cc8e2099c14",
+    "scratch/alfred-greenfield-public-comparison-source-20261010/manifest.json": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+    "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/actual-receipt.json": "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939",
+    "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/public-source-manifest.json": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+    "scratch/alfred-transfer-integrity-independent-20261010/execution.json": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca",
+    "scratch/alfred-transfer-integrity-independent-20261010/manifest.json": "77059740512e1051957acd11f34c7eec30894b80f1ccf35e897df7a8e2dc93b6",
+    "scratch/alfred-transfer-integrity-source-actor-20261010/manifest.json": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9"
+  },
+  "integrated": true,
+  "inventoryExclusiveCreate": true,
+  "inventoryMode": "0600",
+  "itemClosure": false,
+  "nativePASS": false,
+  "newPhysicalSources": 4,
+  "other106SelectedByteExact": true,
+  "parent106MemberMapAfterSha256": "61964fdea8c30f41a5d9665d959e49f22b869c9c418ba6d779545332a3f035de",
+  "parent106MemberMapBeforeSha256": "61964fdea8c30f41a5d9665d959e49f22b869c9c418ba6d779545332a3f035de",
+  "parentSelectedSourceCount": 106,
+  "physicalReplacements": 0,
+  "productTestsRunByAssembler": 0,
+  "proofs": {
+    "comparison": {
+      "cases": 15,
+      "cliCase": "GPC001 directly invokes runGreenfieldPublicComparison",
+      "completionSha256": "e5a0f7e8d2cbd8abc5e62dbe6ab3ad2666f1d4b947a45d4ca8ebeeda67a99f79",
+      "counts": {
+        "fail": 0,
+        "pass": 15,
+        "skip": 0,
+        "todo": 0
+      },
+      "executionSha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e",
+      "graphConserved": true,
+      "independentManifestSha256": "ccd343ecafa1dcfe0e2954a512d3b44884001543d37b3873218d9cc8e2099c14",
+      "native": false,
+      "officialClosure": false,
+      "sourceManifestSha256": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+      "testSha256": "a3ff8f153f33a3c25d8edb174a49383156e84d2cb7bc1a47f12d0dd08116fa43"
+    },
+    "transfer": {
+      "cases": 16,
+      "completionSha256": "c0e0be735425477de3395701cdf652764ced223674112814cf3802b9a68b234b",
+      "counts": {
+        "fail": 0,
+        "pass": 16,
+        "skip": 0,
+        "todo": 0
+      },
+      "executionSha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca",
+      "graphConserved": true,
+      "independentManifestSha256": "77059740512e1051957acd11f34c7eec30894b80f1ccf35e897df7a8e2dc93b6",
+      "itemClosure": false,
+      "native": false,
+      "sourceManifestSha256": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9"
+    }
+  },
+  "qualificationScope": "31 synthetic actual cases; GPC001 directly invokes the comparison CLI",
+  "resultSelectedSourceCount": 110,
+  "retainedPublicParents": [
+    "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+    "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939"
+  ],
+  "schema": "alfred.qualified-transfer-comparison-integration-receipt.v1",
+  "selectionScope": "transfer and comparison library/CLI only; close-block docs and Source-authored tests excluded",
+  "sourceWrites": 4,
+  "sources": [
+    {
+      "actualPostNlink": 1,
+      "bytes": 7532,
+      "canonicalPath": "plugins/pipeline-core/lib/bound-artifact-transfer.mjs",
+      "mode": 420,
+      "preState": "absent",
+      "proofSuite": "BTF001-BTF016",
+      "sha256": "4301d330d38f8bbed12667e009ca871d4b3483c9390624a7a00dbf61023b9549",
+      "sourcePath": "scratch/alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/lib/bound-artifact-transfer.mjs"
+    },
+    {
+      "actualPostNlink": 1,
+      "bytes": 6570,
+      "canonicalPath": "plugins/pipeline-core/scripts/bound-artifact-transfer.mjs",
+      "mode": 420,
+      "preState": "absent",
+      "proofSuite": "BTF001-BTF016",
+      "sha256": "430024295fdd8d8b0be553b570bc7fe56652ebd22ecf336176e3f042bc5675aa",
+      "sourcePath": "scratch/alfred-transfer-integrity-source-actor-20261010/postimages/plugins/pipeline-core/scripts/bound-artifact-transfer.mjs"
+    },
+    {
+      "actualPostNlink": 1,
+      "bytes": 11927,
+      "canonicalPath": "plugins/pipeline-core/lib/greenfield-public-comparison.mjs",
+      "mode": 420,
+      "preState": "absent",
+      "proofSuite": "GPC001-GPC015",
+      "sha256": "9ce8b654233a97a7ce63ded8a40c54fb398983939aa9ef0d121fc4381a12c44d",
+      "sourcePath": "scratch/alfred-greenfield-public-comparison-source-20261010/postimages/plugins/pipeline-core/lib/greenfield-public-comparison.mjs"
+    },
+    {
+      "actualPostNlink": 1,
+      "bytes": 1222,
+      "canonicalPath": "plugins/pipeline-core/scripts/greenfield-public-comparison.mjs",
+      "mode": 493,
+      "preState": "absent",
+      "proofSuite": "GPC001-GPC015",
+      "sha256": "68e1ae431866108e08a898ff82b25331bb3830baac01873bfc270f5dfd0b2563",
+      "sourcePath": "scratch/alfred-greenfield-public-comparison-source-20261010/postimages/plugins/pipeline-core/scripts/greenfield-public-comparison.mjs"
+    }
+  ],
+  "status": "actual-four-source-CAS-integrated-not-stamped",
+  "wholePrivateExportPortability": false
+}

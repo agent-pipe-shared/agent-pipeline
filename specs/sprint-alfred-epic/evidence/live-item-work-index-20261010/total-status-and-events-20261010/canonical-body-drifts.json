@@ -1,0 +1,27 @@
+{
+  "schema": "alfred.canonical-body-drift-checkpoint.v1",
+  "rows": [
+    {
+      "id": "pipeline.catalogue-admit-prescribed-lifecycle-verbs",
+      "retainedBodySha256": "05841d13d3cee49314df5155bbdccd590987eb9d292bf153556b00f6b2e83ca8",
+      "currentPhysicalBodySha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+      "bodyPath": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "action": "Root reconciles intentional append/history versus original body binding; no silent replacement or item acceptance"
+    },
+    {
+      "id": "pipeline.signature-ceremony-requires-operator-work-and-breaks",
+      "retainedBodySha256": "6d4630b7eb0ab4a628530f584e7ae4d7ae9125549d7a9c23c2884937d3ce69b0",
+      "currentPhysicalBodySha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+      "bodyPath": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "action": "Root reconciles intentional append/history versus original body binding; no silent replacement or item acceptance"
+    },
+    {
+      "id": "pipeline.forensics-and-audit-evidence-not-reconstructable",
+      "retainedBodySha256": "c5da98d43d09c7fef137e4072d9e67a873d8869fe018afbafe378d48d5bc452b",
+      "currentPhysicalBodySha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bodyPath": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "action": "Root reconciles intentional append/history versus original body binding; no silent replacement or item acceptance"
+    }
+  ],
+  "bodyRewrites": 0
+}

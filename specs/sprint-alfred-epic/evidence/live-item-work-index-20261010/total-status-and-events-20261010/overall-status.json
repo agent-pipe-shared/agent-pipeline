@@ -1,0 +1,131 @@
+{
+  "schema": "alfred.total-current-status.v1",
+  "originalScope": {
+    "AC": 37,
+    "IR": 4,
+    "items": 176
+  },
+  "wholeCriteriaAccepted": 0,
+  "officialItemsClosed": 0,
+  "currentSelectedCanonicalSourcePaths": 110,
+  "prior106ByteExact": true,
+  "scopedItemStages": {
+    "unknown": 163,
+    "50": 5,
+    "75": 5,
+    "25": 3
+  },
+  "focusedRunsNewlyObserved": [
+    {
+      "name": "Transfer",
+      "counts": {
+        "pass": 16,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "actual-proof-metadata/Transfer.json",
+        "sha256": "e7e1ec6eccddcd789c0297c6c3e29def9ca78b4b742172536490930cb40ac15c",
+        "bytes": 1389,
+        "mode": 420
+      },
+      "sourceExecution": {
+        "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+        "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca"
+      },
+      "graphConserved": true,
+      "status": 0,
+      "nativeClaim": false
+    },
+    {
+      "name": "Comparison",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "actual-proof-metadata/Comparison.json",
+        "sha256": "2df7dd5902147a3b391bec657bd11c6d98b1067db343f33ce4bd54e69fe87462",
+        "bytes": 1343,
+        "mode": 420
+      },
+      "sourceExecution": {
+        "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+        "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e"
+      },
+      "graphConserved": true,
+      "status": 0,
+      "nativeClaim": false
+    },
+    {
+      "name": "RoleFallback",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "actual-proof-metadata/RoleFallback.json",
+        "sha256": "5e8f027fcc60fe97e3652ab599540916ecc69e211d83994548ef79e506561090",
+        "bytes": 1373,
+        "mode": 420
+      },
+      "sourceExecution": {
+        "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+        "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+      },
+      "graphConserved": true,
+      "status": 0,
+      "nativeClaim": false
+    },
+    {
+      "name": "StateI08",
+      "counts": {
+        "pass": 2,
+        "fail": 22,
+        "skip": 0,
+        "todo": 0
+      },
+      "proof": {
+        "path": "actual-proof-metadata/StateI08.json",
+        "sha256": "40136cc408cf7f5d20557105dd16e25ef4ba36b2587074195da686512fd57b55",
+        "bytes": 1385,
+        "mode": 420
+      },
+      "sourceExecution": {
+        "path": "scratch/alfred-state-i08-actual-resources-independent-20261010/execution.json",
+        "sha256": "2482a409b14cfd419b1da8cf59f03efdc626c7a60c646cd7175939553b969b5c"
+      },
+      "graphConserved": true,
+      "status": 1,
+      "nativeClaim": false
+    }
+  ],
+  "retainedFailures": {
+    "STB3": {
+      "pass": 3,
+      "fail": 9
+    },
+    "HGLcurrent": {
+      "pass": 8,
+      "fail": 4
+    }
+  },
+  "bodyDrifts": 3,
+  "nativeClaim": false,
+  "newSemanticRuns": 0,
+  "GitOperations": 0,
+  "criteriaMapperSnapshotsUnchanged": 106,
+  "workCountLimit": "Source paths, dispositions, item stages and accepted criteria count different subjects; no count of unique remaining fixes established",
+  "nextOwners": {
+    "Root": "Review/integrate returned packages, archive metadata and assign finite remaining criterion work",
+    "StateI08": "Root source defect/prerequisite checkpoint on actual2/22; no automatic22bug inference",
+    "HGL": "Root executes separately reviewed resource successor",
+    "STB": "Root executes separately reviewed descriptor-parent successor5743"
+  },
+  "locatorCorrection": "State execution is package-root execution.json confirmed from actual launcher; qualification/execution.json was not read"
+}

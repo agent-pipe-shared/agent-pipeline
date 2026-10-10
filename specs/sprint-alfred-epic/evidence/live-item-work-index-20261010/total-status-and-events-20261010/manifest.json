@@ -1,0 +1,421 @@
+{
+  "schema": "alfred.total-status-preparation-manifest.v1",
+  "frozen": true,
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "SourceProposal/Coordinator metadata; methodology-only/native unverified",
+  "inputs": [
+    {
+      "path": "scratch/alfred-all-slots-current-events-successor-20261010/manifest.json",
+      "sha256": "ded758390309b921f6a1ae68722ced9d2a86089b7ffb0d2087295009b82c88b0",
+      "bytes": 4771
+    },
+    {
+      "path": "scratch/alfred-all-slots-current-events-successor-20261010/stage-overlay.json",
+      "sha256": "d659b9b1f5c1784bae4cdb05604e914e75d39f224e9ba3567c80cf000a9e0c2a",
+      "bytes": 203890
+    },
+    {
+      "path": "scratch/alfred-all-slots-current-events-successor-20261010/current-brief-matrix.json",
+      "sha256": "14b46f3e5f10f4575e03ca6c6e8ef79a7e984fb140d73e22e49f0ace1f42006d",
+      "bytes": 49333
+    },
+    {
+      "path": "scratch/alfred-all-slots-current-events-successor-20261010/current-events.json",
+      "sha256": "7398d1f33cd1849a30eae9e5f82e40aa2a0f776434d58f458402a2141ab579a2",
+      "bytes": 9998
+    },
+    {
+      "path": "scratch/alfred-ac01-13-current-completion-20261010/matrix.json",
+      "sha256": "1be3c7adeda5ecec4f58e9c6ab06a383b7a684344a4ede8a09099e9bbaaaa3f3",
+      "bytes": 20852
+    },
+    {
+      "path": "scratch/alfred-ac01-13-current-completion-20261010/manifest.json",
+      "sha256": "d6797106fb0b2219172c9794b8c4f959be46d2cf9d32913988ed0e64084c1539",
+      "bytes": 612
+    },
+    {
+      "path": "scratch/alfred-ac01-13-current-completion-20261010/matrix.json",
+      "sha256": "1be3c7adeda5ecec4f58e9c6ab06a383b7a684344a4ede8a09099e9bbaaaa3f3",
+      "bytes": 20852
+    },
+    {
+      "path": "scratch/alfred-ac01-13-current-completion-20261010/manifest.json",
+      "sha256": "d6797106fb0b2219172c9794b8c4f959be46d2cf9d32913988ed0e64084c1539",
+      "bytes": 612
+    },
+    {
+      "path": "scratch/alfred-ac01-13-current-completion-20261010/report.md",
+      "sha256": "1dec928741768f753606a484e2a540f35a45c149f12a6f34eb0f232d51381e41",
+      "bytes": 5384
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/matrix.json",
+      "sha256": "fec9a2923abddabce3cf6f13373fdc621713a4f0fd0cb106b651957309fb9155",
+      "bytes": 71347
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/manifest.json",
+      "sha256": "91e379885e30a0a0570efb78da5d6b9575a1185d6ce3634490c4787837501cb3",
+      "bytes": 3751
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/matrix.json",
+      "sha256": "fec9a2923abddabce3cf6f13373fdc621713a4f0fd0cb106b651957309fb9155",
+      "bytes": 71347
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/manifest.json",
+      "sha256": "91e379885e30a0a0570efb78da5d6b9575a1185d6ce3634490c4787837501cb3",
+      "bytes": 3751
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/matrix.md",
+      "sha256": "9d2fc3de9927fd350398a2e85a3b20cbe6e85540e8c9ea3e249849b85f7d9ce2",
+      "bytes": 6659
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/report.md",
+      "sha256": "8a0ba558a59a8814a51b6d9b739c7365f7b835b2cc742c22233b3830e8ab4238",
+      "bytes": 4794
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.json",
+      "sha256": "62837016491b38c274cbfb69464565f36e6a7ef579eacb427471b0eb18de430f",
+      "bytes": 412831
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/manifest.json",
+      "sha256": "eeda33df4fe49d835a35349485adbd05f14b9798d651ffa1f5734c5bad9c4324",
+      "bytes": 38453
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.json",
+      "sha256": "62837016491b38c274cbfb69464565f36e6a7ef579eacb427471b0eb18de430f",
+      "bytes": 412831
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/manifest.json",
+      "sha256": "eeda33df4fe49d835a35349485adbd05f14b9798d651ffa1f5734c5bad9c4324",
+      "bytes": 38453
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.md",
+      "sha256": "2d99c6f73f92c1a27569d50f7cc495aeb70b65ee8454806569e21f31c0228421",
+      "bytes": 9754
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+      "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca",
+      "bytes": 1186
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+      "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e",
+      "bytes": 1005
+    },
+    {
+      "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+      "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d",
+      "bytes": 19579
+    },
+    {
+      "path": "scratch/alfred-state-i08-actual-resources-independent-20261010/execution.json",
+      "sha256": "2482a409b14cfd419b1da8cf59f03efdc626c7a60c646cd7175939553b969b5c",
+      "bytes": 1234
+    },
+    {
+      "path": "scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-receipt.json",
+      "sha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+      "bytes": 6114
+    },
+    {
+      "path": "scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-source-manifest.json",
+      "sha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+      "bytes": 29224
+    }
+  ],
+  "publicWhitelist": [
+    {
+      "path": "mapper-evidence/alfred-ac01-13-current-completion-20261010/matrix.json",
+      "sha256": "1be3c7adeda5ecec4f58e9c6ab06a383b7a684344a4ede8a09099e9bbaaaa3f3",
+      "bytes": 20852,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac01-13-current-completion-20261010/manifest.json",
+      "sha256": "d6797106fb0b2219172c9794b8c4f959be46d2cf9d32913988ed0e64084c1539",
+      "bytes": 612,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac01-13-current-completion-20261010/report.md",
+      "sha256": "1dec928741768f753606a484e2a540f35a45c149f12a6f34eb0f232d51381e41",
+      "bytes": 5384,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac14-25-current-completion-20261010/matrix.json",
+      "sha256": "fec9a2923abddabce3cf6f13373fdc621713a4f0fd0cb106b651957309fb9155",
+      "bytes": 71347,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac14-25-current-completion-20261010/manifest.json",
+      "sha256": "91e379885e30a0a0570efb78da5d6b9575a1185d6ce3634490c4787837501cb3",
+      "bytes": 3751,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac14-25-current-completion-20261010/matrix.md",
+      "sha256": "9d2fc3de9927fd350398a2e85a3b20cbe6e85540e8c9ea3e249849b85f7d9ce2",
+      "bytes": 6659,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac14-25-current-completion-20261010/report.md",
+      "sha256": "8a0ba558a59a8814a51b6d9b739c7365f7b835b2cc742c22233b3830e8ab4238",
+      "bytes": 4794,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac26-37-ir-current-completion-20261010/matrix.json",
+      "sha256": "62837016491b38c274cbfb69464565f36e6a7ef579eacb427471b0eb18de430f",
+      "bytes": 412831,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac26-37-ir-current-completion-20261010/manifest.json",
+      "sha256": "eeda33df4fe49d835a35349485adbd05f14b9798d651ffa1f5734c5bad9c4324",
+      "bytes": 38453,
+      "mode": 420
+    },
+    {
+      "path": "mapper-evidence/alfred-ac26-37-ir-current-completion-20261010/matrix.md",
+      "sha256": "2d99c6f73f92c1a27569d50f7cc495aeb70b65ee8454806569e21f31c0228421",
+      "bytes": 9754,
+      "mode": 420
+    },
+    {
+      "path": "criteria-current.json",
+      "sha256": "a73e20ddfb55759b63caa68770f39c9271a33f1acb9c3172b72a416723a104dd",
+      "bytes": 310744,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/Transfer.json",
+      "sha256": "e7e1ec6eccddcd789c0297c6c3e29def9ca78b4b742172536490930cb40ac15c",
+      "bytes": 1389,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/Comparison.json",
+      "sha256": "2df7dd5902147a3b391bec657bd11c6d98b1067db343f33ce4bd54e69fe87462",
+      "bytes": 1343,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/RoleFallback.json",
+      "sha256": "5e8f027fcc60fe97e3652ab599540916ecc69e211d83994548ef79e506561090",
+      "bytes": 1373,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/StateI08.json",
+      "sha256": "40136cc408cf7f5d20557105dd16e25ef4ba36b2587074195da686512fd57b55",
+      "bytes": 1385,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/current-source-manifest.json",
+      "sha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+      "bytes": 29224,
+      "mode": 420
+    },
+    {
+      "path": "actual-proof-metadata/integration-receipt.json",
+      "sha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+      "bytes": 6114,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "a6493cebc3344c06d19ed5284f55a06d202f84c6a2c06634f0a1300a15307868",
+      "bytes": 12875,
+      "mode": 420
+    },
+    {
+      "path": "canonical-body-drifts.json",
+      "sha256": "50258ef887e8a1c880798bd2b96c999f2921b06943ad00c687f32db369b639af",
+      "bytes": 1773,
+      "mode": 420
+    },
+    {
+      "path": "items-current.json",
+      "sha256": "4eca878179b6ddfe0b860c29e99c4265b46d7de5840bac62a428b2a7ca01387a",
+      "bytes": 244967,
+      "mode": 420
+    },
+    {
+      "path": "current-workers.json",
+      "sha256": "14b46f3e5f10f4575e03ca6c6e8ef79a7e984fb140d73e22e49f0ace1f42006d",
+      "bytes": 49333,
+      "mode": 420
+    },
+    {
+      "path": "overall-status.json",
+      "sha256": "7a303ce54bf091c3c5820de6866267f2309f40ad95da82f57aad873eb4171d18",
+      "bytes": 3915,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "290de0a7a8ac97e2d90a04dc0184a08913623d9b2f9acab24f14c101ab95b256",
+      "bytes": 1469,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan.json",
+      "sha256": "7762e2a0ce3b94377d96df9a43c22a680f6a459ad8ccecbe72edb1d1e21d4739",
+      "bytes": 5372,
+      "mode": 420
+    }
+  ],
+  "archivePlanSha256": "7762e2a0ce3b94377d96df9a43c22a680f6a459ad8ccecbe72edb1d1e21d4739",
+  "counts": {
+    "schema": "alfred.total-current-status.v1",
+    "originalScope": {
+      "AC": 37,
+      "IR": 4,
+      "items": 176
+    },
+    "wholeCriteriaAccepted": 0,
+    "officialItemsClosed": 0,
+    "currentSelectedCanonicalSourcePaths": 110,
+    "prior106ByteExact": true,
+    "scopedItemStages": {
+      "unknown": 163,
+      "50": 5,
+      "75": 5,
+      "25": 3
+    },
+    "focusedRunsNewlyObserved": [
+      {
+        "name": "Transfer",
+        "counts": {
+          "pass": 16,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "proof": {
+          "path": "actual-proof-metadata/Transfer.json",
+          "sha256": "e7e1ec6eccddcd789c0297c6c3e29def9ca78b4b742172536490930cb40ac15c",
+          "bytes": 1389,
+          "mode": 420
+        },
+        "sourceExecution": {
+          "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+          "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca"
+        },
+        "graphConserved": true,
+        "status": 0,
+        "nativeClaim": false
+      },
+      {
+        "name": "Comparison",
+        "counts": {
+          "pass": 15,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "proof": {
+          "path": "actual-proof-metadata/Comparison.json",
+          "sha256": "2df7dd5902147a3b391bec657bd11c6d98b1067db343f33ce4bd54e69fe87462",
+          "bytes": 1343,
+          "mode": 420
+        },
+        "sourceExecution": {
+          "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+          "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e"
+        },
+        "graphConserved": true,
+        "status": 0,
+        "nativeClaim": false
+      },
+      {
+        "name": "RoleFallback",
+        "counts": {
+          "pass": 8,
+          "fail": 0,
+          "skip": 0,
+          "todo": 0
+        },
+        "proof": {
+          "path": "actual-proof-metadata/RoleFallback.json",
+          "sha256": "5e8f027fcc60fe97e3652ab599540916ecc69e211d83994548ef79e506561090",
+          "bytes": 1373,
+          "mode": 420
+        },
+        "sourceExecution": {
+          "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+          "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+        },
+        "graphConserved": true,
+        "status": 0,
+        "nativeClaim": false
+      },
+      {
+        "name": "StateI08",
+        "counts": {
+          "pass": 2,
+          "fail": 22,
+          "skip": 0,
+          "todo": 0
+        },
+        "proof": {
+          "path": "actual-proof-metadata/StateI08.json",
+          "sha256": "40136cc408cf7f5d20557105dd16e25ef4ba36b2587074195da686512fd57b55",
+          "bytes": 1385,
+          "mode": 420
+        },
+        "sourceExecution": {
+          "path": "scratch/alfred-state-i08-actual-resources-independent-20261010/execution.json",
+          "sha256": "2482a409b14cfd419b1da8cf59f03efdc626c7a60c646cd7175939553b969b5c"
+        },
+        "graphConserved": true,
+        "status": 1,
+        "nativeClaim": false
+      }
+    ],
+    "retainedFailures": {
+      "STB3": {
+        "pass": 3,
+        "fail": 9
+      },
+      "HGLcurrent": {
+        "pass": 8,
+        "fail": 4
+      }
+    },
+    "bodyDrifts": 3,
+    "nativeClaim": false,
+    "newSemanticRuns": 0,
+    "GitOperations": 0,
+    "criteriaMapperSnapshotsUnchanged": 106,
+    "workCountLimit": "Source paths, dispositions, item stages and accepted criteria count different subjects; no count of unique remaining fixes established",
+    "nextOwners": {
+      "Root": "Review/integrate returned packages, archive metadata and assign finite remaining criterion work",
+      "StateI08": "Root source defect/prerequisite checkpoint on actual2/22; no automatic22bug inference",
+      "HGL": "Root executes separately reviewed resource successor",
+      "STB": "Root executes separately reviewed descriptor-parent successor5743"
+    },
+    "locatorCorrection": "State execution is package-root execution.json confirmed from actual launcher; qualification/execution.json was not read"
+  },
+  "sourceWrites": 0,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "archiveExecution": false,
+  "predecessorManifestSha256": "ded758390309b921f6a1ae68722ced9d2a86089b7ffb0d2087295009b82c88b0"
+}

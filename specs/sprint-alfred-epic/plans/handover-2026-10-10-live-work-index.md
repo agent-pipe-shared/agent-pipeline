@@ -1,5 +1,48 @@
 # Alfred current work and continuity — 2026-10-10
 
+**Latest actual checkpoint:** the selected assembly inventory is now **111**.
+Root reviewed and integrated the 8/8-qualified role-fallback library, preserving
+all 110 prior selected members. The physical role parent existed but was previously
+unindexed: this is one physical replacement and one selected-membership addition.
+Current inventory: `scratch/alfred-qualified-role-fallback-assembly-20261010/actual-source-manifest.json`,
+SHA `6978242e26832777d1eab50aa8b4bf2e42235272c83a2a7109e5e1aebb78c54a`;
+actual integration receipt SHA
+`a8b63c51ffa0f58245765082efe04ffa4d92117c24a594f4aa5eba772609a2f5`.
+Complete-resource HGL passed 12/12; commit-hint CHP passed 8/8. HGL's coherent
+source generation is not yet jointly integrated into the 111-member assembly.
+The initializer-fix State/I08 successor completed 23 PASS / 1 FAIL, up from
+2 PASS / 22 FAIL with the same 24 assertions. The remaining STATE001 failure is
+`model-family-host:namespace-drift` during reservation, before its target assertion;
+its exact physical cause is being investigated. The 14 owned State positives and
+12 I08 transition positives remain separately unqualified.
+Generator compaction completed 13 PASS / 7 FAIL; all seven failures share a
+fixture prerequisite expecting `planned` where the actual portable plan contract
+returns `ready`. The fixture correction and frozen-resource custody successor
+are separate from any product change; no successor PASS is claimed.
+The [archived 37-AC/four-IR and 176-item checkpoint](../evidence/live-item-work-index-20261010/total-status-and-events-20261010/report.md)
+retains its earlier source-110 scope and precedes these new events. No final
+signature, stamp, native-host acceptance or whole-item closure is claimed.
+
+**Prior actual checkpoint:** the selected assembly inventory reached **110**,
+after Root reviewed and applied the four qualified transfer/comparison library
+and CLI additions. All prior 106 selected members remain byte-exact.
+Actual inventory: `scratch/alfred-qualified-transfer-comparison-assembly-20261010/actual-source-manifest.json`,
+SHA `5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5`;
+actual integration receipt SHA
+`accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc`.
+Transfer passed 16/16 and comparison passed 15/15; their selected runtime payloads
+are integrated. Role fallback passed 8/8, but its source integration is pending.
+State/I08 completed 24 cases: 2 PASS / 22 FAIL. The 22 failures share the measured
+descriptor-parent initialization prerequisite before their target assertions;
+they are not 22 independently established invariant defects. The real initializer
+fix is frozen in `scratch/alfred-stb-descriptor-parent-before-catalogue-source-20261010/`
+and its focused qualification is being prepared without fixture prewarming.
+The original 37 ACs and four IR criteria now each have a source/proof/remaining-work
+mapping in the three `scratch/alfred-ac*-current-completion-20261010/` packets.
+All 176 selected items remain officially OPEN; no whole-item acceptance, final
+review, candidate signature or stamp is claimed. These facts supersede the
+historical checkpoints below. Root owns public archival of the new frozen packets.
+
 **Newest progress:** [25/50/75 stage overlay](../evidence/live-item-work-index-20261010/progress-stages/stage-overlay.json),
 [worker matrix](../evidence/live-item-work-index-20261010/progress-stages/work-matrix.json),
 and [subsequent actual events](../evidence/live-item-work-index-20261010/progress-stages/current-events.json).

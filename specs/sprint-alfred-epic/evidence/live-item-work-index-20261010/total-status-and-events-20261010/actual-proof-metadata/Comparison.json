@@ -1,0 +1,36 @@
+{
+  "schema": "alfred.greenfield-comparison-independent.execution.v1",
+  "status": 0,
+  "signal": null,
+  "graphConserved": true,
+  "testSha256": "a3ff8f153f33a3c25d8edb174a49383156e84d2cb7bc1a47f12d0dd08116fa43",
+  "originalExecution": {
+    "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+    "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e"
+  },
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "1ca5064f217741cb533b808f81ae59fdae3717e2aa670d551638fd8d3177ff4a",
+    "caseSetSha256": "a8c9cf277fed61d63661366474ce26d21adbe41ab9b8795b27b6e74b8496218a",
+    "dispositionsSha256": "fcfcdd7e8b6229e54c3ff1fcbca61500970f5beab8908408d554bed12a5bbade",
+    "declaredCount": 15,
+    "disposedCount": 15,
+    "counts": {
+      "pass": 15,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completion": {
+    "sha256": "e5a0f7e8d2cbd8abc5e62dbe6ab3ad2666f1d4b947a45d4ca8ebeeda67a99f79",
+    "bytes": 2464
+  },
+  "setupCapturesExcluded": true,
+  "rawStreamsExcluded": true,
+  "nativeClaim": false,
+  "officialClosure": false,
+  "wholeCriterionAcceptance": false,
+  "scope": "Actual existing focused METHOD run; no new execution; distinct source graph, not an aggregate candidate run"
+}

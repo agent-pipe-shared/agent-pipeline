@@ -1,0 +1,328 @@
+{
+  "schema": "alfred.progress-stage-current-events-successor.v1",
+  "parentManifestSha256": "ded758390309b921f6a1ae68722ced9d2a86089b7ffb0d2087295009b82c88b0",
+  "scope": "workflow stages and scoped actual execution; no whole-item acceptance",
+  "events": [
+    {
+      "kind": "qualified-integration",
+      "slice": "OSE22",
+      "stage": 75,
+      "receipt": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/actual-receipt.json",
+      "receiptSha256": "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939",
+      "selectedSourceCount": 106,
+      "inventorySha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "officialClosure": false,
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "STB12-third-attempt",
+      "receipt": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/qualification-root/execution.json",
+      "receiptSha256": "3b0100412131eb7a06ad4e240a29ba1670e7a5514f72eb2f1e560de02731ea42",
+      "counts": {
+        "pass": 3,
+        "fail": 9,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "source-owned namespace checkpoint diagnosis before changing predicates",
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "HGL12-current-source",
+      "receipt": "scratch/alfred-hgl-current-source-independent-20261010/execution-terminal.json",
+      "receiptSha256": "0baacd7fd213a93912285627e80853c6aff9fb97cd91c190e708a143df0713b2",
+      "counts": {
+        "pass": 8,
+        "fail": 4,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "separate plugin-manifest fixture and unavailable-Git source diagnosis",
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "I07 joint authority bounded12",
+      "executionSha256": "fbf9b99ebc3a1c4951d51228cf52932bbb2cffdf7a9d35036664e69b4ea8f498",
+      "publicProofManifest": {
+        "path": "i07-public-proof/manifest.json",
+        "sha256": "857313b596871909ef2cb1abd569eea7facdcce63e8786157e76e4438f15e9f9",
+        "bytes": 1568,
+        "mode": "0644"
+      },
+      "counts": {
+        "pass": 12,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "FD3Sha256": "2d2276b61b4e35b7ceedc8a520cec3d2ea45613d4541dffede0b586d124ebba8",
+      "graphConserved": true,
+      "integration": "not established by this run",
+      "stageUpgrade": null,
+      "remaining": "Full positive native course/lifecycle and acceptance remain unqualified"
+    },
+    {
+      "kind": "assignment-checkpoint",
+      "workers": [
+        {
+          "agent": "/root/alfred_r10_integration_inventory",
+          "slice": "Operational current events and I07 proof",
+          "location": "scratch/alfred-all-slots-current-events-successor-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_r10_integration_inventory",
+          "itemIDs": []
+        },
+        {
+          "agent": "/root/agy_greenfield_intake_package",
+          "slice": "RGGRAM independent stopped partial: wrong graph prefix",
+          "location": "scratch/alfred-shell-grammar-capability-placement-independent-20261010",
+          "dispatchState": "STOPPED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_roles_audit",
+          "slice": "Public comparison independent; returned prepared Root metadata",
+          "location": "scratch/alfred-greenfield-public-comparison-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.greenfield-comparisons-need-reproducible-public-evidence"
+          ]
+        },
+        {
+          "agent": "/root/alfred_role_fallback_independent",
+          "slice": "Role fallback independent",
+          "location": "scratch/alfred-role-fallback-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_role_fallback_independent",
+          "itemIDs": [
+            "pipeline.role-route-preflight-with-self-dispatch-fallback"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_acceptance_audit",
+          "slice": "Commit hint protocol independent",
+          "location": "scratch/alfred-commit-hint-protocol-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/agy_greenfield_acceptance_audit",
+          "itemIDs": [
+            "pipeline.commit-grammar-hint-still-requires-scratch-message-file"
+          ]
+        },
+        {
+          "agent": "/root/agy_greenfield_design_audit",
+          "slice": "Generator compaction genuine fixture",
+          "location": "scratch/alfred-generator-compaction-genuine-fixture-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/agy_greenfield_design_audit",
+          "itemIDs": [
+            "pipeline.design-generator-repeats-large-source-material"
+          ]
+        },
+        {
+          "agent": "/root/alfred_obl013_override_digest_regression",
+          "slice": "I03 genuine METHOD dispatch source: partial",
+          "location": "scratch/alfred-i03-genuine-method-dispatch-source-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_obl013_override_digest_regression",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_obl016_heredoc_extractor_regression",
+          "slice": "STB native namespace diagnosis returned; Root next launch",
+          "location": "scratch/alfred-stb-native-namespace-current-diagnosis-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_reader_2plus1_docs_r2",
+          "slice": "Scratch durability integration source returned",
+          "location": "scratch/alfred-scratch-durability-integration-source-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.scratch-has-no-retention-and-no-durability-check"
+          ]
+        },
+        {
+          "agent": "/root/alfred_reader_controller_independent_tests",
+          "slice": "Generator compaction independent; resource closure pending",
+          "location": "scratch/alfred-generator-compaction-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_reader_controller_independent_tests",
+          "itemIDs": [
+            "pipeline.design-generator-repeats-large-source-material"
+          ]
+        },
+        {
+          "agent": "/root/quality_inline_coordinator_audit",
+          "slice": "HGL diagnosis completed; new resource successor location unknown",
+          "location": null,
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/r10_reader_budget_fix",
+          "slice": "Current106 returned package integration plan",
+          "location": "scratch/alfred-current106-returned-package-integration-plan-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/r10_reader_budget_fix",
+          "itemIDs": []
+        },
+        {
+          "agent": "/root/alfred_optional_advisor_source_followthrough",
+          "slice": "Transfer integrity independent returned; Root next launch",
+          "location": "scratch/alfred-transfer-integrity-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.transfer-redaction-alters-digest-bound-files"
+          ]
+        },
+        {
+          "agent": "/root/alfred_state_i08_invariant_assertions",
+          "slice": "State I08 actual resources independent: fresh rebrief",
+          "location": "scratch/alfred-state-i08-actual-resources-independent-20261010",
+          "dispatchState": "RUNNING",
+          "currentResponsible": "/root/alfred_state_i08_invariant_assertions",
+          "itemIDs": [
+            "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+            "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+          ]
+        },
+        {
+          "agent": "/root/alfred_transfer_integrity_source_actor",
+          "slice": "Optional Advisor diagnostics independent returned",
+          "location": "scratch/alfred-optional-advisor-diagnostics-independent-20261010",
+          "dispatchState": "RETURNED",
+          "currentResponsible": "/root",
+          "itemIDs": [
+            "pipeline.codex-advisor-evidence-fails-after-host-update",
+            "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write"
+          ]
+        }
+      ],
+      "source": "Root finite current assignments; previous assignments retained in matrix",
+      "newAuthority": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "Transfer",
+      "counts": {
+        "pass": 16,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+        "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "Comparison",
+      "counts": {
+        "pass": 15,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+        "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "RoleFallback",
+      "counts": {
+        "pass": 8,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+        "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-focused-qualification",
+      "slice": "StateI08",
+      "counts": {
+        "pass": 2,
+        "fail": 22,
+        "skip": 0,
+        "todo": 0
+      },
+      "receipt": {
+        "path": "scratch/alfred-state-i08-actual-resources-independent-20261010/execution.json",
+        "sha256": "2482a409b14cfd419b1da8cf59f03efdc626c7a60c646cd7175939553b969b5c"
+      },
+      "parserStatus": "complete",
+      "graphConserved": true,
+      "nativeClaim": false
+    },
+    {
+      "kind": "actual-integration",
+      "selectedCanonicalPathCount": 110,
+      "previous106Conserved": true,
+      "sourceInventorySha256": "5027a2dd734cf5363473bc96accb6c962fa488662775c22a3f11adba737e0fc5",
+      "receiptSha256": "accf957bf8cbc11f4a5d17c519003fda227325782505dac4d69c579abb582bfc",
+      "scopes": [
+        "Transfer library/CLI",
+        "Comparison library/CLI"
+      ],
+      "nativeClaim": false,
+      "officialClosure": false
+    }
+  ],
+  "candidateReady": false,
+  "officialClosures": 0,
+  "globalCompletionPercentage": null,
+  "parentEventsSha256": "a1caf62a3564002a86126cf7d51def1d3d28ae041e0ad8b724a9ee1a045630db",
+  "nativeClaim": false,
+  "currentSelectedSourceCount": 110,
+  "pendingRootDeclaredSources": [
+    {
+      "slice": "HGL resource successor",
+      "state": "resource complete; not executed; exact successor location unknown at cutoff",
+      "currentResponsible": "/root"
+    },
+    {
+      "slice": "STB descriptor-parent repair",
+      "sourcePrefix": "5743",
+      "state": "source ready; unrun; exact closed manifest not supplied here",
+      "currentResponsible": "/root"
+    }
+  ]
+}

@@ -1,0 +1,1341 @@
+{
+  "schema": "alfred.ac14-25.current-completion.v1",
+  "status": "bounded-source-and-proof-reconciliation-not-acceptance",
+  "candidateRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "selectedInventorySha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+  "selectedInventoryCount": 106,
+  "consolidatedCounts": {
+    "canonicalItems": 176,
+    "officialClosures": 0
+  },
+  "authority": [
+    {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "bytes": 189041
+    },
+    {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "bytes": 63204
+    },
+    {
+      "path": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7",
+      "bytes": 24030
+    }
+  ],
+  "rows": [
+    {
+      "id": "AC-14",
+      "requirement": "Every wave's deliverables passed ≥1 independent Critic round (fresh context, paths-only dispatch); fail-then-fix cycles documented — and the same bar held for every design document of this epic before PO review (spec §12 design-phase review duty)",
+      "requiredEvidence": "Critic evidence under `evidence/critic/`",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 31,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [],
+      "staticAssertions": [],
+      "actualFocusedProof": [
+        {
+          "name": "M5_18",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m5-admission-lineage-fixed-qualification-20261010/qualification-manifest.json",
+            "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898"
+          },
+          "physical": {
+            "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898",
+            "bytes": 1529,
+            "declaredMatches": true
+          },
+          "reportedPass": 18,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "Controlled hook observations, actual default producer and Git/private proof readback on Linux; native attribution unavailable."
+          ],
+          "sourceComparison": [
+            {
+              "qualifiedSha256": "19c1c563ca8fbb231a8d2ef36a25a0dba620eeb80d008eef8ae70cf38af72f29",
+              "canonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+              "exactCurrent": true
+            },
+            {
+              "qualifiedSha256": "e2ddc79983e334e98a92bfbf54747bdaf1a412589225375a8c8f05447270566e",
+              "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "Clause56",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-critic-original-clause-fixed-qualification-20261010/compatibility-terminal.json",
+            "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc"
+          },
+          "physical": {
+            "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc",
+            "bytes": 3746,
+            "declaredMatches": true
+          },
+          "reportedPass": 56,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "32 pure plus24 physical actual cases; do not double-count separate Clause24. No whole candidate/Verify/native proof."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+              "currentAuditSha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03"
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "CRT39_39",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-critic39-current-nine-final-qualification-20261010/qualification-manifest.json",
+            "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95"
+          },
+          "physical": {
+            "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95",
+            "bytes": 4706,
+            "declaredMatches": true
+          },
+          "reportedPass": 39,
+          "reportedCaseEvidence": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "fab7fef8fbe129503f3f2adb2ee33a8542fd5dc69ff8eed06fdaf63ef6611e7a",
+            "caseSetSha256": "14cdb17734bd7ca84ec9bee87828778f5fb1191512cae90e945f3eba97b73504",
+            "dispositionsSha256": "45cdfaab1c2e8e7a3078e62bc8c075a2c0e4ed1dde849b30b01dcc24d1cfa1c3",
+            "declaredCount": 39,
+            "disposedCount": 39,
+            "counts": {
+              "pass": 39,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "scopeLimits": [
+            "Actual current-nine controlled runtime; later guard b507 successor differs from b7d3 qualified guard. No blanket joint qualification on current source104."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "qualifiedSha256": "b7d3db64804d3eca85c83c3416ea74112e9abb6a9727de466a3366407b73c8f2",
+              "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+              "qualifiedSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+              "currentAuditSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+              "qualifiedSha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+              "currentAuditSha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+              "qualifiedSha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+              "currentAuditSha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+              "qualifiedSha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+              "currentAuditSha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/review-economy.mjs",
+              "qualifiedSha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+              "currentAuditSha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+              "qualifiedSha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+              "currentAuditSha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+              "qualifiedSha256": "0171392c243b0acd2b4a13041ad59c4f167ca478feb6bfe2fb1acc55aa2375d8",
+              "currentAuditSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+              "qualifiedSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+              "currentAuditSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "M2-M3_11",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+            "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7"
+          },
+          "physical": {
+            "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7",
+            "bytes": 2041,
+            "declaredMatches": true
+          },
+          "reportedPass": 11,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/report-source-readers.mjs",
+              "currentAuditSha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+              "currentAuditSha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+              "currentAuditSha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+              "currentAuditSha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6"
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "M2-M3_11",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m2-m3-reporting-independent-20261010/qualification-manifest.json",
+            "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7"
+          },
+          "physical": {
+            "sha256": "5b5db013bfd561f86e12d01de52e520df003846bf301f67bddc090beb9f351b7",
+            "bytes": 2041,
+            "declaredMatches": true
+          },
+          "reportedPass": 11,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "Report-only implementation/evidence association does not authenticate observations or introduce a completion gate; actual consuming project proof pending."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/report-source-readers.mjs",
+              "currentAuditSha256": "bac68a6bcadede34f358f64041347dd4a1480a396835c7283c15fa0baf155756"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/candidate-implementation-coverage-report.mjs",
+              "currentAuditSha256": "64f0a7aef9eb35e0dc2898bc199b2f3778275af953d8b4cb8ba68a3c5223141b"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/declared-criteria-evidence-report.mjs",
+              "currentAuditSha256": "1dcfad68371d7039f0d8fef73d9c59f25417d3f3e0bcefcad339adfc61fe597a"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/acceptance-coverage-report.mjs",
+              "currentAuditSha256": "700b2f294e3c9d1aa0d1c00220a6024b4476bdb5e05fd97bce766cfb6cdd70d6"
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "M4_15",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-manifest.json",
+            "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a"
+          },
+          "physical": {
+            "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a",
+            "bytes": 6411,
+            "declaredMatches": true
+          },
+          "reportedPass": 15,
+          "reportedCaseEvidence": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "7cb5d9f16929648d49ab2461cb1020976476c04eaa1a269808ab7dfd77d3242e",
+            "caseSetSha256": "134f821e2a2abfa233d5e89ae0116c4cc874f167fa4a04d54e670bdfaac0a5b6",
+            "dispositionsSha256": "c3a88d46cdeb09e56699f99c6c8fb418377b218bc1f7ae4b0215ba744bc21b89",
+            "declaredCount": 15,
+            "disposedCount": 15,
+            "counts": {
+              "pass": 15,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "scopeLimits": [
+            "Synthetic administrative historical-review exception; ordinary completion stays blocked; unknown historical debt is not review coverage; original setup failure retained."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+              "sha256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+              "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+              "sha256": "542d31ab35cbdb6351dedf28d2126399afae8701859696dd31f61468f607b02e",
+              "mode": 493,
+              "nlink": 1,
+              "currentAuditSha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+              "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "M5_18",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m5-admission-lineage-fixed-qualification-20261010/qualification-manifest.json",
+            "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898"
+          },
+          "physical": {
+            "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898",
+            "bytes": 1529,
+            "declaredMatches": true
+          },
+          "reportedPass": 18,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "Controlled hook observations, actual default producer and Git/private proof readback on Linux; native attribution unavailable."
+          ],
+          "sourceComparison": [
+            {
+              "qualifiedSha256": "19c1c563ca8fbb231a8d2ef36a25a0dba620eeb80d008eef8ae70cf38af72f29",
+              "canonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+              "exactCurrent": true
+            },
+            {
+              "qualifiedSha256": "e2ddc79983e334e98a92bfbf54747bdaf1a412589225375a8c8f05447270566e",
+              "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "Clause56",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-critic-original-clause-fixed-qualification-20261010/compatibility-terminal.json",
+            "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc"
+          },
+          "physical": {
+            "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc",
+            "bytes": 3746,
+            "declaredMatches": true
+          },
+          "reportedPass": 56,
+          "reportedCaseEvidence": null,
+          "scopeLimits": [
+            "32 pure plus24 physical actual cases; do not double-count separate Clause24. No whole candidate/Verify/native proof."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+              "currentAuditSha256": "e36c1e06fbe8917e276420348ba0620f991fc2d5252f9db7a37599ae04d10c03"
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "CRT39_39",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-critic39-current-nine-final-qualification-20261010/qualification-manifest.json",
+            "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95"
+          },
+          "physical": {
+            "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95",
+            "bytes": 4706,
+            "declaredMatches": true
+          },
+          "reportedPass": 39,
+          "reportedCaseEvidence": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "fab7fef8fbe129503f3f2adb2ee33a8542fd5dc69ff8eed06fdaf63ef6611e7a",
+            "caseSetSha256": "14cdb17734bd7ca84ec9bee87828778f5fb1191512cae90e945f3eba97b73504",
+            "dispositionsSha256": "45cdfaab1c2e8e7a3078e62bc8c075a2c0e4ed1dde849b30b01dcc24d1cfa1c3",
+            "declaredCount": 39,
+            "disposedCount": 39,
+            "counts": {
+              "pass": 39,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "scopeLimits": [
+            "Actual current-nine controlled runtime; later guard b507 successor differs from b7d3 qualified guard. No blanket joint qualification on current source104."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+              "qualifiedSha256": "b7d3db64804d3eca85c83c3416ea74112e9abb6a9727de466a3366407b73c8f2",
+              "currentAuditSha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+              "qualifiedSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+              "currentAuditSha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+              "qualifiedSha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+              "currentAuditSha256": "64c4f5a19be35986b5fe738a9bf7972292aab8e1140b9c4f264a462c5e2c463e",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+              "qualifiedSha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+              "currentAuditSha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+              "qualifiedSha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+              "currentAuditSha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/review-economy.mjs",
+              "qualifiedSha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+              "currentAuditSha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+              "qualifiedSha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+              "currentAuditSha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+              "qualifiedSha256": "0171392c243b0acd2b4a13041ad59c4f167ca478feb6bfe2fb1acc55aa2375d8",
+              "currentAuditSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+              "qualifiedSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+              "currentAuditSha256": "7a8bbae262e11a8c1c64d788f84125e1ee0e6ff2490ed03b3b347fcd0e30c125",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        },
+        {
+          "name": "M4_15",
+          "relatedCriteria": [
+            "AC-14"
+          ],
+          "reference": {
+            "path": "scratch/alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-manifest.json",
+            "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a"
+          },
+          "physical": {
+            "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a",
+            "bytes": 6411,
+            "declaredMatches": true
+          },
+          "reportedPass": 15,
+          "reportedCaseEvidence": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "7cb5d9f16929648d49ab2461cb1020976476c04eaa1a269808ab7dfd77d3242e",
+            "caseSetSha256": "134f821e2a2abfa233d5e89ae0116c4cc874f167fa4a04d54e670bdfaac0a5b6",
+            "dispositionsSha256": "c3a88d46cdeb09e56699f99c6c8fb418377b218bc1f7ae4b0215ba744bc21b89",
+            "declaredCount": 15,
+            "disposedCount": 15,
+            "counts": {
+              "pass": 15,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "scopeLimits": [
+            "Synthetic administrative historical-review exception; ordinary completion stays blocked; unknown historical debt is not review coverage; original setup failure retained."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+              "sha256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "6f10035fd29072a97384fdfa904ab5e927f8477cc01c6839f88c3aa0b2b82c56",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+              "sha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "ee85058aab6971eef7a057dea5abdaac0d9e89c6529663b38a8de0f1f90e6b9d",
+              "exactCurrent": true
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+              "sha256": "542d31ab35cbdb6351dedf28d2126399afae8701859696dd31f61468f607b02e",
+              "mode": 493,
+              "nlink": 1,
+              "currentAuditSha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+              "exactCurrent": false
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",
+              "sha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+              "mode": 420,
+              "nlink": 1,
+              "currentAuditSha256": "6ebd09bf6fc43ae78fa56724dd716b40851ec99771f0bfadaf6a39117a3cb204",
+              "exactCurrent": true
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        }
+      ],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "No candidate-wide per-wave and per-design-document independent review coverage has been proven by this metadata task. Source author reports, counts and syntax are not Critic reviews. Final Root Critic remains separate. Existing M5/Clause/CRT focused proofs are review-control mechanics, not evidence that every original wave/design document actually received independent semantic review.",
+      "nextAction": "Bind every original wave/design document to actual independent paths-only review and correction history, then qualify the finished exact candidate; do not launch another review from this mapper.",
+      "proposedOwner": "Root final-review/evidence owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-15",
+      "requirement": "Documentation acceptance per member issue against the exact accepted candidate",
+      "requiredEvidence": "per-issue doc evidence links",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 32,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/doc-reader-course.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/doc-reader-course.mjs",
+          "sha256": "a8a43a799a7f4aeb92bde83d9b8078bcdde2b5bc272f97578d71366e2955161f",
+          "bytes": 27053,
+          "lines": "Reader course source selected in106",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+          "sha256": "6611ea5d88b09a2acf394c5539d3d3191c8b85565df31dea17e61c7acd53225a",
+          "bytes": 7609,
+          "lines": "immutable public/source and consumer input snapshot",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Reader implementation presence does not establish per-member-issue documentation acceptance on the final accepted candidate; focused Reader evidence is not a blanket document/issue receipt.",
+      "nextAction": "Build per-issue documentation matrix and bind genuine completed Reader reports to final committed documents and exact accepted candidate, preserving accepted2+1.",
+      "proposedOwner": "Root documentation/Reader evidence owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-16",
+      "requirement": "Every host-layout onboarding test this sprint adds or touches asserts the success contract of §D; a rejection-only test appears solely for an explicitly unsupported layout. The affected-artifact set is **re-derived after the Nova rebase** (PO constraint, 2026-08-28) rather than carried from this clone base",
+      "requiredEvidence": "§D review lens; A-track Critic evidence; the wave-0 post-rebase re-derivation note",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 33,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+          "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+          "bytes": 423484,
+          "lines": "actual onboarding producer; PCI selection",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "sha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+          "bytes": 425560,
+          "lines": "ordinary lifecycle observer selected P7",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+          "sha256": "f6b827cd56383996ed1e5c7fe78fd4199e9ceb42e3dfa1a8d9fa1839badf5536",
+          "bytes": 573921,
+          "lines": "existing full suite, not executed by mapper",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [],
+      "actualFocusedProof": [
+        {
+          "path": "scratch/alfred-claude-verify-configuration-route-independent-20261010/actual-qualification-proof.json",
+          "sha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+          "caseIds": [
+            "VCR001",
+            "VCR004",
+            "VCR016"
+          ],
+          "result": "pass",
+          "scope": "16-case real approval/configuration/ordinary Git hook method proof; partial AC16 adjacency, no onboarding-wide closure"
+        }
+      ],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Complete post-Nova touched host-layout test set and all inspect/plan/apply/readback/allowed-write/host-preservation assertions are not proven here. P16 is one genuine layout/commit proof, not exhaustive onboarding success.",
+      "nextAction": "Re-derive affected onboarding tests from actual post-Nova candidate and apply accepted §D review lens; qualify supported layouts, explicitly label unsupported layouts.",
+      "proposedOwner": "Onboarding source/independent test owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-17",
+      "requirement": "**Disposition before authority:** no work package reaches implementation authority in a governed area whose architecture disposition is unresolved; an `adoption-deferred` decision satisfies this, an absent one does not",
+      "requiredEvidence": "D4 adoption-state fixtures; planning-boundary evaluator run",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 34,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+          "bytes": 728628,
+          "lines": "10460–10520 implementation entry; retained calibration observer",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+          "bytes": 25281,
+          "lines": "15–24 dependencies;112–173 checkpoint observation;299–end implementation eligibility",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-adoption.mjs",
+          "sha256": "35607b09f2acb7f3323bf2fa0eb0a2b287220ceef08a39dc61f515fb7b85ec72",
+          "bytes": 26799,
+          "lines": "62–139 resolution;344–end planning disposition",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+          "sha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+          "bytes": 18190,
+          "lines": "112–123;229–254;267–277",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "PO-deferred adoption reports fitness without enforcing",
+            "real signed approved-scoped reaches physical readiness",
+            "unresolved disposition remains blocked"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [
+        {
+          "path": "scratch/alfred-claude-verify-configuration-route-independent-20261010/actual-qualification-proof.json",
+          "sha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+          "caseIds": [
+            "VCR001",
+            "VCR004",
+            "VCR016"
+          ],
+          "result": "pass",
+          "scope": "genuine default approved implementing method fixture; not full adoption acceptance"
+        }
+      ],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Actual source implements disposition at implementation entry, including accepted deferral. P16 proves one genuine approved implementing fixture, not all WPs/scopes/negative deferral conditions on one candidate.",
+      "nextAction": "Qualify existing entry/adoption assertions against the selected source and then bind each actual implementation entry disposition; fix only actual independent failures.",
+      "proposedOwner": "Architecture entry source/independent regression owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-18",
+      "requirement": "**Map currency fails closed:** an accepted candidate never leaves its navigation map stale against contracts it touched; a checkpoint push instead records typed staleness debt, and the next planning boundary consumes that debt rather than discarding it",
+      "requiredEvidence": "D3 class-7 fixtures (fresh/stale map); push-boundary debt fixture",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 35,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+          "bytes": 25281,
+          "lines": "15–24 dependencies;112–173 checkpoint observation;299–end implementation eligibility",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "sha256": "7d965c507df67f07f1916998fa9cd9a3f19bb166566f622db20aa8a23a252f85",
+          "bytes": 40411,
+          "lines": "600–665 navigation;856–875 fragmentation;1028–1038 remedy projection",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-push-currency.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-push-currency.mjs",
+          "sha256": "e74a79209303b761f2ffc3fc28590c7d7dc6c4a2a1c02004975046bf38e739bf",
+          "bytes": 5297,
+          "lines": "candidate/publication freshness and checkpoint projection",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "sha256": "e182838152d57e5de6d1e5c24b93cb22fdb6a129add2428afdee4c0fe664b6ad",
+          "bytes": 34218,
+          "lines": "270–299;390–411;721–748",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "Class7 fresh/stale checkpoint debt",
+            "candidate stale-map refusal",
+            "checkpoint typed debt"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+          "sha256": "e375e5de4a5bbfd1f635cd411063514aaebfb193608c2d8e27f4db3efe2e2538",
+          "bytes": 18190,
+          "lines": "126–169",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "checkpoint debt blocks planning during deferral",
+            "descendant repair consumed after class7 pass",
+            "unreadable debt fails closed"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Source carries checkpoint debt and planning consumption. No measured exact final candidate freshness/real push→next-plan debt run is located here. Some older fitness cases merely supply mapStale or check array presence; they cannot alone prove actual push history consumption.",
+      "nextAction": "Qualify actual push audit/debt reader plus planning boundary and bind final touched-contract map; retain historical checkpoint debt rather than erase it.",
+      "proposedOwner": "Architecture push/entry independent owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-19",
+      "requirement": "**Decision parity across runners:** two fresh sessions on different supported runners resolve the same effective architecture constraints and active exceptions for the same governed area, or emit a typed divergence finding",
+      "requiredEvidence": "D1 parity fixture (two-runner replay)",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 36,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+          "sha256": "616059c54e33adc7ef56f6c95dbbc8f9c46afdbb64ee0e271c60ad6e7f18b3ff",
+          "bytes": 12701,
+          "lines": "72–198 effective sources;201–end comparison",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+          "sha256": "97b8dfded6918c4e6151b960d44fb85c9963168ff6008cee274ecf8428c904e4",
+          "bytes": 6002,
+          "lines": "effective local+inherited composition/parity",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+          "sha256": "f1e4a5f1f69897a8322472017f6397f0b91dff2cf8656080d5376f8d20393dc1",
+          "bytes": 12513,
+          "lines": "49–92",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "two isolated reads same decision agree",
+            "changed valid source typed divergence",
+            "active-exception digest validation"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+          "sha256": "e610773fc17f3cadc4c74672ebca00c79475c07b36599ba7ea32d04470da9b22",
+          "bytes": 7752,
+          "lines": "25–end",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "AC19 inherited source revision parity",
+            "conflicting project/inherited authority",
+            "configured signed feed readback"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "These are deterministic/source fixtures, not two fresh sessions on different supported runners. No genuine runner-paired replay record is located; do not relabel in-process repeats native parity.",
+      "nextAction": "Replay identical governed area through two genuine fresh supported runner sessions and compare source/exception projections; emit typed divergence without inventing native provenance.",
+      "proposedOwner": "Root cross-runner qualification owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-20",
+      "requirement": "**Semantic conformance, not file presence:** the Critic review catches a token ADR that does not match its implementation",
+      "requiredEvidence": "D1 token-ADR fixture (#99 §7)",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 37,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-baseline.mjs",
+          "sha256": "86e10e91cb68a1e7506d79e640d79481e01dbd4c6a98c7f122c94d60951d5be9",
+          "bytes": 21663,
+          "lines": "significance and ADR schema support",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+          "sha256": "2b89e562dbbdd3933f6bc93e3fee866a30ae4319edc7677805f49d21d7817390",
+          "bytes": 16976,
+          "lines": "352–382",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "invalid ADR digest rejected",
+            "schema-valid digest-matching semantically false implementation retained for independent review"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Actual test explicitly calls itself schema precondition, not semantic Critic fixture. It demonstrates mayPublish contradicts ADR, but no independent Critic catching that token pair is proven here.",
+      "nextAction": "Provide the valid token-ADR/implementation paths to the final independent semantic review and retain its genuine finding plus conformance result; do not convert schema validation into semantic PASS.",
+      "proposedOwner": "Root final Critic/evidence owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-21",
+      "requirement": "**Anti-fragmentation:** a change that improves a metric by shredding topology into tiny modules is rejected rather than rewarded",
+      "requiredEvidence": "#104 \"misleading tiny-module optimization\" fixture",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 38,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "sha256": "7d965c507df67f07f1916998fa9cd9a3f19bb166566f622db20aa8a23a252f85",
+          "bytes": 40411,
+          "lines": "600–665 navigation;856–875 fragmentation;1028–1038 remedy projection",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-remedy.mjs",
+          "sha256": "f631a8a7056c029ccdaa3546d7406ff875c21a8ae858e356e8dc4c815ce3606b",
+          "bytes": 7931,
+          "lines": "anti-fragmentation remedy analysis",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "sha256": "e182838152d57e5de6d1e5c24b93cb22fdb6a129add2428afdee4c0fe664b6ad",
+          "bytes": 34218,
+          "lines": "447–475",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "misleading tiny-module optimization rejected",
+            "overallStatus blocked"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+          "sha256": "1002426f56573954aa7a1426a7969be8d599a0e6e40156b156246dc04901cc3a",
+          "bytes": 5874,
+          "lines": "89–128",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "tiny remedy not recommended",
+            "micro-module shredding finding"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Existing deterministic anti-fragmentation checks and assertions are present. Execution and actual topology-changing candidate proof remain unlocated; a passed supplied-flag fixture alone cannot establish semantic architectural quality.",
+      "nextAction": "Run unchanged required anti-fragmentation controls on exact candidate; independently review actual topology remedies before assigning full AC completion.",
+      "proposedOwner": "Architecture fitness/remedy independent owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-22",
+      "requirement": "**Active optimization exists at planning:** a finding at the planning boundary carries proposed conformant remedy options with their comparison, not only the violation",
+      "requiredEvidence": "D2 remedy-comparison generator fixture",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 39,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.mjs",
+          "sha256": "7d965c507df67f07f1916998fa9cd9a3f19bb166566f622db20aa8a23a252f85",
+          "bytes": 40411,
+          "lines": "600–665 navigation;856–875 fragmentation;1028–1038 remedy projection",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-remedy.mjs",
+          "sha256": "f631a8a7056c029ccdaa3546d7406ff875c21a8ae858e356e8dc4c815ce3606b",
+          "bytes": 7931,
+          "lines": "conformant remedy options/tradeoffs",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+          "sha256": "e182838152d57e5de6d1e5c24b93cb22fdb6a129add2428afdee4c0fe664b6ad",
+          "bytes": 34218,
+          "lines": "475–499",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "planning carries remedy comparison; candidate does not"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+          "sha256": "1002426f56573954aa7a1426a7969be8d599a0e6e40156b156246dc04901cc3a",
+          "bytes": 5874,
+          "lines": "13–65",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "contract violation compared options",
+            "boundary crossing alternatives",
+            "map regeneration remedy"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [
+        {
+          "name": "RHH11",
+          "relatedCriteria": [
+            "AC-22"
+          ],
+          "reference": {
+            "path": "scratch/alfred-claude-resource-headroom-independent-20261010/qualification-manifest.json",
+            "sha256": "260febaaa80f808fa6ee7200cc26a1989feb77d37c6665426e099b2997c4f7c9"
+          },
+          "physical": {
+            "sha256": "260febaaa80f808fa6ee7200cc26a1989feb77d37c6665426e099b2997c4f7c9",
+            "bytes": 4669,
+            "declaredMatches": true
+          },
+          "reportedPass": 11,
+          "reportedCaseEvidence": {
+            "schema": "pipeline.verify-case-completion-attestation.v1",
+            "status": "complete",
+            "policySha256": "4b8ccf946de4f46b8e99edbea31e47e60b501698186f491c97339d481c546cfa",
+            "caseSetSha256": "8620715cbe51c6bdf45142e8a659dbaa990f41be0309bc7f0d941a53e5ba405d",
+            "dispositionsSha256": "c79fa95f23decd90007890b0c95515256e4dc08b9567dc441e8c14f7390e5feb",
+            "declaredCount": 11,
+            "disposedCount": 11,
+            "counts": {
+              "pass": 11,
+              "fail": 0,
+              "skip": 0,
+              "todo": 0
+            }
+          },
+          "scopeLimits": [
+            "Declared observations only; no actual measurement authentication/compliance; template static rather than exercised dispatch; current READY CLI admission and consumer integration unproved."
+          ],
+          "sourceComparison": [
+            {
+              "canonicalPath": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+              "currentAuditSha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2"
+            },
+            {
+              "canonicalPath": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+              "currentAuditSha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801"
+            },
+            {
+              "canonicalPath": "templates/prompts/goldfish-task.md",
+              "currentAuditSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6"
+            }
+          ],
+          "assurance": "Existing public business-proof metadata plus exact physical CAS when available; no new execution and no whole-criterion closure."
+        }
+      ],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Planning remedy projection exists. No exact candidate-bound execution record located for these suites; complete active planning application remains proof debt, not evidence of missing code.",
+      "nextAction": "Qualify unchanged planning comparison assertions and retain actual finding/options projection on the accepted planning candidate.",
+      "proposedOwner": "Architecture fitness/remedy evidence owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-23",
+      "requirement": "**AGENTS.md linkage:** a governed repository's AGENTS.md references the map bundle entry point, and the declared re-entry reading order resolves end to end from it",
+      "requiredEvidence": "D2 estate fixture; re-entry walkthrough evidence",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 40,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/module-inventory.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/module-inventory.mjs",
+          "sha256": "3953f8f07a308962db6e8f25c3379d858f184cd83bf6a85ff0708ee47a8a49a3",
+          "bytes": 13093,
+          "lines": "249–297 six steps;301–316 root pointer check",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+          "sha256": "471ff282849ec52ab77d0841112e9f07abc3a2bba3c2ae65926d0b25a7364d90",
+          "bytes": 1619,
+          "lines": "Greenfield separate root AGENTS pointer",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+          "sha256": "e504f2a83759fcb7c6dd4a9c095f6f9ab5cfb94926e47725b02234f6e9923c97",
+          "bytes": 25281,
+          "lines": "15–24 dependencies;112–173 checkpoint observation;299–end implementation eligibility",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/module-inventory.test.mjs",
+          "sha256": "5370db6f58c4a973ed06a7e98aa9078b1a72d29b5bf715ecd4e743cce95dc057",
+          "bytes": 20933,
+          "lines": "282–385",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "complete six-step order",
+            "disposable project static entry route",
+            "missing/stale/alias pointers",
+            "CLI honest bootstrap assurance"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+          "sha256": "fe99f91b4db5a749408045294feb406bb08873dcc52626ab3291fe1c165e7cab",
+          "bytes": 1833,
+          "lines": "20–34",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "fresh project separate root entry pointer"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Actual pointer/order source exists and tests expressly stop at static entry route. No end-to-end fresh runtime reading-order walkthrough is located; source cannot assert host pipeline-start ran.",
+      "nextAction": "Bind a genuine re-entry walkthrough to root AGENTS, actual map/touched concepts/decisions/bootstrap/owned surface; keep static and host observation evidence separate.",
+      "proposedOwner": "Root re-entry/runtime qualification owner",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-24",
+      "requirement": "**Provider-free AGY dispatch seam:** a complete runner-neutral Goldfish packet reaches `invokeAgy` through one production caller with candidate/input/result isolation and a typed receipt. Fake executable cases prove success, malformed output, model mismatch, timeout and cancellation; a missing/mismatched repo-local plugin/pipeline-start marker refuses or remains unavailable. `agy plugins list`, a sandbox flag, and fixture success do not count as native guard or three-runner proof.",
+      "requiredEvidence": "E3 Verify suite; `pipeline.cross-runner-dispatch-receipt.v1` fixture receipt; A1/A2/A3/A5 precondition readback",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 41,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs",
+          "sha256": "0a2d11eded8f9c719814eed91a0bcb47516b9e54308173d035ba4b3696a14b37",
+          "bytes": 23861,
+          "lines": "production E3 caller and bound receipt",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+          "sha256": "1a497af790aed575d9ac28b9dc647d69d8c5f187b88a173a0b3e4bcc7e967329",
+          "bytes": 12927,
+          "lines": "invokeAgy execution boundary",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/goldfish-antigravity-host.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/goldfish-antigravity-host.test.mjs",
+          "sha256": "c98d58ddbb363256790c6e694e984c74ccc34d126bb9ab41bb692416d5b6d553",
+          "bytes": 20145,
+          "lines": "134–end",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "E3H01 start measurement",
+            "E3H04 successful bound dispatch",
+            "E3H05 malformed/model mismatch",
+            "E3H06 timeout",
+            "E3H07 cancellation",
+            "E3H08/09 missing/mismatched marker",
+            "E3H12/13 result collision/traversal",
+            "E3H14 forged A1 PASS refused"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Fixture code uses fake executable and injected qualifyNativeA1 only in controlled fixture seam; sealed/default production refuses caller-authored A1 PASS. No one-candidate complete E3 suite execution/current A1/A2/A3/A5 readback located here. Native AGY not required or claimed by AC24.",
+      "nextAction": "Qualify full unchanged fake-executable E3 suite and actual current candidate-bound prerequisite readback; report unavailable gate honestly without real provider calls.",
+      "proposedOwner": "E3 source and independent fixture qualifier",
+      "sourceAuthorIsIndependentCritic": false
+    },
+    {
+      "id": "AC-25",
+      "requirement": "**Native Claude/Codex Host-Commit:** each direct runner route binds the exact prelaunch candidate and child/session/model identity to one validated structured final return; only its exact allowed diff is committed by the host with ordinary Git hooks, then commit readback, private local observation, and authored v4 publication occur in that order. Ambiguous or invalid returns do not gain authorship; a fresh clone without a separately approved signed export remains `UNVERIFIABLE`; no provider attestation is claimed.",
+      "requiredEvidence": "Native Goldfish host state/return/finalizer/commit-execution Verify suites; authorship writer/verifier regressions; runner-hook contract readback",
+      "requirementBinding": {
+        "path": "specs/sprint-alfred-epic/acceptance.md",
+        "line": 42,
+        "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7"
+      },
+      "sources": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+          "sha256": "e2ddc79983e334e98a92bfbf54747bdaf1a412589225375a8c8f05447270566e",
+          "bytes": 8077,
+          "lines": "selected M5 initial finalizer",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/native-goldfish-host.mjs",
+          "sha256": "97eab37a9dc859183df98f703060469c9271c94406c125ec4063b42a9670bb03",
+          "bytes": 2377,
+          "lines": "native start/return hook boundary",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+          "sha256": "b1eb62d7f167995744d843557df7cf9471a7e719a4252b7561d94e15f4c0dcef",
+          "bytes": 14870,
+          "lines": "prelaunch state bindings",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+          "sha256": "bb6b2eaa460ca09f6fbfbd9821780d2871e0868c6e26802d00ee8add59c7c613",
+          "bytes": 10201,
+          "lines": "structured native return",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+          "sha256": "19c1c563ca8fbb231a8d2ef36a25a0dba620eeb80d008eef8ae70cf38af72f29",
+          "bytes": 33527,
+          "lines": "selected M5 final authored-record writer",
+          "selected106": true,
+          "scope": "source-read-not-runtime-proof"
+        }
+      ],
+      "staticAssertions": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+          "sha256": "5706e798616ae3909846d190c586cc85b601b38161226e42935bf48e09a36ba0",
+          "bytes": 8666,
+          "lines": "70–end",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "NGHF01 Claude valid return publication last",
+            "NGHF02 Codex model drift refusal",
+            "NGHF03 Codex v2 functional role/private observation"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
+          "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
+          "sha256": "eb4dcdacb848af3ee21b3c9debe8acc84ebf648d0f1f5963b9292c87f805bf1d",
+          "bytes": 4155,
+          "lines": "18–end",
+          "selected106": false,
+          "scope": "source-read-not-runtime-proof",
+          "caseNames": [
+            "real fixture commit/readback",
+            "foreign or invalid return no commit"
+          ],
+          "execution": "not-run-by-mapper; actual execution record not located for this suite"
+        }
+      ],
+      "actualFocusedProof": [],
+      "status": "not-complete-on-one-exact-candidate",
+      "gap": "Code and synthetic host fixtures are present. No actual direct Claude/Codex host-bound session/child/model+commit/receipt/publication record was read or proven, and private host custody was deliberately not inspected. Fixture success or authored Source metadata cannot establish actual native host evidence; fresh-clone assurance remains UNVERIFIABLE without accepted signed export.",
+      "nextAction": "Qualify public deterministic source controls, then obtain genuine separately scoped direct native host observation/readback for each supported runner; do not manufacture native receipts or signed exports.",
+      "proposedOwner": "Root native host qualification owner",
+      "sourceAuthorIsIndependentCritic": false
+    }
+  ],
+  "limits": [
+    "No semantic runs, Source writes, Git, native/provider or private host/key reads.",
+    "No whole-AC closure inferred from106 files or176 items.",
+    "Relevant Spec sections read; initial full output truncated, not a full-Spec-read claim.",
+    "Two distinct refused discovery/input actions retained without equivalent retry.",
+    "Mapper authored some earlier source slices; this is not independent Critic review."
+  ]
+}

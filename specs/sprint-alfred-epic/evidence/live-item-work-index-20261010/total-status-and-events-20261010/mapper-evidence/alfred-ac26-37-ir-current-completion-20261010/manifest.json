@@ -1,0 +1,980 @@
+{
+  "schema": "alfred.completion-map-manifest.v1",
+  "frozen": true,
+  "scope": "Original AC26–37 and IR1–4 tracking only",
+  "outputs": [
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.json",
+      "sha256": "62837016491b38c274cbfb69464565f36e6a7ef579eacb427471b0eb18de430f",
+      "bytes": 412831,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/matrix.md",
+      "sha256": "2d99c6f73f92c1a27569d50f7cc495aeb70b65ee8454806569e21f31c0228421",
+      "bytes": 9754,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/criterion-ranges.md",
+      "sha256": "6f437d30051a395475f6cee44efb92baa15afb28f3d974e6a0f3f7e57837de6f",
+      "bytes": 93989,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/selected-item-extract.json",
+      "sha256": "b81ca65ac8413ed0471111c9c964c50f22f6fb03e20c51f7c014c00e781b3413",
+      "bytes": 79837,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/inventory-extract.json",
+      "sha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "bytes": 27295,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/extract.mjs",
+      "sha256": "5a03a2966bde29161ed5bb611347cf59693146a22519397022f3b5bedc3d5b9b",
+      "bytes": 1751,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-ac26-37-ir-current-completion-20261010/build-matrix.mjs",
+      "sha256": "c947fa468aa5193b3b07f0bb2abaab3182b9f3e3fdbf13752bffc4bebfbbcbc7",
+      "bytes": 29474,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "inputBindings": [
+    {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "bytes": 189041,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "bytes": 63204,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7",
+      "bytes": 24030,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/traceability.md",
+      "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d",
+      "bytes": 28262,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/current-source-manifest.json",
+      "sha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "bytes": 27295,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/current-events.json",
+      "sha256": "a1caf62a3564002a86126cf7d51def1d3d28ae041e0ad8b724a9ee1a045630db",
+      "bytes": 1908,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/work-matrix.json",
+      "sha256": "06e3b9393958af7ff6f47a16eebc355c678e8d86474a1185222dba2a2870ed41",
+      "bytes": 29238,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/docs/adr/0085-one-review-one-signature-design-approval.md",
+      "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+      "bytes": 6091,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-claude-merge-message-policy-independent-20261010/qualification-manifest.json",
+      "sha256": "66ca9b57829ba55f222a24fa4b692c0d053f0fa04bb48a68179131ce2b869336",
+      "bytes": 931,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/command-catalogue.mjs",
+      "sha256": "b8444707124eb122757643646c6f2c9383acba7ee83f673f4a83cc3ba23081f4",
+      "bytes": 27733,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs",
+      "sha256": "708049b8d29d200cdee333fbb36c0061839990ac26eeb5f3f21c726fae41bfc1",
+      "bytes": 22914,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "sha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+      "bytes": 39861,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "sha256": "dc1640abea896ad65ff044bdd116fd7c739653598e411bc4724413ac8dec10dc",
+      "bytes": 111990,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs",
+      "sha256": "d387f92cd14f30630f391cf8485991b8ba49bb47f8c01f3b238cdcf1bb95b814",
+      "bytes": 32252,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-m6-literal-read-baseline-closure-v2-20261010/fixed-current-nine/execution.json",
+      "sha256": "a77d90e25b638f32a7e22813d18964397d4ea09af6bb3a881ce3e3f61344f780",
+      "bytes": 1926,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-policy.mjs",
+      "sha256": "df02946f7fe30255cb52ac78943ce7ff7a5f717f19a78f89bef07377c870360f",
+      "bytes": 9965,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+      "sha256": "696e847de64e5f99fc3c2289f068d9041902d40cd5c3ff7a9b253d7aec3ff049",
+      "bytes": 4990,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+      "sha256": "39639eca721081f36fca88e29bac91baa4fa0fa26872d7b65183cb53f0586544",
+      "bytes": 5826,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "446baf21925a616274632227254e7470c25227b51096a8b2afbebdc2bc2646b8",
+      "bytes": 67539,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/git-cmd.mjs",
+      "sha256": "17352abd77dac12c1a4800c4b0cc26124652505dd72ba20bb2154afecab5ab78",
+      "bytes": 78973,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/csr27/execution.json",
+      "sha256": "4c0d4a86f3ee73a3417c29da3d0c0a62cae9fb5da6acf21797a5ccbbce6c9452",
+      "bytes": 4547,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "997cdad28bad0952c63ac4705a812208075128231276bf33d3cc8b700c8a3176",
+      "bytes": 150218,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+      "bytes": 176415,
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "sha256": "93957f6c60955c0ce8ad30628ed80c1d79758cbb07e28e0deb5357b6e52ecb84",
+      "bytes": 246487,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "412b0e3d5c1662ee5f52af8bc04a9107d3b243cbe6c2058ba72caa43020d3cca",
+      "bytes": 59864,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+      "bytes": 423484,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-external-stop-combined-qualification-20261010/execution-v2.json",
+      "sha256": "bdf9671f926a27fee22e4d12d4f684dd0cd16c6101d6176816318f231106f0ce",
+      "bytes": 4839,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-m5-admission-lineage-fixed-qualification-20261010/qualification-manifest.json",
+      "sha256": "d05f67dfc055fd7aeaa298c93d6ef861aaa02001d2d62414052e93fe88ab2898",
+      "bytes": 1529,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic39-current-nine-final-qualification-20261010/qualification-manifest.json",
+      "sha256": "b7f673ab7cb4be638236646cc2381f21432f3638b812e2954043b1709310cb95",
+      "bytes": 4706,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/clr12/qualification-manifest.json",
+      "sha256": "6a8bfbeaaa6998257ca397d7377cbb4633a83c9c20e2977f7e7c9108cc6042b8",
+      "bytes": 3512,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/wel12/actual-qualification-proof.json",
+      "sha256": "56f7d91010bd8175eb77d92bae73f5ee1a513f019288ea24ca0127f4ce77c90b",
+      "bytes": 4817,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/role-route-preflight.mjs",
+      "sha256": "965acac7727d6e1c22ebe8e46b4de4a50cf2b84d2ec3761ca4ec1f4cf838e864",
+      "bytes": 9355,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/role-route-preflight.test.mjs",
+      "sha256": "000bf8983246fff7bd8b9ac9bcea8800f26a9bb5516d086b0a880e9b598517bc",
+      "bytes": 12823,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "sha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182",
+      "bytes": 8003,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+      "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285",
+      "bytes": 118731,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+      "sha256": "46b8d4be8ac5449e3e83060c2be75ad8ea395047b6fdf3f4c2b2a861d631a85f",
+      "bytes": 15265,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "sha256": "282bc3a2b8168442fcfd382e5972b57f7ccbdc5d0273c972aa18bb5f26b74e4e",
+      "bytes": 46463,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-critic-original-clause-fixed-qualification-20261010/compatibility-terminal.json",
+      "sha256": "7370021763f61faa4f0366aa2bb576e7c94eae1e063c8048b5ba0d33fa6b0dcc",
+      "bytes": 3746,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-m4-fresh-review-independent-20261010/setup-data-closure-successor/qualification-manifest.json",
+      "sha256": "9350eb10f321031bd556c5146fabd6f65b6165a361f738d453896a42da0dac0a",
+      "bytes": 6411,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p7-ordinary10/qualification-manifest.json",
+      "sha256": "3ad2a41cfeeb3830b7536de155fa8b00e502354578cf530af7c316751c6a6229",
+      "bytes": 2124,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p16-actual16/actual-qualification-manifest.json",
+      "sha256": "71d697d9728631347c83be57eca0104362b3304d76082222f7555e504fbb89da",
+      "bytes": 1734,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/pci-actual12/qualification-manifest.json",
+      "sha256": "bc4832257dbc1e8fbbb97c07f02a15ce52de072cd2b85d13481a0af52f07743d",
+      "bytes": 2928,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-claude-resource-headroom-independent-20261010/qualification-manifest.json",
+      "sha256": "260febaaa80f808fa6ee7200cc26a1989feb77d37c6665426e099b2997c4f7c9",
+      "bytes": 4669,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/design-course-coordinator.mjs",
+      "sha256": "61b94d6a2deb9a66a693cdc61b9772ca29a03f6723de9acc8ac56195a9e08f62",
+      "bytes": 5105,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/design-course-coordinator.test.mjs",
+      "sha256": "1d3a3e16e56dbd03f524e9b4e13c9df8b136affa54da1aa214430ad3be90e355",
+      "bytes": 2849,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/design-course-session.mjs",
+      "sha256": "924abfc7f39491b520b296b58ae907df96a501e92bdf4d2b9ec38f4d0be104a7",
+      "bytes": 49450,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/design-workflow-package-v2.mjs",
+      "sha256": "9e7da019546ea71895da8998b9c8b085d51084637866d958f6761c4a668c3638",
+      "bytes": 31090,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/commit-message-policy.mjs",
+      "sha256": "3a319ce909f6872e158629d6eb29c485d581e64455b8ff5b48e2b8e136a89d8b",
+      "bytes": 23791,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "sha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+      "bytes": 15099,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "sha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+      "bytes": 7902,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/audit-pack.mjs",
+      "sha256": "b727dec4502baf35c162134c92e2208591acf3a86402d2238ff3d9f3998ce555",
+      "bytes": 22126,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/audit-bundle.mjs",
+      "sha256": "debef5a4eb22fef20d5b1b76d7e11230670c0a54411ff69d98b0c7fadd568c95",
+      "bytes": 18450,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs",
+      "sha256": "f3e894380032566ab48d6b4744a3f0603bfbaab61ab75734d21e1f2770f5899d",
+      "bytes": 17882,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+      "bytes": 728628,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+      "sha256": "90d173880447fdd17507e438d5227d09cd0d7e20f2e94e8067df5cda6b9cbad0",
+      "bytes": 149878,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs",
+      "sha256": "adc2914d37734bb130281c046dd0d7b82c30fa98cff6c87fcb0d960c9049f150",
+      "bytes": 77496,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/session-cleanup.mjs",
+      "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d",
+      "bytes": 46798,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/attended-recovery.mjs",
+      "sha256": "8c5ad72bbd4ab718fec0d8932b88725b07951664e7b46d0ba0ec355b2f5ef21a",
+      "bytes": 12450,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/harness/scripts/attended-recovery.test.mjs",
+      "sha256": "d457c2e0bdc8f996faae86831080d670e0f7f35fb52b30ac2aeb027e32f6caf1",
+      "bytes": 38178,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-uninstall.mjs",
+      "sha256": "0148a294b9fe2223fe72ae1f34ad7940dd1c44eb0c27014e7dd58db209186ca8",
+      "bytes": 15860,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-uninstall.test.mjs",
+      "sha256": "c26eba36b067a5241b1439f8b19950e9d1f7e33c643607ca2555ce658da950a1",
+      "bytes": 20220,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-uninstall-contract.mjs",
+      "sha256": "2e530d72f36991307e7c76d3acb71388bb643e18e714c6637c3a3b6c3b38f0cf",
+      "bytes": 1847,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-latest-selection.mjs",
+      "sha256": "8e8737ff33e800a91e7ef1bd7c8a73bdcfc157448c02f70e7f417c3cc0780973",
+      "bytes": 18365,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-latest-selection.test.mjs",
+      "sha256": "fcf3f9d8434fe2f431b6466086d7c31461bc735ae4dd834a7970f7d036714916",
+      "bytes": 17152,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-authority.mjs",
+      "sha256": "a26ec5d3c3785b8bd32dd50197236e9106124956dd062cca2eb3d4e3dad29518",
+      "bytes": 18911,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-acceptance.mjs",
+      "sha256": "00e7cadec91aac5925d64a5cb7ce6fd0ce0fc17ac04c908d4d974bf7774a0876",
+      "bytes": 7225,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-role-host-session.mjs",
+      "sha256": "53ac47846985b078dc4145935cb11451be068ce9a778418b304c36a9949a82d3",
+      "bytes": 6331,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/signing-ceremony.mjs",
+      "sha256": "568710b197fc08b7766e62d67a67f96d0b13be17647c400796221513dacd83a5",
+      "bytes": 11905,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "5725cc46667927d4d8bb49b3fa0da7308e345a2e84381d3b1ddce0fba1eb17bf",
+      "bytes": 11957,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/protected-baseline.test.mjs",
+      "sha256": "a9c7e5d7a7901cd65ef068afcaf980eabc0df646fa95c40642703e8e9ea341a7",
+      "bytes": 8113,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+      "bytes": 425560,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/hooks/guard-testpath.mjs",
+      "sha256": "cad661cf18d2106f57362a977b02a78c73faf6f029a189109910c2e978b92cb4",
+      "bytes": 25073,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs",
+      "sha256": "59b2b7e047297f9201f59080c5ba41df0e8948c4b1fbd80392fd8bc763c80362",
+      "bytes": 30665,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/interruption-receipts.mjs",
+      "sha256": "c89bf9d668ca6d5a91bf3ea71123617e75774c5e37b8949a16c6e4f9411f7e2e",
+      "bytes": 37184,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/interruption-receipts.test.mjs",
+      "sha256": "f822f0aced0f903117e2bdba9bf8995a6d044ff5f7d98621ee117c2bdf9107b5",
+      "bytes": 99335,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/interruption-source-adapter.mjs",
+      "sha256": "228311c947b722ee32e51ea14971f992a127e7d2ba86f1e034ac84e533ad71c9",
+      "bytes": 8794,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/interruption-receipt-store.mjs",
+      "sha256": "f2916158bc27a30038db0e7a6ccf09edba729bf8cb4f1641f36dccb25291e2fd",
+      "bytes": 53110,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/report-interruptions.mjs",
+      "sha256": "e5c519414b8716c853b7e29bf60f9b280f95c214efb2f7eed84a3ef433431bde",
+      "bytes": 20176,
+      "mode": 493,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "sha256": "7b88539ea84253242cef593f8ad842301036af5bdb6dd9ce31e427fcad45bf96",
+      "bytes": 32926,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+      "sha256": "e870bf1616030bd18468c1c535737a7ea7509ad13d77f027c0b88fb1130af881",
+      "bytes": 10296,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+      "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca",
+      "bytes": 1186,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-source-actor-20261010/manifest.json",
+      "sha256": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9",
+      "bytes": 8025,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-independent-20261010/launch-freeze.json",
+      "sha256": "e192e4689bb93965ecb76807566aeab2e3614dbf60ae28d8e152e95ae7a39bc8",
+      "bytes": 4067,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/execution.json",
+      "sha256": "19eef3d42bdb9b4ef589671dbd95374bf65b7188332de7e89750893870d1d47e",
+      "bytes": 1005,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-source-20261010/manifest.json",
+      "sha256": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+      "bytes": 3218,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-independent-20261010/manifest.json",
+      "sha256": "ccd343ecafa1dcfe0e2954a512d3b44884001543d37b3873218d9cc8e2099c14",
+      "bytes": 3329,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/actual-receipt.json",
+      "sha256": "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939",
+      "bytes": 3299,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-source-followthrough-20261010/manifest.json",
+      "sha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+      "bytes": 6070,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-lifecycle-coordination-commands-refused-as-implementation-writes.md",
+      "sha256": "eb5dd7b86b29e75d4fb43a8ded316d010c1c7a13a4bfd6d161029c1cd5496730",
+      "bytes": 3159,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-draft-phase-guard-blocks-mandatory-bootstrap-preflight.md",
+      "sha256": "61479577fc83265c8fb96773e3dbe33c443c034b760d07c65d6ae9e0a7eeb8d2",
+      "bytes": 3561,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md",
+      "sha256": "42fc4b81bb2759d9a3399b3b1e097dbb6bb2809ffd83946554a987fc1dffd22f",
+      "bytes": 2875,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-catalogue-admit-prescribed-lifecycle-verbs.md",
+      "sha256": "d2541da96d6540b1e57d2211dadd70bb30312cd7e9d1dd96d30b7e06ff4b4628",
+      "bytes": 2403,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md",
+      "sha256": "c324ad339647bacded677944953b112f2adeb18d00f60de9bf47cd4ac6ad31d0",
+      "bytes": 7857,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md",
+      "sha256": "feddfc71a1537d618505d1852a484b22c6207e635262558170ec07275d880e0b",
+      "bytes": 2711,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md",
+      "sha256": "c45590ae6c71961262f2036ddc4e9439c1343db360b2f7919da3e93955c0b591",
+      "bytes": 2575,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-passive-read-policy-admits-uncovered-credential-files-and-rg-follow.md",
+      "sha256": "68433f8d12cbea149864924df9134bb5bc7c0361c10df99c036ee869360b40eb",
+      "bytes": 2046,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-signature-ceremony-requires-operator-work-and-breaks.md",
+      "sha256": "f4c8efca87b05e9233e8ff9a30b63f97044f2b53a5dfe0847bbca87fd08b9560",
+      "bytes": 4606,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-feature-branch-push-admitted-without-signature-approval.md",
+      "sha256": "bbea391e74d35fb4d64b44dc6c614f2ef14de2c7cf9c8fdd2a72441ec6c661d1",
+      "bytes": 3330,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+      "sha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+      "bytes": 2131,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md",
+      "sha256": "be7223b78fc14d727ee3621ad9586c0aba3c43b1185f3180562d4b323bf5705e",
+      "bytes": 3637,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-role-route-preflight-with-self-dispatch-fallback.md",
+      "sha256": "46cbd6502fe091a27a2ec4a5af79d94190b99ac53efe0d4566ba51ee03f795dd",
+      "bytes": 2297,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md",
+      "sha256": "8075e6d45918e0e558f19137785e966d6e101bdd3ed681b2a2cef42a0c295c2c",
+      "bytes": 4086,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-dispatch-budget-lock-refuses-every-subagent-call-on-windows.md",
+      "sha256": "7a02040dc1a2de7a1dfbf16190cf62a407a79ff7e778c179fd0b55c9316324e4",
+      "bytes": 4937,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-dispatch-guard-rejects-built-in-capitalized-agent-types.md",
+      "sha256": "7d02ca0e1585e41cd88af9d5660378ef8ef46dbaa95765071dfb173236e34bed",
+      "bytes": 3371,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-advisor-evidence-fails-after-host-update.md",
+      "sha256": "d298a895ebbdd60dcda187ec030f1ae992edf19676a7f52811db08756a64cef8",
+      "bytes": 1818,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md",
+      "sha256": "928968269e65b5757e369c457c1a93f2e2e678eacbd9d28d66a1bb4c28ed28e4",
+      "bytes": 2294,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md",
+      "sha256": "ab10d421a47de3aee032785042c5029b69f734323b6a1844fa376f706ca17942",
+      "bytes": 6115,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md",
+      "sha256": "2db1d79416dd18bbfe07a9e8ee8ebd44bd1afc7bb692121a2bba657dba6e5b0e",
+      "bytes": 3161,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-design-intake-generator-omits-question-answers.md",
+      "sha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099",
+      "bytes": 2638,
+      "mode": 384,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md",
+      "sha256": "40ed1a98333226ad4310823ff472dd6272315883547fcbc2df0f28047877ca75",
+      "bytes": 4735,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.md",
+      "sha256": "40e59303bcf223545821234806b83325f7fee9e3afb11ac6e457946a2c3e7eb1",
+      "bytes": 2193,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md",
+      "sha256": "f29ee4a1444ab25829346902b93a5b891d41c4f5228e42ccd45778dbf1904e68",
+      "bytes": 4527,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+      "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+      "bytes": 1295,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-lifecycle-inspect-omits-current-plan-spec-digests.md",
+      "sha256": "41c6867860580b2d4d96517455345e87cefd01261fc044de777d704d204f994b",
+      "bytes": 3298,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-handover-doc-committed-without-governance-classification.md",
+      "sha256": "104374db922fe39de59cfaa23d3550d02c30d3c824e89c179f2e5eaffc239a52",
+      "bytes": 2002,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md",
+      "sha256": "ad7579c4e55f24661936225b638a474af210e04aa92122679e46311d8e700e62",
+      "bytes": 2524,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+      "sha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+      "bytes": 1717,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+      "sha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+      "bytes": 15507,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-30-model-family-approval-with-automatic-version-upgrades.md",
+      "sha256": "241d32ed22c27521c161df682580a722b394723f74d921d603c3104073ce90ac",
+      "bytes": 2212,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-model-role-bootstrap-is-always-unavailable-on-native-windows.md",
+      "sha256": "8b5fbaa1eefa716041dcf3a37a2e4466dcaef63d6fb6467fbec14b58ba2c1941",
+      "bytes": 2330,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-existing-signing-key-reuse-deadlocks-onboarding.md",
+      "sha256": "440165b16c815c1a856a2afe9e3c762a909a36404cedeaac21ecdb93cf224d50",
+      "bytes": 961,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md",
+      "sha256": "e2cb39c490b2c46ecf91c2a4ffef343fc89db40b1c304b9ebb4c21d448c1ceec",
+      "bytes": 2872,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-preflight-hides-the-git-error-behind-gs-git-unavailable.md",
+      "sha256": "d004f3fd834bd9a4c33443575529d07f20d3d07dd3c0d27b890701061ca3e2f7",
+      "bytes": 1879,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-06-approval-bound-design-package-lives-in-an-ignored-directory.md",
+      "sha256": "c9fa8e859c076d94fa3b81aa01269571aab64e557762c1189bf47f043de288e7",
+      "bytes": 3968,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-machine-wide-key-directory-resolution.md",
+      "sha256": "c6642b811980a118917bf22546670ce393e9348ba9a742717e1bf6352c9d268f",
+      "bytes": 1707,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-07-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.md",
+      "sha256": "2fc3f35c97a66d043394a8887bcc0f4940ad8da3b5d57dbc5fcf541883a89eb6",
+      "bytes": 2977,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-08-transfer-redaction-alters-digest-bound-files.md",
+      "sha256": "f6967fa71d3b483650269fc178c32441c6f071dd00124c74e94be4fce1cb58a3",
+      "bytes": 1707,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-script-mediated-writes-bypass-protected-test-paths.md",
+      "sha256": "6939ae43ec6a9890fa9525cd0148bc6013aa2f55c0b795c5c7d8a3b2989b7d25",
+      "bytes": 1479,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-protected-baseline-rejects-canonical-discarded-idle-state.md",
+      "sha256": "20faa16cd7ee4faf7706b72c40188b1b1c59e3ea7dfb8f4080108a12f55c1665",
+      "bytes": 2883,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-30-read-only-guard-admits-execution-and-output-options.md",
+      "sha256": "b8b90ded3071e53a544969980e7ce42b726c3b598e9dc9a9a7e6ee5a02d758a5",
+      "bytes": 2544,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "sourceReadCount": 58,
+  "criterionCount": 16,
+  "semanticRuns": 0,
+  "productImports": 0,
+  "officialClosures": 0
+}

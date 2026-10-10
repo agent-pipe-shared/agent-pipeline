@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.transfer-independent-actual-qualification.v1",
+  "status": 0,
+  "signal": null,
+  "graphConserved": true,
+  "launchFreezeSha256": "e192e4689bb93965ecb76807566aeab2e3614dbf60ae28d8e152e95ae7a39bc8",
+  "originalExecution": {
+    "path": "scratch/alfred-transfer-integrity-independent-20261010/execution.json",
+    "sha256": "c3789e5c4d673949578ce0ac1f634e9b2fc7e095868e1c934cc8140f8e6203ca"
+  },
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "fbf76cd2ef5391474e41b3c998d0d51e543dc3d48d46e75b150b4c5643b13d5d",
+    "caseSetSha256": "be8ca62465b054b8496dbabe677bc973c16c9174e5ef9eec06b30f251b4d44f6",
+    "dispositionsSha256": "296b93ff621771bc3f7d18717769dbe5f7d71242dd35254d076227a9a92d507c",
+    "declaredCount": 16,
+    "disposedCount": 16,
+    "counts": {
+      "pass": 16,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completion": {
+    "path": "qualification/completion.fd3.jsonl",
+    "sha256": "c0e0be735425477de3395701cdf652764ced223674112814cf3802b9a68b234b",
+    "bytes": 2595
+  },
+  "setupCapturesExcluded": true,
+  "rawStreamsExcluded": true,
+  "nativeClaim": false,
+  "officialClosure": false,
+  "wholeCriterionAcceptance": false,
+  "scope": "Actual existing focused METHOD run; no new execution; distinct source graph, not an aggregate candidate run"
+}

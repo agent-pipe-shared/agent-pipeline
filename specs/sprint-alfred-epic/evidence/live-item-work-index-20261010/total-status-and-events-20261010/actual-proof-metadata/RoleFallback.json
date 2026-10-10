@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.role-fallback-actual-qualification.v1",
+  "status": 0,
+  "signal": null,
+  "graphConserved": true,
+  "sourceGraphSha256": "5328d102911116cc94dfb3ebd42f3db2f897d4110b80ef00f91ae2ecb00edd1e",
+  "originalExecution": {
+    "path": "scratch/alfred-role-fallback-independent-20261010/execution.json",
+    "sha256": "fabf776cf5a72ca6c40aa399c66e3bcde437cbe1a8aab6935f7bdd795184018d"
+  },
+  "attestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "2ccbbe729f52b7751266b5a11caac843788520604573debe98318d17fc7916cb",
+    "caseSetSha256": "6022a024ab01fd623761f66fe24d9f24529a92e1a104bc5325cc36603e0801b2",
+    "dispositionsSha256": "fa8185b47fbccc92b109d52fed2e120b290cd84d3b89e220532945455512390e",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completion": {
+    "path": "qualification/completion.fd3.jsonl",
+    "sha256": "b1753fc4e8241c9b9fd7c585be8f4fc8b79f47b2bf0d3d578378547bb6a13b24",
+    "bytes": 1569
+  },
+  "setupCapturesExcluded": true,
+  "rawStreamsExcluded": true,
+  "nativeClaim": false,
+  "officialClosure": false,
+  "wholeCriterionAcceptance": false,
+  "scope": "Actual existing focused METHOD run; no new execution; distinct source graph, not an aggregate candidate run"
+}

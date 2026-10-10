@@ -1,0 +1,104 @@
+{
+  "schema": "alfred.completion-metadata-manifest.v1",
+  "inputs": [
+    {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "bytes": 189041
+    },
+    {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "bytes": 63204
+    },
+    {
+      "path": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7",
+      "bytes": 24030
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/current-source-manifest.json",
+      "sha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "bytes": 27295
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793
+    },
+    {
+      "path": "scratch/alfred-claude-verify-configuration-route-independent-20261010/actual-qualification-proof.json",
+      "sha256": "6de31c75a81ee135ca8bffa4190307566739e2cd46669fae574a8048ad65e0be",
+      "bytes": 7057
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/stage-overlay.json",
+      "sha256": "5f2c82a43958b5b7af3669a506464443b0c53a8b4798326643fa987a29bfd527",
+      "bytes": 187208
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/progress-stages/current-events.json",
+      "sha256": "a1caf62a3564002a86126cf7d51def1d3d28ae041e0ad8b724a9ee1a045630db",
+      "bytes": 1908
+    },
+    {
+      "path": "scratch/alfred-all-slots-current-events-successor-20261010/manifest.json",
+      "sha256": "ded758390309b921f6a1ae68722ced9d2a86089b7ffb0d2087295009b82c88b0",
+      "bytes": 4771
+    }
+  ],
+  "rows": [
+    "AC-14",
+    "AC-15",
+    "AC-16",
+    "AC-17",
+    "AC-18",
+    "AC-19",
+    "AC-20",
+    "AC-21",
+    "AC-22",
+    "AC-23",
+    "AC-24",
+    "AC-25"
+  ],
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "semanticRuns": 0,
+  "outputs": [
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/matrix.json",
+      "sha256": "fec9a2923abddabce3cf6f13373fdc621713a4f0fd0cb106b651957309fb9155",
+      "bytes": 71347
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/matrix.md",
+      "sha256": "9d2fc3de9927fd350398a2e85a3b20cbe6e85540e8c9ea3e249849b85f7d9ce2",
+      "bytes": 6659
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/index-projection.json",
+      "sha256": "e68448c32f564dd965741cf8f8ef1b65e0f4512f83cf3c4de872c8b2792f3f06",
+      "bytes": 43378
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/proof-summary.json",
+      "sha256": "3b33e580114574a4f7b71da466565b15997e031c9af58d44b6b0731e3f08f0f1",
+      "bytes": 25708
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/refusals.json",
+      "sha256": "1a3bce6ff5d17d2fcd7770d38c704928f6c0d7d4b8d2157352cf0acf82dc6bc7",
+      "bytes": 351
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/reconcile.mjs",
+      "sha256": "937505566e1fcaeeb482a4b758008a034d09ff0c11b155bba3b1c15793065b60",
+      "bytes": 17467
+    },
+    {
+      "path": "scratch/alfred-ac14-25-current-completion-20261010/finish.mjs",
+      "sha256": "fda48ae51d8a847281111ff2bcae6238f6d21e9bce8d1777f5fd63388d117b6e",
+      "bytes": 3518
+    }
+  ],
+  "status": "frozen-completion-metadata-not-acceptance"
+}
