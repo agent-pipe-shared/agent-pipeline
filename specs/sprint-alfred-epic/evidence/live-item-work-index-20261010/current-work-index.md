@@ -1,5 +1,14 @@
 # Current Alfred work index
 
+**Intermediate stages:** [176-item stage overlay](progress-stages/stage-overlay.json)
+and [worker ownership matrix](progress-stages/work-matrix.json). Read the
+[subsequent actual events](progress-stages/current-events.json) after this
+immutable snapshot. OSE22 is now qualified and materialized in the 106-file
+selected union. STB12 is 3 PASS / 9 FAIL; HGL12 is 8 PASS / 4 FAIL. Both
+completed their declared cases and conserved source graphs. Later assignments
+supersede worker states captured in the matrix. No whole-item acceptance or
+ready candidate is implied.
+
 **Current view:** [all 176 items with stages, work locations and next actions](consolidated/current-work-index.md).
 Read [subsequent assignments and returned packets](current-followthrough.json)
 alongside that snapshot; they record the next concrete owner and work location.

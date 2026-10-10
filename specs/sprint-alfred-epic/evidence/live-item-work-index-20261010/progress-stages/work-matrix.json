@@ -1,0 +1,618 @@
+{
+  "schema": "alfred.all16-work-matrix.v1",
+  "frozen": true,
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "methodology-only SourceProposal/Coordinator metadata; model/native/production dispatch authority unverified",
+  "slotPolicy": {
+    "totalIncludingRoot": 16,
+    "workers": 15,
+    "prior10SupersededPermanently": true,
+    "unusedSlots": "Root refills concrete closed tasks; returned/stopped is not running",
+    "onlyReview": "one final Critic plus diff"
+  },
+  "parent": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+    "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+    "bytes": 3329793
+  },
+  "parentManifest": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/manifest.json",
+    "sha256": "b93442a86e1517e29e1c02e09838cf5b388af272151a1c25362034ad281fa125",
+    "bytes": 4759
+  },
+  "followthrough": {
+    "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-followthrough.json",
+    "sha256": "d8b6fa381a746095d19991818912567c0d1c17dd1769ce55c5a520032f491df5",
+    "bytes": 2210
+  },
+  "root": {
+    "agent": "/root",
+    "responsibility": "sole approved qualification, candidate source assembly/integration, durable custody and refill",
+    "OSE": {
+      "component": "Own-session audit integration",
+      "currentOwner": "/root",
+      "sourceAuthor": "/root/agy_greenfield_guard_audit",
+      "assemblyPlanAuthor": "/root/agy_greenfield_intake_package",
+      "stage": "qualified-source-and-corrected-assembly-plan-returned",
+      "workLocation": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor",
+      "manifestSha256": "789afbc93ed3a95ed51e24937c05a0f73df11a8e8c599ef92aeacef142569412",
+      "helperPath": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/assemble.py",
+      "helperSha256": "cbdfa67a42be17d03851d55c7cb80e8f913435387513f7768a60213ee59c6d7c",
+      "nextAction": "Root fully reads and applies the exact qualified three-source assembly; observe actual 106-source inventory and retained 103-source hashes.",
+      "executedProof": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22/manifest.json",
+      "actualSourceIntegration": false
+    },
+    "STBThird": {
+      "manifest": {
+        "path": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/manifest.json",
+        "sha256": "c43062f3ef4fc745cd0cfddce3298222428675d38a42809559ef9e7b87ccafbb",
+        "bytes": 4174
+      },
+      "sourceFreezeSha256": "8361ccfe9b4f17ebbaa31ccc0da4b992f40f373dac092bae9260d8529526523e",
+      "assertionFreezeSha256": "39703bbe26643cf080071ebe7163d213f616793c418249c80454e814da66cb04",
+      "ready": true,
+      "executed": false
+    },
+    "HRC": "qualified and materialized audit104; parent evidence retained"
+  },
+  "workers": [
+    {
+      "slot": 2,
+      "workerNumber": 1,
+      "agent": "/root/alfred_r10_integration_inventory",
+      "slice": "Operational176 tracking/status overlay",
+      "location": "scratch/alfred-all-slots-work-matrix-successor-20261010",
+      "dispatchState": "RUNNING",
+      "currentResponsible": "/root/alfred_r10_integration_inventory",
+      "sourceOrFixtureAuthor": "/root/alfred_r10_integration_inventory",
+      "kind": "metadata-only",
+      "itemIDs": [],
+      "mappingBasis": "unknown/unmapped; no speculative item mapping",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": null,
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "Root exact source CAS, independent qualification/integration and remaining accepted scope"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": false,
+      "nextAction": "Finish exact owned slice and deliver immutable source/fixture/CAS handoff"
+    },
+    {
+      "slot": 3,
+      "workerNumber": 2,
+      "agent": "/root/agy_greenfield_intake_package",
+      "slice": "Role-route fallback runtime source",
+      "location": "scratch/alfred-role-route-fallback-runtime-source-20261010",
+      "dispatchState": "RUNNING",
+      "currentResponsible": "/root/agy_greenfield_intake_package",
+      "sourceOrFixtureAuthor": "/root/agy_greenfield_intake_package",
+      "kind": "source-active",
+      "itemIDs": [
+        "pipeline.role-route-preflight-with-self-dispatch-fallback"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 25,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json",
+        "sha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa",
+        "bytes": 5922
+      },
+      "declaredPacketStatus": "source-proposal-static-only; not acceptance or closure",
+      "dependencies": [
+        "Genuine course/result receipt intake; native adapter/readiness carrier remains unsupported; source package alone is not PASS"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": false,
+      "nextAction": "Finish exact owned slice and deliver immutable source/fixture/CAS handoff"
+    },
+    {
+      "slot": 4,
+      "workerNumber": 3,
+      "agent": "/root/agy_greenfield_roles_audit",
+      "slice": "Commit-hint admission source; prior docsda025 retained",
+      "location": "scratch/alfred-commit-hint-admission-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/agy_greenfield_roles_audit",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.commit-grammar-hint-still-requires-scratch-message-file"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-commit-hint-admission-source-20261010/manifest.json",
+        "sha256": "0f70465bddefc95b40164599824f9863cd01737a09cd67c4b94c4fc2eeb59412",
+        "bytes": 1716
+      },
+      "declaredPacketStatus": "hint-only-frozen-not-qualified",
+      "dependencies": [
+        "Independent CHA controls not executed; HRC bytes conserved; unchanged Q12/B policy; extra guidance IDs not guessed"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 5,
+      "workerNumber": 4,
+      "agent": "/root/agy_greenfield_guard_audit",
+      "slice": "Generator storage compaction source",
+      "location": "scratch/alfred-generator-storage-compaction-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/agy_greenfield_guard_audit",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.design-generator-repeats-large-source-material"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-generator-storage-compaction-source-20261010/manifest.json",
+        "sha256": "b50a201abf5214099c5a572a39b3c69d884352c4cbaa0a70b1c3a5a4cc2ca637",
+        "bytes": 5628
+      },
+      "declaredPacketStatus": "frozen-inert-source-not-qualified",
+      "dependencies": [
+        "Running independent generator qualification; reconcile exact continuity source hunks without overwrite; native telemetry unavailable"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 6,
+      "workerNumber": 5,
+      "agent": "/root/agy_greenfield_acceptance_audit",
+      "slice": "I07 joint authority qualification graph",
+      "location": "scratch/alfred-agy-joint-authority-launch-graph-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/agy_greenfield_acceptance_audit",
+      "kind": "prepared-qualification-only",
+      "itemIDs": [
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-agy-joint-authority-launch-graph-20261010/manifest.json",
+        "sha256": "0530999269b2f8827a2d7b021fb53ecf58f49ebb932f344231471bebfa9db569",
+        "bytes": 1714
+      },
+      "declaredPacketStatus": "READY-RUN-mechanism-only",
+      "dependencies": [
+        "Root one acknowledged12-case run pending; no native/full lifecycle positive claim"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 7,
+      "workerNumber": 6,
+      "agent": "/root/agy_greenfield_design_audit",
+      "slice": "Greenfield reproducible public comparison",
+      "location": "scratch/alfred-greenfield-public-comparison-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/agy_greenfield_design_audit",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.greenfield-comparisons-need-reproducible-public-evidence"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-greenfield-public-comparison-source-20261010/manifest.json",
+        "sha256": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+        "bytes": 3218
+      },
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "Transfer helper dependency; actual retrospective public data unavailable; independent qualification/integration pending"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 8,
+      "workerNumber": 7,
+      "agent": "/root/alfred_obl013_override_digest_regression",
+      "slice": "Partial I03 registered dispatch prelude",
+      "location": "scratch/alfred-i03-registered-dispatch-prelude-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_obl013_override_digest_regression",
+      "kind": "partial-source",
+      "itemIDs": [
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-i03-registered-dispatch-prelude-source-20261010/manifest.json",
+        "sha256": "cc4636f42e7ce4df3f625fad7533ad363b224c6722459f708d43b659c278df57",
+        "bytes": 3119
+      },
+      "declaredPacketStatus": "partial-suite-prelude-frozen-registered-dispatch-authority-unavailable",
+      "dependencies": [
+        "Authentic METHOD registered-dispatch producer missing; full constructor false; cannot stamp50"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 9,
+      "workerNumber": 8,
+      "agent": "/root/alfred_obl016_heredoc_extractor_regression",
+      "slice": "I08 domain lifecycle independent fixture",
+      "location": "scratch/alfred-i08-domain-lifecycle-independent-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_obl016_heredoc_extractor_regression",
+      "kind": "fixture-only",
+      "itemIDs": [
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-i08-domain-lifecycle-independent-20261010/manifest.json",
+        "sha256": "57c4a68c2f8f1b1e3b258e895e7e21780aa34d50141113487a496c3e50539ecc",
+        "bytes": 1644
+      },
+      "declaredPacketStatus": "prepared-not-executed",
+      "dependencies": [
+        "Positive constructors not closed; independent invariant callbacks need fresh closed author brief; zero semantics"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 10,
+      "workerNumber": 9,
+      "agent": "/root/alfred_reader_2plus1_docs_r2",
+      "slice": "State14 lifecycle independent partial",
+      "location": "scratch/alfred-state14-lifecycle-independent-20261010",
+      "dispatchState": "STOPPED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_reader_2plus1_docs_r2",
+      "kind": "stopped-partial",
+      "itemIDs": [
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": null,
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "Fresh closed rebrief required; source certificate gap/paired writer qualification not inferred"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root supplies fresh closed recovery brief before reuse"
+    },
+    {
+      "slot": 11,
+      "workerNumber": 10,
+      "agent": "/root/alfred_reader_controller_independent_tests",
+      "slice": "Generator compaction independent assertions; HGL ready graph returned",
+      "location": "scratch/alfred-generator-compaction-independent-20261010",
+      "dispatchState": "RUNNING",
+      "currentResponsible": "/root/alfred_reader_controller_independent_tests",
+      "sourceOrFixtureAuthor": "/root/alfred_reader_controller_independent_tests",
+      "kind": "independent-author-active",
+      "itemIDs": [
+        "pipeline.design-generator-repeats-large-source-material"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 25,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": null,
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "Sourceb50 frozen; no generator business PASS yet; HGL ready-run separate scope"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": false,
+      "nextAction": "Finish exact owned slice and deliver immutable source/fixture/CAS handoff",
+      "additionalReturnedPacket": {
+        "location": "scratch/alfred-hgl-current-source-independent-20261010",
+        "manifest": {
+          "path": "scratch/alfred-hgl-current-source-independent-20261010/manifest.json",
+          "sha256": "23ad9ad28c479691ff889b060765258b7b0ab1fafef812db91e140be4e202e0d"
+        },
+        "itemIDs": [
+          "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+          "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+        ],
+        "status": "Root-launch-ready-no-semantic-execution",
+        "stageContribution": null
+      }
+    },
+    {
+      "slot": 12,
+      "workerNumber": 11,
+      "agent": "/root/quality_inline_coordinator_audit",
+      "slice": "Shell grammar capability placement",
+      "location": "scratch/alfred-shell-grammar-capability-placement-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/quality_inline_coordinator_audit",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-shell-grammar-capability-placement-source-20261010/manifest.json",
+        "sha256": "f3dede2bf52e0cf33b1f75fddf90496ae30382a0c7f5338ad3caf85a2c2ebadd",
+        "bytes": 9024
+      },
+      "declaredPacketStatus": "frozen-source-proposal-not-qualified",
+      "dependencies": [
+        "Four RGCP cases unexecuted; preserve195 registry and exact integrated inventory sourceBaseline; no historical fixture identity assumed"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 13,
+      "workerNumber": 12,
+      "agent": "/root/r10_reader_budget_fix",
+      "slice": "Scratch durability reporter partial integration delta",
+      "location": "scratch/alfred-scratch-durability-report-source-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/r10_reader_budget_fix",
+      "kind": "partial-source",
+      "itemIDs": [
+        "pipeline.scratch-has-no-retention-and-no-durability-check"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": null,
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "Helper/CLI complete but actual skill/guard fullpostimages absent; WARN-only integration deltas not full fix package"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 14,
+      "workerNumber": 13,
+      "agent": "/root/alfred_optional_advisor_source_followthrough",
+      "slice": "Optional Advisor diagnostic/source followthrough",
+      "location": "scratch/alfred-optional-advisor-source-followthrough-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_optional_advisor_source_followthrough",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.codex-advisor-evidence-fails-after-host-update",
+        "pipeline.advisor-provenance-ancestor-check-fails-on-any-sibling-write"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-optional-advisor-source-followthrough-20261010/manifest.json",
+        "sha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+        "bytes": 6070
+      },
+      "declaredPacketStatus": "source-proposal-unqualified",
+      "dependencies": [
+        "Ancestor predicate unchanged; source cause projection only; independent focused qualification and installed replay pending"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    },
+    {
+      "slot": 15,
+      "workerNumber": 14,
+      "agent": "/root/alfred_state_i08_invariant_assertions",
+      "slice": "State/I08 independent invariant assertions",
+      "location": null,
+      "dispatchState": "STOPPED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_state_i08_invariant_assertions",
+      "kind": "stopped-no-files",
+      "itemIDs": [
+        "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+        "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": null,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": null,
+      "declaredPacketStatus": null,
+      "dependencies": [
+        "No output files declared; fresh closed constructive author brief required; no guessed directory"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root supplies fresh closed recovery brief before reuse"
+    },
+    {
+      "slot": 16,
+      "workerNumber": 15,
+      "agent": "/root/alfred_transfer_integrity_source_actor",
+      "slice": "Digest-bound transfer integrity actor",
+      "location": "scratch/alfred-transfer-integrity-source-actor-20261010",
+      "dispatchState": "RETURNED",
+      "currentResponsible": "/root",
+      "sourceOrFixtureAuthor": "/root/alfred_transfer_integrity_source_actor",
+      "kind": "full-source-package",
+      "itemIDs": [
+        "pipeline.transfer-redaction-alters-digest-bound-files"
+      ],
+      "mappingBasis": "Explicit delivered item IDs or exact canonical parent requirement/scope for Root-declared slice",
+      "stageContribution": 50,
+      "stageScope": "This exact slice only; no whole accepted contract or closure",
+      "manifest": {
+        "path": "scratch/alfred-transfer-integrity-source-actor-20261010/manifest.json",
+        "sha256": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9",
+        "bytes": 8025
+      },
+      "declaredPacketStatus": "frozen-source-proposal-semantics-unexecuted",
+      "dependencies": [
+        "Tests source-authored/unexecuted; exact byte transfer/CLI/close skill qualification and integration pending"
+      ],
+      "originalACMapping": "unknown: no new original item\u2192AC/IR mapping established",
+      "accepted": false,
+      "nativeClaim": false,
+      "refillRequired": true,
+      "nextAction": "Root qualifies/integrates returned eligible packet; refill this worker with a concrete new closed task"
+    }
+  ],
+  "workerStates": {
+    "RUNNING": 3,
+    "RETURNED": 10,
+    "STOPPED": 2
+  },
+  "historicalExcluded": "/root/agy_greenfield_ac_source_audit STOPPED, not counted among15 viable worker paths",
+  "canonicalItems": 176,
+  "officialClosures": 0,
+  "itemsTally": {
+    "unknown": 165,
+    "50": 8,
+    "25": 1,
+    "75": 2
+  },
+  "all16Claim": "16 available and15 assigned worker roles; not a claim15 simultaneous RUNNING processes",
+  "sourceWrites": 0,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "nativeClaim": false,
+  "inputs": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/manifest.json",
+      "sha256": "b93442a86e1517e29e1c02e09838cf5b388af272151a1c25362034ad281fa125",
+      "bytes": 4759
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-followthrough.json",
+      "sha256": "d8b6fa381a746095d19991818912567c0d1c17dd1769ce55c5a520032f491df5",
+      "bytes": 2210
+    },
+    {
+      "path": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/manifest.json",
+      "sha256": "c43062f3ef4fc745cd0cfddce3298222428675d38a42809559ef9e7b87ccafbb",
+      "bytes": 4174
+    },
+    {
+      "path": "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json",
+      "sha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa",
+      "bytes": 5922
+    },
+    {
+      "path": "scratch/alfred-commit-hint-admission-source-20261010/manifest.json",
+      "sha256": "0f70465bddefc95b40164599824f9863cd01737a09cd67c4b94c4fc2eeb59412",
+      "bytes": 1716
+    },
+    {
+      "path": "scratch/alfred-generator-storage-compaction-source-20261010/manifest.json",
+      "sha256": "b50a201abf5214099c5a572a39b3c69d884352c4cbaa0a70b1c3a5a4cc2ca637",
+      "bytes": 5628
+    },
+    {
+      "path": "scratch/alfred-agy-joint-authority-launch-graph-20261010/manifest.json",
+      "sha256": "0530999269b2f8827a2d7b021fb53ecf58f49ebb932f344231471bebfa9db569",
+      "bytes": 1714
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-source-20261010/manifest.json",
+      "sha256": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+      "bytes": 3218
+    },
+    {
+      "path": "scratch/alfred-i03-registered-dispatch-prelude-source-20261010/manifest.json",
+      "sha256": "cc4636f42e7ce4df3f625fad7533ad363b224c6722459f708d43b659c278df57",
+      "bytes": 3119
+    },
+    {
+      "path": "scratch/alfred-i08-domain-lifecycle-independent-20261010/manifest.json",
+      "sha256": "57c4a68c2f8f1b1e3b258e895e7e21780aa34d50141113487a496c3e50539ecc",
+      "bytes": 1644
+    },
+    {
+      "path": "scratch/alfred-hgl-current-source-independent-20261010/manifest.json",
+      "sha256": "23ad9ad28c479691ff889b060765258b7b0ab1fafef812db91e140be4e202e0d",
+      "bytes": 2209
+    },
+    {
+      "path": "scratch/alfred-shell-grammar-capability-placement-source-20261010/manifest.json",
+      "sha256": "f3dede2bf52e0cf33b1f75fddf90496ae30382a0c7f5338ad3caf85a2c2ebadd",
+      "bytes": 9024
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-source-followthrough-20261010/manifest.json",
+      "sha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+      "bytes": 6070
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-source-actor-20261010/manifest.json",
+      "sha256": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9",
+      "bytes": 8025
+    }
+  ]
+}

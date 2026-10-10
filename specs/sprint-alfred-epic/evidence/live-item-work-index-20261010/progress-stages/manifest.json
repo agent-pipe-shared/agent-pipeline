@@ -1,0 +1,119 @@
+{
+  "schema": "alfred.all16-work-matrix-manifest.v1",
+  "frozen": true,
+  "outputs": [
+    {
+      "path": "work-matrix.json",
+      "sha256": "06e3b9393958af7ff6f47a16eebc355c678e8d86474a1185222dba2a2870ed41",
+      "bytes": 29238,
+      "nlink": 1
+    },
+    {
+      "path": "stage-overlay.json",
+      "sha256": "5f2c82a43958b5b7af3669a506464443b0c53a8b4798326643fa987a29bfd527",
+      "bytes": 187208,
+      "nlink": 1
+    },
+    {
+      "path": "report.md",
+      "sha256": "1d9683858ec8129b7cf1f8359b8b768fd7c11a68001b700821df90729f5b1e02",
+      "bytes": 1780,
+      "nlink": 1
+    }
+  ],
+  "inputs": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/live-work-index.json",
+      "sha256": "f18c2ffb3cea1edf7fe49ca725ea4f2c8f4fb737e88a3095186adfa5fe5c96f7",
+      "bytes": 3329793
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/consolidated/manifest.json",
+      "sha256": "b93442a86e1517e29e1c02e09838cf5b388af272151a1c25362034ad281fa125",
+      "bytes": 4759
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/current-followthrough.json",
+      "sha256": "d8b6fa381a746095d19991818912567c0d1c17dd1769ce55c5a520032f491df5",
+      "bytes": 2210
+    },
+    {
+      "path": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/manifest.json",
+      "sha256": "c43062f3ef4fc745cd0cfddce3298222428675d38a42809559ef9e7b87ccafbb",
+      "bytes": 4174
+    },
+    {
+      "path": "scratch/alfred-role-route-fallback-runtime-source-20261010/manifest.json",
+      "sha256": "9b5f7ae72a5cf3c34466cf2fb79e7586dda07c17a94b0463efd805eeb5ad91fa",
+      "bytes": 5922
+    },
+    {
+      "path": "scratch/alfred-commit-hint-admission-source-20261010/manifest.json",
+      "sha256": "0f70465bddefc95b40164599824f9863cd01737a09cd67c4b94c4fc2eeb59412",
+      "bytes": 1716
+    },
+    {
+      "path": "scratch/alfred-generator-storage-compaction-source-20261010/manifest.json",
+      "sha256": "b50a201abf5214099c5a572a39b3c69d884352c4cbaa0a70b1c3a5a4cc2ca637",
+      "bytes": 5628
+    },
+    {
+      "path": "scratch/alfred-agy-joint-authority-launch-graph-20261010/manifest.json",
+      "sha256": "0530999269b2f8827a2d7b021fb53ecf58f49ebb932f344231471bebfa9db569",
+      "bytes": 1714
+    },
+    {
+      "path": "scratch/alfred-greenfield-public-comparison-source-20261010/manifest.json",
+      "sha256": "1d7f6c1b750d8d469f452efddd27725c82af7041ea97989df2d1d1ff30e0a7f6",
+      "bytes": 3218
+    },
+    {
+      "path": "scratch/alfred-i03-registered-dispatch-prelude-source-20261010/manifest.json",
+      "sha256": "cc4636f42e7ce4df3f625fad7533ad363b224c6722459f708d43b659c278df57",
+      "bytes": 3119
+    },
+    {
+      "path": "scratch/alfred-i08-domain-lifecycle-independent-20261010/manifest.json",
+      "sha256": "57c4a68c2f8f1b1e3b258e895e7e21780aa34d50141113487a496c3e50539ecc",
+      "bytes": 1644
+    },
+    {
+      "path": "scratch/alfred-hgl-current-source-independent-20261010/manifest.json",
+      "sha256": "23ad9ad28c479691ff889b060765258b7b0ab1fafef812db91e140be4e202e0d",
+      "bytes": 2209
+    },
+    {
+      "path": "scratch/alfred-shell-grammar-capability-placement-source-20261010/manifest.json",
+      "sha256": "f3dede2bf52e0cf33b1f75fddf90496ae30382a0c7f5338ad3caf85a2c2ebadd",
+      "bytes": 9024
+    },
+    {
+      "path": "scratch/alfred-optional-advisor-source-followthrough-20261010/manifest.json",
+      "sha256": "1a11804ab829f15275dc5ddc2308698f3a52b882beff376e1259e815d62b2f8e",
+      "bytes": 6070
+    },
+    {
+      "path": "scratch/alfred-transfer-integrity-source-actor-20261010/manifest.json",
+      "sha256": "c69f6bf19f7b1ea66b8d158329b6fcb0789a29efdbc87f14813f5c0bfd518be9",
+      "bytes": 8025
+    }
+  ],
+  "publicWhitelist": [
+    "work-matrix.json",
+    "stage-overlay.json",
+    "report.md",
+    "manifest.json"
+  ],
+  "canonicalItems": 176,
+  "officialClosures": 0,
+  "tally": {
+    "unknown": 165,
+    "50": 8,
+    "25": 1,
+    "75": 2
+  },
+  "workerRoles": 15,
+  "slotsIncludingRoot": 16,
+  "noSourceGitSemanticWrites": true,
+  "privacy": "repo-relative public metadata, no raw captures/fixtures/keys/host material"
+}

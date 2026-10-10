@@ -1,5 +1,18 @@
 # Alfred current work and continuity — 2026-10-10
 
+**Newest progress:** [25/50/75 stage overlay](../evidence/live-item-work-index-20261010/progress-stages/stage-overlay.json),
+[worker matrix](../evidence/live-item-work-index-20261010/progress-stages/work-matrix.json),
+and [subsequent actual events](../evidence/live-item-work-index-20261010/progress-stages/current-events.json).
+OSE22 is now materialized in the assembly checkout; selected source count is
+106, inventory SHA `6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb`.
+Third STB12 execution remains 3 PASS / 9 FAIL. Current HGL12 is 8 PASS / 4 FAIL;
+both have complete case receipts and conserved graphs. HGL's four failures
+share an omitted genuine plugin-manifest resource; original HGL011 now passes.
+The subsequently executed I07 twelve-case subset passed 12/12 with conserved
+graph and complete FD3 receipt; this does not prove its full native lifecycle.
+These facts supersede the earlier snapshots below. No candidate stamp or
+whole-item acceptance is claimed.
+
 **Single current work queue:** [consolidated 176-item view](../evidence/live-item-work-index-20261010/consolidated/current-work-index.md)
 and [machine drilldown](../evidence/live-item-work-index-20261010/consolidated/live-work-index.json).
 This joins the prior updates, retains original bodies/history and separates

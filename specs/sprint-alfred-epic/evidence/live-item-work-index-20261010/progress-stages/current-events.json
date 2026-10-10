@@ -1,0 +1,51 @@
+{
+  "schema": "alfred.progress-stage-followthrough.v1",
+  "parentManifestSha256": "a0433856e69a07d152b2a43818302af42c0d636dd9992a1a4b9f027db2b7cfd2",
+  "scope": "workflow stages and scoped actual execution; no whole-item acceptance",
+  "events": [
+    {
+      "kind": "qualified-integration",
+      "slice": "OSE22",
+      "stage": 75,
+      "receipt": "scratch/alfred-qualified-ose-assembly-plan-20261010/accounting-successor/actual-receipt.json",
+      "receiptSha256": "695ef970c4b56d269813c6d7c794beec2e3f8c17225884be55106c81f1e13939",
+      "selectedSourceCount": 106,
+      "inventorySha256": "6526eef350719e8cbc34759c73b3b2b641217ee6948ff388185bfcbf38c529cb",
+      "officialClosure": false,
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "STB12-third-attempt",
+      "receipt": "scratch/alfred-stb12-runtime-order-successor-source-graph-20261010/qualification-root/execution.json",
+      "receiptSha256": "3b0100412131eb7a06ad4e240a29ba1670e7a5514f72eb2f1e560de02731ea42",
+      "counts": {
+        "pass": 3,
+        "fail": 9,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "source-owned namespace checkpoint diagnosis before changing predicates",
+      "nativeClaim": false
+    },
+    {
+      "kind": "focused-execution",
+      "slice": "HGL12-current-source",
+      "receipt": "scratch/alfred-hgl-current-source-independent-20261010/execution-terminal.json",
+      "receiptSha256": "0baacd7fd213a93912285627e80853c6aff9fb97cd91c190e708a143df0713b2",
+      "counts": {
+        "pass": 8,
+        "fail": 4,
+        "skip": 0,
+        "todo": 0
+      },
+      "graphConserved": true,
+      "nextAction": "separate plugin-manifest fixture and unavailable-Git source diagnosis",
+      "nativeClaim": false
+    }
+  ],
+  "candidateReady": false,
+  "officialClosures": 0,
+  "globalCompletionPercentage": null
+}
