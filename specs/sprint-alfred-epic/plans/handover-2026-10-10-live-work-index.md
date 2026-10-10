@@ -4,6 +4,14 @@ This is the current operational entry. The older 2026-10-09 handover remains
 history and must not be used as the current work queue. Implementation remains
 approved at continuity revision 32; this handover grants no new authority.
 
+Read the [latest item journal](../evidence/live-item-work-index-20261010/deltas/source-and-qualification/current-delta.json)
+before the earlier owner/stage snapshot below. It retains all 176 parent items,
+records six existing item updates and eight workstreams, and binds actual
+HRC20 qualification. The later [assembly receipt](../evidence/live-item-work-index-20261010/deltas/source-and-qualification/headroom-actual-integration.json)
+records its single-file integration, with the other 103 files preserved. Current
+source inventory SHA is `3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e`.
+Both snapshots stay immutable; later handoffs append further entries.
+
 ## Scope and truthful status
 
 Finish Alfred 0.7.0, its 37 ACs and 4 incident criteria, and the selected 176

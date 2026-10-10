@@ -1,0 +1,29 @@
+{
+  "schema": "alfred.headroom-qualified-actual-materialization.v1",
+  "sourceFiles": 104,
+  "sourceWrites": 1,
+  "other103ByteExact": true,
+  "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+  "preSha256": "1c08d20586b9191c2a67d1e7d749b2ed8ba4ff0d5e4b8996ad9530a534cb8163",
+  "postSha256": "446baf21925a616274632227254e7470c25227b51096a8b2afbebdc2bc2646b8",
+  "executionSha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+  "sourceInventorySha256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e",
+  "baselineCounts": {
+    "pass": 15,
+    "fail": 5,
+    "skip": 0,
+    "todo": 0
+  },
+  "fixedCounts": {
+    "pass": 20,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "mainWrites": 0,
+  "installedWrites": 0,
+  "gitWrites": 0,
+  "nativePASS": false,
+  "itemClosure": false,
+  "stamped": false
+}

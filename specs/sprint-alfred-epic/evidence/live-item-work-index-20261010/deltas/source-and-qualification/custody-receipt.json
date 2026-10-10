@@ -1,0 +1,34 @@
+{
+  "schema": "alfred.live-work-delta-archive.v1",
+  "parentIndexSha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+  "canonicalItemsRetained": 176,
+  "officialClosures": 0,
+  "deltaManifestSha256": "737d9aeba2ca88c5310ddd15c9d37f2567e645c14a631542e9f1847d0eec62c4",
+  "laterActualIntegrationReceiptSha256": "8ff4f87c66e5aeda60261e90379cdeffb56f32be63a94f3316627f1908471de1",
+  "archiveFiles": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/current-delta.json",
+      "sha256": "3b47dcf3089d2abbd58c7a8fd70b4c480bb39dc448bdb54761e9b38070e29473"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/report.md",
+      "sha256": "7636b6291c090c20140ea3e75be385a402a705dc7ac5f7c2266d51d088baade0"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/manifest.json",
+      "sha256": "737d9aeba2ca88c5310ddd15c9d37f2567e645c14a631542e9f1847d0eec62c4"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/headroom-actual-integration.json",
+      "sha256": "8ff4f87c66e5aeda60261e90379cdeffb56f32be63a94f3316627f1908471de1"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/deltas/source-and-qualification/current-source-manifest.json",
+      "sha256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e"
+    }
+  ],
+  "archiveSourceWrites": 0,
+  "archiveBusinessRuns": 0,
+  "stamped": false,
+  "installed": false
+}

@@ -1,0 +1,180 @@
+{
+  "schema": "alfred.live-item-work-current-delta-manifest.v1",
+  "status": "prepared-not-archived-or-applied",
+  "parentIndex": {
+    "canonicalPath": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+    "physicalReadPath": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+    "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+    "canonicalItemCount": 176,
+    "officialClosures": 0
+  },
+  "outputs": [
+    {
+      "path": "current-delta.json",
+      "sha256": "3b47dcf3089d2abbd58c7a8fd70b4c480bb39dc448bdb54761e9b38070e29473",
+      "bytes": 63215,
+      "mode": 384
+    },
+    {
+      "path": "report.md",
+      "sha256": "7636b6291c090c20140ea3e75be385a402a705dc7ac5f7c2266d51d088baade0",
+      "bytes": 2317,
+      "mode": 384
+    }
+  ],
+  "inputs": [
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+      "bytes": 1924395,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-i08-registry-transition-source-20261010/manifest.json",
+      "sha256": "5541db05d2981319b7751cacff02f08717849c0a8b198b94cd8f3b9532b30718",
+      "bytes": 3612,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-chat-stable-physical-helper-successor-20261010/manifest.json",
+      "sha256": "acd28ced8489b10c5eb0cff5a1df9d76ae08cb054f60c7bea259f8c3c7d8ce41",
+      "bytes": 3465,
+      "mode": 384
+    },
+    {
+      "path": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/manifest.json",
+      "sha256": "bd75826f748d4e055441b591030b2a471dcb19da3819d6e47dd1b3cdf71cc9c2",
+      "bytes": 3775,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/manifest.json",
+      "sha256": "45ed1ec407ff8d5210e61bec5c7aff2007e5a5ac4fe3dc14721053baa94d3142",
+      "bytes": 3694,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/manifest.json",
+      "sha256": "accb3bb525c480c85619e9a4fc7b6e672eb5ee61400f47a6451df75cd02ca868",
+      "bytes": 3182,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-onboarding-controlled-cleanup-constructor-source-20261010/artifact-preparation-source-successor/manifest.json",
+      "sha256": "52d92e7e64b43281aabce7465f359acb2e649ef8a424082f8fa78e0f9d039404",
+      "bytes": 2249,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-session-authority-observers-source-20261010/manifest.json",
+      "sha256": "17a36291503390c8db129673477e49eb125f75ed82c86f7ca60acb29d79463a8",
+      "bytes": 9555,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-i08-registry-transition-source-20261010/report.md",
+      "sha256": "3d3fd3f9fae2f85e473a17016648b0aa1a8422c2861df30e64b187915701fef0",
+      "bytes": 5505,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-chat-stable-physical-helper-successor-20261010/report.md",
+      "sha256": "6df1e0a617b3dd15ceaf8e38acae10b5a1d039b63461474f755f38ddd5470764",
+      "bytes": 5986,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/report.md",
+      "sha256": "877d15b36fef11e52437e04cbcbbcd15e35a77a8d984113026678325602f8cda",
+      "bytes": 4273,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/report.md",
+      "sha256": "dc6a51d2b9cd05372a40618f31b26b70208da7cee413669dc9f6e3d050be55d8",
+      "bytes": 2142,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/report.md",
+      "sha256": "a6fdc44f6d126b39121174b609fad017af790d603ae552ca3b8b97541f8835fc",
+      "bytes": 3014,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2/actual-qualification-proof.json",
+      "sha256": "69946471f251097492a043b5a7d86cd6594c20e72ac44212746bb374b9b72260",
+      "bytes": 4305,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2/actual-qualification-report.md",
+      "sha256": "01194bf18efbdd26c41c4c489db8f4a8ad96c9c703ce622ca8714ab91e4ecbb2",
+      "bytes": 4057,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/execution.json",
+      "sha256": "c4576cdb5f2d5f65ddaa31d07a5468d6c70d501c73b77b7eb387dd0d40d4a943",
+      "bytes": 1249,
+      "mode": 384
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/report.md",
+      "sha256": "2290ac05b5b0df31d2cfc384169821694180a11cd7d7a1d1e73b850e1909457b",
+      "bytes": 3394,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/assertions-freeze.json",
+      "sha256": "e19a4b1676bfdcfe6bd2094b1ebc289f79d35f282696dde6ca1c98680c6a495d",
+      "bytes": 3281,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/fd-signal-successor/execution.json",
+      "sha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+      "bytes": 3224,
+      "mode": 384
+    }
+  ],
+  "canonicalItemsRetained": 176,
+  "touchedExistingItems": 6,
+  "components": 8,
+  "newFrozenPackets": 7,
+  "officialClosures": 0,
+  "sourceEdits": 0,
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "canonicalMetadataWrites": 0,
+  "nativeClaims": false,
+  "archiveCopySet": [
+    {
+      "path": "current-delta.json",
+      "sha256": "3b47dcf3089d2abbd58c7a8fd70b4c480bb39dc448bdb54761e9b38070e29473",
+      "bytes": 63215,
+      "mode": 384
+    },
+    {
+      "path": "report.md",
+      "sha256": "7636b6291c090c20140ea3e75be385a402a705dc7ac5f7c2266d51d088baade0",
+      "bytes": 2317,
+      "mode": 384
+    },
+    {
+      "path": "manifest.json",
+      "selfHashStoredExternally": true
+    }
+  ],
+  "privacy": {
+    "publicMetadataOnly": true,
+    "repoRelativePathsOnly": true,
+    "rawStdout": false,
+    "rawPrivateState": false,
+    "keys": false,
+    "fixtureRepositories": false,
+    "retainedInputProjection": false
+  },
+  "frozen": true,
+  "qualificationUpdate": "HRC focused fixed20 qualified, integration pending; no whole-item closure."
+}

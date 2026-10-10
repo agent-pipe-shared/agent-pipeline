@@ -1,0 +1,1294 @@
+{
+  "schema": "alfred.live-item-work-current-delta.v1",
+  "snapshot": "2026-10-10",
+  "status": "prepared-public-journal-delta-not-applied",
+  "parentIndex": {
+    "canonicalPath": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+    "physicalReadPath": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+    "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+    "canonicalItemCount": 176,
+    "officialClosures": 0
+  },
+  "stageVocabulary": [
+    "proposed",
+    "frozen-source",
+    "qualified",
+    "integrated",
+    "accepted"
+  ],
+  "stageSemantics": {
+    "proposed": "authoring or preparation; no actual passing semantic proof",
+    "frozen-source": "source packet immutable/static checked; independently unqualified",
+    "qualified": "exact receipt scope only; partial failures remain explicit",
+    "integrated": "actual source publication/application receipt required",
+    "accepted": "item-specific accepted ledger/proof required; not granted by this delta"
+  },
+  "sourcePackets": [
+    {
+      "id": "I08-REGISTRY",
+      "manifest": {
+        "path": "scratch/alfred-i08-registry-transition-source-20261010/manifest.json",
+        "sha256": "5541db05d2981319b7751cacff02f08717849c0a8b198b94cd8f3b9532b30718",
+        "bytes": 3612,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "source-proposed-unqualified",
+      "sourceDeclarations": [
+        {
+          "canonical": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "parentPath": "scratch/alfred-hgo-partial-effect-lock-retention-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "parentSha256": "b9ef43bc45bbd09fb16514fa1646bad77cba380c7ffc186ac8716825c8903bcb",
+          "parentSize": 93581,
+          "postimage": "scratch/alfred-i08-registry-transition-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "sha256": "7e768bcda7ee1ff7daa1bdcf1f0bdd0fae3c6d677e50e9d8010e744be8795402",
+          "size": 113175,
+          "mode": 420,
+          "nlink": 1,
+          "additionSha256": "9872bba9489cf6817dcb52b2d83b9bbe44fc3ca5964b270a9c82e945545c1056",
+          "patchSha256": "4e3611fe43d4ce61f8ec9fb693132fe5080de7761f3926c9fc9babc6172153c2",
+          "businessImports": 0,
+          "semanticRuns": 0
+        }
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "CHAT-PHYSICAL",
+      "manifest": {
+        "path": "scratch/alfred-chat-stable-physical-helper-successor-20261010/manifest.json",
+        "sha256": "acd28ced8489b10c5eb0cff5a1df9d76ae08cb054f60c7bea259f8c3c7d8ce41",
+        "bytes": 3465,
+        "mode": 384
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "source-only-independent-qualification-pending",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "parentPath": "scratch/alfred-obl047-chat-gate-caller-integration-successor-20261010/postimages/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "parentSha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6",
+          "preimagePath": "scratch/alfred-chat-stable-physical-helper-successor-20261010/preimages/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "postimagePath": "scratch/alfred-chat-stable-physical-helper-successor-20261010/postimages/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+          "postSha256": "eef31ee510b52b0a3b6fe3e559f47b23a9b7cd58a444839d0b1c578cb201b64f",
+          "bytes": 29318,
+          "mode": 420,
+          "nlink": 1,
+          "gitMode": "100644",
+          "syntax": {
+            "command": "node --check",
+            "exitCode": 0,
+            "businessImport": false
+          }
+        }
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "STATE-APPROVE",
+      "manifest": {
+        "path": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/manifest.json",
+        "sha256": "bd75826f748d4e055441b591030b2a471dcb19da3819d6e47dd1b3cdf71cc9c2",
+        "bytes": 3775,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "partial-source-proposal-frozen",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "preimagePath": "scratch/alfred-obl047-state-design-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "preSHA256": "623c87c89f5f54ad69e5b2a375fee996f02f09d5c4268bfdde3062cd39aa5be5",
+          "postimagePath": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "postSHA256": "4bbe0d8aa35e5e2c9444c8cebeeb76889efda2b71deb7219153ffd5e6dbac012",
+          "bytes": 787328,
+          "physicalMode": "0644",
+          "gitMode": "100644",
+          "nlink": 1
+        }
+      ],
+      "supportedEntries": [
+        "set-feature",
+        "submit-plan",
+        "present-plan",
+        "approve-plan",
+        "materialize-architecture"
+      ],
+      "remainingEntries": [
+        "discard-feature",
+        "continuity-init",
+        "continuity-result-bootstrap-plan",
+        "continuity-result-bootstrap-apply",
+        "continuity-result-rebind-plan",
+        "continuity-result-rebind-apply",
+        "continuity-result-close-plan",
+        "continuity-result-close-apply",
+        "close-feature"
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "STATE14-REGISTRY",
+      "manifest": {
+        "path": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/manifest.json",
+        "sha256": "45ed1ec407ff8d5210e61bec5c7aff2007e5a5ac4fe3dc14721053baa94d3142",
+        "bytes": 3694,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "source-proposal-unqualified",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "preimagePath": "scratch/alfred-hgo-partial-effect-lock-retention-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "preSha256": "b9ef43bc45bbd09fb16514fa1646bad77cba380c7ffc186ac8716825c8903bcb",
+          "postimagePath": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/postimages/plugins/pipeline-core/lib/session-authority-registry.mjs",
+          "postSha256": "d672efaa8eba7e9b334b0374d1a8115d6ef00262b8a1c58440a28b3bfd9a19e0",
+          "size": 94665,
+          "changed": true
+        },
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+          "preimagePath": "scratch/alfred-hgo-partial-effect-lock-retention-source-20261010/postimages/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+          "preSha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+          "postimagePath": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/postimages/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+          "postSha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+          "size": 39560,
+          "changed": false
+        }
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "STATE10-RESULT",
+      "manifest": {
+        "path": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/manifest.json",
+        "sha256": "accb3bb525c480c85619e9a4fc7b6e672eb5ee61400f47a6451df75cd02ca868",
+        "bytes": 3182,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "partial-source-proposal-frozen",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "preimagePath": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "preSHA256": "4bbe0d8aa35e5e2c9444c8cebeeb76889efda2b71deb7219153ffd5e6dbac012",
+          "postimagePath": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/postimages/plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "postSHA256": "6c698fbecb808c63b664a3e282383549c592f2fde18a35215c84b5d10000aae0",
+          "bytes": 787983,
+          "gitMode": "100644",
+          "physicalMode": "0644",
+          "nlink": 1
+        }
+      ],
+      "supportedEntries": [
+        "set-feature",
+        "submit-plan",
+        "present-plan",
+        "approve-plan",
+        "materialize-architecture",
+        "continuity-result-bootstrap-plan",
+        "continuity-result-rebind-plan",
+        "continuity-result-rebind-apply",
+        "continuity-result-close-plan",
+        "continuity-result-close-apply"
+      ],
+      "remainingEntries": [
+        "discard-feature",
+        "continuity-init",
+        "continuity-result-bootstrap-apply",
+        "close-feature"
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "I03-PRELUDE",
+      "manifest": {
+        "path": "scratch/alfred-obl047-onboarding-controlled-cleanup-constructor-source-20261010/artifact-preparation-source-successor/manifest.json",
+        "sha256": "52d92e7e64b43281aabce7465f359acb2e649ef8a424082f8fa78e0f9d039404",
+        "bytes": 2249,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "source-frozen-not-qualified",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "postimagePath": "scratch/alfred-obl047-onboarding-controlled-cleanup-constructor-source-20261010/artifact-preparation-source-successor/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+          "preSHA256": "f34356f33ea7c9cb4b8e52d0e442419b58381b8617c2df0edc0b90883786b482",
+          "postSHA256": "7256025217661c3ae4bebd5fdd73cd709222ba0cb007b9eae20348605a2cf19d",
+          "mode": 420,
+          "observation": "Manifest-declared source; no new source payload execution or qualification."
+        }
+      ],
+      "sourceQualification": null
+    },
+    {
+      "id": "A01-COLLECTOR",
+      "manifest": {
+        "path": "scratch/alfred-session-authority-observers-source-20261010/manifest.json",
+        "sha256": "17a36291503390c8db129673477e49eb125f75ed82c86f7ca60acb29d79463a8",
+        "bytes": 9555,
+        "mode": 420
+      },
+      "stage": "frozen-source",
+      "qualified": false,
+      "integrated": false,
+      "accepted": false,
+      "originalStatus": "source-proposal-unqualified",
+      "sourceDeclarations": [
+        {
+          "canonicalPath": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+          "preSha256": null,
+          "preimageDisposition": "Additive absence confirmed by Root and declared graph preparation; no repeat of prior refused missing-path read",
+          "postimagePath": "scratch/alfred-session-authority-observers-source-20261010/postimages/plugins/pipeline-core/lib/session-authority-observers.mjs",
+          "postSha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819",
+          "size": 3165,
+          "mode": 420,
+          "nlink": 1
+        }
+      ],
+      "limits": [
+        "Actual external-root inventories can remain unavailable; no empty baseline substitution",
+        "No native carrier or all12 qualification inferred"
+      ],
+      "sourceQualification": null
+    }
+  ],
+  "components": [
+    {
+      "id": "AUTH-A01",
+      "owner": "/root/agy_greenfield_intake_package",
+      "location": "scratch/alfred-session-authority-observers-source-20261010",
+      "stage": "frozen-source",
+      "packetId": "A01-COLLECTOR",
+      "nextStep": "Bind exact collector2df848 to selected BASIC27 graph; complete static source/resource closure and Root one-use checkpoint. Do not substitute empty baselines for worker external-root migration refusal.",
+      "limits": [
+        "STB12 no semantic execution",
+        "Collector branding/factory declarations do not prove all12 availability"
+      ]
+    },
+    {
+      "id": "AUTH-I03",
+      "owner": "/root/agy_greenfield_roles_audit",
+      "location": "scratch/alfred-i03-genuine-verify-close-carrier-source-20261010",
+      "stage": "proposed",
+      "relatedPacketId": "I03-PRELUDE",
+      "nextStep": "Finish genuine finite Verify/close producer carrier and exact State/I03 handoff; independently qualify actual route and private readback before promotion.",
+      "limits": [
+        "Prelude725602 frozen-source, constructorComplete false, zero semantics",
+        "Actual carrier work is authoring; no delivered receipt inferred"
+      ]
+    },
+    {
+      "id": "AUTH-I08-REGISTRY-STATE",
+      "owner": "/root/agy_greenfield_design_audit",
+      "location": "scratch/alfred-registry-i08-state-route-composed-source-20261010",
+      "stage": "proposed",
+      "packetIds": [
+        "I08-REGISTRY",
+        "STATE14-REGISTRY",
+        "STATE-APPROVE",
+        "STATE10-RESULT"
+      ],
+      "nextStep": "Compose exact b9ef\u2192Registry7e768 with disjoint d672 State route/result corrections, retain all prior bytes, then bind genuine helper ticket exports and I03 carrier before independent qualification.",
+      "limits": [
+        "Registry7e768 and d672 are sibling proposals, not already a qualified combined module",
+        "State10 leaves discard-feature, continuity-init, bootstrap-apply and close-feature unavailable",
+        "Complete14 metadata is not fourteen exercised writers"
+      ]
+    },
+    {
+      "id": "AUTH-CHAT-PHYSICAL",
+      "owner": "/root",
+      "ownerRole": "Coordination; exact source successor frozen, focused qualification owner to be dispatched",
+      "location": "scratch/alfred-chat-stable-physical-helper-successor-20261010",
+      "stage": "frozen-source",
+      "packetId": "CHAT-PHYSICAL",
+      "nextStep": "Compose paired helper/Registry source bindings and qualify genuine producer lifecycle, source-file races, physical ancestor/layout negatives and real fd0/PTY behavior.",
+      "limits": [
+        "Chat physical fact format changed; no automatic old catalogue migration",
+        "HGO527 and PO961 retained by source declaration, not newly qualified here",
+        "Native Windows unavailable remains explicit"
+      ]
+    },
+    {
+      "id": "AUTH-NATIVE-PHYSICAL",
+      "owner": "/root/agy_greenfield_acceptance_audit",
+      "location": null,
+      "declaredWork": "native-bound to physical-readback helper mismatch source authoring",
+      "stage": "proposed",
+      "nextStep": "Deliver exact named source packet and genuine bound-versus-readback mismatch correction with inverse/CAS, then freeze independent focused lifetime/negative qualification.",
+      "limits": [
+        "Exact owned work directory not supplied in this dispatch; no filename guessed",
+        "No native carrier/identity guarantee inferred"
+      ]
+    },
+    {
+      "id": "OWN-EXPORT22",
+      "owner": "/root/alfred_reader_controller_independent_tests",
+      "location": "scratch/alfred-own-session-export-independent-20261010",
+      "stage": "proposed",
+      "assertionFreeze": {
+        "path": "scratch/alfred-own-session-export-independent-20261010/assertions-freeze.json",
+        "sha256": "e19a4b1676bfdcfe6bd2094b1ebc289f79d35f282696dde6ca1c98680c6a495d"
+      },
+      "nextStep": "Prepare complete bounded actual104 public resource/source closure and reviewed one-use launcher for unchanged OSE001\u2013022; Root separately executes.",
+      "limits": [
+        "22 assertions frozen; zero semantic runs",
+        "Uninstall/re-enrollment producer fixture remains unqualified",
+        "Deterministic in-call replacement race unqualified; changed-between-invocations case is narrower"
+      ]
+    },
+    {
+      "id": "HGO-LEGACY-HGL12",
+      "owner": "/root",
+      "ownerRole": "Coordination and separately dispatched source/focused qualifier",
+      "location": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2",
+      "stage": "qualified",
+      "qualificationScope": "partial12 predecessor METHOD",
+      "wholeContractQualified": false,
+      "nextStep": "Preserve predecessor11/1 sourceRED; separately qualify unchanged HGL12 on explicit current HGO/Registry lock-retention successors and complete HGL011 both branches before any closure.",
+      "limits": [
+        "HGL001\u2013010/012 pass; HGL011 actual custody failure",
+        "HGOc1d/Registryb21/Requester9c66 predecessor proof cannot certify later HGO527/Registryb9/7e/d672",
+        "Original26 and native acceptance remain separate"
+      ]
+    },
+    {
+      "id": "HRC-ROUTE",
+      "owner": "/root/agy_greenfield_intake_package",
+      "location": "scratch/alfred-headroom-command-route-independent-20261010/fd-signal-successor",
+      "stage": "qualified",
+      "nextStep": "Root prepares exact single-file audit104 parent-CAS integration of qualified closed reporter-route grammar; retain original empty-capture failure and separate baseline/fixed evidence.",
+      "limits": [
+        "Focused fixed20 PASS after genuine baseline15PASS/5FAIL; integration pending",
+        "Prior missing FD announcement preserved; old callbacks unobserved",
+        "No reporter execution, broad Verify, native or full-item closure"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "id": "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
+      "baseRowSha256": "15952787b5ca8f44eda01aa73abd951a23fa69727b40bd11a122227019f21cb8",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+        "canonicalPath": "backlog/items/2026-10-05-host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.md",
+        "sha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+        "bytes": 1717,
+        "parentSha256": "d5ceec3387d87ba379e1dc3422bab25635c45a7c5a02586d73b2d627f1e35990",
+        "assignmentChanged": false
+      },
+      "componentIds": [
+        "AUTH-A01",
+        "AUTH-I03",
+        "AUTH-I08-REGISTRY-STATE",
+        "AUTH-CHAT-PHYSICAL",
+        "AUTH-NATIVE-PHYSICAL",
+        "HGO-LEGACY-HGL12"
+      ],
+      "currentOwners": [
+        "/root/agy_greenfield_intake_package",
+        "/root/agy_greenfield_roles_audit",
+        "/root/agy_greenfield_design_audit",
+        "/root",
+        "/root/agy_greenfield_acceptance_audit"
+      ],
+      "workLocations": [
+        {
+          "componentId": "AUTH-A01",
+          "location": "scratch/alfred-session-authority-observers-source-20261010"
+        },
+        {
+          "componentId": "AUTH-I03",
+          "location": "scratch/alfred-i03-genuine-verify-close-carrier-source-20261010"
+        },
+        {
+          "componentId": "AUTH-I08-REGISTRY-STATE",
+          "location": "scratch/alfred-registry-i08-state-route-composed-source-20261010"
+        },
+        {
+          "componentId": "AUTH-CHAT-PHYSICAL",
+          "location": "scratch/alfred-chat-stable-physical-helper-successor-20261010"
+        },
+        {
+          "componentId": "AUTH-NATIVE-PHYSICAL",
+          "location": null,
+          "declaredWork": "native-bound to physical-readback helper mismatch source authoring"
+        },
+        {
+          "componentId": "HGO-LEGACY-HGL12",
+          "location": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "AUTH-A01",
+          "owner": "/root/agy_greenfield_intake_package",
+          "nextStep": "Bind exact collector2df848 to selected BASIC27 graph; complete static source/resource closure and Root one-use checkpoint. Do not substitute empty baselines for worker external-root migration refusal."
+        },
+        {
+          "componentId": "AUTH-I03",
+          "owner": "/root/agy_greenfield_roles_audit",
+          "nextStep": "Finish genuine finite Verify/close producer carrier and exact State/I03 handoff; independently qualify actual route and private readback before promotion."
+        },
+        {
+          "componentId": "AUTH-I08-REGISTRY-STATE",
+          "owner": "/root/agy_greenfield_design_audit",
+          "nextStep": "Compose exact b9ef\u2192Registry7e768 with disjoint d672 State route/result corrections, retain all prior bytes, then bind genuine helper ticket exports and I03 carrier before independent qualification."
+        },
+        {
+          "componentId": "AUTH-CHAT-PHYSICAL",
+          "owner": "/root",
+          "nextStep": "Compose paired helper/Registry source bindings and qualify genuine producer lifecycle, source-file races, physical ancestor/layout negatives and real fd0/PTY behavior."
+        },
+        {
+          "componentId": "AUTH-NATIVE-PHYSICAL",
+          "owner": "/root/agy_greenfield_acceptance_audit",
+          "nextStep": "Deliver exact named source packet and genuine bound-versus-readback mismatch correction with inverse/CAS, then freeze independent focused lifetime/negative qualification."
+        },
+        {
+          "componentId": "HGO-LEGACY-HGL12",
+          "owner": "/root",
+          "nextStep": "Preserve predecessor11/1 sourceRED; separately qualify unchanged HGL12 on explicit current HGO/Registry lock-retention successors and complete HGL011 both branches before any closure."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root (AUTH coordination); component owners below",
+        "ownerRole": "coordination/follow-through; source implementor unassigned",
+        "sourceBindings": [
+          {
+            "canonicalPath": "plugins/pipeline-core/scripts/session-cleanup.mjs",
+            "postimagePath": "scratch/alfred-qualified-twohook-successor-composition-20261010/postimages/plugins/pipeline-core/scripts/session-cleanup.mjs",
+            "sha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d",
+            "originalFixSource": "scratch/alfred-obl047-signed-descriptor-custody-source-repair-20261010/postimages/plugins/pipeline-core/scripts/session-cleanup.mjs",
+            "proofClass": "source73 selected proposal exact explicit-owner correspondence; behavior/acceptance not inferred",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/plugins/pipeline-core/scripts/session-cleanup.mjs",
+            "currentSourceSha256": "3f7c68b622a6f9ab756ce4b7dbefed315890081883b7f26a8f86fb866ce48d4d",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          }
+        ],
+        "businessProofs": [],
+        "inheritedTestEvidence": {
+          "historicalNamedTests": null,
+          "explicitCommittedCaseIDs": [],
+          "currentActualReceiptLinks": [],
+          "inheritedActualReceiptBindings": [],
+          "unresolved": "Exact accepted-clause\u2192case\u2192selected-source proof not complete; no current item PASS inferred from source presence or global suite count."
+        },
+        "nextAction": "Reconcile retained item clauses with current selected source and existing proof before assigning further work. Remaining acceptance: exact consumer/host/item coverage not established. Preserve existing implementation; do not assume another source fix is needed.",
+        "reconciliationSourceBinding": null
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": null
+    },
+    {
+      "id": "pipeline.design-intake-generator-omits-question-answers",
+      "baseRowSha256": "4c65d24e436d82d6f70357cd15a146bfd9b3865124b3d7631c1a0d9da8bdb813",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-design-intake-generator-omits-question-answers.md",
+        "sha256": "914a10b2eba32003c39677b2a6b80204684640cb10fb2437b9b1eaecfecba099"
+      },
+      "componentIds": [
+        "AUTH-I03"
+      ],
+      "currentOwners": [
+        "/root/agy_greenfield_roles_audit"
+      ],
+      "workLocations": [
+        {
+          "componentId": "AUTH-I03",
+          "location": "scratch/alfred-i03-genuine-verify-close-carrier-source-20261010"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "AUTH-I03",
+          "owner": "/root/agy_greenfield_roles_audit",
+          "nextStep": "Finish genuine finite Verify/close producer carrier and exact State/I03 handoff; independently qualify actual route and private readback before promotion."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root",
+        "ownerRole": "coordination/follow-through; source implementor unassigned",
+        "sourceBindings": [
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "parentPath": "scratch/alfred-obl047-onboarding-authority-source-20261010/successor/frozen-successor/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "parentSha256": "5aeb1270ca4d19105946ae5dae9f45cde44c28191e78e557e874f43b50e656bb",
+            "postimageSha256": "ddc2d9b79ea1493dfe7de19fb6f32a0db85c2a901ddb60fc06e78fd27af51819",
+            "postimagePath": "scratch/alfred-claude-design-input-answers-source-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "hashAssurance": "Parent/postimage hashes declared by the physically hashed frozen source manifest; this metadata task does not independently requalify product bytes.",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "currentSourceSha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          },
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "currentAuditSha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+            "currentSourceSha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          }
+        ],
+        "businessProofs": [
+          {
+            "name": "P7-ordinary10",
+            "proof": {
+              "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/qualified-slices-20261010/p7-ordinary10/qualification-manifest.json",
+              "sha256": "3ad2a41cfeeb3830b7536de155fa8b00e502354578cf530af7c316751c6a6229"
+            },
+            "pass": 10,
+            "caseEvidence": null,
+            "canonicalPaths": [
+              "plugins/pipeline-core/lib/onboarding-continuity.mjs"
+            ],
+            "backlogIds": [
+              "pipeline.design-intake-generator-omits-question-answers"
+            ],
+            "relatedCriteria": [
+              "AC-30"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Ordinary10 preserves focused Q/A cases on384 resource-successor; all12 authority-owning producers/I03/native and full consumer walk remain separate."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+                "currentAuditSha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290"
+              }
+            ],
+            "officialClosure": false
+          }
+        ],
+        "inheritedTestEvidence": {},
+        "nextAction": "Retain completed P7-ordinary10 focused receipts and selected audit104 source bindings; address remaining actual consumer/host coverage: Ordinary10 preserves focused Q/A cases on384 resource-successor; all12 authority-owning producers/I03/native and full consumer walk remain separate.. Then candidate-bound independent review and item-specific acceptance/closure. Do not rerun completed qualification as an inherited preparation step.",
+        "reconciliationSourceBinding": null
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": "Shared continuity successor/context dependency; retain ordinary P7 proof without requalifying or closing this item."
+    },
+    {
+      "id": "pipeline.codex-own-session-audit-export-missing",
+      "baseRowSha256": "ac0d7b8f02d27e1aa9b35cc77426cd95be5d6b42f0189d8d7b5014a60ed1c3d6",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+        "canonicalPath": "backlog/items/2026-09-29-codex-own-session-audit-export-missing.md",
+        "sha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+        "bytes": 1295,
+        "parentSha256": "b706c0a50e215eb3a93c2e91fcbe3a6763d3e4e56c21a0f41f0e4add02e1693b",
+        "assignmentChanged": false
+      },
+      "componentIds": [
+        "OWN-EXPORT22"
+      ],
+      "currentOwners": [
+        "/root/alfred_reader_controller_independent_tests"
+      ],
+      "workLocations": [
+        {
+          "componentId": "OWN-EXPORT22",
+          "location": "scratch/alfred-own-session-export-independent-20261010"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "OWN-EXPORT22",
+          "owner": "/root/alfred_reader_controller_independent_tests",
+          "nextStep": "Prepare complete bounded actual104 public resource/source closure and reviewed one-use launcher for unchanged OSE001\u2013022; Root separately executes."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root/agy_greenfield_guard_audit",
+        "ownerRole": "new finite source follow-through",
+        "sourceBindings": [],
+        "businessProofs": [],
+        "inheritedTestEvidence": {
+          "historicalNamedTests": null,
+          "explicitCommittedCaseIDs": [],
+          "currentActualReceiptLinks": [],
+          "inheritedActualReceiptBindings": [],
+          "unresolved": "Exact accepted-clause\u2192case\u2192selected-source proof not complete; no current item PASS inferred from source presence or global suite count."
+        },
+        "nextAction": "Implement finite uninstall/own-session export route under current declared duty; preserve old41 reconciliation, require independent evidence before review/acceptance; no source PASS yet",
+        "currentWorkPackage": "scratch/alfred-uninstall-export-followthrough-20261010",
+        "reconciliationSourceBinding": {
+          "path": "scratch/alfred-old41-completion-reconciliation-20261010/matrix.json",
+          "sha256": "4a2e2dab8e78f0303777f5dd74efdb7ca7c5e7a6ea8a45d09343b8caeda0b934"
+        }
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": null
+    },
+    {
+      "id": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+      "baseRowSha256": "04345ff0ee26291d620d62c0760050fcb3db017a1727d64b2984601f7e7202c1",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+        "canonicalPath": "backlog/items/2026-09-28-no-uninstall-path-for-a-repository-that-once-opted-in.md",
+        "sha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+        "bytes": 15507,
+        "parentSha256": "39840fdab94645876989e3c5e27b98df2d78cbf6c7d8f307fd3730ab5691f0d7",
+        "assignmentChanged": false
+      },
+      "componentIds": [
+        "OWN-EXPORT22",
+        "AUTH-I03",
+        "AUTH-A01"
+      ],
+      "currentOwners": [
+        "/root/alfred_reader_controller_independent_tests",
+        "/root/agy_greenfield_roles_audit",
+        "/root/agy_greenfield_intake_package"
+      ],
+      "workLocations": [
+        {
+          "componentId": "OWN-EXPORT22",
+          "location": "scratch/alfred-own-session-export-independent-20261010"
+        },
+        {
+          "componentId": "AUTH-I03",
+          "location": "scratch/alfred-i03-genuine-verify-close-carrier-source-20261010"
+        },
+        {
+          "componentId": "AUTH-A01",
+          "location": "scratch/alfred-session-authority-observers-source-20261010"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "OWN-EXPORT22",
+          "owner": "/root/alfred_reader_controller_independent_tests",
+          "nextStep": "Prepare complete bounded actual104 public resource/source closure and reviewed one-use launcher for unchanged OSE001\u2013022; Root separately executes."
+        },
+        {
+          "componentId": "AUTH-I03",
+          "owner": "/root/agy_greenfield_roles_audit",
+          "nextStep": "Finish genuine finite Verify/close producer carrier and exact State/I03 handoff; independently qualify actual route and private readback before promotion."
+        },
+        {
+          "componentId": "AUTH-A01",
+          "owner": "/root/agy_greenfield_intake_package",
+          "nextStep": "Bind exact collector2df848 to selected BASIC27 graph; complete static source/resource closure and Root one-use checkpoint. Do not substitute empty baselines for worker external-root migration refusal."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root/agy_greenfield_guard_audit",
+        "ownerRole": "new finite source follow-through",
+        "sourceBindings": [
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/governance-scope.mjs",
+            "currentPackagePath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/governance-scope.mjs",
+            "currentSourceSha256": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+            "integration": "materialized-audit104-declared-by-reconciliation",
+            "assurance": "Selected104 metadata correspondence; no new physical/source behavior observation"
+          },
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+            "currentPackagePath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+            "currentSourceSha256": "7724703598b8806e4af9237c4e53543eea011ca35991a926c6f3cf09f34976f9",
+            "integration": "materialized-audit104-declared-by-reconciliation",
+            "assurance": "Selected104 metadata correspondence; no new physical/source behavior observation"
+          }
+        ],
+        "businessProofs": [],
+        "inheritedTestEvidence": {
+          "historicalNamedTests": null,
+          "explicitCommittedCaseIDs": [],
+          "currentActualReceiptLinks": [],
+          "inheritedActualReceiptBindings": [],
+          "unresolved": "Exact accepted-clause\u2192case\u2192selected-source proof not complete; no current item PASS inferred from source presence or global suite count."
+        },
+        "nextAction": "Implement finite uninstall/own-session export route under current declared duty; preserve old41 reconciliation, require independent evidence before review/acceptance; no source PASS yet",
+        "currentWorkPackage": "scratch/alfred-uninstall-export-followthrough-20261010",
+        "reconciliationSourceBinding": {
+          "path": "scratch/alfred-old41-completion-reconciliation-20261010/matrix.json",
+          "sha256": "4a2e2dab8e78f0303777f5dd74efdb7ca7c5e7a6ea8a45d09343b8caeda0b934"
+        }
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": null
+    },
+    {
+      "id": "pipeline.project-resource-budget-headroom-is-not-reported",
+      "baseRowSha256": "cca4aeb59f8145ea6d8281cfb789abe28b3c23715f760c3f3b25093cf6b195d7",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-10-project-resource-budget-headroom-is-not-reported.md",
+        "sha256": "dc5c10386742ef16d32cf5903f264ed700266fb4b43d234407e1e6e55f234028"
+      },
+      "componentIds": [
+        "HRC-ROUTE"
+      ],
+      "currentOwners": [
+        "/root/agy_greenfield_intake_package"
+      ],
+      "workLocations": [
+        {
+          "componentId": "HRC-ROUTE",
+          "location": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "HRC-ROUTE",
+          "owner": "/root/agy_greenfield_intake_package",
+          "nextStep": "Prepare separately reviewed launcher declaration announcing PIPELINE_VERIFY_CASE_COMPLETION_FD for genuine producer registration; preserve failed baseline and unresolved child cause, then obtain Root one-use successor checkpoint."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root/agy_greenfield_intake_package",
+        "ownerRole": "current consumer follow-through worker",
+        "sourceBindings": [
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+            "currentAuditSha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/plugins/pipeline-core/lib/project-resource-headroom.mjs",
+            "currentSourceSha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          },
+          {
+            "canonicalPath": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+            "currentAuditSha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+            "currentSourceSha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          },
+          {
+            "canonicalPath": "templates/prompts/goldfish-task.md",
+            "currentAuditSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+            "currentPackagePath": "scratch/alfred-qualified-candidate-p7-p16-successor-20261010/postimages/templates/prompts/goldfish-task.md",
+            "currentSourceSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6",
+            "integration": "materialized-audit104",
+            "integrationReceipt": {
+              "path": "scratch/alfred-qualified-candidate-pci-successor-20261010/actual-receipt.json",
+              "sha256": "fd773e1a5e83fd76d1bb800d0f53c8a44350d24eed394e3e5186524af1aca9f1"
+            }
+          }
+        ],
+        "businessProofs": [
+          {
+            "name": "RHH11",
+            "proof": {
+              "path": "scratch/alfred-claude-resource-headroom-independent-20261010/qualification-manifest.json",
+              "sha256": "260febaaa80f808fa6ee7200cc26a1989feb77d37c6665426e099b2997c4f7c9"
+            },
+            "pass": 11,
+            "caseEvidence": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "4b8ccf946de4f46b8e99edbea31e47e60b501698186f491c97339d481c546cfa",
+              "caseSetSha256": "8620715cbe51c6bdf45142e8a659dbaa990f41be0309bc7f0d941a53e5ba405d",
+              "dispositionsSha256": "c79fa95f23decd90007890b0c95515256e4dc08b9567dc441e8c14f7390e5feb",
+              "declaredCount": 11,
+              "disposedCount": 11,
+              "counts": {
+                "pass": 11,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "canonicalPaths": [
+              "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+              "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+              "templates/prompts/goldfish-task.md"
+            ],
+            "backlogIds": [
+              "pipeline.project-resource-budget-headroom-is-not-reported"
+            ],
+            "relatedCriteria": [
+              "AC-22",
+              "AC-30"
+            ],
+            "criterionAssurance": "Partial requirement relationship; no full AC/IR completion inferred from focused cases or path overlap.",
+            "limits": [
+              "Declared observations only; no actual measurement authentication/compliance; template static rather than exercised dispatch; current READY CLI admission and consumer integration unproved."
+            ],
+            "sourceBinding": [
+              {
+                "canonicalPath": "plugins/pipeline-core/lib/project-resource-headroom.mjs",
+                "currentAuditSha256": "5447358ff030c744682745b3472cb487a89ff6a65ee927919a9b3c544e991ed2"
+              },
+              {
+                "canonicalPath": "plugins/pipeline-core/scripts/report-resource-headroom.mjs",
+                "currentAuditSha256": "717a951df982bf70b67b6e9797fde353f11b039335387986ddb9ede7a5fc0801"
+              },
+              {
+                "canonicalPath": "templates/prompts/goldfish-task.md",
+                "currentAuditSha256": "afd1f1c1d0750cf8af57fe8fefb30103aa84833f67356f767a2581876fbf0ed6"
+              }
+            ],
+            "officialClosure": false
+          }
+        ],
+        "inheritedTestEvidence": {},
+        "nextAction": "Implement/qualify actual quick/scoped consumer and resource-headroom workflow route under current bounded duty. Preserve existing template afd1 and RHH11 receipts; no repeat of completed focused proof. Candidate review/item acceptance remain open.",
+        "currentWorkPackage": "scratch/alfred-quick-scoped-consumer-followthrough-20261010",
+        "reconciliationSourceBinding": null
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": null
+    },
+    {
+      "id": "pipeline.guard-override-request-digest-drifts-after-arming",
+      "baseRowSha256": "2b95e27548fe0e113751df8cc64e2ceca8b97e5d85b8e57bf0c6c271a7ea2a80",
+      "officialStatus": "open",
+      "body": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+        "canonicalPath": "backlog/items/2026-10-03-guard-override-request-digest-drifts-after-arming.md",
+        "sha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+        "bytes": 2131,
+        "parentSha256": "a959bb6a375bd9dcee9815092113b40c263a092082ee60f90df6b7aad593e46c",
+        "assignmentChanged": false
+      },
+      "componentIds": [
+        "HGO-LEGACY-HGL12",
+        "AUTH-CHAT-PHYSICAL"
+      ],
+      "currentOwners": [
+        "/root"
+      ],
+      "workLocations": [
+        {
+          "componentId": "HGO-LEGACY-HGL12",
+          "location": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2"
+        },
+        {
+          "componentId": "AUTH-CHAT-PHYSICAL",
+          "location": "scratch/alfred-chat-stable-physical-helper-successor-20261010"
+        }
+      ],
+      "nextSteps": [
+        {
+          "componentId": "HGO-LEGACY-HGL12",
+          "owner": "/root",
+          "nextStep": "Preserve predecessor11/1 sourceRED; separately qualify unchanged HGL12 on explicit current HGO/Registry lock-retention successors and complete HGL011 both branches before any closure."
+        },
+        {
+          "componentId": "AUTH-CHAT-PHYSICAL",
+          "owner": "/root",
+          "nextStep": "Compose paired helper/Registry source bindings and qualify genuine producer lifecycle, source-file races, physical ancestor/layout negatives and real fd0/PTY behavior."
+        }
+      ],
+      "previous": {
+        "currentOwner": "/root",
+        "ownerRole": "coordination/follow-through; source implementor unassigned",
+        "sourceBindings": [
+          {
+            "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+            "currentPackagePath": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+            "currentSourceSha256": "93957f6c60955c0ce8ad30628ed80c1d79758cbb07e28e0deb5357b6e52ecb84",
+            "integration": "materialized-audit104-declared-by-reconciliation",
+            "assurance": "Selected104 metadata correspondence; no new physical/source behavior observation"
+          }
+        ],
+        "businessProofs": [],
+        "inheritedTestEvidence": {
+          "historicalNamedTests": null,
+          "explicitCommittedCaseIDs": [],
+          "currentActualReceiptLinks": [],
+          "inheritedActualReceiptBindings": [
+            {
+              "copiedPath": "evidence/hgo16/execution.json",
+              "freshRun": false,
+              "label": "hgo16",
+              "originalPath": "scratch/alfred-obl013-feature-bind-plan-sixteen-qualification-v4-20261010/fixed/execution.json",
+              "sha256": "b40c214b0399f3b3b71b86a04a68571f4d755d346c99c9cd8ca6c6e8625c8763",
+              "proofClass": "retained exact source73 receipt binding; no replay; item-specific coverage must be reconciled"
+            }
+          ],
+          "unresolved": "Exact accepted-clause\u2192case\u2192selected-source proof not complete; no current item PASS inferred from source presence or global suite count."
+        },
+        "nextAction": "Semanticdigest10 and visibleMismatch16 qualify correction; source93957 selected. Final integration/native Windows/POSIX replay acceptance and closure remain.",
+        "reconciliationSourceBinding": {
+          "path": "scratch/alfred-old41-completion-reconciliation-20261010/matrix.json",
+          "sha256": "4a2e2dab8e78f0303777f5dd74efdb7ca7c5e7a6ea8a45d09343b8caeda0b934"
+        }
+      },
+      "integrationStatus": "new-delta-packets-not-integrated; retain prior audit104 historical bindings",
+      "acceptanceStatus": "open",
+      "independentReviewStatus": "not-established-for-current-successors",
+      "closureProof": null,
+      "associationLimit": "Related shared HGO source conservation only; HGL11/1 is OBL047/I04 compatibility evidence, not a replacement for retained OBL013 digest16."
+    }
+  ],
+  "evidence": {
+    "HGL": {
+      "proofPath": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2/actual-qualification-proof.json",
+      "sha256": "69946471f251097492a043b5a7d86cd6594c20e72ac44212746bb374b9b72260",
+      "counts": {
+        "pass": 11,
+        "fail": 1,
+        "skip": 0,
+        "todo": 0
+      },
+      "failIds": [
+        "HGL011"
+      ],
+      "sourceBindings": {
+        "qualificationFreezeSha256": "690fbc266bda2d8a56bcb85a377ec9f49daf534d4050a1e651e76ae6bfb4950a",
+        "graphManifestSha256": "3a35ad3523a70ff7c7af2a094bc6127b8cac3495fcf1cf5a73d8f061ef2e6adb",
+        "assertionsFreezeSha256": "a27d9d153ab064839f8a7715cd85c0016ec1e9507fbe20d711d098b38f91befc",
+        "hgoSourceSha256": "c1d16077f21f5f22a006838bb754454fb3907be525feb8ecc787b7c0c094dd2e",
+        "registrySourceSha256": "b21a021fa5648479800440874c027d939b3140ae195ac096269328407c8842e1",
+        "requesterSourceSha256": "9c666cd532d1259b02a842d334fe534171f1f85a4fc3c3b1971fca7d11fe8229",
+        "executionTerminalSha256": "50623e9adab9f42015a58d8deff76d269759e3313ec0f048e9d5d5e68333d55e",
+        "completionSha256": "9888f4421776b482777259c214bbb5a3b92f75b3668dc6327a789b86c99ff62a",
+        "stdoutSha256": "bffb910b6eb9347162e15f0e72a414a9842a236b7202813be152f6e411c3698e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "classification": "actual-source-requirement-failure; partial predecessor method proof",
+      "failure": {
+        "id": "HGL011",
+        "classification": "actual-source-requirement-failure",
+        "assertion": "partial-effect CAS refusal must retain owned lock",
+        "observedActual": false,
+        "observedExpected": true,
+        "fixtureBranch": "catalogue mutation during actual owning appendCommandOffer closure",
+        "passedBeforeFailure": [
+          "one actual append callback",
+          "physical offer file exists",
+          "typed journalRefusal present",
+          "nextAction absent"
+        ],
+        "unexecutedTail": [
+          "held lock single-link/mode assertions",
+          "case's offer kind/state assertions after lock check",
+          "second control-mutation loop branch"
+        ],
+        "sourceCauseInference": "Legacy registry releases its unchanged owned lock unconditionally in finally after actual owner effect and postimage absence/control CAS refusal. HGO correctly reports typed journal refusal and withholds nextAction. This causal classification is backed by actual source bytes, not a captured internal exception code.",
+        "requiredCorrection": "Separate registry successor retains genuine owner lock on post-effect absence/topology CAS refusal; preserve normal completed/no-effect cleanup, invalid-proof recovery and existing eleven positive/refusal cases. No assertion relaxation.",
+        "laterSuccessors": "Current owner confirmed later registry ab626 inherits same cleanup; requester ba8 terminal observer and HGO527 caller integration do not close this predecessor failure. No qualification of those successors is inferred."
+      }
+    },
+    "HRC": {
+      "executionPath": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/execution.json",
+      "sha256": "c4576cdb5f2d5f65ddaa31d07a5468d6c70d501c73b77b7eb387dd0d40d4a943",
+      "childStatus": 1,
+      "signal": null,
+      "error": null,
+      "fd3": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "attestation": null,
+      "parserError": "VERIFY-CASE-COMPLETION-BOUNDS",
+      "graphConserved": true,
+      "fixedRun": false,
+      "callbacksObserved": false,
+      "callbackCount": null,
+      "classification": "unqualified transport/registration prerequisite; exact child cause unresolved; not source RED",
+      "latestLauncherObservation": "Root observed missing PIPELINE_VERIFY_CASE_COMPLETION_FD announcement; registration inert without it; no synthetic disposition",
+      "successorQualification": {
+        "execution": {
+          "path": "scratch/alfred-headroom-command-route-independent-20261010/fd-signal-successor/execution.json",
+          "sha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+          "bytes": 3224,
+          "mode": 384
+        },
+        "results": [
+          {
+            "name": "baseline",
+            "status": 1,
+            "signal": null,
+            "error": null,
+            "transportComplete": true,
+            "successful": false,
+            "fd3": {
+              "sha256": "523628887d4b44182fb73fd2b8e0bea6dbc39c344af388eb73cdb5fdfa081515",
+              "bytes": 3119
+            },
+            "attestation": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+              "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+              "dispositionsSha256": "76cb8fc191ae6c6ca06bdda5a3822869e6d134260e1f2bd4bfb50020bad74429",
+              "declaredCount": 20,
+              "disposedCount": 20,
+              "counts": {
+                "pass": 15,
+                "fail": 5,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "parserError": null
+          },
+          {
+            "name": "fixed",
+            "status": 0,
+            "signal": null,
+            "error": null,
+            "transportComplete": true,
+            "successful": true,
+            "fd3": {
+              "sha256": "741eae738695802407044a98474e23a57619422d3f22752bc9cc2fdb08c80aa7",
+              "bytes": 3119
+            },
+            "attestation": {
+              "schema": "pipeline.verify-case-completion-attestation.v1",
+              "status": "complete",
+              "policySha256": "360b996598905feadff5894fd029c18b0d788d0a8a58ff1511af9d8b1b1d58a9",
+              "caseSetSha256": "3a7700f53d5f6ca2e2480e4d766beb02b9ad1e51479b96244d0bbe0a84fc180e",
+              "dispositionsSha256": "7fe0c367e0b4167fa03b93506f9a65e3bd76ba412ccb1729280f5a8dd3862249",
+              "declaredCount": 20,
+              "disposedCount": 20,
+              "counts": {
+                "pass": 20,
+                "fail": 0,
+                "skip": 0,
+                "todo": 0
+              }
+            },
+            "parserError": null
+          }
+        ],
+        "graphConserved": true,
+        "conservationError": null,
+        "scope": "Focused closed reporter command classification only; no reporter business execution/native/full item closure."
+      }
+    },
+    "OSE22": {
+      "freezePath": "scratch/alfred-own-session-export-independent-20261010/assertions-freeze.json",
+      "sha256": "e19a4b1676bfdcfe6bd2094b1ebc289f79d35f282696dde6ca1c98680c6a495d",
+      "caseIds": [
+        "OSE001",
+        "OSE002",
+        "OSE003",
+        "OSE004",
+        "OSE005",
+        "OSE006",
+        "OSE007",
+        "OSE008",
+        "OSE009",
+        "OSE010",
+        "OSE011",
+        "OSE012",
+        "OSE013",
+        "OSE014",
+        "OSE015",
+        "OSE016",
+        "OSE017",
+        "OSE018",
+        "OSE019",
+        "OSE020",
+        "OSE021",
+        "OSE022"
+      ],
+      "semanticRuns": 0,
+      "pendingAcceptance": [
+        "Deterministic physical in-call replacement/snapshot race fixture; OSE020 only covers changed-between-invocations observation",
+        "Genuine uninstall/re-enrollment source-produced authority, retirement and consent fixture constructors",
+        "Complete bounded current source/module-init public asset closure and Root-reviewed one-use launcher",
+        "Actual native host current carrier assurance remains unavailable"
+      ]
+    }
+  },
+  "inputs": [
+    {
+      "path": "scratch/alfred-greenfield-agy-audit-20261009/specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/live-work-index.json",
+      "sha256": "5c01c3501c51d0614f8bfa52aaee732c15b77d1cd051b8ef30f988a8e21d62f9",
+      "bytes": 1924395,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-i08-registry-transition-source-20261010/manifest.json",
+      "sha256": "5541db05d2981319b7751cacff02f08717849c0a8b198b94cd8f3b9532b30718",
+      "bytes": 3612,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-chat-stable-physical-helper-successor-20261010/manifest.json",
+      "sha256": "acd28ced8489b10c5eb0cff5a1df9d76ae08cb054f60c7bea259f8c3c7d8ce41",
+      "bytes": 3465,
+      "mode": 384
+    },
+    {
+      "path": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/manifest.json",
+      "sha256": "bd75826f748d4e055441b591030b2a471dcb19da3819d6e47dd1b3cdf71cc9c2",
+      "bytes": 3775,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/manifest.json",
+      "sha256": "45ed1ec407ff8d5210e61bec5c7aff2007e5a5ac4fe3dc14721053baa94d3142",
+      "bytes": 3694,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/manifest.json",
+      "sha256": "accb3bb525c480c85619e9a4fc7b6e672eb5ee61400f47a6451df75cd02ca868",
+      "bytes": 3182,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-onboarding-controlled-cleanup-constructor-source-20261010/artifact-preparation-source-successor/manifest.json",
+      "sha256": "52d92e7e64b43281aabce7465f359acb2e649ef8a424082f8fa78e0f9d039404",
+      "bytes": 2249,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-session-authority-observers-source-20261010/manifest.json",
+      "sha256": "17a36291503390c8db129673477e49eb125f75ed82c86f7ca60acb29d79463a8",
+      "bytes": 9555,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-i08-registry-transition-source-20261010/report.md",
+      "sha256": "3d3fd3f9fae2f85e473a17016648b0aa1a8422c2861df30e64b187915701fef0",
+      "bytes": 5505,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-chat-stable-physical-helper-successor-20261010/report.md",
+      "sha256": "6df1e0a617b3dd15ceaf8e38acae10b5a1d039b63461474f755f38ddd5470764",
+      "bytes": 5986,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-approve-companion-source-successor-20261010/report.md",
+      "sha256": "877d15b36fef11e52437e04cbcbbcd15e35a77a8d984113026678325602f8cda",
+      "bytes": 4273,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-registry-state-companion-route-result-erratum-20261010/report.md",
+      "sha256": "dc6a51d2b9cd05372a40618f31b26b70208da7cee413669dc9f6e3d050be55d8",
+      "bytes": 2142,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-state-result-companion-source-successor-20261010/report.md",
+      "sha256": "a6fdc44f6d126b39121174b609fad017af790d603ae552ca3b8b97541f8835fc",
+      "bytes": 3014,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2/actual-qualification-proof.json",
+      "sha256": "69946471f251097492a043b5a7d86cd6594c20e72ac44212746bb374b9b72260",
+      "bytes": 4305,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-obl047-hgo-legacy-control-independent-20261010/resource-successor2/actual-qualification-report.md",
+      "sha256": "01194bf18efbdd26c41c4c489db8f4a8ad96c9c703ce622ca8714ab91e4ecbb2",
+      "bytes": 4057,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/execution.json",
+      "sha256": "c4576cdb5f2d5f65ddaa31d07a5468d6c70d501c73b77b7eb387dd0d40d4a943",
+      "bytes": 1249,
+      "mode": 384
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/resource-successor/report.md",
+      "sha256": "2290ac05b5b0df31d2cfc384169821694180a11cd7d7a1d1e73b850e1909457b",
+      "bytes": 3394,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-own-session-export-independent-20261010/assertions-freeze.json",
+      "sha256": "e19a4b1676bfdcfe6bd2094b1ebc289f79d35f282696dde6ca1c98680c6a495d",
+      "bytes": 3281,
+      "mode": 420
+    },
+    {
+      "path": "scratch/alfred-headroom-command-route-independent-20261010/fd-signal-successor/execution.json",
+      "sha256": "6ff8957555d2051183a77bf1b6a8c8d9a09b61d18cae44cbbdda9ba222f69551",
+      "bytes": 3224,
+      "mode": 384
+    }
+  ],
+  "officialStatusChanges": 0,
+  "closureProof": null,
+  "progressPercentage": null,
+  "mainIntegration": false,
+  "jointQualification": false,
+  "nativeClaims": false,
+  "privacy": {
+    "publicMetadataOnly": true,
+    "repoRelativePathsOnly": true,
+    "rawStdout": false,
+    "rawPrivateState": false,
+    "keys": false,
+    "fixtureRepositories": false,
+    "retainedInputProjection": false
+  },
+  "pointerProposal": {
+    "operation": "Root archives exact delta+report+manifest and updates versioned live-index journal pointer separately",
+    "writePerformed": false
+  },
+  "limits": [
+    "Historical source/test references retained without destructive matrix rewrite",
+    "Latest packets are not automatically selected into BASIC STB graph",
+    "Source count and route count are not obligation/completion counts",
+    "Native helper authoring location unresolved; named owner and task retained rather than guessed",
+    "Late events after this cutoff require another append delta",
+    "Events after this frozen cutoff require a new append; latest native helper, own-export rebase and A01 graph work are not silently promoted."
+  ]
+}

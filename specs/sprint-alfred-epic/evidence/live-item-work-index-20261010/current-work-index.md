@@ -1,5 +1,13 @@
 # Current Alfred work index
 
+Read the [latest journal](deltas/source-and-qualification/report.md) and its
+[item updates](deltas/source-and-qualification/current-delta.json) before the
+historical tables below. The subsequent [actual integration receipt](deltas/source-and-qualification/headroom-actual-integration.json)
+records HRC20 as qualified and materialized in the assembly checkout. The
+[current 104-file inventory](deltas/source-and-qualification/current-source-manifest.json)
+supersedes the earlier assembly inventory; the other 103 files are byte-identical.
+No official item closure, stamp or installation is implied.
+
 Public v2 uses repository-relative work locations. All 176 official statuses remain OPEN. [Full item drilldown](live-work-index.json) separates implementation, evidence, integration, independent review and acceptance, with exact package paths/hashes and inherited history.
 
 ## Current stages
