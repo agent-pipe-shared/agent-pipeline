@@ -1,0 +1,33 @@
+{
+  "schema": "alfred.own-session-audit-execution-public.v1",
+  "rawReceiptSha256": "e804b9c2ff5b3ca8821ef36f726964f0f7c07f5f6d099ef85ef695725480571b",
+  "exitCode": 0,
+  "signal": null,
+  "startedAt": "2026-10-10T10:13:28.226Z",
+  "finishedAt": "2026-10-10T10:13:29.588Z",
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "ce9899b5c8d37a76e7ee278400e0849a638c060a829aa89d99ab508a52519fe2",
+    "caseSetSha256": "528b4eaff12749ed95f391f4ba24da6577cd6f50d9502c4ca62be4b4f753c2ef",
+    "dispositionsSha256": "25b2810de7b47ccd186543fd70bd5ebb158b8b279b7e56abd6586a8e693873b5",
+    "declaredCount": 22,
+    "disposedCount": 22,
+    "counts": {
+      "pass": 22,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "preparationError": null,
+  "spawnError": null,
+  "parserError": null,
+  "graphError": null,
+  "parentError": null,
+  "redactedFields": [
+    "runtimeRoot",
+    "childPid"
+  ],
+  "scope": "One actual Root-operated METHOD qualification; no native host ownership/human/model assurance."
+}

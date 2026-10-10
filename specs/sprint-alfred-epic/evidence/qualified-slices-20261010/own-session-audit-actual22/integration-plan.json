@@ -1,0 +1,48 @@
+{
+  "schema": "alfred.own-session-audit-three-source-integration-plan.v1",
+  "owner": "Root integration only",
+  "baseInventorySha256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e",
+  "baseReceiptSha256": "8ff4f87c66e5aeda60261e90379cdeffb56f32be63a94f3316627f1908471de1",
+  "baseSourceCount": 104,
+  "resultSourceCount": 105,
+  "existingReplacements": 2,
+  "newSources": 1,
+  "unchangedExistingSourceCount": 102,
+  "sources": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "preSha256": null,
+      "postSha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+      "sourcePath": "scratch/alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "preSha256": "fcce222b8ef54cc8f64f18f6bb9e105e84df9b471ea6c7adae0a8176996ac0c6",
+      "postSha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+      "sourcePath": "scratch/alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "preSha256": "0d1b747ca533a7f448e2a9d331cc13636a5c02ec95dd72028a43c7e00480b9d6",
+      "postSha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+      "sourcePath": "scratch/alfred-own-session-export-actual104-guard-successor-20261010/source/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "mode": 420
+    }
+  ],
+  "steps": [
+    "CAS every actual104 canonical source/hash/mode against the declared current inventory; source root remains the existing ordinary candidate.",
+    "CAS all three independently qualified proposal files against these exact source bindings; no other dependency override.",
+    "Publish the new helper exclusively when absent and replace CLI/guard only when originalfcce/0d1 bytes and modes still match. Preserve other102 sources exactly, including qualified shell grammar446 and its already present717a public resource.",
+    "Read back all105 actual source hashes/modes and independently derive the exact union/inventory; actual qualification does not itself stamp or install a release.",
+    "Copy only the explicit privacy-reviewed public whitelist below into versioned evidence and read back exact transferred hashes."
+  ],
+  "precondition": "Any drift/alias/mode discrepancy or existing newhelper stops before writes; never silently rebase or clear a guard.",
+  "notAuthorizedByThisPlan": [
+    "Live source writes by independent test owner",
+    "Git operations",
+    "Semantic rerun",
+    "Native carrier or uninstall acceptance waiver"
+  ]
+}

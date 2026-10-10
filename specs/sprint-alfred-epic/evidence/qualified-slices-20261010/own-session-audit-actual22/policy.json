@@ -1,0 +1,5 @@
+{
+  "schema":"pipeline.verify-case-completion-policy.v1",
+  "caseIds":["OSE001","OSE002","OSE003","OSE004","OSE005","OSE006","OSE007","OSE008","OSE009","OSE010","OSE011","OSE012","OSE013","OSE014","OSE015","OSE016","OSE017","OSE018","OSE019","OSE020","OSE021","OSE022"],
+  "maxBytes":65536
+}

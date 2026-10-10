@@ -1,0 +1,91 @@
+{
+  "schema": "alfred.own-session-audit-public-transfer-supplement.v1",
+  "canonicalDestinationPrefix": "specs/sprint-alfred-epic/evidence/qualified-slices-20261010/own-session-audit-actual22",
+  "originalWhitelistSha256": "0010107532564a95674ec19025f15690446333ee3dba8f9e97d6c600c412a5c0",
+  "files": [
+    {
+      "path": "completion.fd3.jsonl",
+      "sha256": "bc0a1969b9bcb53938519267b9998a52a404f420f17a72e0eb751526c1fa1ec1",
+      "bytes": 3381,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/completion.fd3.jsonl"
+    },
+    {
+      "path": "policy.json",
+      "sha256": "7b74ea2321ed691e20d9e9a196defa673120d41bb96e3be83b82d96220975706",
+      "bytes": 292,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/policy.json"
+    },
+    {
+      "path": "assertions.mjs",
+      "sha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+      "bytes": 10842,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/assertions.mjs"
+    },
+    {
+      "path": "fixture.mjs",
+      "sha256": "ace4d7a813403ed9a8151cfe09af2dc109969d06b9036b4f45ca4737b3ce816f",
+      "bytes": 2871,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/fixture.mjs"
+    },
+    {
+      "path": "driver.mjs",
+      "sha256": "2492bacfeb815d97b6c6e0349a5cdb97474393360b512a21a10003f27b7e89d2",
+      "bytes": 1561,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/driver.mjs"
+    },
+    {
+      "path": "execution-projection.json",
+      "sha256": "83538a6b8729f9d6e26d1cb1d6c3784d4b0c19503db37cfd25930c6cad30c9a0",
+      "bytes": 1087,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/execution-projection.json"
+    },
+    {
+      "path": "case-associations.json",
+      "sha256": "ea27c7d6dc8bc57dd91cb7c542dbdfd9a3af56ccfc481faa102560713c6114ed",
+      "bytes": 3290,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/case-associations.json"
+    },
+    {
+      "path": "source-bindings.json",
+      "sha256": "d29f4ba2d240d30c0d832cd4e342fe09dfdc4e302ef4a49294929cc2c51f5b91",
+      "bytes": 2029,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/source-bindings.json"
+    },
+    {
+      "path": "integration-plan.json",
+      "sha256": "8b3d7e37f4ae747fc7763a8b0f54ab3cb9b2dff4b307ca05540532d849d5495a",
+      "bytes": 2874,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/integration-plan.json"
+    },
+    {
+      "path": "public-proof.json",
+      "sha256": "d8c67577c04b1f2f60003ff0ca5bb68a253ef12992ec3692daa37cbe73174676",
+      "bytes": 3543,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/public-proof.json"
+    },
+    {
+      "path": "report.md",
+      "sha256": "7746157889bc98a72bb1c56549c426ca85e0253933b9fff6f83c0d353b71b183",
+      "bytes": 3795,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/report.md"
+    },
+    {
+      "path": "public-transfer-whitelist.json",
+      "sha256": "0010107532564a95674ec19025f15690446333ee3dba8f9e97d6c600c412a5c0",
+      "bytes": 3422,
+      "sourceRelativePath": "scratch/alfred-own-session-export-independent-20261010/public-proof-successor/public-transfer-whitelist.json"
+    }
+  ],
+  "excluded": [
+    "raw stdout/stderr",
+    "raw execution terminal with runtimeRoot/childPid",
+    "private synthetic stores",
+    "real user environment/transcripts/keys",
+    "absolute runtime paths",
+    "large operational graphs",
+    "original failed static probes"
+  ],
+  "claim": "Actual 22-case controlled method qualification only; no native, race, uninstall, item, or release certification.",
+  "canonicalCopiesPerformed": false,
+  "integrationPerformed": false
+}

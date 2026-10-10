@@ -1,0 +1,73 @@
+{
+  "schema": "alfred.own-session-audit-actual-qualified-proof.v1",
+  "focusGroup": 17,
+  "originalItemId": "pipeline.codex-own-session-audit-export-missing",
+  "secondaryPendingItemId": "pipeline.no-uninstall-path-for-a-repository-that-once-opted-in",
+  "status": "actual-22-pass-method-qualified-not-integrated",
+  "counts": {
+    "pass": 22,
+    "fail": 0,
+    "skip": 0,
+    "todo": 0
+  },
+  "declaredCount": 22,
+  "disposedCount": 22,
+  "completionSha256": "bc0a1969b9bcb53938519267b9998a52a404f420f17a72e0eb751526c1fa1ec1",
+  "policyByteSha256": "7b74ea2321ed691e20d9e9a196defa673120d41bb96e3be83b82d96220975706",
+  "assertionsSha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+  "fixtureSha256": "ace4d7a813403ed9a8151cfe09af2dc109969d06b9036b4f45ca4737b3ce816f",
+  "driverSha256": "2492bacfeb815d97b6c6e0349a5cdb97474393360b512a21a10003f27b7e89d2",
+  "rawReceiptSha256": "e804b9c2ff5b3ca8821ef36f726964f0f7c07f5f6d099ef85ef695725480571b",
+  "sourceManifestSha256": "f51f78cefa4226bec8f9811afc9125ff663775ebee5900ac546af6513af93fd7",
+  "parent104InventorySha256": "3b6fc46175694fcf81ef43bee8e5da40abc79946e5b527e53a289d8cc1a00f6e",
+  "parent104ReceiptSha256": "8ff4f87c66e5aeda60261e90379cdeffb56f32be63a94f3316627f1908471de1",
+  "sourceBindings": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "preSha256": null,
+      "postSha256": "a20d79b3cd6e9d0ae0fea92bd9443985c4eb0a07b1b275a1673ac8a99beb8f1c",
+      "sourcePath": "scratch/alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/lib/runner-own-session-audit.mjs",
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "preSha256": "fcce222b8ef54cc8f64f18f6bb9e105e84df9b471ea6c7adae0a8176996ac0c6",
+      "postSha256": "3713ea8110f965cb86f024c9aab11d55c7628d6472d059254e3af50642938bbc",
+      "sourcePath": "scratch/alfred-uninstall-export-followthrough-20261010/source/plugins/pipeline-core/scripts/runner-transcript-recovery.mjs",
+      "mode": 420
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "preSha256": "0d1b747ca533a7f448e2a9d331cc13636a5c02ec95dd72028a43c7e00480b9d6",
+      "postSha256": "0f12986e5443f1b6f50fd8cd3071a3dbc23897802b4af7f14c957ed58c2482fe",
+      "sourcePath": "scratch/alfred-own-session-export-actual104-guard-successor-20261010/source/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs",
+      "mode": 420
+    }
+  ],
+  "conservation": {
+    "publicGraphFiles": 625,
+    "actualParentFiles": 104,
+    "allErrorsNull": true,
+    "original22Unchanged": true,
+    "originalPreparedGraph624Unchanged": true
+  },
+  "privacy": {
+    "realProviderStoreOpened": false,
+    "realUserSessionContentRead": false,
+    "realKeysOpened": false,
+    "rawLogsPublished": false,
+    "runtimeRootPublished": false,
+    "environmentValuesPublished": false,
+    "testFixtures": "Public source uses only explicitly synthetic owned metadata and fixed noncredential sentinels."
+  },
+  "remaining": [
+    "Native current Codex carrier/reconnect readback unavailable",
+    "No deterministic in-call replacement race proof",
+    "Genuine uninstall current signed-authority constructor unavailable; planned OSE023/024 not executable",
+    "No current transcript pathname/content export grant implemented",
+    "No whole original item/AC/candidate/release certification"
+  ],
+  "semanticReruns": 0,
+  "nativePASS": false,
+  "itemClosure": false
+}

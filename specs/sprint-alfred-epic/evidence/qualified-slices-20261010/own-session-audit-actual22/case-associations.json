@@ -1,0 +1,147 @@
+{
+  "schema": "alfred.own-session-audit-case-associations.v1",
+  "assertionsSha256": "c01e40cab9437f9ad889970ef7fe6d52428c05e80016775eb53590195b2f7aaf",
+  "fixtureSha256": "ace4d7a813403ed9a8151cfe09af2dc109969d06b9036b4f45ca4737b3ce816f",
+  "caseCount": 22,
+  "cases": [
+    {
+      "id": "OSE001",
+      "ordinal": 0,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE002",
+      "ordinal": 1,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE003",
+      "ordinal": 2,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE004",
+      "ordinal": 3,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE005",
+      "ordinal": 4,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE006",
+      "ordinal": 5,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE007",
+      "ordinal": 6,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE008",
+      "ordinal": 7,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE009",
+      "ordinal": 8,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE010",
+      "ordinal": 9,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE011",
+      "ordinal": 10,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE012",
+      "ordinal": 11,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE013",
+      "ordinal": 12,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE014",
+      "ordinal": 13,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE015",
+      "ordinal": 14,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE016",
+      "ordinal": 15,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE017",
+      "ordinal": 16,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE018",
+      "ordinal": 17,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE019",
+      "ordinal": 18,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE020",
+      "ordinal": 19,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE021",
+      "ordinal": 20,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    },
+    {
+      "id": "OSE022",
+      "ordinal": 21,
+      "disposition": "pass",
+      "assertionModule": "assertions.mjs"
+    }
+  ],
+  "completionSha256": "bc0a1969b9bcb53938519267b9998a52a404f420f17a72e0eb751526c1fa1ec1",
+  "allCallbacksExecuted": true,
+  "uninstallCasesNotInSuite": [
+    "OSE023",
+    "OSE024"
+  ],
+  "inCallReplacementRaceQualified": false
+}
