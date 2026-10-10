@@ -1,0 +1,47 @@
+{
+  "schema": "alfred.actual146.events.v1",
+  "selectedSourceCount": 146,
+  "all142PriorSelectedBytesModesPreserved": true,
+  "newSelectedMembers": 4,
+  "physicalTopologyReplacement": 1,
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "officialAcceptance": 0,
+  "priorArchivesRootReportedExecuted": {
+    "actual142Files": 20,
+    "latest122Files": 18
+  },
+  "PODecisions": {
+    "durablePath": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-10-review-budget.md",
+    "sha256": "d72b7d21652d332d6d9a414b8ba77db60812b257dd3ae772915ac01185779fac",
+    "selectedCount": 2,
+    "critic": "One full plus at most one correction-diff review per finished batch; former QG13 extra-round exception superseded; implementation/qualification pending",
+    "controlledTarget": "Existing genuine review route selected; proposed METHOD target class remains unaccepted/unactivated"
+  },
+  "CMO": "Prior actual complete0PASS12FAIL before target seed inherited-hook prerequisite preserved; not rerun here",
+  "Agy22": "pretest setup failed missing unselected testframework base dependency; no22 business result; corrected owner preparing",
+  "newOwnerActions": [
+    {
+      "slice": "Critic cap source",
+      "owner": "alfred_obl016_heredoc_extractor_regression",
+      "manifestPath": "scratch/alfred-critic-one-plus-diff-po-decision-source-20261010/source-manifest.json",
+      "manifestSha256": "7fb603d42e926767099db0855358115d10ca8948d1d4a8025a050f0c1e84408c",
+      "status": "returned-source-unqualified"
+    },
+    {
+      "slice": "Critic cap independent",
+      "owner": "alfred_optional_advisor_source_followthrough",
+      "status": "constructive consumed-course fixture prerequisite open"
+    },
+    {
+      "slice": "Tracking navigation",
+      "owner": "alfred_reader_2plus1_docs_r2",
+      "manifestPath": "scratch/alfred-permanent-work-tracking-index-proposal-20261010/manifest.json",
+      "manifestSha256": "242a4a6ad09090f36b17b78f807fe387ef6a50b32bc607650103f3c0248ae566",
+      "status": "returned-proposal-unpublished"
+    }
+  ],
+  "nativeRouteVerified": false,
+  "noFullItemStagePromotionHere": true
+}

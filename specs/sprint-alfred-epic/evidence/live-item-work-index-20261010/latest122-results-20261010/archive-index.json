@@ -1,0 +1,62 @@
+{
+  "schema": "alfred.latest122-archive-index.v1",
+  "target": "main",
+  "sourceManifestSha256": "ba677c85d536e47430f2f181afc8926e07f8418a17399630c920deaa80e3ea97",
+  "planSha256": "81ec186d97c07c0bbe289f0b4430d4a24250fd6af496cf005d1ec3d13d58ab0d",
+  "files": [
+    {
+      "path": "hgl12-proof.json",
+      "sha256": "1e2fc6b987de52804af213c3f73424f8ebbd9d54f6ef2c087df5f1fd57752b75",
+      "bytes": 2136,
+      "mode": 420
+    },
+    {
+      "path": "agy7.fd3.jsonl",
+      "sha256": "50ff875d2326e46fb5337b8fd47f5b1f522af8130493255c46c2d0fc584aeedc",
+      "bytes": 1478,
+      "mode": 420
+    },
+    {
+      "path": "agy7-proof.json",
+      "sha256": "523abacb2085f2397a11b3aa47cc0a43e89545d2fd51ccd3717ca6409a72f0f0",
+      "bytes": 3030,
+      "mode": 420
+    },
+    {
+      "path": "stb-measurement-summary.json",
+      "sha256": "c5db3a7904e83eacc31a8772250309225989245d1adcd196fc86a8efa434d205",
+      "bytes": 1660,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "2a5d7f83553d884a7d3e65463c11216d9de534fe8d8731b62f6d1b877f07276d",
+      "bytes": 2240,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "d14deb97f2e1baaeddb3815b7ff7f358dee3d0bf1f9ca43c38bfe78f7ad81184",
+      "bytes": 1367,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan.json",
+      "sha256": "81ec186d97c07c0bbe289f0b4430d4a24250fd6af496cf005d1ec3d13d58ab0d",
+      "bytes": 1530,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "ba677c85d536e47430f2f181afc8926e07f8418a17399630c920deaa80e3ea97",
+      "bytes": 3208,
+      "mode": 420
+    }
+  ],
+  "canonicalSourceCount": 122,
+  "officialItemClosures": 0,
+  "wholeCriteriaAccepted": 0,
+  "nativeClaim": false,
+  "GitOperations": 0,
+  "businessRuns": 0
+}

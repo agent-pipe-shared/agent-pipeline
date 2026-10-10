@@ -1,0 +1,35 @@
+{
+  "schema": "alfred.cmo12.public-terminal-proof.v1",
+  "actualReceiptPath": "scratch/alfred-controlled-method-coherent-twelve-successor-preparation-20261010/execution.json",
+  "actualReceiptSha256": "9b8024b4eaf949ed48d7fad191b74a79b93669a779a4999983ccd9b287f65db6",
+  "status": 1,
+  "signal": null,
+  "error": null,
+  "parser": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "8e880462b081efa4df5ff6995f9cd3c8b344d508323db57d96cf4b1dacaf0d2a",
+    "caseSetSha256": "036e3db04842b55f71f97d9fb176eadff72aec8c2b5ed84600ba4c26f540961c",
+    "dispositionsSha256": "dab93dbaf65952733305250fd09d45c9befed8b6ea39da11dc3efa22ec720360",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 0,
+      "fail": 12,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "parserError": null,
+  "operationError": null,
+  "sourceConserved": true,
+  "runtimeConserved": true,
+  "closureSha256": "29b25d4ab71770271cf825c2e4a08002688483f1d7b3449be7a178a01a387135",
+  "freezeSha256": "33391b03089242125e49430d920c4de2482560ba6a4690876ba8b001e41c40d0",
+  "completionSha256": "a0bb6dfd0b3106cf778e45388cbea1a6470f7cc5f303c650e405669c56427197",
+  "rootReportedCause": "All12 fail before target behavior at seed commit inherited-hook guard prerequisite",
+  "failureClassification": "shared constructive-fixture prerequisite; no12 distinct product defects or target-effect failure claim",
+  "native": false,
+  "independentCriticPass": false,
+  "fullConstructor": false
+}

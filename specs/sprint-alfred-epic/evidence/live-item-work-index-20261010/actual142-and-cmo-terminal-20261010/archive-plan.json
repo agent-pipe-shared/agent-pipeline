@@ -1,0 +1,54 @@
+{
+  "schema": "alfred.actual142-public-archive-plan.v1",
+  "payloads": [
+    {
+      "path": "actual-source-manifest.json",
+      "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd",
+      "bytes": 97606,
+      "mode": 420
+    },
+    {
+      "path": "actual-materialization-public-receipt.json",
+      "sha256": "f7f208dc295e1b6b281abeb4d3f41728bd4dc9319d0acaa2a4a75f77b7d13581",
+      "bytes": 20436,
+      "mode": 420
+    },
+    {
+      "path": "source-generation-map.json",
+      "sha256": "6480bbd2ffaa23fdc61b733e21accbb016eedef3510f727cd03bd8759d6dcc19",
+      "bytes": 48274,
+      "mode": 420
+    },
+    {
+      "path": "cmo12.fd3.jsonl",
+      "sha256": "a0bb6dfd0b3106cf778e45388cbea1a6470f7cc5f303c650e405669c56427197",
+      "bytes": 2071,
+      "mode": 420
+    },
+    {
+      "path": "cmo12-public-proof.json",
+      "sha256": "0d8ef208efa04dd63c0030d3f13b7f6293e34d6fd1fcd7d3120b1a0df9dfcbc2",
+      "bytes": 1530,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "6cb30484923b72955a9a33b96a50c5488df4b76f0332b4b9fdb954a05431f916",
+      "bytes": 903,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "fc6602ab6c93ba7e98142a3e351ab892cb42f194fdb3f61a11b4744c24cf9455",
+      "bytes": 1289,
+      "mode": 420
+    }
+  ],
+  "noOverwrite": true,
+  "sourceInventoryGuard": {
+    "path": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-source-manifest.json",
+    "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd"
+  },
+  "auditRelativeRoot": "scratch/alfred-greenfield-agy-audit-20261009",
+  "destination": "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010/actual142-and-cmo-terminal-20261010"
+}

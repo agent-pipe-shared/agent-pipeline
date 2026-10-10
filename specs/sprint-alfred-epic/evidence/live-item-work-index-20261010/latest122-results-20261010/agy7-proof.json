@@ -1,0 +1,76 @@
+{
+  "schema": "alfred.latest.agy7-public-proof.v1",
+  "actualReceiptPath": "scratch/alfred-agy-observed-version-independent-tests-20261010/execution-v3.json",
+  "actualReceiptSha256": "4936fdc6067ddd18006f37d6def1dde85f730227912156e4ee679701c108f988",
+  "exitCode": 0,
+  "signal": null,
+  "completionValid": true,
+  "completionAttestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "9ca4a97e56cab0a68f4ca7eeb04dbc885f9beca5a472c04157c794562c85bbe1",
+    "caseSetSha256": "8db1578949636456f1796d9186e2b908163083bf2f575c3893fd4cf5bc382db3",
+    "dispositionsSha256": "cdb2aa49ce05917cc2f54d243b67ef2b6900db9783e3881baa6c019f86ea674b",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionParseError": null,
+  "fd3Sha256": "50ff875d2326e46fb5337b8fd47f5b1f522af8130493255c46c2d0fc584aeedc",
+  "completionPolicy": {
+    "schema": "pipeline.verify-case-completion-policy.v1",
+    "caseIds": [
+      "AGYVER001",
+      "AGYVER002",
+      "AGYVER003",
+      "AGYVER004",
+      "AGYVER005",
+      "AGYVER006",
+      "AGYVER007"
+    ],
+    "maxBytes": 8192
+  },
+  "sourceBindings": [
+    {
+      "source": "scratch/alfred-agy-managed-plugin-source-resolution-20261010/postimages/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+      "target": "graph/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+      "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+      "bytes": 12903,
+      "nlink": 1
+    },
+    {
+      "source": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/governance-event.mjs",
+      "target": "graph/plugins/pipeline-core/lib/governance-event.mjs",
+      "sha256": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+      "bytes": 15831,
+      "nlink": 1
+    },
+    {
+      "source": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/test-case-completion.mjs",
+      "target": "graph/plugins/pipeline-core/lib/test-case-completion.mjs",
+      "sha256": "616f1fc97316e740f569c948d27cd4550fa68de8122e979a7437325624691b55",
+      "bytes": 10816,
+      "nlink": 1
+    },
+    {
+      "source": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "target": "graph/plugins/pipeline-core/lib/verify-case-completion-receipt.mjs",
+      "sha256": "17d238e6de603714e61ec5106c62aee7cfab1cfb03204e965f8a6c1aa3e1bf7b",
+      "bytes": 5517,
+      "nlink": 1
+    },
+    {
+      "source": "scratch/alfred-agy-observed-version-independent-tests-20261010/version-boundary.test.mjs",
+      "target": "version-boundary.test.mjs",
+      "sha256": "3857e6a932ea01d5d879fb5ccbb6cf6c268fd39a5801e1d00d8afca0abfb3e96",
+      "bytes": 1772,
+      "nlink": 1
+    }
+  ],
+  "scope": "Seven observed-version boundary vectors only; no native availability, installed full-course or whole-item approval"
+}

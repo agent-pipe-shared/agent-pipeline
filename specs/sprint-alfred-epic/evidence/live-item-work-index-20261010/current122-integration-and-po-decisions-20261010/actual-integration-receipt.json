@@ -1,0 +1,80 @@
+{
+  "schema": "alfred.gitleaks-current120-assembly-receipt.v1",
+  "status": "actual-two-source-CAS-integrated-not-stamped",
+  "manifestSha256": "a30a97202b1f46d3cdf86b1a8822911f5a1a8ef4fb0dd5ed94511fa9da98ab8f",
+  "actualInventorySha256": "15115993488b0d856b58fb6377be7e3d0ec4570ab06667e068998a47b8bb2ac6",
+  "parentInventorySha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+  "parentSelectedSourceCount": 120,
+  "resultSelectedSourceCount": 122,
+  "physicalReplacements": 2,
+  "newPhysicalFiles": 0,
+  "selectedMembershipAdditions": 2,
+  "all120ExistingMembersByteExact": true,
+  "proof": {
+    "rootReceiptPath": "scratch/alfred-gitleaks-privacy-corrected-402-ten-replay-preparation-20261010/root-receipt.json",
+    "rootReceiptSha256": "d1ad31f49c095ef25a5a1f777737daeee8c32815b8d82bdc1a3243f5bcddb8d5",
+    "completionSha256": "49263fe5ab17eb86729b5238d98c838165f5368429bb9e8694b154db296efb37",
+    "attestation": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "5252c0602bd78922caad1c785864feb0a4cec3ede7ad2b6ed7126a7a66f1f9a9",
+      "caseSetSha256": "1a2e3f41bc0f0dfceda99515a00f97db5416052310a4312bd7902da2fcd4a512",
+      "dispositionsSha256": "080ee7edcd5cdc284e6a523f846b0964948b45ec02793f815a7f6c02a49cdf05",
+      "declaredCount": 10,
+      "disposedCount": 10,
+      "counts": {
+        "pass": 10,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "caseIds": [
+      "GLR001",
+      "GLR002",
+      "GLR003",
+      "GLR004",
+      "GLR005",
+      "GLR006",
+      "GLR007",
+      "GLR008",
+      "GLR009",
+      "GLR010"
+    ],
+    "maxCompletionBytes": 32768,
+    "sourceManifestSha256": "d4fe93de7204f0f6dfae168459d2d0bab02cbd1e23dc93d5a34cebebd4ecea55",
+    "originalRecomputeSourceManifestSha256": "7a7939394110bec02ae30ac3941696039159fbd17d5e9d9caae3a9326afefcdb",
+    "adapterSha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+    "cliSha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+    "actualBeforeAfter1193Bindings402343402ResourcesMatched": true,
+    "original10AssertionsUnchanged": true,
+    "original18": "old adapter0c943 graph unrun; predecessor setup-failure history preserved; no original18 pass claim",
+    "scope": "finite corrected GLR001-GLR010 synthetic-scanner privacy/recompute and three CLI gate controls only; no whole assembled-current runtime proof",
+    "realGitleaks": false,
+    "nativeProof": false,
+    "humanSigning": false,
+    "wholeAC11": false,
+    "itemClosure": false
+  },
+  "integrationScope": "Cumulative gitleaks recompute and malformed-report privacy Source; finite synthetic ten only; all120 siblings unchanged; original18 unrun and whole AC11/native/real scanner unqualified",
+  "nativePASS": false,
+  "itemClosure": false,
+  "GitOperations": 0,
+  "productExecutions": 0,
+  "targets": [
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+      "bytes": 33602,
+      "mode": 420,
+      "parentSha256": "9d60fdcbb310d533248741a581945fddcc7fc54d275e97c8f263af4858001159"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+      "bytes": 11185,
+      "mode": 420,
+      "parentSha256": "bdd0b171eb02375893b7f2c0416ef8824086bcc219bc91627cc10081bfd7be82"
+    }
+  ]
+}

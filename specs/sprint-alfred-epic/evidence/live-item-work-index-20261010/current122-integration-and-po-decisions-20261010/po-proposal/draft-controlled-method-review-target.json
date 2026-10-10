@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-controlled-method-review-target",
+  "title": "A controlled METHOD review target has its own truthful admission class",
+  "status": "proposed",
+  "scope": "project",
+  "digest": "aa90a072e69a941218ab04aed498c4753055d3ac2b783c0caec75a2314e779b7",
+  "supersedes": null,
+  "exception": null
+}

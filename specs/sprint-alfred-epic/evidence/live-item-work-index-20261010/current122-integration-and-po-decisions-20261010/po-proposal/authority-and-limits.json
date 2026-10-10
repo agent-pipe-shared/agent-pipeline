@@ -1,0 +1,21 @@
+{
+  "schema":"alfred.controlled-method-review-target-adr-authority.v1",
+  "status":"proposed-only-no-acceptance",
+  "decisionOwner":"human-po via Root decision queue",
+  "rulesetSha256":"b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "priorDesignManifest":"scratch/alfred-controlled-method-review-target-source-design-20261010/manifest.json",
+  "priorDesignManifestSha256":"3d943b0e40ca314c498c9e1db918cb29276abeb893fd695df2d78016e56ea4ba",
+  "assessmentPath":"scratch/alfred-controlled-method-review-target-source-design-20261010/architecture-assessment.json",
+  "assessmentSha256":"08ec821d59357dd183097e611bae8a2059c8cb57fefd5f88392ccc7a4b33e443",
+  "currentCriticPolicy":"Root operational brief permits one final Alfred Critic; no additional review launched; possible per-work interpretation is an unresolved PO question, not inferred permission",
+  "sourcePolicyChanged":false,
+  "runtimeActivation":false,
+  "genericExecutor":false,
+  "nativeOrModelVerified":false,
+  "full26Acceptance":false,
+  "criticInvocations":0,
+  "semanticRuns":0,
+  "gitOperations":0,
+  "retainedGuardRefusal":{"requestSha256":"ca711b15c157b3d11cdfacda3ac70dd11a6565adcd4060b2bf1d29492f9c4b5a","operation":"optional schema locator discovery; grammar refusal retryActions empty","retried":false,"overrideRequested":false},
+  "schemaValidationStatus":"await exact existing declared schema from Root; no runtime schema pass claimed"
+}

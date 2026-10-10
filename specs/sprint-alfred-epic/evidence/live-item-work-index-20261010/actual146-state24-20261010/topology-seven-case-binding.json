@@ -1,0 +1,33 @@
+{
+  "schema": "alfred.actual146.topology-source-binding.v1",
+  "canonicalPath": "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+  "selectedSha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+  "artifact": {
+    "path": "antigravity-plugin-topology.mjs.txt",
+    "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+    "bytes": 12903,
+    "mode": 420
+  },
+  "canonicalMode": 420,
+  "sourceInputPath": "scratch/alfred-agy-managed-plugin-source-resolution-20261010/postimages/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+  "sourceInputMode": 420,
+  "actualPure7ReceiptPath": "scratch/alfred-agy-observed-version-independent-tests-20261010/execution-v3.json",
+  "actualPure7ReceiptSha256": "4936fdc6067ddd18006f37d6def1dde85f730227912156e4ee679701c108f988",
+  "completionAttestation": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "9ca4a97e56cab0a68f4ca7eeb04dbc885f9beca5a472c04157c794562c85bbe1",
+    "caseSetSha256": "8db1578949636456f1796d9186e2b908163083bf2f575c3893fd4cf5bc382db3",
+    "dispositionsSha256": "cdb2aa49ce05917cc2f54d243b67ef2b6900db9783e3881baa6c019f86ea674b",
+    "declaredCount": 7,
+    "disposedCount": 7,
+    "counts": {
+      "pass": 7,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "fd3Sha256": "50ff875d2326e46fb5337b8fd47f5b1f522af8130493255c46c2d0fc584aeedc",
+  "scope": "Actual pure observed-version7 only; current22 did not reach business tests after missing testframework base dependency; corrected launcher owner preparing"
+}

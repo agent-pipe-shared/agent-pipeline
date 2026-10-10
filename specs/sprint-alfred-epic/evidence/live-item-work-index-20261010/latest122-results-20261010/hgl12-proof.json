@@ -1,0 +1,58 @@
+{
+  "schema": "alfred.latest.hgl12-public-proof.v1",
+  "actualReceiptPath": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/inherited-safe-home-launch-successor/execution-terminal.json",
+  "actualReceiptSha256": "7844b96b9c7cc1866e5a8bc309708cafb0a58a040e6c1c2128fd7519eeed8dbc",
+  "status": 0,
+  "signal": null,
+  "errors": {
+    "spawnError": null,
+    "preparationError": null,
+    "parserError": null,
+    "graphError": null,
+    "parentError": null
+  },
+  "completion": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "08c51c8c02d8c5294e4f1c899abb538e32d7efed639e64ecd00e196d2dfb9a27",
+    "caseSetSha256": "6d055395283c091e85224575584bdf780c376ceb4aa132d04d9cacc1512bda50",
+    "dispositionsSha256": "1d0bd20ca34570d77e2f1e920cfca3a268ae4f3030d119be77919451f338db7b",
+    "declaredCount": 12,
+    "disposedCount": 12,
+    "counts": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "completionSha256": "f7d0edc7155a0db00608a61a7fc4897ddfaba0e94aa5d086e2d261c8fd0c69d7",
+  "sourceGraphSha256": "3e503f124d2d3179989bfa96cf004668bb3b854cfc197583797c8ff90b397e5c",
+  "expectedGraphFiles": 1860,
+  "freezeSha256": "4d88ea2021ec65c72ed42ae7621874557faa8c0aa0a2b3e5388435b3553ac45a",
+  "assertions": [
+    {
+      "path": "fixture.mjs",
+      "sha256": "2dad38097751ba89291c278ef5936719ff0712b71e673ca1bc31cf76aa32483a",
+      "bytes": 11688,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "legacy-control.test.mjs",
+      "sha256": "aff7d3f87658c281dc5069aad9e2ca160eea7a1d23f73de4f4ae38699141a7c9",
+      "bytes": 11639,
+      "mode": 420,
+      "nlink": 1
+    },
+    {
+      "path": "registry-layout-api.json",
+      "sha256": "5a7011c2187176d35aef0b72e6819a6d78b6648b6ca0527156df304150a2a216",
+      "bytes": 1668,
+      "mode": 420,
+      "nlink": 1
+    }
+  ],
+  "sourceGraphPhysicalPath": "not named by supplied manifest/freeze; digest bound without guessed path",
+  "scope": "Actual separate HGL12 synthetic controlled legacy slice; no full-body/native acceptance or assembled122 runtime proof"
+}

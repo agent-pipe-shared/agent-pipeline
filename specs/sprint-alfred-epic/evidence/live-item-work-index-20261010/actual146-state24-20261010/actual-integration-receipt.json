@@ -1,0 +1,37 @@
+{
+  "schema": "alfred.agy-root-application.v1",
+  "status": "applied",
+  "parentInventory": {
+    "path": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-source-manifest.json",
+    "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd",
+    "count": 142
+  },
+  "completed": [
+    {
+      "canonicalPath": "plugins/pipeline-core/install-agy.mjs",
+      "sha256": "c91fd55dade9dfbb75257f13b4df6c432fc5895b1cd22b7f21b98f26a478923c",
+      "physicalBytesChanged": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-plugin-topology.mjs",
+      "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+      "physicalBytesChanged": true
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+      "sha256": "62343bc64ef38b74355b069a8a5c19825b1df8a345fcc68be4715b5d13f180fe",
+      "physicalBytesChanged": false
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/antigravity-json-spans.mjs",
+      "sha256": "2316b295cb2290d428e7d8d1193672bf020cc125b0206212a938d4b78cb7eec4",
+      "physicalBytesChanged": false
+    }
+  ],
+  "semanticRuns": 0,
+  "nativeProof": false,
+  "actualInventorySha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381",
+  "actualSourceCount": 146,
+  "allInputRowsPreserved": true,
+  "actualInventoryPath": "scratch/alfred-agy-managed-topology-row-boundary-successor-20261010/actual-source-manifest.json"
+}

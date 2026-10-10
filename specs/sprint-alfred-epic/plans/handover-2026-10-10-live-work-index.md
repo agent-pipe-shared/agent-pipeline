@@ -1,6 +1,48 @@
 # Alfred current work and continuity — 2026-10-10
 
 **Current actual checkpoint (supersedes the historical snapshots below):**
+The Audit assembly now selects **146 source files**. The [current source inventory](../evidence/live-item-work-index-20261010/actual146-state24-20261010/actual-source-manifest.json)
+has SHA `2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381`.
+Root integrated HGL's 122-to-142 source proposal, followed by the four Agy
+membership additions and one physical topology replacement. All 142 prior
+selected identities remain unchanged in the 146 checkpoint. The [actual receipt](../evidence/live-item-work-index-20261010/actual146-state24-20261010/actual-integration-receipt.json)
+and [current events](../evidence/live-item-work-index-20261010/actual146-state24-20261010/current-events.json)
+are retained outside ignored scratch. The joined 176-item inventory below remains
+the complete scope mapping; file selections do not establish item completion.
+
+The original State regression sequence now completed **24 PASS / 0 FAIL / 0 SKIP**;
+its [public proof](../evidence/live-item-work-index-20261010/actual146-state24-20261010/state24-public-proof.json)
+binds the exact qualified generation. The separate fourteen State and twelve I08
+full positive constructors remain unfinished; these 24 controls do not substitute
+for them. Selected topology also has a separately bound seven-case focused proof.
+
+Both [PO decisions](po-decisions-2026-10-10-review-budget.md) are now answered:
+each batch allows one full Critic review and at most one correction-diff review,
+with no extra rounds; controlled tests must use the existing genuine authored
+review route. The historical proposal queue is superseded. These chat decisions
+do not provide a cryptographic candidate signature or activate the rejected
+METHOD target-class proposal.
+
+Latest subsequent focused executions remain non-green: the onboarding-parent
+repair replay completed original STB twelve **8 PASS / 4 FAIL**, independent
+eight **8 PASS / 0 FAIL**, with conserved inputs; four genuine positive State
+operations still report an unavailable authority route. The CMO twelve preserved
+all original assertions but fail before target behavior because fixture seed
+commit messages omit required final trailers. AC-07's fourteen-case launcher
+stopped before case completion because the resource graph lacks
+`config/runner-profiles-v2.json`. JCP's twelve-case setup stopped before any
+semantic child: guarded Git initialization returned EPERM; its genuinely created
+empty fixture repository is preserved for a bounded setup continuation.
+Each actual result is a prerequisite/failure measurement, not successful proof.
+Source and fixture owners are addressing these specific causes without relaxing
+product gates. Main product-source integration and the final signed/stamped
+local candidate remain pending. No push or installation occurred.
+
+**Previous 122-file checkpoint (historical):**
+The [122-source inventory](../evidence/live-item-work-index-20261010/current122-integration-and-po-decisions-20261010/actual-source-manifest.json)
+retains the Gitleaks integration and the pre-decision proposal queue.
+
+**Previous 120-file checkpoint (historical):**
 The assembly selects **120 source files**. The [durable source inventory](../evidence/live-item-work-index-20261010/current120-crosswalk-reconciliation-20261010/current-source-manifest.json)
 has SHA `29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c`.
 Root integrated six optional-Advisor diagnostic sources, preserving all 114

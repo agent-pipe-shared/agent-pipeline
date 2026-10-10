@@ -1,0 +1,28 @@
+{
+  "schema": "alfred.current122.po-queue.v1",
+  "decisionOwner": "human PO via Root",
+  "decisions": [
+    {
+      "id": "method-review-target-class",
+      "status": "proposed-unaccepted-unactivated",
+      "manifestPath": "scratch/alfred-controlled-method-review-target-adr-proposal-20261010/manifest.json",
+      "manifestSha256": "d28ea3a4ce58b26069818dc935f95f0f80d3772bb19d619613b11f03592dd87f",
+      "options": [
+        "existing genuine ordinary authored review route",
+        "confined source-owned METHOD target class",
+        "retain component qualification with complete-constructor gap"
+      ],
+      "nextAction": "PO decides admission class and distinct-target review budget; no source activation here"
+    },
+    {
+      "id": "critic-one-plus-diff-budget",
+      "status": "clarification-required-policy-unchanged",
+      "sourceResolutionPath": "scratch/alfred-critic-budget-and-reader-cap-source-resolution-20261010/source-resolution.json",
+      "sourceResolutionSha256": "65751e93e253681a064489bcb2b638ebca0e58de248f6372832cf304717aa8db",
+      "currentContract": "Ordinary full round plus delta round; QG13 authenticated actual-PASS exception rounds3-4. Reader2+1 already selected.",
+      "question": "Does one Critic plus diff mean one full plus one delta, or supersede current QG13 exception?",
+      "nextAction": "Root obtains explicit interpretation; no cap rewrite or extra Critic invocation"
+    }
+  ],
+  "acceptedDecisions": 0
+}

@@ -1,0 +1,56 @@
+{
+  "schema": "alfred.latest122.events.v1",
+  "sourceInventory": {
+    "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/actual-source-manifest.json",
+    "sha256": "15115993488b0d856b58fb6377be7e3d0ec4570ab06667e068998a47b8bb2ac6",
+    "count": 122
+  },
+  "prior122Archive": {
+    "RootReportedActualFilesCopiedMainAudit": 34,
+    "status": "executed-not-recopied",
+    "manifestSha256": "6ad07ddf742dff7e5a5bef1fcf3e01b1d4fbcece7015605b9871f922abd0dbd8"
+  },
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "accepted": 0,
+  "bodyGenerations": "Historical/current bindings retained in durable176/current crosswalk; focused proofs do not discharge full bodies or resolve drift provenance",
+  "owners": [
+    {
+      "slice": "HGL12",
+      "currentOwner": "Root",
+      "historicalSourceOwner": "quality_inline_coordinator_audit",
+      "status": "focused-qualified-assembly-coherence-pending"
+    },
+    {
+      "slice": "Agy version7",
+      "currentOwner": "Root",
+      "status": "focused-qualified"
+    },
+    {
+      "slice": "STB diagnosis",
+      "currentOwner": "Root",
+      "historicalSourceOwner": "alfred_state_i08_invariant_assertions",
+      "workLocation": "scratch/alfred-stb-native-collector-before-after-diagnostic-preparation-20261010/",
+      "status": "readonly-measurement-complete-next-replay-unrun"
+    },
+    {
+      "slice": "CMO coherent12",
+      "currentOwner": "Root",
+      "historicalSourceOwner": "agy_greenfield_acceptance_audit",
+      "manifestPath": "scratch/alfred-controlled-method-coherent-twelve-successor-preparation-20261010/manifest.json",
+      "manifestSha256": "2bd5f845062c20f085eb2244520d71ef0ed095b7634329aee9ece8e0d32e7a7e",
+      "status": "prepared-unrun",
+      "originalLinkFailurePreserved": true,
+      "qualificationFreeze": {
+        "path": "scratch/alfred-controlled-method-coherent-twelve-successor-preparation-20261010/qualification-freeze.json",
+        "sha256": "471d936b1eb84af99444cb34810039dcb5a4ca9274a1a12a6908295dedb6000f",
+        "bytes": 6209,
+        "mode": 420,
+        "nlink": 1
+      }
+    }
+  ],
+  "policyDecision": "METHOD target ADR and Critic-budget wording remain pending; no self-approval",
+  "stagePromotionHere": false
+}

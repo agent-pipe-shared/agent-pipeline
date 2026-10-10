@@ -1,0 +1,40 @@
+{
+  "schema": "alfred.latest.stb-measurement-summary.v1",
+  "analysisPath": "scratch/alfred-stb-native-collector-before-after-diagnostic-preparation-20261010/observed-result-analysis.json",
+  "analysisSha256": "0b1e2d661439ca2f27585b80b0f602745fa64c0c04a859ce0745751dd915aeb6",
+  "facts": {
+    "actualMeasurementSha256": "3a3795abd7c2bf08b9723e256cdf74682d0499ce4be205211e18c0da08b65ba3",
+    "measuredCount": 8,
+    "totalCount": 12,
+    "all8NativeRootsAbsent": true,
+    "all8NativeFactsAndOperationsEmpty": true,
+    "all8OnlyMembershipEntrySetDigestDiffers": true,
+    "all8SelectedStateBytesAndIdentityConserved": true,
+    "historicalOperandsUnavailable": true,
+    "caseMappingUnavailable": true,
+    "earliestReadSiteUnavailable": true,
+    "causality": "No exact historical ancestor change established; no invariant fix selected",
+    "sourceCorrectionSelected": false
+  },
+  "latestRootReportedCases": {
+    "original12": {
+      "pass": 8,
+      "fail": 4
+    },
+    "independent8": {
+      "pass": 8,
+      "fail": 0
+    },
+    "failures": [
+      "STB003",
+      "STB004",
+      "STB005",
+      "STB006"
+    ],
+    "reason": "native-goldfish:namespace-drift"
+  },
+  "beforeAfterDiagnosticManifestPath": "scratch/alfred-stb-native-collector-before-after-diagnostic-preparation-20261010/manifest.json",
+  "beforeAfterDiagnosticManifestSha256": "22859f65a8676f6a03a33036e8b5ab465db5676fdffa37222c5b4369e5facd73",
+  "beforeAfterReplayStatus": "prepared-unrun-at-checkpoint",
+  "scope": "Eight of twelve consumed fixtures measured; no exact historical ancestor cause/case association/invariant fix established;26 positive constructors remain open"
+}

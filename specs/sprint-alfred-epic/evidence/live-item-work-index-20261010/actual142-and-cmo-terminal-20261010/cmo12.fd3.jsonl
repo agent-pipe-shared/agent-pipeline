@@ -1,0 +1,14 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["CMO001","CMO002","CMO003","CMO004","CMO005","CMO006","CMO007","CMO008","CMO009","CMO010","CMO011","CMO012"],"caseCount":12,"caseSetSha256":"036e3db04842b55f71f97d9fb176eadff72aec8c2b5ed84600ba4c26f540961c"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO001","ordinal":0,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO002","ordinal":1,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO003","ordinal":2,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO004","ordinal":3,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO005","ordinal":4,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO006","ordinal":5,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO007","ordinal":6,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO008","ordinal":7,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO009","ordinal":8,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO010","ordinal":9,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO011","ordinal":10,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"CMO012","ordinal":11,"disposition":"fail"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":12,"disposedCount":12,"caseIds":["CMO001","CMO002","CMO003","CMO004","CMO005","CMO006","CMO007","CMO008","CMO009","CMO010","CMO011","CMO012"],"caseSetSha256":"036e3db04842b55f71f97d9fb176eadff72aec8c2b5ed84600ba4c26f540961c","dispositionsSha256":"dab93dbaf65952733305250fd09d45c9befed8b6ea39da11dc3efa22ec720360","counts":{"pass":0,"fail":12,"skip":0,"todo":0}}

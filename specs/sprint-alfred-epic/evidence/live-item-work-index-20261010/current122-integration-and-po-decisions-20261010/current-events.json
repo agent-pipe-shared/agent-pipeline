@@ -1,0 +1,55 @@
+{
+  "schema": "alfred.current122.events.v1",
+  "parentCurrent120Manifest": "scratch/alfred-current120-event-and-crosswalk-reconciliation-20261010/manifest.json",
+  "canonicalSourceCount": 122,
+  "retainedPreviousMembers": 120,
+  "integration": "Root actual apply exit0; two physical replacements and two selected additions",
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "acceptance": 0,
+  "latestSTB": {
+    "source": "Root message and State owner checkpoint",
+    "countsMeasuredHere": false,
+    "original12": {
+      "pass": 8,
+      "fail": 4
+    },
+    "independent8": {
+      "pass": 8,
+      "fail": 0
+    },
+    "failedIDs": [
+      "STB003",
+      "STB004",
+      "STB005",
+      "STB006"
+    ],
+    "reportedSharedCode": "SDC-AUTHORITY-CAS",
+    "enumDiagnosticManifestPath": "scratch/alfred-stb-safe-home-four-failure-source-resolution-20261010/enum-replay/manifest.json",
+    "enumDiagnosticManifestSha256": "024bccf4e4d81e89d855fdbc92c79d73d8b825f1a755887d9307b65bf27ccf4c",
+    "enumDiagnosticStatus": "static-ready-unrun",
+    "nextOwner": "Root qualification",
+    "positiveConstructorsOpen": 26
+  },
+  "heldLaunchers": [
+    {
+      "slice": "HGL",
+      "owner": "quality_inline_coordinator_audit",
+      "status": "unsafe-launcher-held-successor-preparing"
+    },
+    {
+      "slice": "CMO",
+      "owner": "agy_greenfield_acceptance_audit",
+      "status": "unsafe-launcher-held-successor-preparing"
+    }
+  ],
+  "currentPlacementOwner": {
+    "owner": "agy_greenfield_intake_package",
+    "workLocation": "scratch/alfred-command-placement-current120-composition-preparation-20261010",
+    "status": "rebase-preparation-current120-with-explicit122-handoff"
+  },
+  "receiptHistoryClarification": "Copied integration receipt preserves its earlier original18-unrun wording. Separately actual original18 later passed18 on adapter0c; it does not prove current1fe8 original18 parity.",
+  "noLiveQualificationClaim": true,
+  "noStagePromotionFromCounts": true
+}

@@ -1,0 +1,164 @@
+{
+  "schema": "alfred.current122-checkpoint-manifest.v1",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "calibration": "SourceProposal operational metadata",
+  "inputs": [
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/actual-source-manifest.json",
+      "sha256": "15115993488b0d856b58fb6377be7e3d0ec4570ab06667e068998a47b8bb2ac6",
+      "bytes": 36241
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/actual-receipt.json",
+      "sha256": "82a4b7a3708e43ca5a05a97329bea13aab96523483f300f1476703641cf84224",
+      "bytes": 3553
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/manifest.json",
+      "sha256": "a30a97202b1f46d3cdf86b1a8822911f5a1a8ef4fb0dd5ed94511fa9da98ab8f",
+      "bytes": 941135
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+      "bytes": 33602
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/inverse/plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "9d60fdcbb310d533248741a581945fddcc7fc54d275e97c8f263af4858001159",
+      "bytes": 32792
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/source-postimages/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+      "bytes": 11185
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/inverse/plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "bdd0b171eb02375893b7f2c0416ef8824086bcc219bc91627cc10081bfd7be82",
+      "bytes": 9503
+    },
+    {
+      "path": "scratch/alfred-controlled-method-review-target-adr-proposal-20261010/manifest.json",
+      "sha256": "d28ea3a4ce58b26069818dc935f95f0f80d3772bb19d619613b11f03592dd87f",
+      "bytes": 1736
+    },
+    {
+      "path": "scratch/alfred-controlled-method-review-target-adr-proposal-20261010/draft-controlled-method-review-target.md",
+      "sha256": "aa90a072e69a941218ab04aed498c4753055d3ac2b783c0caec75a2314e779b7",
+      "bytes": 8585
+    },
+    {
+      "path": "scratch/alfred-controlled-method-review-target-adr-proposal-20261010/draft-controlled-method-review-target.json",
+      "sha256": "a7f8a505630a56ab66cf7d82edc86be04d63b38745325ea640f2cafebf0e178f",
+      "bytes": 355
+    },
+    {
+      "path": "scratch/alfred-controlled-method-review-target-adr-proposal-20261010/authority-and-limits.json",
+      "sha256": "b9fb28876cc9ed2598663436156fc279e8af4cffcb3b5a361601a94dd1d89fe3",
+      "bytes": 1435
+    },
+    {
+      "path": "scratch/alfred-critic-budget-and-reader-cap-source-resolution-20261010/source-resolution.json",
+      "sha256": "65751e93e253681a064489bcb2b638ebca0e58de248f6372832cf304717aa8db",
+      "bytes": 5139
+    }
+  ],
+  "payloads": [
+    {
+      "path": "actual-source-manifest.json",
+      "sha256": "15115993488b0d856b58fb6377be7e3d0ec4570ab06667e068998a47b8bb2ac6",
+      "bytes": 36241,
+      "mode": 420
+    },
+    {
+      "path": "actual-integration-receipt.json",
+      "sha256": "82a4b7a3708e43ca5a05a97329bea13aab96523483f300f1476703641cf84224",
+      "bytes": 3553,
+      "mode": 420
+    },
+    {
+      "path": "source/1.mjs.txt",
+      "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+      "bytes": 33602,
+      "mode": 420
+    },
+    {
+      "path": "source/1.patch.txt",
+      "sha256": "7f95d4bf73b15b0b675c3dfb08f527c34cc45c2c3c453b1aae8d301d70bf0e21",
+      "bytes": 2794,
+      "mode": 420
+    },
+    {
+      "path": "source/2.mjs.txt",
+      "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+      "bytes": 11185,
+      "mode": 420
+    },
+    {
+      "path": "source/2.patch.txt",
+      "sha256": "912ad2d91beec9b4bfc0c646d14e3a4c4f222954879e2d7786d1ec10595e48c9",
+      "bytes": 4433,
+      "mode": 420
+    },
+    {
+      "path": "source-custody-bindings.json",
+      "sha256": "46a6ed3d5e2c1646dd8305f621bc2cc376e273382060d8b8a4333f4786b723aa",
+      "bytes": 1311,
+      "mode": 420
+    },
+    {
+      "path": "po-proposal/draft-controlled-method-review-target.md",
+      "sha256": "aa90a072e69a941218ab04aed498c4753055d3ac2b783c0caec75a2314e779b7",
+      "bytes": 8585,
+      "mode": 420
+    },
+    {
+      "path": "po-proposal/draft-controlled-method-review-target.json",
+      "sha256": "a7f8a505630a56ab66cf7d82edc86be04d63b38745325ea640f2cafebf0e178f",
+      "bytes": 355,
+      "mode": 420
+    },
+    {
+      "path": "po-proposal/authority-and-limits.json",
+      "sha256": "b9fb28876cc9ed2598663436156fc279e8af4cffcb3b5a361601a94dd1d89fe3",
+      "bytes": 1435,
+      "mode": 420
+    },
+    {
+      "path": "critic-budget-source-resolution.json",
+      "sha256": "65751e93e253681a064489bcb2b638ebca0e58de248f6372832cf304717aa8db",
+      "bytes": 5139,
+      "mode": 420
+    },
+    {
+      "path": "po-decision-queue.json",
+      "sha256": "dc809abab741723b5a0078dfb8b2754a0f7a819feee634224b74c1a455414f5c",
+      "bytes": 1466,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "2a65022ac6d6adb1b402bfa31a0fb37544124547ef5d746724be91e2cc7dd66c",
+      "bytes": 1983,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "1fd6848695b9c762cec304bd2ae06627404242258d7b184a7b58b9ae0dab1d45",
+      "bytes": 1310,
+      "mode": 420
+    }
+  ],
+  "archivePlan": {
+    "path": "archive-plan.json",
+    "sha256": "24e65768d4a3ee35d419de709a4cd5b49742f949379ddae6c36beea1c816a6ef",
+    "bytes": 3069,
+    "mode": 420
+  },
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "nativeRouteVerified": false,
+  "accepted": 0,
+  "privacyReviewed": true
+}

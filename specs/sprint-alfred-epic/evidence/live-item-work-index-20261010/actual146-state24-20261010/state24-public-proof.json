@@ -1,0 +1,41 @@
+{
+  "schema": "alfred.actual146.state24-proof.v1",
+  "actualReceiptPath": "scratch/alfred-state001-safe-home-namespace-diagnostic-preparation-20261010/full-sequence-successor/execution.json",
+  "actualReceiptSha256": "6cdd25421d3549e60217a92bd5c160e4b7f056f1ee11baceeb4a8d325f895816",
+  "execution": {
+    "schema": "alfred.state001.original24-qualification.v1",
+    "freezeSha256": "9ac91752783596cf59227b2f1ff27dc8043b8e5737f7b7629b8216aaef36f9e3",
+    "childStarted": true,
+    "status": 0,
+    "signal": null,
+    "error": null,
+    "setupError": null,
+    "graphError": null,
+    "parentError": null,
+    "parserError": null,
+    "completion": {
+      "schema": "pipeline.verify-case-completion-attestation.v1",
+      "status": "complete",
+      "policySha256": "e15221857cc80542a64bd1db10c66d5f0040bec0fa48259ff0271c07a1e973d4",
+      "caseSetSha256": "5c9f1e285f7386c3b9f9ed35d3cdfc6a027a3ecb24903fc1ac3c3236603b7b60",
+      "dispositionsSha256": "f3bbb074f95eb6aed8368d61fad2588b6af843a675d65bee94496b0dcf607685",
+      "declaredCount": 24,
+      "disposedCount": 24,
+      "counts": {
+        "pass": 24,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      }
+    },
+    "fd3Sha256": "6c5d4f2d52493aba99f449fc5e0329761d29c95b0a673747d5f16101c6527713",
+    "fd3Bytes": 3763,
+    "availableSubsetPass": true,
+    "unavailableOwnedStatePositiveCount": 14,
+    "unavailableDomainPositiveCount": 12,
+    "nativeAssurance": false,
+    "officialClosure": false
+  },
+  "RootReportedSourceConserved": true,
+  "scope": "Original24 same assertions in actual full sequence;14 State owned positives and12 domain positives remain unavailable; no native/whole-item acceptance"
+}

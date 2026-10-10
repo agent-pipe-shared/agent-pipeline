@@ -1,0 +1,20 @@
+{
+  "schema": "alfred.actual142.events.v1",
+  "officialOpenItems": 176,
+  "AC": 37,
+  "IR": 4,
+  "accepted": 0,
+  "selectedSourceCount": 142,
+  "sourceCountNotItemCompletion": true,
+  "actualIntegrationOwner": "Root",
+  "HGLQualification": "Separate actual12PASS legacy controlled slice; not all12/native/whole142 acceptance",
+  "CMOStatus": "terminal0PASS12FAIL complete before target prerequisite; previous unrun snapshot remains historical",
+  "StateDiagnostic": {
+    "RootReportedSession": 50805,
+    "statusAtCheckpoint": "live-outcome-unknown",
+    "noOutcomeInferred": true
+  },
+  "prior122Archives": "immutable, already Root-copied; no recopy here",
+  "pendingPO": "METHOD target ADR and Critic budget interpretation remain unaccepted",
+  "generationLimit": "142source integration and separate HGL/CMO/State executions have distinct candidate/fixture generations; no aggregate qualification"
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "alfred.actual146-archive-index.v1",
+  "target": "main",
+  "sourceManifestSha256": "a7b4c15c003c3a24b685f2234be003c786328009d90d7d95eb70b48c25a3d623",
+  "planSha256": "e4efc9bfbf636f2f249b89c5ec6374d58cc40b489f6d0ad5dfd99d6ea66fa0e6",
+  "files": [
+    {
+      "path": "actual-source-manifest.json",
+      "sha256": "2b9683cf73347fc91d5c2833dfd233c6e5f574a34a8830eb4f02b63f0dbae381",
+      "bytes": 98776,
+      "mode": 420
+    },
+    {
+      "path": "actual-integration-receipt.json",
+      "sha256": "40b9e2e4ea15d18d3894eb56e67aa5f01d7dc5a563fff7a9754ad41b99628fa9",
+      "bytes": 1532,
+      "mode": 420
+    },
+    {
+      "path": "antigravity-plugin-topology.mjs.txt",
+      "sha256": "ded1a614d7f8af94c2e2fc8ed102c8b571222fae232be3274d43de05d7367336",
+      "bytes": 12903,
+      "mode": 420
+    },
+    {
+      "path": "topology-seven-case-binding.json",
+      "sha256": "6ed29c1c2f88e683696c2dc55d8a37e0bd885c11025ea4b880dcda95f5ecf131",
+      "bytes": 1618,
+      "mode": 420
+    },
+    {
+      "path": "state24-public-proof.json",
+      "sha256": "510eef7ebb946a0ccf8b378b1a727b3b65694eb5ce08606dbc8456113ed8fa36",
+      "bytes": 1682,
+      "mode": 420
+    },
+    {
+      "path": "po-decisions-2026-10-10-review-budget.md",
+      "sha256": "d72b7d21652d332d6d9a414b8ba77db60812b257dd3ae772915ac01185779fac",
+      "bytes": 1892,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "82cbbf7b5ed940677773c269da0e7292af75f68d8bc433999d065e130a0b5e9d",
+      "bytes": 2120,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "3778685cf1621c43a06be15b5777d927c92f939a2b2a9d403bfdd39684c21fd1",
+      "bytes": 1257,
+      "mode": 420
+    },
+    {
+      "path": "archive-plan.json",
+      "sha256": "e4efc9bfbf636f2f249b89c5ec6374d58cc40b489f6d0ad5dfd99d6ea66fa0e6",
+      "bytes": 1960,
+      "mode": 420
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "a7b4c15c003c3a24b685f2234be003c786328009d90d7d95eb70b48c25a3d623",
+      "bytes": 3601,
+      "mode": 420
+    }
+  ],
+  "canonicalSourceCount": 146,
+  "officialItemClosures": 0,
+  "wholeCriteriaAccepted": 0,
+  "nativeClaim": false,
+  "GitOperations": 0,
+  "businessRuns": 0
+}

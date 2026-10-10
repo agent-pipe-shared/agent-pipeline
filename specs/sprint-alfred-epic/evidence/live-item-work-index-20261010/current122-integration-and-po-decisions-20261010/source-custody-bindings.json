@@ -1,0 +1,38 @@
+[
+  {
+    "canonicalPath": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+    "parentSha256": "9d60fdcbb310d533248741a581945fddcc7fc54d275e97c8f263af4858001159",
+    "postSha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+    "canonicalMode": 420,
+    "artifact": {
+      "path": "source/1.mjs.txt",
+      "sha256": "1fe8f1a89b02a853ce340a3d4dfc2997262a56a157c684da8ab7364845c547f7",
+      "bytes": 33602,
+      "mode": 420
+    },
+    "diff": {
+      "path": "source/1.patch.txt",
+      "sha256": "7f95d4bf73b15b0b675c3dfb08f527c34cc45c2c3c453b1aae8d301d70bf0e21",
+      "bytes": 2794,
+      "mode": 420
+    }
+  },
+  {
+    "canonicalPath": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+    "parentSha256": "bdd0b171eb02375893b7f2c0416ef8824086bcc219bc91627cc10081bfd7be82",
+    "postSha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+    "canonicalMode": 420,
+    "artifact": {
+      "path": "source/2.mjs.txt",
+      "sha256": "eedacd749e3e5b824ba665e0cdcd859362f0ca0a37269df99938b8f8bb1aa56b",
+      "bytes": 11185,
+      "mode": 420
+    },
+    "diff": {
+      "path": "source/2.patch.txt",
+      "sha256": "912ad2d91beec9b4bfc0c646d14e3a4c4f222954879e2d7786d1ec10595e48c9",
+      "bytes": 4433,
+      "mode": 420
+    }
+  }
+]

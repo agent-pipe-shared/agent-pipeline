@@ -1,0 +1,86 @@
+{
+  "schema": "alfred.actual142-projection-manifest.v1",
+  "inputs": [
+    {
+      "path": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-source-manifest.json",
+      "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd",
+      "bytes": 97606
+    },
+    {
+      "path": "scratch/alfred-gitleaks-current120-assembly-preparation-20261010/actual-source-manifest.json",
+      "sha256": "15115993488b0d856b58fb6377be7e3d0ec4570ab06667e068998a47b8bb2ac6",
+      "bytes": 36241
+    },
+    {
+      "path": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-materialization-receipt.json",
+      "sha256": "c7b84915484ded728ccc6800b99ab1e6b157d11acc4aaee59dc091bbf9543a8a",
+      "bytes": 22643
+    },
+    {
+      "path": "scratch/alfred-controlled-method-coherent-twelve-successor-preparation-20261010/execution.json",
+      "sha256": "9b8024b4eaf949ed48d7fad191b74a79b93669a779a4999983ccd9b287f65db6",
+      "bytes": 1453
+    },
+    {
+      "path": "scratch/alfred-controlled-method-coherent-twelve-successor-preparation-20261010/qualification/completion.fd3.jsonl",
+      "sha256": "a0bb6dfd0b3106cf778e45388cbea1a6470f7cc5f303c650e405669c56427197",
+      "bytes": 2071
+    }
+  ],
+  "payloads": [
+    {
+      "path": "actual-source-manifest.json",
+      "sha256": "4dd5b4b8a7738acfd0920a45c1b91b43aafc87b504ae099bc305d5d7d628e6fd",
+      "bytes": 97606,
+      "mode": 420
+    },
+    {
+      "path": "actual-materialization-public-receipt.json",
+      "sha256": "f7f208dc295e1b6b281abeb4d3f41728bd4dc9319d0acaa2a4a75f77b7d13581",
+      "bytes": 20436,
+      "mode": 420
+    },
+    {
+      "path": "source-generation-map.json",
+      "sha256": "6480bbd2ffaa23fdc61b733e21accbb016eedef3510f727cd03bd8759d6dcc19",
+      "bytes": 48274,
+      "mode": 420
+    },
+    {
+      "path": "cmo12.fd3.jsonl",
+      "sha256": "a0bb6dfd0b3106cf778e45388cbea1a6470f7cc5f303c650e405669c56427197",
+      "bytes": 2071,
+      "mode": 420
+    },
+    {
+      "path": "cmo12-public-proof.json",
+      "sha256": "0d8ef208efa04dd63c0030d3f13b7f6293e34d6fd1fcd7d3120b1a0df9dfcbc2",
+      "bytes": 1530,
+      "mode": 420
+    },
+    {
+      "path": "current-events.json",
+      "sha256": "6cb30484923b72955a9a33b96a50c5488df4b76f0332b4b9fdb954a05431f916",
+      "bytes": 903,
+      "mode": 420
+    },
+    {
+      "path": "report.md",
+      "sha256": "fc6602ab6c93ba7e98142a3e351ab892cb42f194fdb3f61a11b4744c24cf9455",
+      "bytes": 1289,
+      "mode": 420
+    }
+  ],
+  "archivePlan": {
+    "path": "archive-plan.json",
+    "sha256": "028cc1e143a70b1f0c1e480cb8eb717d9eca68fc0e361b4279f08f5b3a0ca82d",
+    "bytes": 1786,
+    "mode": 420
+  },
+  "semanticRuns": 0,
+  "GitOperations": 0,
+  "accepted": 0,
+  "privacyReviewed": true,
+  "route": "SourceProposal methodology-only/native-unverified",
+  "ruleset": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d"
+}

@@ -1,0 +1,9 @@
+{"schema":"pipeline.test-case-completion.v1","event":"DECLARED","caseIds":["AGYVER001","AGYVER002","AGYVER003","AGYVER004","AGYVER005","AGYVER006","AGYVER007"],"caseCount":7,"caseSetSha256":"8db1578949636456f1796d9186e2b908163083bf2f575c3893fd4cf5bc382db3"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER001","ordinal":0,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER002","ordinal":1,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER003","ordinal":2,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER004","ordinal":3,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER005","ordinal":4,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER006","ordinal":5,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"DISPOSED","id":"AGYVER007","ordinal":6,"disposition":"pass"}
+{"schema":"pipeline.test-case-completion.v1","event":"TERMINAL","declaredCount":7,"disposedCount":7,"caseIds":["AGYVER001","AGYVER002","AGYVER003","AGYVER004","AGYVER005","AGYVER006","AGYVER007"],"caseSetSha256":"8db1578949636456f1796d9186e2b908163083bf2f575c3893fd4cf5bc382db3","dispositionsSha256":"cdb2aa49ce05917cc2f54d243b67ef2b6900db9783e3881baa6c019f86ea674b","counts":{"pass":7,"fail":0,"skip":0,"todo":0}}

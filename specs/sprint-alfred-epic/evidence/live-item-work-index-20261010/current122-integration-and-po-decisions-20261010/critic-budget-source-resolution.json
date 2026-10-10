@@ -1,0 +1,85 @@
+{
+  "schema": "alfred.critic-budget-reader-cap-source-resolution.v1",
+  "taskId": "alfred-critic-budget-and-reader-cap-source-resolution-20261010",
+  "duty": "SourceProposal / source-resolution evidence",
+  "rulesetSha256": "b7115494a79c3271c224c51d0bd388b0ccfff931a4ae11a0cd6a7eb19ce0b88d",
+  "methodologyOnly": true,
+  "productExecutionPerformed": false,
+  "gitOperationsPerformed": false,
+  "currentInventory": {
+    "path": "scratch/alfred-optional-advisor-current114-assembly-preparation-20261010/actual-source-manifest.json",
+    "sha256": "29df256e9f74272e404e61baf8796184f2558d137f7d38f51eeac16ce28d706c",
+    "count": 120
+  },
+  "sourceResolutions": [
+    {
+      "requirement": "Reader v2 course: two regular paired rounds plus at most one justified COMPLETE escalation; preserve legacy v1 four-round validation",
+      "status": "already-selected-and-implemented",
+      "selectedSources": [
+        {
+          "path": "harness/scripts/doc-reader-terminal-binding.mjs",
+          "sha256": "5f9aa17c130d1c2c942e27dcb866dd8a47dc045c9002752f719d8c1aa098ad94",
+          "selection": "BASE73"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/doc-reader-course.mjs",
+          "sha256": "a8a43a799a7f4aeb92bde83d9b8078bcdde2b5bc272f97578d71366e2955161f",
+          "selection": "BASE73"
+        },
+        {
+          "path": "harness/scripts/doc-reader-course-budget.test.mjs",
+          "sha256": "0ede055126e4d2edc67c93e2d2638241726a5e6e4e4dda8c56c050fb7eb5a4cc",
+          "selection": "BASE73"
+        }
+      ],
+      "sourceEvidence": "The selected terminal binder accepts v2 lengths 2 or 3, retains v1 length 4, and rejects a third v2 round unless the exact escalation record binds afterRound 2, a bounded reason, and an immutable source whose commit precedes the third reviewed snapshot. The selected course module and budget test are present in the current 120 inventory. No new Source change is indicated."
+    },
+    {
+      "requirement": "Critic budget and round cap",
+      "status": "runtime-control-present; crosswalk-alias-bindings-and-user-cap-wording-unresolved",
+      "currentRuntimeSources": [
+        {
+          "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+          "sha256": "710cba1eda8168f5c2cd4c868f563e119655aee36540f0b2d9f4b51ddfd8d6b0",
+          "selection": "CURRENT9"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/review-economy.mjs",
+          "sha256": "c85630b6e73fe17113d8df0b4706439a31d6022d88984de09db5c28cdf7e9b12"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+          "sha256": "193eec52c39c3f66a43c5b18fcc60742b7b60fdd069b322232e1a49537e5a313"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
+          "sha256": "6652c27fa519bf25197ff4b646842e1f845f7c7888381468de7d8b76d5cd3216"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+          "sha256": "601b359f44be9c367b476d6a65e03177f31b88e069123d26a16184b5bdf217a4"
+        },
+        {
+          "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+          "sha256": "b5075c7e0031ebba574435593856caf92763a124ec9a009d59d659a57368c285"
+        }
+      ],
+      "missingCrosswalkCanonicalBindings": [
+        "plugins/pipeline-core/lib/critic-launch-observation.mjs",
+        "plugins/pipeline-core/lib/critic-lifecycle.mjs"
+      ],
+      "sourceEvidence": "The current dispatch preflight imports and invokes readCriticCourseAdmission. That runtime composes selected review-economy admission with selected dispatch-budget launch observation and consumed-result lifecycle helpers. Ordinary review behavior allows one full round and one delta round; the authenticated QG-13 actual-PASS path may admit rounds 3-4. The runtime reports maxReviewRounds 4 and maxCorrectionCommits 3. Exact critic-launch-observation.mjs and critic-lifecycle.mjs are absent from the current inventory and no files with those exact names were present in scratch. Existing behavior is in selected renamed modules; this is not a docs-only controller."
+    }
+  ],
+  "disposition": {
+    "newCriticSourcePatch": "not-prepared",
+    "reason": "The task forbids changing accepted criteria and supplies shorthand 'max one Critic + correction diff' that is ambiguous against the retained ordinary two-round delta behavior and explicit QG-13 rounds 3-4 actual-PASS exception. A hard single-review cap would change both. The selected runtime already provides a real bounded dispatch admission path; exact missing crosswalk names are not proof of missing implementation.",
+    "rootDecisionNeeded": "Confirm whether the user's cap supersedes QG-13 actual-PASS rounds 3-4 and whether 'one Critic + correction diff' means one review total or one full plus one delta review."
+  },
+  "limits": [
+    "No product source was edited, imported, or executed.",
+    "No test was authored or run.",
+    "No Audit or Main path was read or modified.",
+    "Current selected-source presence is not an item-specific qualification or closure claim."
+  ]
+}

@@ -1,0 +1,509 @@
+{
+  "schema": "alfred.actual142.public-materialization.v1",
+  "actualReceiptPath": "scratch/alfred-hgl-current114-coherent-source-preparation-20261010/current122-assembly-proposal/actual-materialization-receipt.json",
+  "actualReceiptSha256": "c7b84915484ded728ccc6800b99ab1e6b157d11acc4aaee59dc091bbf9543a8a",
+  "status": "complete",
+  "error": null,
+  "actualDerivedSourceCount": 142,
+  "operations": [
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "93957f6c60955c0ce8ad30628ed80c1d79758cbb07e28e0deb5357b6e52ecb84",
+        "bytes": 246487,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/human-guard-override.mjs",
+        "sha256": "527779fe39bdc9994b8f21a3578a6e563c489a95c951f57df04a3be80e3b0616",
+        "bytes": 301059,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/human-guard-override.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "sha256": "955053b189da72353c19c0a476213b684856ef61549f152d534900d951c74610",
+        "bytes": 176415,
+        "mode": 493,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/po-human-approval.mjs",
+        "sha256": "961ea6bef05402e5cee4d145df22592f0ad4b9006b410f77282ff44f780b6a49",
+        "bytes": 178532,
+        "mode": 493,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "logicalGitClass": "100755"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-requester-bridge.mjs",
+      "kind": "add",
+      "parent": null,
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-requester-bridge.mjs",
+        "sha256": "ba8bc1b9afd9885e56bb0dab2d1f36a1fc81860dffb0624e64a08da08818b64c",
+        "bytes": 39560,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": null,
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-observers.mjs",
+      "kind": "add",
+      "parent": null,
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-observers.mjs",
+        "sha256": "2df8489463e3e63a24e55904738b8a9f2e10a648804e9c12815caa281866b819",
+        "bytes": 3165,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": null,
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "kind": "add",
+      "parent": null,
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-registry.mjs",
+        "sha256": "3c9f9cb0f5e792e3aca1447436d289bba3d948230b4a545581d1cfa11b835c2d",
+        "bytes": 122576,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": null,
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "2a0b0b9bd2f16948758aebbb62c4079f283ba9767a32a8dc1c6eaa998672aa43",
+        "bytes": 728628,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "sha256": "a52fec798a5c83966d70d830633a74e97ba77d9fee8b3c279750b495dd17f4db",
+        "bytes": 794431,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+        "sha256": "22e23a1099f2344f8d16b0cc06ffda461e7aee9becfb07b09be4067e60ffff57",
+        "bytes": 7566,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+        "sha256": "2dff589e957ae9b2de059b35b57888232a2a18e3f28ffb39832c8f64a0bc0fc6",
+        "bytes": 28714,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "202572a093803bb0b0376377c63e61a08d2dfe6cb453c38ffa10da1c3c284632",
+        "bytes": 11669,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+        "sha256": "a8bb9a199c162434721f00fa0e02dc311cbf5c3c3edc5f855db78fe1a8616fac",
+        "bytes": 26894,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/codex-host-process-journal.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "sha256": "b1eb62d7f167995744d843557df7cf9471a7e719a4252b7561d94e15f4c0dcef",
+        "bytes": 14870,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+        "sha256": "880dfaca2300c0ec16669edcddb824a5627b5ebe32216b1ed0c29ca51649cbcd",
+        "bytes": 29615,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-session-authority.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-authority.mjs",
+        "sha256": "f93f53aed13588b52814d3b374b2e94f0668097a8c808ee1298ced353c9745c5",
+        "bytes": 23310,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-authority.mjs",
+        "sha256": "e1c576f78629a5fdc87137d8ec190ba2118e77b0e9379022dc9b182400ba63b0",
+        "bytes": 36376,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/agy-session-authority.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+        "sha256": "b1b17fc00d86df857ecf70f82ef485a73414a330117e6d3cbcf830242c04a7eb",
+        "bytes": 35509,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+        "sha256": "4d82954f182b8e21ed6711efcca335284f2d6aac15f2af1d36d9e681d0edb20f",
+        "bytes": 51174,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "0e5bd3554720a34c96f8a49f8ebe1962776cb448b06b54d4719ca7703ce80bec",
+        "bytes": 62084,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-host-store.mjs",
+        "sha256": "2e02fba077aa7a91278743bccb6ab91fce83cdf4ae7af1ccfc19d013bf982930",
+        "bytes": 70896,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/afk-ledger.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "258abe7f1d920426b358c1572609bfd61a58ddd45d67d4ac04380f6aeeef06ad",
+        "bytes": 27235,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/afk-ledger.mjs",
+        "sha256": "64d793a0c3d2f09b0bd8cacbc0e6ef214500a770afca5122fd1f02d39d87c390",
+        "bytes": 31290,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/afk-ledger.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-power.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "c26890face66f58b93d378979d2bf3f547f4d39abc1e1837c8f95c07e74ffec2",
+        "bytes": 24777,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-power.mjs",
+        "sha256": "cd53511d48c6f484415acc75d6eba94903252b71e0d83cce66106924e67660c0",
+        "bytes": 28129,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/session-power.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "e74c95581f117d03f06b233bae0a8a83bb822ef7726134ba620a30c46dfba8e8",
+        "bytes": 62885,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+        "sha256": "bb88b93125d240b6ec671fb795fc8454435a641306fd10050690186ef72bd262",
+        "bytes": 70229,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/local-worker-supervisor.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "kind": "add",
+      "parent": null,
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+        "sha256": "1a6367488ccd31a36b75776e458b1d11d3047c115d06fdb31d8d87683873aff7",
+        "bytes": 21109,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": null,
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+        "sha256": "a2bddc0027cd30f0ed9f55460bce46b2306ff03b6ed9d677f85ad02c4cca8d56",
+        "bytes": 48969,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+        "sha256": "2d03909b66e940e665bbd684dd02498c27cc32ce1ea22043dbc2e5fa19ea3657",
+        "bytes": 49200,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "sha256": "2880f2d57a8621876156f143bc34ac00c137ebb01e1b703b41365b453b1f1ef6",
+        "bytes": 7128,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+        "sha256": "33057d57247a103ba9b739d9c42f0e145ad8f5e7775b9fc16bb5183a28e75b99",
+        "bytes": 26973,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+      "kind": "add",
+      "parent": null,
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-managed-authority-support.mjs",
+        "sha256": "124dd2f01ea47f788fe0dd71a8b20d4454d6cbb5bd8d1e47115f0c2ea3625a0f",
+        "bytes": 6940,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": null,
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee",
+        "bytes": 14803,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+        "sha256": "ddb70e13b598ef3ab83f6294acaecdddd291aa1cc532b555ecfbb6dc13af0a7c",
+        "bytes": 18854,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "sha256": "e2ddc79983e334e98a92bfbf54747bdaf1a412589225375a8c8f05447270566e",
+        "bytes": 8077,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+        "sha256": "30741dff332fb375b081fde7ba9e1d74787f8d2588da30c07c0ba5731e7c281f",
+        "bytes": 12679,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "sha256": "78e2ef73537498b459d9a77acb1b9bf8e9e515a21c5ed580429e0592837d8853",
+        "bytes": 12789,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+        "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699",
+        "bytes": 13184,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "sha256": "d4d398eb2303b51d791d710dda7d1448787296d9bb32e49b6d048b7d9cfd35d2",
+        "bytes": 14525,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/model-family-invocation.mjs",
+        "sha256": "7600193f6a35670859861ab9f5bb807565951d0ac55ce20197130d4f5a256d8a",
+        "bytes": 15676,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/model-family-invocation.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "016f17e4e793f620176a25608a44ebfa003b3aae591ada2d77bcd65feac2e29a",
+        "bytes": 16449,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+        "sha256": "af961bcadb562a77eb29189a0b6ba0fc46dd8679b5bbfe39e11374b2e92a8351",
+        "bytes": 16936,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/local-supervisor-state.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "sha256": "366aadcfa6619c8d72e6c02259f590f4b8d3b6d6e223a4cb2146d02fd5ef0541",
+        "bytes": 101734,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "sha256": "8d398b1b8f1492fbd3b923b95a316b5a140c2019e118fdb2cd6a01f2ad9d4277",
+        "bytes": 117511,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+      "logicalGitClass": "100644"
+    },
+    {
+      "canonicalPath": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "kind": "replace",
+      "parent": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "384224a5ceee61c14ae72a50a452863e58b3374294c445761a977087fc5e2290",
+        "bytes": 425560,
+        "mode": 420,
+        "nlink": 1
+      },
+      "actualPost": {
+        "path": "scratch/alfred-greenfield-agy-audit-20261009/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "sha256": "b0aa73f591bd3043c55703830d095fc64e5326a91145910d3fdb3922684060a6",
+        "bytes": 523449,
+        "mode": 420,
+        "nlink": 1
+      },
+      "backup": "backups/plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "logicalGitClass": "100644"
+    }
+  ],
+  "backupCount": 21,
+  "physicalAdditions": 5,
+  "all122MembershipPreserved": true,
+  "unchangedPrior122BytesAndModes": 116,
+  "priorMembersReplaced": 6,
+  "selectedMembershipAdditions": 20,
+  "preservedOA6AndGitleaks2": true,
+  "GitWrites": 0,
+  "semanticRuns": 0
+}
