@@ -61,6 +61,7 @@ and reuse the Codex results through
 | --- | --- | --- |
 | P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | **blocked before launch** by guard-dispatch `SQ-DELIVERY-STATE-UNAVAILABLE` (see T6); nothing ran, nothing written |
 | P0 pilot v3 | git-for-windows-2-56-rejects-git-config-global-nul (`ALF-C-P0-NUL`, R7-1a / AC-37) | T6-A installed (`0.7.0+claude.20261012094314.d097ecf`, hooks refreshed, preflight ready). Read-only pre-check of the built v3 prompt: briefing `NGHR-BRIEFING-VALID`; **not launched** because admission would refuse twice — see T10 |
+| Scope fanout | all 174 items, 8 read-only Sonnet dispatches (`ALF-SCOPE-01…08`) | Done 2026-10-12. Results under [scope/](../implementation/claude-2026-10-12/scope/), not Elephant-verified. Status counts: 17 implementable, 43 already-satisfied (evidence binding only), 31 needs-native-host, 23 needs-po-decision, 60 unclear. [wave-plan.md](../implementation/claude-2026-10-12/wave-plan.md): the 17 implementable items fall into 5 disjoint waves (10/4/1/1/1). Overlaps are reserved on write paths, the check test, and the lib/scripts module family. `po-human-approval.mjs` serializes three items. `windows-owned-authority-backend.mjs` sequences the dispatch-budget item after T11. The 60 unclear rows go to a one-Goldfish-per-item EGM analysis that starts with a live re-check. Every productive dispatch still waits on T10 and T11 |
 
 ### T6-A exception scope (PO-granted, Elephant-implemented)
 
