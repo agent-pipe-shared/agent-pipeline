@@ -6,9 +6,11 @@
 **Current task: portable Alfred WIP checkpoint, 2026-10-12.**
 Start at [the Claude handover](../specs/sprint-alfred-epic/plans/HANDOVER-2026-10-12.md).
 The PO requests all important work and public evidence committed for another PC.
-The subsequent instruction authorizes pushing the complete checked checkpoint to
-`origin`, `refs/heads/feat/sprint-alfred`. No push has yet occurred.
+The checkpoint was pushed: `origin/feat/sprint-alfred` = `6447fcc1a` (observed
+2026-10-12 by the Claude continuation after `git fetch`).
 This is a transfer checkpoint, not release, installation readiness or acceptance.
+Claude continuation ledger (batches, collected patches, PO topics):
+[claude-session-2026-10-12](../specs/sprint-alfred-epic/plans/claude-session-2026-10-12.md).
 
 ## Scope and measurable progress
 

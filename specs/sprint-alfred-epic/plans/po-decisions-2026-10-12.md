@@ -67,4 +67,19 @@ everything is included. The target is `origin`, `refs/heads/feat/sprint-alfred`.
 Preparation and ordinary local commits are authorized; actual protected
 Source and push signatures remain governed by the installed exact-scope
 validators. No old proof, invented review, or verification PASS is implied.
-No push has yet been performed.
+The push has since been performed: on 2026-10-12 the Claude continuation
+observed `origin/feat/sprint-alfred` at `6447fcc1a` (equal to local HEAD) after
+`git fetch`.
+
+## Signature-bound work: prepare now, sign en bloc later (PO, 2026-10-12, Claude session)
+
+PO chat instruction (German original, paraphrased in English): topics that need a
+signature may be worked on as normal; collect the resulting patches, and the PO
+signs them in one block when present. Consequence: whole-item owners also
+prepare changes whose integration needs a human signature (protected paths,
+signed quality package). Such changes are delivered as inert, digest-bound
+patches under `specs/sprint-alfred-epic/implementation/claude-2026-10-12/`,
+never applied to protected paths and never self-authorized. One combined
+signing package is prepared for the PO's next attended session. This is not
+a signature, approval or acceptance; seed any ceremony only when the PO can
+sign immediately.
