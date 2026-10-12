@@ -1,0 +1,52 @@
+{
+  "schema": "pipeline.feature-package.v1",
+  "feature": {
+    "id": "sprint-alfred-epic",
+    "rigor": 2
+  },
+  "state": "implementing",
+  "artifacts": [
+    {
+      "class": "prd",
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "spec",
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "acceptance",
+      "path": "specs/sprint-alfred-epic/acceptance.md",
+      "sha256": "1a0427d91e0297f9e4f533fc733fb0f80ddb6b3d9b1ca0845af187eab22e8fd7",
+      "authority": true,
+      "mutability": "mutable",
+      "retention": "active"
+    },
+    {
+      "class": "result",
+      "path": "specs/sprint-alfred-epic/result.md",
+      "sha256": "c5ea827698aee6e26a5f14b703528ee5b93d4ee9a44f0de9b46a5aa9a8787eb6",
+      "authority": true,
+      "mutability": "append-only",
+      "retention": "active"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-alfred-epic/evidence/accepted-delivery-contract-17a060259731894745877ef86adca9eb09f9c1239d7c0358dee063bfc4656ac3.json",
+      "sha256": "17a060259731894745877ef86adca9eb09f9c1239d7c0358dee063bfc4656ac3",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    }
+  ],
+  "candidate": null,
+  "supersedes": null
+}

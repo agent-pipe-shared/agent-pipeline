@@ -131,6 +131,51 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
     defect.
   - A failed `sign-intent` leaves `.git/agent-pipeline/session-authority/registry.lock`
     behind (`registry-lock-held` on retry), and there is no recovery action for it.
+- T19 (2026-10-12, PO decision): governed item admission refused the pilot with
+  `CAC-REGISTRATION-INVALID`. `readAcceptedDeliveryContract` requires the signed
+  accepted-delivery contract to be registered as `candidate-evidence` in
+  `specs/sprint-alfred-epic/lifecycle.json`. `approve-plan` writes that `manifestPath`
+  into the envelope without checking the manifest exists, and no product writer
+  registers `candidate-evidence` (only test fixtures build it by hand; the
+  sanctioned bootstrap admits only `draft` with one PRD).
+  The PO chose a script: `scratch/alfred-claude-20261012/write-alfred-lifecycle.mjs`
+  writes the manifest in state `implementing`, binding prd/spec/acceptance/result and
+  the contract; `validateFeaturePackage` and the identity resolution both pass.
+  The next gate, `item-course-criterion-unbound` (`native-goldfish-host-state.mjs:838`),
+  admits only criteria that already have an independent PASS, or that have no
+  criterion at all, so no open AC can ever be admitted. Per the PO's pre-agreed fallback,
+  dispatch continues WITHOUT the v3 item binding (`build-v3.mjs … plain`):
+  template-built goldfish-task briefings, and the Goldfish commits by exact pathspec.
+  §23 evidence is reconciled afterwards.
+  This is the fourth late design-route failure after DDB, ceremony mode bits and the
+  per-file `ls-tree`.
+
+### Design-to-implementation blocker list (PO 2026-10-12: map onto EXISTING Alfred items, no new item, no design reopen)
+
+PO target: switching from design to implementation takes about 10 minutes of PO time and
+exactly one terminal signature. On 2026-10-12 it took over 7 hours. Every blocker surfaced
+only after the previous one was fixed.
+
+Each blocker gets fixed under an existing Alfred item (Windows/performance/route items),
+or as a follow-up note on one. It never becomes a new scope entry.
+
+1. POSIX mode checks on win32 (`design-decision-bindings.mjs` `DDB-PARENT-UNSAFE`,
+   `chat-gate-ceremony.mjs` `chat:unsafe-namespace-chain` after the passphrase). Skipped on win32 in
+   `5672330ac`; the proper fix is the DACL assessment. The ~160 similar sites still need a sweep.
+2. A stale `session-authority/registry.lock` after a failed `sign-intent`; no recovery action.
+3. The Elephant's own Windows fix is refused while the plan awaits approval, so every fix becomes
+   a PO-run script.
+4. `approve-plan` took about 1 h: one `git ls-tree` per file (hotfixed, uncommitted, protected).
+5. `approve-plan` `CAC-CAPTURE-READBACK`: directory fsync on win32, plus a stale contract file, and
+   the cause is swallowed (hotfixed, uncommitted).
+6. `CVCT-APPROVAL-UNAVAILABLE`: the writer does not harden the state-file DACL (PO `icacls`).
+7. `CAC-REGISTRATION-INVALID`: no lifecycle.json and no candidate-evidence writer (T19 script).
+8. `item-course-criterion-unbound`: open ACs can never be admitted (T19 fallback).
+
+The root pattern: no end-to-end test of the real route on a legacy package on native Windows.
+Fixtures hand-build exactly the missing pieces. Fix direction: one read-only route pre-check
+that reports every precondition before the signature, a performance bound on approve-plan, and an
+end-to-end test from a legacy package to an admitted open-AC item.
 
 ## PO topics (to ask when the PO is present)
 
