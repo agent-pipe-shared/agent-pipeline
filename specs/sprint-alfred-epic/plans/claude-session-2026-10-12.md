@@ -215,7 +215,11 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
   - Capacity: two productive Goldfish slots under the current limit. The PO was asked whether to raise it.
 - **PO decision 2026-10-12:** follow both recommendations, T11 (a) and T10 (§23 register plus one re-approval signature).
   - T11 (a) applied in `b1933efa0`; the helper working copy is now LF and matches the pin. Stamp `b29cf4f4c` (`0.7.0+claude.20261012111014.b1933ef`) is waiting for the PO's install.
-  - Capacity was not answered; it stays at the default.
+  - Capacity, PO 2026-10-12: up to 10 parallel dispatches. This matches the shared-pool direction in `docs/adr/draft-shared-agent-capacity.md` (proposed, not adopted).
+    - Checked in source: `concurrencyLimit` is only seeded (value 4) and shape-validated (`continuity-state.mjs:335-354`). The legacy reserved slots normalize to the shared shape, so no idle Critic or recovery slot is subtracted.
+    - No dispatch guard enforces the number. The only consumer is the Workflow failover recovery check at `workflow-writer-preflight.mjs:440-441`, which does not apply to Agent-tool dispatches.
+    - So no source change is needed for 10 parallel: the effective bound is disjoint write scopes, enforced by the guard's collision check.
+    - The State value stays 4. No sanctioned capacity migration writer exists, and protected State is not hand-edited.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
