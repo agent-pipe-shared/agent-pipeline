@@ -85,6 +85,19 @@ test("CLI normalizes unsorted --path input to the sorted output and still refuse
     "GF-COMMAND-PATH");
 });
 
+test("ALF-C-W1-03 AC-137: the CLI producer never spends a refusal on path order for any permutation of several paths", () => {
+  const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,
+    "--summary", input.summary, ...input.bodyParagraphs.flatMap((body) => ["--body", body])];
+  const paths = ["docs/new file.md", "src/regular.js", "src/zeta.js"];
+  const sorted = runGoldfishCommitCommandFlow([...base, ...paths.flatMap((path) => ["--path", path])]);
+  assert.equal(sorted.ok, true);
+  for (const order of [[2, 1, 0], [1, 2, 0], [2, 0, 1], [1, 0, 2]]) {
+    const result = runGoldfishCommitCommandFlow([...base, ...order.flatMap((i) => ["--path", paths[i]])]);
+    assert.equal(result.ok, true, `order ${order.join("")} is normalized, not refused`);
+    assert.deepEqual(result, sorted);
+  }
+});
+
 test("generated commands create one exact-path Git commit with the required trailer block", (t) => {
   const root = mkdtempSync(join(tmpdir(), "goldfish-command-flow-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
