@@ -244,6 +244,9 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
     2. Ship the wave planner as a plugin script. It reads the item write and check scopes and emits disjoint waves.
     3. Add the fanout default to the post-compact reground context.
     4. Add a `pipeline-start` rule that an epic's item register is a Spec section.
+- **PO decision 2026-10-12: T15 is in.** T14 and T15 are new work, not original Alfred items, so neither has a §23 row yet.
+  - The T10 design review budget is spent: an initial review plus one delta, and ADR-0085 allows no round 3. Adding rows now would void both receipts.
+  - So T14 and T15 enter by one follow-up Spec delta, with rows AC-275 and above. It is bundled with any other scope additions at the next design reopen, after the first waves are admitted. That costs one more review and one more PO signature, and the T10 approval is not delayed.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
