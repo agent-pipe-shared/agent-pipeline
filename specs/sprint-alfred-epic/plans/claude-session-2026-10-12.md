@@ -103,6 +103,13 @@ local marketplace copy. Review: one full design-tier Critic (MP-07).
   on native Windows/Claude. Not bypassed: no hand-written queue, no guard
   disable, no hooks/installed-plugin edit, no non-goldfish agent writing code.
 
+### Wave pre-check (2026-10-12, Elephant, existence only)
+
+This is a pre-check of the 17 implementable rows; it only checks that the named paths exist.
+- 10 rows have an existing check test.
+- 6 rows name a new test file for the Goldfish to create: hgo-disjoint, both platform-owner tests, NUL sites, both git-hook-runtime-snapshot rows, and guard-override digest.
+- `gitleaks-content-suppression-does-not-match-on-windows` names `lib/gitleaks.mjs`, which does not exist. Its write set must be re-derived inside that item's EGM dispatch, so it is not briefable as scoped.
+
 ## Collected signature-bound patches
 
 (none yet)
@@ -195,6 +202,15 @@ local marketplace copy. Review: one full design-tier Critic (MP-07).
   normalization in the backend. Either is a source change under the current
   dispatch catch-22 (no Goldfish admissible), so it needs the PO's call
   together with T10.
+- **T12 Item-level PO decisions (23, from the scope fanout):** these rows are listed under `needs-po-decision` in [wave-plan.md](../implementation/claude-2026-10-12/wave-plan.md), and each one's reason is in its scope batch file. Some are bundled with topics already raised:
+  - Opus-critic routing: covered by today's direction.
+  - design-workflow-package-omits-contract: part of T10.
+  - critic-scratch-notes: reproduced live.
+  The rest are presented to the PO as one list, in groups: design-course and Advisor routes, trailer form, push lane, security scope, and telemetry ownership.
+- **T11/T10 recommendation (raised 2026-10-12):**
+  - T11: the preferred option is a per-file `.gitattributes` `eol=lf` override for the helper, plus a one-time re-checkout. It writes no production code. It also avoids colliding with the prepared backend postimage of the dispatch-budget item.
+  - T10: the §23 register; recompute the locators against the actual post-edit spec sha; then one current-schema re-approval signature.
+  - Capacity: two productive Goldfish slots under the current limit. The PO was asked whether to raise it.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
