@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-10-09T09:43:11.012Z",
+  "updatedAt": "2026-10-12T16:04:00.133Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -469,13 +469,29 @@
       {
         "phase": "implementation",
         "at": "2026-10-07T06:43:11.228Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-12T11:37:05.940Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-12T11:37:05.940Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-10-12T11:37:05.940Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-10-12T16:04:00.131Z"
       }
     ]
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-alfred-epic",
-    "revision": 32,
+    "revision": 35,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -484,11 +500,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-        "sha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8"
+        "sha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e"
       },
       "spec": {
         "path": "specs/sprint-alfred-epic/spec.md",
-        "sha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+        "sha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
       },
       "result": null
     },
@@ -504,7 +520,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 31,
+      "sourceRevision": 35,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -532,10 +548,10 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "71dcfcbe134617ef37cd30a6a016cd8e5af01b8e20261aa6e91605fbc7561b11",
+    "invalidatedSubmissionSha256": "91c6e662c1f381377bc6d4cda467917109ea21c89a25b9d6d13b68e84fd904c2",
     "invalidatedApprovalSha256": null,
-    "invalidatedBy": "APS",
-    "invalidatedAt": "2026-10-06T21:21:17.119Z",
+    "invalidatedBy": "The Agent-Pipeline Contributors",
+    "invalidatedAt": "2026-10-12T11:37:05.940Z",
     "reason": "reopen-design"
   },
   "planMixedStateRecovery": {
@@ -552,13 +568,13 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-alfred-epic",
     "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-    "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+    "planSha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
     "specPath": "specs/sprint-alfred-epic/spec.md",
-    "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+    "specSha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6",
     "profile": "epic",
     "profileSha256": "a58df122a632741cdfb0d305e75163fa084c4219811676ecc67e7787a093fd46",
-    "submittedBy": "APS",
-    "submittedAt": "2026-10-07T06:35:14.540Z"
+    "submittedBy": "The Agent-Pipeline Contributors",
+    "submittedAt": "2026-10-12T13:05:03.905Z"
   },
   "selectedProfile": "epic",
   "planApprovalBriefing": {
@@ -566,9 +582,9 @@
     "scope": {
       "featureId": "sprint-alfred-epic",
       "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-      "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "planSha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
       "specPath": "specs/sprint-alfred-epic/spec.md",
-      "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468",
+      "specSha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6",
       "profile": "epic"
     },
     "change": {
@@ -585,20 +601,1042 @@
       "scope-beyond-bound-plan-and-spec"
     ]
   },
+  "rigorHistory": [
+    {
+      "schema": "pipeline.rigor-journal-entry.v1",
+      "previousEntrySha256": null,
+      "entrySha256": "e524dfd40d9e0428ce68f742ad9c659b724def81b5ddd6c61ac49154e5ee8ef1",
+      "body": {
+        "featureId": "sprint-alfred-epic",
+        "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "boundary": "plan-submission",
+        "observedAt": "2026-10-12T11:46:53.285Z",
+        "candidate": {
+          "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+          "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+        },
+        "baselineCandidate": {
+          "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+          "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+        },
+        "inputs": {
+          "plannedPaths": {
+            "value": [
+              "docs/ARCHITECTURE.md",
+              "docs/state.md",
+              "harness/scripts/verify.mjs",
+              "policies/alfred-e3-gate-readback.v1.json"
+            ],
+            "status": "available",
+            "sourceContract": "pipeline.architecture-planning-surface.v1"
+          },
+          "actualPaths": {
+            "value": [
+              "project/pipeline-state.json",
+              "project/pipeline-state.json.lock",
+              "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md"
+            ],
+            "status": "available",
+            "sourceContract": "git.working-tree"
+          },
+          "protectedTouches": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "contractDeltas": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.contract-freeze.v1"
+          },
+          "reversibility": {
+            "value": "high",
+            "status": "available",
+            "sourceContract": "pipeline.reversibility-assessment.v1"
+          },
+          "diffStats": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "git.diff-stat"
+          },
+          "selectedProfile": {
+            "value": "epic",
+            "status": "available",
+            "sourceContract": "pipeline.state.v0:selectedProfile"
+          },
+          "protectedIdentity": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "architectureProfile": {
+            "value": {
+              "id": "inherited-agent-first",
+              "source": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+              "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+            },
+            "status": "available",
+            "sourceContract": "pipeline.architecture-profile.v1"
+          },
+          "fitnessOutcomes": {
+            "value": {
+              "sourceSha256": "7b87a2b3bd86a69dc7b9c6ec35e4cb058b1dc43f7649c0c576ca1048133b0b4b",
+              "outcomes": [
+                {
+                  "classId": 1,
+                  "propertyId": "module-identity-ownership",
+                  "outcome": "finding"
+                },
+                {
+                  "classId": 2,
+                  "propertyId": "contract-presence-freshness",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 3,
+                  "propertyId": "dependency-direction-cycles",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 4,
+                  "propertyId": "boundary-crossing",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 5,
+                  "propertyId": "authority-effect-ownership",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 6,
+                  "propertyId": "verification-locality",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 7,
+                  "propertyId": "navigation-currency",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 8,
+                  "propertyId": "parallel-overlap",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 9,
+                  "propertyId": "profile-drift",
+                  "outcome": "unavailable"
+                },
+                {
+                  "classId": 10,
+                  "propertyId": "calibrated-friction-thresholds",
+                  "outcome": "unavailable"
+                }
+              ]
+            },
+            "status": "available",
+            "sourceContract": "pipeline.rigor-fitness-projection.v1"
+          },
+          "interruptionLineage": {
+            "value": null,
+            "status": "unavailable",
+            "sourceContract": "pipeline.interruption-store-snapshot.v1"
+          }
+        },
+        "observation": {
+          "schema": "pipeline.rigor-lifecycle-observation.v1",
+          "mode": "report-only",
+          "boundary": "plan-submission",
+          "featureId": "sprint-alfred-epic",
+          "candidate": {
+            "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+            "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+          },
+          "derivation": {
+            "schema": "pipeline.rigor-derivation.v1",
+            "minProfile": "feature",
+            "requiredEvidenceClasses": [
+              "critic",
+              "verify"
+            ],
+            "escalationTriggers": [
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage",
+              "SURFACE_EXPANSION",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats"
+            ],
+            "derivationRevision": "b1-r2-bindings",
+            "inputDigest": "8818d97eddb7d74ea6eb8a61c861c6d6632800da7c650fa9c10f89df7c65c244",
+            "explanation": "Derived minimum rigor floor is feature due to triggers: UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity, UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes, UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage, SURFACE_EXPANSION, UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats. Accepted protectedIdentity observation is unknown; Accepted fitnessOutcomes observation is incomplete; Accepted interruptionLineage observation is unavailable; Actual surface expanded beyond planned paths: project/pipeline-state.json, project/pipeline-state.json.lock, specs/sprint-alfred-epic/prd_sprint-alfred-epic.md; Diff stats status is unknown. Human-selected profile 'epic' is higher than derived floor 'feature' and is respected beside the floor."
+          },
+          "retainedProfile": "feature",
+          "previousInputDigest": null,
+          "disagreement": {
+            "selected": "epic",
+            "derived": "feature",
+            "agrees": true
+          },
+          "reauthorization": "not-required-by-floor",
+          "promotionAuthority": "unavailable-no-threshold-promotion-granted"
+        },
+        "bindings": {
+          "protected": {
+            "baselineRevision": "1",
+            "baselineDigest": "51cfe512fada6b471de9645a16914ad1ce104641cd31e78f1741e0fbd454a1e3",
+            "mergedDigest": "c35a73b69257945c59bdc5b5b3d8893b5c3dc0915d2f1932ff9e44ba1abe89e8"
+          },
+          "architectureProfile": {
+            "path": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+            "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+          },
+          "fitnessModel": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "architectureBaseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "architectureMap": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "interruptionSnapshot": null,
+          "candidateStable": true,
+          "baselineAncestry": "established"
+        },
+        "fitnessProjection": {
+          "schema": "pipeline.rigor-fitness-projection.v1",
+          "candidate": {
+            "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+            "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+          },
+          "model": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "baseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "map": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "boundary": "plan-submission",
+          "outcomes": [
+            {
+              "classId": 1,
+              "propertyId": "module-identity-ownership",
+              "outcome": "finding"
+            },
+            {
+              "classId": 2,
+              "propertyId": "contract-presence-freshness",
+              "outcome": "pass"
+            },
+            {
+              "classId": 3,
+              "propertyId": "dependency-direction-cycles",
+              "outcome": "pass"
+            },
+            {
+              "classId": 4,
+              "propertyId": "boundary-crossing",
+              "outcome": "pass"
+            },
+            {
+              "classId": 5,
+              "propertyId": "authority-effect-ownership",
+              "outcome": "pass"
+            },
+            {
+              "classId": 6,
+              "propertyId": "verification-locality",
+              "outcome": "pass"
+            },
+            {
+              "classId": 7,
+              "propertyId": "navigation-currency",
+              "outcome": "pass"
+            },
+            {
+              "classId": 8,
+              "propertyId": "parallel-overlap",
+              "outcome": "pass"
+            },
+            {
+              "classId": 9,
+              "propertyId": "profile-drift",
+              "outcome": "unavailable"
+            },
+            {
+              "classId": 10,
+              "propertyId": "calibrated-friction-thresholds",
+              "outcome": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "schema": "pipeline.rigor-journal-entry.v1",
+      "previousEntrySha256": "e524dfd40d9e0428ce68f742ad9c659b724def81b5ddd6c61ac49154e5ee8ef1",
+      "entrySha256": "8133c23ba444823d000e317def417576db58a2af0af6461e2276aba599a4eb2c",
+      "body": {
+        "featureId": "sprint-alfred-epic",
+        "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "boundary": "plan-submission",
+        "observedAt": "2026-10-12T12:49:25.593Z",
+        "candidate": {
+          "commit": "aea3f754f0fa58d8a61fa52099e0f807002d99fd",
+          "tree": "b080df5260cabd307f43373edc8baef9eb7bd8e0"
+        },
+        "baselineCandidate": {
+          "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+          "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+        },
+        "inputs": {
+          "plannedPaths": {
+            "value": [
+              "docs/ARCHITECTURE.md",
+              "docs/state.md",
+              "harness/scripts/verify.mjs",
+              "policies/alfred-e3-gate-readback.v1.json"
+            ],
+            "status": "available",
+            "sourceContract": "pipeline.architecture-planning-surface.v1"
+          },
+          "actualPaths": {
+            "value": [
+              "backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md",
+              "project/pipeline-state.json",
+              "project/pipeline-state.json.lock",
+              "specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/T10-delta-bindings.json",
+              "specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/T10-design-review.md",
+              "specs/sprint-alfred-epic/plans/claude-session-2026-10-12.md",
+              "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+              "specs/sprint-alfred-epic/review/t10-design-review-round1-receipt.json",
+              "specs/sprint-alfred-epic/review/t10-design-review-round1.md",
+              "specs/sprint-alfred-epic/review/t10-design-review-round2-receipt.json",
+              "specs/sprint-alfred-epic/review/t10-design-review-round2.md",
+              "specs/sprint-alfred-epic/spec.md"
+            ],
+            "status": "available",
+            "sourceContract": "git.working-tree"
+          },
+          "protectedTouches": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "contractDeltas": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.contract-freeze.v1"
+          },
+          "reversibility": {
+            "value": "high",
+            "status": "available",
+            "sourceContract": "pipeline.reversibility-assessment.v1"
+          },
+          "diffStats": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "git.diff-stat"
+          },
+          "selectedProfile": {
+            "value": "epic",
+            "status": "available",
+            "sourceContract": "pipeline.state.v0:selectedProfile"
+          },
+          "protectedIdentity": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "architectureProfile": {
+            "value": {
+              "id": "inherited-agent-first",
+              "source": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+              "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+            },
+            "status": "available",
+            "sourceContract": "pipeline.architecture-profile.v1"
+          },
+          "fitnessOutcomes": {
+            "value": {
+              "sourceSha256": "8c13a3ac27d57c508f08237ae038d44fdf8687981236c9c4fcd73843fd86324e",
+              "outcomes": [
+                {
+                  "classId": 1,
+                  "propertyId": "module-identity-ownership",
+                  "outcome": "finding"
+                },
+                {
+                  "classId": 2,
+                  "propertyId": "contract-presence-freshness",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 3,
+                  "propertyId": "dependency-direction-cycles",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 4,
+                  "propertyId": "boundary-crossing",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 5,
+                  "propertyId": "authority-effect-ownership",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 6,
+                  "propertyId": "verification-locality",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 7,
+                  "propertyId": "navigation-currency",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 8,
+                  "propertyId": "parallel-overlap",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 9,
+                  "propertyId": "profile-drift",
+                  "outcome": "unavailable"
+                },
+                {
+                  "classId": 10,
+                  "propertyId": "calibrated-friction-thresholds",
+                  "outcome": "unavailable"
+                }
+              ]
+            },
+            "status": "available",
+            "sourceContract": "pipeline.rigor-fitness-projection.v1"
+          },
+          "interruptionLineage": {
+            "value": null,
+            "status": "unavailable",
+            "sourceContract": "pipeline.interruption-store-snapshot.v1"
+          }
+        },
+        "observation": {
+          "schema": "pipeline.rigor-lifecycle-observation.v1",
+          "mode": "report-only",
+          "boundary": "plan-submission",
+          "featureId": "sprint-alfred-epic",
+          "candidate": {
+            "commit": "aea3f754f0fa58d8a61fa52099e0f807002d99fd",
+            "tree": "b080df5260cabd307f43373edc8baef9eb7bd8e0"
+          },
+          "derivation": {
+            "schema": "pipeline.rigor-derivation.v1",
+            "minProfile": "feature",
+            "requiredEvidenceClasses": [
+              "critic",
+              "verify"
+            ],
+            "escalationTriggers": [
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage",
+              "SURFACE_EXPANSION",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats",
+              "DIFF_SIZE_EXCEEDED_THRESHOLD"
+            ],
+            "derivationRevision": "b1-r2-bindings",
+            "inputDigest": "86f8b50570af51119ca219d98ccbbb2e897667b9c4a68f0bff8926323412d4d9",
+            "explanation": "Derived minimum rigor floor is feature due to triggers: UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity, UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes, UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage, SURFACE_EXPANSION, UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats, DIFF_SIZE_EXCEEDED_THRESHOLD. Accepted protectedIdentity observation is unknown; Accepted fitnessOutcomes observation is incomplete; Accepted interruptionLineage observation is unavailable; Actual surface expanded beyond planned paths: backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md, project/pipeline-state.json, project/pipeline-state.json.lock; Diff stats status is unknown; Actual file count 12 exceeds mini threshold 5. Human-selected profile 'epic' is higher than derived floor 'feature' and is respected beside the floor."
+          },
+          "retainedProfile": "feature",
+          "previousInputDigest": "8818d97eddb7d74ea6eb8a61c861c6d6632800da7c650fa9c10f89df7c65c244",
+          "disagreement": {
+            "selected": "epic",
+            "derived": "feature",
+            "agrees": true
+          },
+          "reauthorization": "not-required-by-floor",
+          "promotionAuthority": "unavailable-no-threshold-promotion-granted"
+        },
+        "bindings": {
+          "protected": {
+            "baselineRevision": "1",
+            "baselineDigest": "51cfe512fada6b471de9645a16914ad1ce104641cd31e78f1741e0fbd454a1e3",
+            "mergedDigest": "c35a73b69257945c59bdc5b5b3d8893b5c3dc0915d2f1932ff9e44ba1abe89e8"
+          },
+          "architectureProfile": {
+            "path": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+            "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+          },
+          "fitnessModel": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "architectureBaseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "architectureMap": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "interruptionSnapshot": null,
+          "candidateStable": true,
+          "baselineAncestry": "established"
+        },
+        "fitnessProjection": {
+          "schema": "pipeline.rigor-fitness-projection.v1",
+          "candidate": {
+            "commit": "aea3f754f0fa58d8a61fa52099e0f807002d99fd",
+            "tree": "b080df5260cabd307f43373edc8baef9eb7bd8e0"
+          },
+          "model": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "baseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "map": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "boundary": "plan-submission",
+          "outcomes": [
+            {
+              "classId": 1,
+              "propertyId": "module-identity-ownership",
+              "outcome": "finding"
+            },
+            {
+              "classId": 2,
+              "propertyId": "contract-presence-freshness",
+              "outcome": "pass"
+            },
+            {
+              "classId": 3,
+              "propertyId": "dependency-direction-cycles",
+              "outcome": "pass"
+            },
+            {
+              "classId": 4,
+              "propertyId": "boundary-crossing",
+              "outcome": "pass"
+            },
+            {
+              "classId": 5,
+              "propertyId": "authority-effect-ownership",
+              "outcome": "pass"
+            },
+            {
+              "classId": 6,
+              "propertyId": "verification-locality",
+              "outcome": "pass"
+            },
+            {
+              "classId": 7,
+              "propertyId": "navigation-currency",
+              "outcome": "pass"
+            },
+            {
+              "classId": 8,
+              "propertyId": "parallel-overlap",
+              "outcome": "pass"
+            },
+            {
+              "classId": 9,
+              "propertyId": "profile-drift",
+              "outcome": "unavailable"
+            },
+            {
+              "classId": 10,
+              "propertyId": "calibrated-friction-thresholds",
+              "outcome": "unavailable"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "schema": "pipeline.rigor-journal-entry.v1",
+      "previousEntrySha256": "8133c23ba444823d000e317def417576db58a2af0af6461e2276aba599a4eb2c",
+      "entrySha256": "a16ed19a7417c312f0057ce4d56c4165911296a1f0d46347ec80863c89f59b34",
+      "body": {
+        "featureId": "sprint-alfred-epic",
+        "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "boundary": "plan-submission",
+        "observedAt": "2026-10-12T13:05:03.905Z",
+        "candidate": {
+          "commit": "5f62ea7bb2165d1dd3f29125a8a21d8d07ef8191",
+          "tree": "bdd7cff0fe918aba71ae17c71e40bf3653c81639"
+        },
+        "baselineCandidate": {
+          "commit": "4007afcd5061964e7cfbe4c1345e775b3187142a",
+          "tree": "2c89356d6b88dc71e12480b12b2ec1f69154d83b"
+        },
+        "inputs": {
+          "plannedPaths": {
+            "value": [
+              "docs/ARCHITECTURE.md",
+              "docs/state.md",
+              "harness/scripts/verify.mjs",
+              "policies/alfred-e3-gate-readback.v1.json"
+            ],
+            "status": "available",
+            "sourceContract": "pipeline.architecture-planning-surface.v1"
+          },
+          "actualPaths": {
+            "value": [
+              "backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md",
+              "project/pipeline-state.json",
+              "project/pipeline-state.json.lock",
+              "specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/T10-delta-bindings.json",
+              "specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/T10-design-review.md",
+              "specs/sprint-alfred-epic/plans/claude-session-2026-10-12.md",
+              "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+              "specs/sprint-alfred-epic/review/t10-design-review-round1-receipt.json",
+              "specs/sprint-alfred-epic/review/t10-design-review-round1.md",
+              "specs/sprint-alfred-epic/review/t10-design-review-round2-receipt.json",
+              "specs/sprint-alfred-epic/review/t10-design-review-round2.md",
+              "specs/sprint-alfred-epic/spec.md"
+            ],
+            "status": "available",
+            "sourceContract": "git.working-tree"
+          },
+          "protectedTouches": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "contractDeltas": {
+            "value": false,
+            "status": "available",
+            "sourceContract": "pipeline.contract-freeze.v1"
+          },
+          "reversibility": {
+            "value": "high",
+            "status": "available",
+            "sourceContract": "pipeline.reversibility-assessment.v1"
+          },
+          "diffStats": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "git.diff-stat"
+          },
+          "selectedProfile": {
+            "value": "epic",
+            "status": "available",
+            "sourceContract": "pipeline.state.v0:selectedProfile"
+          },
+          "protectedIdentity": {
+            "value": null,
+            "status": "unknown",
+            "sourceContract": "pipeline.protected-baseline.v1"
+          },
+          "architectureProfile": {
+            "value": {
+              "id": "inherited-agent-first",
+              "source": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+              "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+            },
+            "status": "available",
+            "sourceContract": "pipeline.architecture-profile.v1"
+          },
+          "fitnessOutcomes": {
+            "value": {
+              "sourceSha256": "502f1178109692b9fc8835df92ae546aa4e2c6562ee07e5a1698ba9684eff454",
+              "outcomes": [
+                {
+                  "classId": 1,
+                  "propertyId": "module-identity-ownership",
+                  "outcome": "finding"
+                },
+                {
+                  "classId": 2,
+                  "propertyId": "contract-presence-freshness",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 3,
+                  "propertyId": "dependency-direction-cycles",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 4,
+                  "propertyId": "boundary-crossing",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 5,
+                  "propertyId": "authority-effect-ownership",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 6,
+                  "propertyId": "verification-locality",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 7,
+                  "propertyId": "navigation-currency",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 8,
+                  "propertyId": "parallel-overlap",
+                  "outcome": "pass"
+                },
+                {
+                  "classId": 9,
+                  "propertyId": "profile-drift",
+                  "outcome": "unavailable"
+                },
+                {
+                  "classId": 10,
+                  "propertyId": "calibrated-friction-thresholds",
+                  "outcome": "unavailable"
+                }
+              ]
+            },
+            "status": "available",
+            "sourceContract": "pipeline.rigor-fitness-projection.v1"
+          },
+          "interruptionLineage": {
+            "value": null,
+            "status": "unavailable",
+            "sourceContract": "pipeline.interruption-store-snapshot.v1"
+          }
+        },
+        "observation": {
+          "schema": "pipeline.rigor-lifecycle-observation.v1",
+          "mode": "report-only",
+          "boundary": "plan-submission",
+          "featureId": "sprint-alfred-epic",
+          "candidate": {
+            "commit": "5f62ea7bb2165d1dd3f29125a8a21d8d07ef8191",
+            "tree": "bdd7cff0fe918aba71ae17c71e40bf3653c81639"
+          },
+          "derivation": {
+            "schema": "pipeline.rigor-derivation.v1",
+            "minProfile": "feature",
+            "requiredEvidenceClasses": [
+              "critic",
+              "verify"
+            ],
+            "escalationTriggers": [
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage",
+              "SURFACE_EXPANSION",
+              "UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats",
+              "DIFF_SIZE_EXCEEDED_THRESHOLD"
+            ],
+            "derivationRevision": "b1-r2-bindings",
+            "inputDigest": "30fdaa30223d9d57fa5890b9734c66f3f4ce28e822decc17bfd82501a97af7c6",
+            "explanation": "Derived minimum rigor floor is feature due to triggers: UNAVAILABLE_OR_UNKNOWN_INPUT:protectedIdentity, UNAVAILABLE_OR_UNKNOWN_INPUT:fitnessOutcomes, UNAVAILABLE_OR_UNKNOWN_INPUT:interruptionLineage, SURFACE_EXPANSION, UNAVAILABLE_OR_UNKNOWN_INPUT:diffStats, DIFF_SIZE_EXCEEDED_THRESHOLD. Accepted protectedIdentity observation is unknown; Accepted fitnessOutcomes observation is incomplete; Accepted interruptionLineage observation is unavailable; Actual surface expanded beyond planned paths: backlog/items/2026-10-12-correction-critic-reuses-the-full-review-context.md, project/pipeline-state.json, project/pipeline-state.json.lock; Diff stats status is unknown; Actual file count 12 exceeds mini threshold 5. Human-selected profile 'epic' is higher than derived floor 'feature' and is respected beside the floor."
+          },
+          "retainedProfile": "feature",
+          "previousInputDigest": "86f8b50570af51119ca219d98ccbbb2e897667b9c4a68f0bff8926323412d4d9",
+          "disagreement": {
+            "selected": "epic",
+            "derived": "feature",
+            "agrees": true
+          },
+          "reauthorization": "not-required-by-floor",
+          "promotionAuthority": "unavailable-no-threshold-promotion-granted"
+        },
+        "bindings": {
+          "protected": {
+            "baselineRevision": "1",
+            "baselineDigest": "51cfe512fada6b471de9645a16914ad1ce104641cd31e78f1741e0fbd454a1e3",
+            "mergedDigest": "c35a73b69257945c59bdc5b5b3d8893b5c3dc0915d2f1932ff9e44ba1abe89e8"
+          },
+          "architectureProfile": {
+            "path": "plugins/pipeline-core/architecture/agent-first-profile.v1.json",
+            "sha256": "c51289e73f0990514bd7c201d26322cc5b3db197bb643e8458671dd5ca51eb14"
+          },
+          "fitnessModel": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "architectureBaseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "architectureMap": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "interruptionSnapshot": null,
+          "candidateStable": true,
+          "baselineAncestry": "established"
+        },
+        "fitnessProjection": {
+          "schema": "pipeline.rigor-fitness-projection.v1",
+          "candidate": {
+            "commit": "5f62ea7bb2165d1dd3f29125a8a21d8d07ef8191",
+            "tree": "bdd7cff0fe918aba71ae17c71e40bf3653c81639"
+          },
+          "model": {
+            "path": "architecture/fitness-model.json",
+            "sha256": "123ec87c8ad07a3a5c855325cc592cdd51ff0633dde29b3fb8890501ed3bd34c"
+          },
+          "baseline": {
+            "path": "architecture/baseline.json",
+            "sha256": "16303bdf168aa42a275f8b07e96c89852a09b51c680ef3c01bf26697fb8e32c5"
+          },
+          "map": [
+            {
+              "path": "architecture/map/backlog.md",
+              "sha256": "96bb6f0e5aa3d3253ac51f7d66fa1a67d357a7acbd5623bebf3336de6ff5dfdc"
+            },
+            {
+              "path": "architecture/map/governance.md",
+              "sha256": "92ae242409b2d3595e73e4fc4f3bda39cd26567718c1ef276f18d14eb15f77aa"
+            },
+            {
+              "path": "architecture/map/harness.md",
+              "sha256": "02b8eeeef6c66e23c6652b20a1890f6b320b6c28e64c6f84e26b7d3514115196"
+            },
+            {
+              "path": "architecture/map/index.md",
+              "sha256": "0be55fea783854a105d1f7d6a1cd34d85734b96bba10a605455d3d8b270a4117"
+            },
+            {
+              "path": "architecture/map/pipeline-core.md",
+              "sha256": "26104f48f04d034d13bac8c1e218aa0d09cc04f6f0829ba2dd39a666daa61da7"
+            },
+            {
+              "path": "architecture/map/schemas.md",
+              "sha256": "6b0e6396db4adce81125bf8005c84ded04b5fa7d636c03c05c50b8f7965af5e4"
+            }
+          ],
+          "boundary": "plan-submission",
+          "outcomes": [
+            {
+              "classId": 1,
+              "propertyId": "module-identity-ownership",
+              "outcome": "finding"
+            },
+            {
+              "classId": 2,
+              "propertyId": "contract-presence-freshness",
+              "outcome": "pass"
+            },
+            {
+              "classId": 3,
+              "propertyId": "dependency-direction-cycles",
+              "outcome": "pass"
+            },
+            {
+              "classId": 4,
+              "propertyId": "boundary-crossing",
+              "outcome": "pass"
+            },
+            {
+              "classId": 5,
+              "propertyId": "authority-effect-ownership",
+              "outcome": "pass"
+            },
+            {
+              "classId": 6,
+              "propertyId": "verification-locality",
+              "outcome": "pass"
+            },
+            {
+              "classId": 7,
+              "propertyId": "navigation-currency",
+              "outcome": "pass"
+            },
+            {
+              "classId": 8,
+              "propertyId": "parallel-overlap",
+              "outcome": "pass"
+            },
+            {
+              "classId": 9,
+              "propertyId": "profile-drift",
+              "outcome": "unavailable"
+            },
+            {
+              "classId": 10,
+              "propertyId": "calibrated-friction-thresholds",
+              "outcome": "unavailable"
+            }
+          ]
+        }
+      }
+    }
+  ],
   "planPresentation": {
-    "schema": "pipeline.plan-presentation.v2",
-    "submissionSha256": "20b6da5169571b727ec67433ad88d3f2988537b8398f7e0a67abc3b7d37207a7",
-    "presentedBy": "APS",
-    "presentedAt": "2026-10-07T06:39:00.362Z",
-    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
-    "designWorkflowPackageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
-    "designWorkflowApprovalRequestPath": "scratch/design-workflow-approval-request-539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7.json"
+    "schema": "pipeline.plan-presentation.v3",
+    "submissionSha256": "2a98ef5002f1969f528cc1812c5067680cc2ec59996f5ac3857070e1895e220e",
+    "presentedBy": "The Agent-Pipeline Contributors",
+    "presentedAt": "2026-10-12T13:58:07.560Z",
+    "designApprovalBinding": {
+      "schema": "pipeline.design-approval-binding.v1",
+      "featureId": "sprint-alfred-epic",
+      "sources": {
+        "prd": {
+          "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+          "sha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e"
+        },
+        "spec": {
+          "path": "specs/sprint-alfred-epic/spec.md",
+          "sha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
+        },
+        "companions": [
+          {
+            "path": "specs/sprint-alfred-epic/traceability.md",
+            "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d"
+          }
+        ]
+      },
+      "reviewReceipts": [
+        {
+          "path": "specs/sprint-alfred-epic/review/t10-design-review-round1-receipt.json",
+          "sha256": "36972bf5a34932f699cb29503a287d15ca8a66b0cddcbb9435934b4cdc1c5e8d",
+          "round": 1
+        },
+        {
+          "path": "specs/sprint-alfred-epic/review/t10-design-review-round2-receipt.json",
+          "sha256": "4f0a9408cc3fcb7d6f16feb5e5c16a40b9e8720aa2e316aa1d5f891f914547a8",
+          "round": 2
+        }
+      ],
+      "verdict": "open-findings",
+      "openFindingIds": [
+        "T10-D1"
+      ]
+    },
+    "designApprovalRequestPath": "scratch/design-approval-request-d6b389ee233a2654307f241fd3953c20bae597938198ef67923ad7dc1f640c3b.json"
   },
   "planApproval": {
-    "schema": "pipeline.plan-approval.v7",
+    "schema": "pipeline.plan-approval.v9",
     "approvedBy": "verified:local-po-key",
-    "approvedAt": "2026-10-07T06:40:45.087Z",
-    "submissionSha256": "20b6da5169571b727ec67433ad88d3f2988537b8398f7e0a67abc3b7d37207a7",
+    "approvedAt": "2026-10-12T16:02:12.731Z",
+    "submissionSha256": "2a98ef5002f1969f528cc1812c5067680cc2ec59996f5ac3857070e1895e220e",
     "profileSha256": "a58df122a632741cdfb0d305e75163fa084c4219811676ecc67e7787a093fd46",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -608,38 +1646,67 @@
       "receiptSha256": "e9a39a2d036437620720707c249494b35cd84d5ecdea0313dbc7a2af24175852",
       "repositoryFingerprint": "3752bc3d65b0cce61a8d7b2ac3a5b4f3f1e4939e5a9f38dde52a8a235ae01eff",
       "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
-      "planSha256": "0fe6c07778577ae2e473e7909badf16ed1d4ec888495f703095d48577dc825c8",
+      "planSha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
       "specPath": "specs/sprint-alfred-epic/spec.md",
-      "specSha256": "141b8a696c97573cf7ac39d5e974cc816eeda8c4ee44f7460e7e4d1d566fc468"
+      "specSha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
     },
-    "priorInvalidationSha256": "4b6202dc221111f744c2b307add8c12fb6c6a2517c248414370b07d133c4571e",
-    "designAdvisorAdmissionSha256": null,
-    "designWorkflowPackagePath": "evidence/design-course/sprint-alfred-epic/r5d.package.json",
-    "designWorkflowPackageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
-    "designWorkflowApproval": {
-      "schema": "pipeline.design-workflow-package-approval.v1",
+    "priorInvalidationSha256": "00d7e400544b480a9d6f8655e14d5108e30fba01605e94b911b8c2beb479bd69",
+    "designApprovalBinding": {
+      "schema": "pipeline.design-approval-binding.v1",
+      "featureId": "sprint-alfred-epic",
+      "sources": {
+        "prd": {
+          "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+          "sha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e"
+        },
+        "spec": {
+          "path": "specs/sprint-alfred-epic/spec.md",
+          "sha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
+        },
+        "companions": [
+          {
+            "path": "specs/sprint-alfred-epic/traceability.md",
+            "sha256": "559be0739a6d7de052e4faa29f3ea521ab90e603a04e87697934eb4c9e2eb12d"
+          }
+        ]
+      },
+      "reviewReceipts": [
+        {
+          "path": "specs/sprint-alfred-epic/review/t10-design-review-round1-receipt.json",
+          "sha256": "36972bf5a34932f699cb29503a287d15ca8a66b0cddcbb9435934b4cdc1c5e8d",
+          "round": 1
+        },
+        {
+          "path": "specs/sprint-alfred-epic/review/t10-design-review-round2-receipt.json",
+          "sha256": "4f0a9408cc3fcb7d6f16feb5e5c16a40b9e8720aa2e316aa1d5f891f914547a8",
+          "round": 2
+        }
+      ],
+      "verdict": "open-findings",
+      "openFindingIds": [
+        "T10-D1"
+      ]
+    },
+    "designApproval": {
+      "schema": "pipeline.design-approval.v1",
       "mode": "signature",
       "approvedBy": "verified:local-po-key",
-      "approvedAt": "2026-10-07T06:40:44.895Z",
-      "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
-      "intentSha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc",
-      "proofSha256": "e1eae2254fcb63f37eb99e7277cfb0b1e4a11bc21188bf9a328ef00b387830fa",
+      "approvedAt": "2026-10-12T16:02:12.504Z",
+      "bindingSha256": "d6b389ee233a2654307f241fd3953c20bae597938198ef67923ad7dc1f640c3b",
+      "intentSha256": "41b84653a8b62406e471b65c13f61dd5c0b0dec62167fa0d19fbcb0e338baccb",
+      "proofSha256": "8373ab914d25f15ec22d8ae6192aabfe29848681aeb5634684e43517f8f22e6f",
       "proof": {
         "schema": "pipeline.po-approval-proof.v1",
-        "intentSha256": "73e92e3620488798b9bb2734d6a5875406cbc782ac752839be5ee29d47d597cc",
+        "intentSha256": "41b84653a8b62406e471b65c13f61dd5c0b0dec62167fa0d19fbcb0e338baccb",
         "keyReference": "local-po-key",
         "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-        "signatureBase64": "x3aerOVSZN4/6ChIztzI2BUVlFfTzn3/wE5V+tXusTgPgqwTjDDo6PJ/Jj5RrxiJLweANECsO4AN990F0UoZDA=="
-      },
-      "advisorException": {
-        "kind": "advisor-unavailable",
-        "oneTime": true,
-        "packageSha256": "539629da3e3208d2c3cb2c1ffc16dffe3b4d8b956ec049e8007aadf28b50faa7",
-        "courseId": "dac_029719691f9e4c365daa1824e9c271654175bc61",
-        "initialContextSha256": "c6d40554e3e4a8ca7eefd4af0ebf912cd4e1798badcdf5a8fad376689e084955",
-        "failureEvidenceSha256": "85400f4172236afe175790c06bf0689bf11a7cc8420af8a1dd74eae48d16f324",
-        "rationale": "Advisor-unavailable exception, feature sprint-alfred-epic, runner claude, design revision 5.\n\nReceipt-backed facts only:\n- The course producer ran the Advisor stage for runner claude on this candidate.\n- Outcome: unavailable-pending-final-approval, code native-initial-answer-provenance-unavailable.\n- No native Advisor child was started and no input was submitted (terminal no-child outcome).\n- Evidence: the course binding and failure receipt exported by the producer and referenced by this package.\n\nWhat the PO accepts, once, at the final plan approval: this design is approved without an Advisor\nanswer. The exception grants no other authority and does not replace readiness.\n"
+        "signatureBase64": "W5ou3BjDjPs/OIfbniItuCJV9pLsT0PIsRE1vsq+a5OCS2j1iLdOFpgJvqKSpRWx/H8nAdhKjl2Vc258+MPSCw=="
       }
+    },
+    "acceptedContract": {
+      "schema": "pipeline.accepted-delivery-contract-reference.v1",
+      "path": "specs/sprint-alfred-epic/evidence/accepted-delivery-contract-17a060259731894745877ef86adca9eb09f9c1239d7c0358dee063bfc4656ac3.json",
+      "sha256": "17a060259731894745877ef86adca9eb09f9c1239d7c0358dee063bfc4656ac3"
     }
   }
 }

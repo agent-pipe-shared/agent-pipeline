@@ -115,6 +115,22 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
 - T11 option (a): [T11a-helper-eol-lf.patch](../implementation/claude-2026-10-12/patches/T11a-helper-eol-lf.patch). It adds a per-file `eol=lf` override to `.gitattributes`. `git apply --check` passes; the patch is not applied. After it is applied, the helper file needs one re-checkout on each machine, and then the installed copy needs a refresh.
 - T11 option (b): [T11-windows-helper-eol.patch](../implementation/claude-2026-10-12/patches/T11-windows-helper-eol.patch). It normalizes CRLF in the backend before the digest check. Not applied.
 - T10: [item-register-proposal.md](../implementation/claude-2026-10-12/item-register-proposal.md) proposes spec §23. Its locators must be recomputed after the actual edit.
+- T16 (2026-10-12, PO-run hotfix): native Windows reports POSIX mode 0o666/0o777, so
+  owner-private / group-other-write mode tests can never pass there. Two such checks
+  blocked the design route: `design-decision-bindings.mjs` (present-plan fails with
+  `DDB-PARENT-UNSAFE`) and `chat-gate-ceremony.mjs` (every `sign-intent` fails with
+  `chat:unsafe-namespace-chain` after the passphrase, so the HGO route could not repair it).
+  The Elephant's own Edit was refused while the plan awaits approval. On the PO's request,
+  `scratch/alfred-claude-20261012/hotfix-win32-mode.mjs` is a PO-run script. It scopes the four
+  mode terms to non-Windows hosts in both the repository copy and the installed marketplace copy.
+  Follow-ups:
+  - Commit the repository copy under the PO exception and stamp.
+  - Backlog: route Windows checks through the DACL assessment (`windows-private-state.mjs`, as
+    `human-guard-override.mjs` already does) instead of skipping them.
+  - Sweep the remaining `mode & 0o0[27]{2}` sites (about 160 hits in 76 files) for the same
+    defect.
+  - A failed `sign-intent` leaves `.git/agent-pipeline/session-authority/registry.lock`
+    behind (`registry-lock-held` on retry), and there is no recovery action for it.
 
 ## PO topics (to ask when the PO is present)
 
