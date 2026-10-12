@@ -176,6 +176,24 @@ local marketplace copy. Review: one full design-tier Critic (MP-07).
   acceptance, consistent with Spec §16 "each backlog item's own acceptance
   remains authoritative"), then one current-schema re-approval by PO
   signature. Both preconditions are cleared by the same single approval.
+- **T11 Windows session authority is unusable on every Windows checkout
+  (2026-10-12, live):** the real pilot dispatch (`ALF-C-P0-NUL`, built from
+  `goldfish-task.md` with the v3 binding) was refused before launch with
+  `SDC-AUTHORITY-UNAVAILABLE`. Reproduced outside the hook with the same
+  session id: reason `WIN-AUTH-HELPER-CAS`
+  (`lib/windows-owned-authority-backend.mjs:19`). Cause: `.gitattributes:18`
+  `*.ps1 text eol=crlf` checks `lib/windows-owned-authority-native.ps1` out
+  with CRLF (150 CRLF), while the backend pins the LF blob digest
+  (`HELPER_SHA256` `66865ee9…`; working file `80035069…`; its LF
+  normalization equals the pin). So the owner scope of T6-A is entered
+  (`entered: true`) but `withSessionAuthorityBoundary` fails on native
+  Windows before any owner, approval or criterion check. This also answers
+  Critic finding F1 at the consumer position: the hook path is reached and
+  fails closed further down. Fix options: a per-file `eol=lf` attribute for
+  the helper (plus re-checkout), or hashing the helper after CRLF→LF
+  normalization in the backend. Either is a source change under the current
+  dispatch catch-22 (no Goldfish admissible), so it needs the PO's call
+  together with T10.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
