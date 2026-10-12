@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.opus-critic-only-batched-for-architecture-and-security
+type: requirement
+owner: pipeline
+status: open
+created: 2026-10-09
+source: "PO general rule, 2026-10-09, Sprint Alfred Rulings 156 and 158; original item Source section"
+sprint: alfred
+done_when: manual
+---
+
 # Opus Critic only for critical architecture and security, once per batch, re-critic on the diff only
 
 - **Source:** PO general rule, 2026-10-09 (Sprint Alfred, Ruling 156), after one night of Opus Critic rounds cost about

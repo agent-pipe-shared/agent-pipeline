@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.restricted-governance-put-re-hardens-the-root-on-every-write
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-10-09

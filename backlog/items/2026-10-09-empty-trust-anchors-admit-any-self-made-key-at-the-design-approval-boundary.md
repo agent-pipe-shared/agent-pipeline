@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.empty-trust-anchors-admit-any-self-made-key-at-the-design-approval-boundary
-type: security
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-09
