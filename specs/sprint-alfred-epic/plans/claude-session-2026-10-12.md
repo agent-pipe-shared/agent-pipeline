@@ -60,6 +60,7 @@ and reuse the Codex results through
 | Wave | Items | Status |
 | --- | --- | --- |
 | P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | **blocked before launch** by guard-dispatch `SQ-DELIVERY-STATE-UNAVAILABLE` (see T6); nothing ran, nothing written |
+| P0 pilot v3 | git-for-windows-2-56-rejects-git-config-global-nul (`ALF-C-P0-NUL`, R7-1a / AC-37) | T6-A installed (`0.7.0+claude.20261012094314.d097ecf`, hooks refreshed, preflight ready). Read-only pre-check of the built v3 prompt: briefing `NGHR-BRIEFING-VALID`; **not launched** because admission would refuse twice — see T10 |
 
 ### T6-A exception scope (PO-granted, Elephant-implemented)
 
@@ -153,6 +154,28 @@ local marketplace copy. Review: one full design-tier Critic (MP-07).
   same cases fail `GS-PRIVATE-MODE` (DrvFs has no POSIX modes). Qualification of
   T6-A therefore runs in an owned native-WSL clone. Root-cause belongs to the
   Windows temp/DACL fixture items.
+- **T10 Item admission needs a re-approved design (2026-10-12, read-only
+  probes, nothing launched):** after T6-A the governed item route has two
+  further hard preconditions the live Alfred state does not meet.
+  (1) `observeCurrentPlanApprovalForCalibration` (`scripts/pipeline-state.mjs`
+  13711-13723) accepts only a current-schema plan approval
+  (`validCurrentPlanApproval`, `lib/plan-spec-state-v2.mjs:410`); the live
+  approval is `pipeline.plan-approval.v7` (valid only as previous-current), so
+  it returns `CVCT-APPROVAL-UNAVAILABLE` and `prepareGovernedItemQueue` refuses.
+  `sealCurrentPlanApproval` does not apply (v4-prior only). (2) The criterion
+  locator must point into `spec.md` itself
+  (`native-goldfish-host-state.mjs:833`) at a structured acceptance entry under
+  an "Acceptance criteria" heading — a `| # | Criterion | Evidence |` table
+  row, an `AC-n` heading paragraph, or a numbered `**AC-n:**` item
+  (`critic-accepted-contract.mjs:196-293`). `spec.md` has none (the AC table is
+  in `acceptance.md`), so every locator is `CAC-CRITERION-UNSUPPORTED`.
+  Collision is per criterion locator, so 37 shared epic ACs would also
+  serialize items that share an AC. Recommendation: one design reopen that adds
+  a per-item acceptance register to `spec.md` (one plain-text row per original
+  item, ids disjoint from AC-1…AC-37, each pointing at the item's own backlog
+  acceptance, consistent with Spec §16 "each backlog item's own acceptance
+  remains authoritative"), then one current-schema re-approval by PO
+  signature. Both preconditions are cleared by the same single approval.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
