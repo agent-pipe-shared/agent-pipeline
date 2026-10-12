@@ -141,12 +141,18 @@ This is a pre-check of the 17 implementable rows; it only checks that the named 
   The PO chose a script: `scratch/alfred-claude-20261012/write-alfred-lifecycle.mjs`
   writes the manifest in state `implementing`, binding prd/spec/acceptance/result and
   the contract; `validateFeaturePackage` and the identity resolution both pass.
-  The next gate, `item-course-criterion-unbound` (`native-goldfish-host-state.mjs:838`),
-  admits only criteria that already have an independent PASS, or that have no
-  criterion at all, so no open AC can ever be admitted. Per the PO's pre-agreed fallback,
-  dispatch continues WITHOUT the v3 item binding (`build-v3.mjs … plain`):
-  template-built goldfish-task briefings, and the Goldfish commits by exact pathspec.
-  §23 evidence is reconciled afterwards.
+  The next refusal, `item-course-criterion-unbound` (`native-goldfish-host-state.mjs:838`),
+  was the Elephant's own locator defect, not a product gate. The §23 parser
+  (`critic-accepted-contract.mjs`) binds the trimmed Criterion CELL of a
+  `| # | Criterion | Evidence |` row. `build-v3.mjs` had located the whole row, so the
+  locator parsed as unsupported. Correction (an earlier note here misread the gate as
+  "only already-passed criteria"): `build-v3.mjs` now locates the cell. The probe then
+  returns `SQ-DELIVERY-REQUIRED` (slice ready), and the real `guard-dispatch` admitted
+  ALF-C-P0-NUL with its v3 binding. The no-binding fallback is not needed; `guard-dispatch`
+  refuses an unbound dispatch anyway with `SQ-DELIVERY-STATE-UNAVAILABLE`.
+  Known gap: the Claude Agent tool launches subagents asynchronously, so the native host
+  commit reports `NGHF-PENDING-UNAVAILABLE`. The Elephant commits the Goldfish's exact
+  write scope afterwards, with `Commit-Act: orchestrator` (EL-13a).
   This is the fourth late design-route failure after DDB, ceremony mode bits and the
   per-file `ls-tree`.
 
@@ -170,12 +176,52 @@ or as a follow-up note on one. It never becomes a new scope entry.
    the cause is swallowed (hotfixed, uncommitted).
 6. `CVCT-APPROVAL-UNAVAILABLE`: the writer does not harden the state-file DACL (PO `icacls`).
 7. `CAC-REGISTRATION-INVALID`: no lifecycle.json and no candidate-evidence writer (T19 script).
-8. `item-course-criterion-unbound`: open ACs can never be admitted (T19 fallback).
+8. `item-course-criterion-unbound`: caused by the Elephant's locator (whole row instead of the
+   Criterion cell). The refusal names no cause, though; a typed diagnostic ("locator does not
+   match the parsed criterion cell bytes X..Y") would have saved the detour.
+9. Async Agent dispatch cannot be host-committed (`NGHF-PENDING-UNAVAILABLE`), and the Agent tool
+   exposes no `run_in_background: false`. Consequence: `prepareNativeGoldfishHostState` fails every
+   governed item dispatch with `NGHS-CLAUDE-FOREGROUND-REQUIRED`, and guard-dispatch blocks it.
+   The first pilot slipped through only because guard-dispatch crashed (non-2 exit, so Claude
+   proceeds). The crash left a stale `session-authority/registry.lock` (19:07:47) and wrote no
+   pending budget binding, so the child was refused at its first call
+   (`DBB-PENDING-BINDING-MISSING`). T20 PO-run hotfix
+   `scratch/alfred-claude-20261012/hotfix-claude-foreground.mjs`: for a Claude runner and exactly
+   that code, warn and continue, with the child left uncommitted. The Elephant commits the exact
+   write scope with `Commit-Act: orchestrator`. Item admission and the budget binding still run.
+    After T20 the second pilot launch failed the same way, so the crash is not foreground-specific.
+    Suspected cause (T21): the `guard-dispatch` hook timeout is 10 s. Even a lock-held refusal
+    took 5.4 s; the full admission run (lock + queue preparation) on Windows exceeds that.
+    Claude Code kills the hook mid-lock, the non-2 exit admits the dispatch, no budget binding is
+    written, and the lock stays behind. PO-run `hotfix-dispatch-timeout.mjs` raises the
+    timeout to 120 s in hooks.json. Structural fix: admission must be fast (seconds), and a
+    killed hook must not admit the dispatch.
+    Measured after the PO removed the lock: one guard-dispatch run takes 20.6 s (old timeout 10 s),
+    which confirms T21.
+    PO direction 2026-10-12: the Elephant removes stale locks itself in every phase, as a
+    deliberate, logged decision, and the PO is never needed for it. Fix: a sanctioned recovery verb
+    with a dead-owner check that runs in all phases, mapped onto the existing lock/recovery items.
+10. A hook crash must fail closed, or at least fail visibly: an exception in guard-dispatch silently
+    admitted a dispatch, and leftover locks (`registry.lock`, twice today) have no recovery action.
+11. Pattern: every blocker above is a POSIX-only or foreground-only assumption, and nothing caught it
+    before live use. Fix direction (PO 2026-10-12): a single preflight that catches all of these before
+    the signature/dispatch, plus a native Windows test lane.
 
 The root pattern: no end-to-end test of the real route on a legacy package on native Windows.
 Fixtures hand-build exactly the missing pieces. Fix direction: one read-only route pre-check
 that reports every precondition before the signature, a performance bound on approve-plan, and an
 end-to-end test from a legacy package to an admitted open-AC item.
+
+### Security scan triage (2026-10-12, Elephant, read-only)
+
+`evidence/security-latest.json` (gitleaks 114 findings, verdict BLOCKING) is spot-checked as false
+positives. All findings sit in code that names PEM headers as string literals
+(`po-human-approval.mjs:1624`, `po-human-approval.test.mjs:122`), in sha256 digests
+matched as "sentry-access-token" (`project/pipeline-state.json:929`, `previousEntrySha256`), and in
+fixtures, evidence logs and checkpoint postimages/patches that copy those same lines.
+No finding was a real credential in the sample. The remaining step belongs to the existing
+Alfred gitleaks items (Windows suppression / repair-ignore no-ops), not a new item.
+osv-scanner was SKIPPED (`untrusted_path`), which is an existing Windows path-trust gap.
 
 ## PO topics (to ask when the PO is present)
 
@@ -311,6 +357,59 @@ end-to-end test from a legacy package to an admitted open-AC item.
 - **T13 Scope intake into a running sprint (PO concern, 2026-10-12; post-Alfred design topic):** with the §23 register, a new backlog item can only enter an implementing sprint through a spec change and a re-approval. That makes small bugfixes pay a design↔implementation switch.
   - Checked: item admission binds the §23 row text in `spec.md`, not the backlog file bytes. Grep of `native-goldfish-host-state.mjs` and `critic-accepted-contract.mjs` shows no backlog binding. So an admitted item's backlog file can still be refined and extended with findings without re-approval.
   - Open: a light intake lane for new in-sprint findings, for example reserved finding slots or a bugfix fast lane, as a Pipeline design item after Alfred.
+- **PO decisions 2026-10-12 (evening):**
+  - T2: the Codex session is closed; this Claude session is the only Elephant writing the repo.
+  - T3: signature-bound changes are collected into one combined signing session: the T17/T18
+    `pipeline-state.mjs` hotfixes, T20 `guard-dispatch.mjs`, T21 `hooks.json`, and Goldfish patches.
+  - T14/T15: attach them to existing §23 items where they fit cleanly (no design reopen). The
+    Elephant checks the fit before dispatching.
+  - T12: go through the item-level decisions one by one, now.
+- **PO decisions 2026-10-12, T12 (item-level, binding for the item Goldfish briefings):**
+  - `sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows`: stronger fix.
+    Spawn openssl only through a resolved absolute path outside the repository; never search the
+    working directory. Search beyond the default install path (PATH entries plus known install
+    locations, for example Git for Windows and OpenSSL installs). The resolved path is remembered
+    machine-locally in `pipeline.user.yaml` (for example `signing.openssl_path`): written on first
+    discovery, afterwards only re-validated (it must exist and lie outside the repository).
+  - `feature-branch-push-admitted-without-signature-approval`: a signature for every push. The
+    unsigned checkpoint lane is removed, so code and docs agree.
+  - `every-dispatch-pays-a-bootstrap-receipt-detour`: a SubagentStart hook issues the receipt
+    automatically. The hooks.json change goes into the signing package.
+  - `draft-phase-guard-blocks-mandatory-bootstrap-preflight`: normalize plugin-root spellings only;
+    no new pre-READY grant.
+  - `design-trailer-verifier-lost-after-closure` and `installed-design-trailer-example-is-rejected-by-git-guard`:
+    remove the `ELEPHANT_DESIGN_ID` form, on one condition: the Elephant must still be able to
+    commit. The Elephant's existing `Dispatch: <id> (elephant)` + `AI-Assisted: true` route must stay
+    admitted, and the Goldfish must prove that with a test.
+  - `critic-scratch-name-randomness-has-no-admitted-command`: the AC-144 Critic notes writer also
+    creates the directory and its name.
+  - `parallel-work-in-one-checkout-is-unsafe`: disjoint write scopes are enough; no new checkout
+    lock. Close the item with that rationale.
+  - `lifecycle-read-scope-blocks-host-declared-system-skill`: an exact host-declared path, read-only.
+  - `hgo-stale-capability-shadows-current-authorization`: the newest authorization wins. A stale
+    capability is refused with a named reason and never shadows the current one.
+  - The five design-course/Advisor route items (`design-course-run-v2-refuses-its-own-documented-routes`,
+    `design-workflow-package-omits-contract`, `revised-native-design-cannot-reach-a-new-advisor-course`,
+    `advisor-demand-reuse-has-no-design-course-bound`, `advisor-provenance-ancestor-check-fails-on-any-sibling-write`):
+    close them against ADR-0085. Each Goldfish checks whether the defect still exists on today's
+    route. If not, it closes the item with evidence; if so, it fixes it on today's route. No
+    retired ceremony is revived and no design reopen happens.
+  - `brownfield-implementation-entry-demands-a-greenfield-design-block`: exempt brownfield; the
+    ratchet applies only to newly created targets.
+  - `design-bootstrap-verify-state-contradicts-deferred-contract`: the Goldfish picks the
+    conservative alternative, which respects the deferred contract, and gives its rationale in
+    the report.
+  - `elephant-main-context-spent-on-wake-ups-and-inline-reads` and
+    `forensics-and-audit-evidence-not-reconstructable`: these stay in Alfred, one Goldfish per item.
+    The plugin (`scripts/`) owns the minimal measurement and recovery tooling; runner-specific parts
+    run on their host.
+  - `codex-bootstrap-in-the-typed-next-action`: re-check live; if it is not reproducible, close it
+    with evidence.
+  - `agy-imported-plugin-snapshot-shadows-registered-plugin`: an Antigravity-host spike inside
+    Alfred, run when an AGY host is available (it is tracked as a native-host item).
+  - `opus-critic-only-batched-for-architecture-and-security`: follows the PO direction of
+    2026-10-12 (Sonnet Critics, Opus only for critical architecture/security).
+  - `critic-scratch-notes-write-is-refused-again`: AC-144 option (a), decided earlier.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
