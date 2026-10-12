@@ -1,0 +1,20 @@
+{
+  "schema": "pipeline.critic-correction-input-bindings.v1",
+  "base": { "commit": "12bb3fb1c0d713eb6a4a856ec5f2d2f56eccc2d6" },
+  "head": { "commit": "e2233e0260157d8da7245b97241288d5948fc584", "tree": "1100655927cd62ca9310031c865cc84287950e3d" },
+  "commits": [
+    { "commit": "9ffccb323ac244a4dc56fcb71371fcd7e2077160", "tree": "ce60ec78037c9218b0187fbd1946716da088190e", "parent": "12bb3fb1c0d713eb6a4a856ec5f2d2f56eccc2d6" },
+    { "commit": "5d1fa36180afcd0fc1bc06c5c5fa7ccd19e30c69", "tree": "0b111fe899ea1192c18ff4f0dd87a81c02076292", "parent": "9ffccb323ac244a4dc56fcb71371fcd7e2077160" },
+    { "commit": "e2233e0260157d8da7245b97241288d5948fc584", "tree": "1100655927cd62ca9310031c865cc84287950e3d", "parent": "5d1fa36180afcd0fc1bc06c5c5fa7ccd19e30c69" }
+  ],
+  "sourcePaths": [
+    "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "specs/sprint-alfred-epic/spec.md"
+  ],
+  "exclusions": [
+    { "path": "specs/sprint-alfred-epic/implementation/claude-2026-10-12/critic/T10-design-review.md", "role": "retained prior result", "versions": [ { "commit": "9ffccb323ac244a4dc56fcb71371fcd7e2077160", "blob": "79ccbf18a5eae0cd687af0431af179de3e8502a5", "sha256": "28c4fb8a6b716a90704f120d9db442928294fea7eab2682c36917c057eb54ae6", "mode": "100644", "previous": "absent" } ] },
+    { "path": "specs/sprint-alfred-epic/review/t10-design-review-round1.md", "role": "retained prior result", "versions": [ { "commit": "5d1fa36180afcd0fc1bc06c5c5fa7ccd19e30c69", "blob": "76a25862ef8a6771e934a689fe7a380643859842", "sha256": "30c473b0f3bdf88458ee9a8ca4bfc393f1eb99cdad4778bcaebb5d008ca12b25", "mode": "100644", "previous": "absent" } ] },
+    { "path": "specs/sprint-alfred-epic/review/t10-design-review-round1-receipt.json", "role": "retained prior result", "versions": [ { "commit": "e2233e0260157d8da7245b97241288d5948fc584", "blob": "6b43beae90c02d7a906440e9185dbfd1384ce363", "sha256": "36972bf5a34932f699cb29503a287d15ca8a66b0cddcbb9435934b4cdc1c5e8d", "mode": "100644", "previous": "absent" } ] }
+  ],
+  "neutralFindingsRegistry": ["T10-F1", "T10-F2", "T10-F3"]
+}
