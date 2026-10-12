@@ -237,11 +237,11 @@ function ceremonyInventory(repo) {
   let cursor=repo.commonDir;
   for(const segment of relative(repo.commonDir,dir).split(/[\\/]/u)){
     cursor=join(cursor,segment);let info;try{info=lstatSync(cursor);}catch(error){if(error.code==="ENOENT")break;throw error;}
-    if(!info.isDirectory()||info.isSymbolicLink()||(info.mode&0o077)!==0||(typeof process.getuid==="function"&&info.uid!==process.getuid()))ceremonyFail("chat:unsafe-namespace-chain");
+    if(!info.isDirectory()||info.isSymbolicLink()||(process.platform!=="win32"&&(info.mode&0o077)!==0)||(typeof process.getuid==="function"&&info.uid!==process.getuid()))ceremonyFail("chat:unsafe-namespace-chain");
   }
   // lstat, rather than existsSync, preserves unreadable/broken-path failures.
   let directory;try{directory=lstatSync(dir);}catch(error){if(error.code!=="ENOENT")throw error;return {records,groups,memberships:[{namespaceId:CEREMONY_NAMESPACE,rootSha256:ceremonyDigest({commonDir:repo.commonDir,path:dir}),entrySetSha256:ceremonyDigest([]),entryCount:0,sourceFacts:[]}]};}
-  if(!directory.isDirectory()||directory.isSymbolicLink()||(directory.mode&0o077)!==0
+  if(!directory.isDirectory()||directory.isSymbolicLink()||(process.platform!=="win32"&&(directory.mode&0o077)!==0)
     ||(typeof process.getuid==="function"&&directory.uid!==process.getuid()))ceremonyFail("chat:unsafe-namespace");
   const names=readdirSync(dir).sort();if(names.length>4096)ceremonyFail("chat:inventory-bound");
   let total=0;

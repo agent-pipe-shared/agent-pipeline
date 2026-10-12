@@ -61,13 +61,14 @@ function physical(root, path, limit = 1048576, internal = false) {
       if (part) cursor = join(cursor, part);
       const stat = lstatSync(cursor, { bigint: true });
       requireValue(stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(cursor) === cursor
-        && (stat.mode & 0o022n) === 0n, 'DDB-PARENT-UNSAFE');
+        && (process.platform === 'win32' || (stat.mode & 0o022n) === 0n), 'DDB-PARENT-UNSAFE');
       parents.push([cursor, locator(stat)]);
     }
     const absolute = join(root, path);
     const before = lstatSync(absolute, { bigint: true });
     requireValue(before.isFile() && !before.isSymbolicLink() && before.nlink === 1n
-      && before.size > 0n && before.size <= BigInt(limit) && (before.mode & 0o022n) === 0n
+      && before.size > 0n && before.size <= BigInt(limit)
+      && (process.platform === 'win32' || (before.mode & 0o022n) === 0n)
       && realpathSync(absolute) === absolute, 'DDB-FILE-UNSAFE');
     fd = openSync(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     requireValue(identity(fstatSync(fd, { bigint: true })) === identity(before), 'DDB-PHYSICAL-DRIFT');
