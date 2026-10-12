@@ -59,7 +59,29 @@ and reuse the Codex results through
 
 | Wave | Items | Status |
 | --- | --- | --- |
-| P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | dispatched; verifies worktree isolation, hooks, integration route |
+| P0 pilot | gitleaks-repair-ignore-cli-is-a-no-op-on-windows (`ALF-C-P0-GLRWIN`) | **blocked before launch** by guard-dispatch `SQ-DELIVERY-STATE-UNAVAILABLE` (see T6); nothing ran, nothing written |
+
+### Verified cause of the dispatch block (2026-10-12)
+
+- `plugins/pipeline-core/hooks/guard-dispatch.mjs:131` — every role-`goldfish`
+  dispatch requires governed item admission; `:444-457` refuses when
+  `resolveGovernedItemQueue` is refused, and once a queue exists requires the
+  native binding parsed from the prompt string (`direct`/`codex` transport
+  only; Workflow `agent()` cannot carry it).
+- `plugins/pipeline-core/lib/native-goldfish-host-state.mjs:771-807` —
+  `specs/sprint-alfred-epic/slice-queue.json` does not exist (no Git history,
+  not ignored), so the catch-all refusal fires. Environment config cannot
+  disable it (by design).
+- The only sanctioned writer, `prepareGovernedItemQueue` (`:814-880`), first
+  requires a bound current owner (`:824`, `item-course-requester-unavailable`).
+- `plugins/pipeline-core/lib/session-requester-bridge.mjs:205-207` — the owner
+  context is an in-process `AsyncLocalStorage` requester; a fresh hook process
+  is never inside one, so under Claude it is always `unavailable`.
+- Conclusion: with current Source, productive Goldfish dispatch from Claude is
+  structurally unreachable. This is the handover's named hold
+  ("real requester/owner … for runtime-stage admission"), now reproduced live
+  on native Windows/Claude. Not bypassed: no hand-written queue, no guard
+  disable, no hooks/installed-plugin edit, no non-goldfish agent writing code.
 
 ## Collected signature-bound patches
 
@@ -82,6 +104,13 @@ and reuse the Codex results through
 - **T5 Cadence:** 174 items at roughly 8 concurrent whole-item owners, each
   briefing finalized and each result integrated by the Elephant, means many
   sessions; no ETA is established or implied.
+- **T6 Dispatch block (blocking all implementation):** options put to the PO —
+  A) bounded EL-01 exception for exactly the one outcome that makes governed
+  item admission obtain a bound owner under Claude (catch-22 breaker),
+  Elephant-implemented, then full Critic; B) run implementation waves on a
+  runner whose native route is qualified (unverified — Codex also reported
+  `SQ-DELIVERY-STATE-UNAVAILABLE`); C) hold productive dispatch and run only
+  the non-productive analysis lane.
 - **Answered in chat:** Elephant model stays Opus (judgment/integration);
   Goldfish default Sonnet, deep tier only with MP-05 rationale. Autocompact at
   500k tokens.
