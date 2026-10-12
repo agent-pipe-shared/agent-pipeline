@@ -15,6 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -145,6 +146,38 @@ test("AC-9 (contract): the command §5 prints is the command the lifecycle guard
     false,
     "a repository-relative form must stay refused -- that is why the document may not print one",
   );
+});
+
+/**
+ * pipeline.agent-obligations-recommends-a-commit-spelling-guard-push-refuses.
+ * The document once recommended `git commit -m ... --trailer ...` while guard-push
+ * refused exactly that spelling. Text-only assertions cannot see that, so this
+ * drives the real guard-push hook with the commit command the document recommends.
+ */
+function runGuardPush(command, cwd) {
+  const guard = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "guard-push.mjs");
+  const res = spawnSync(process.execPath, [guard], {
+    input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+    encoding: "utf8",
+    cwd,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: cwd },
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 20000,
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+
+test("AC-106 (contract): the commit spelling the document recommends is admitted by guard-push", () => {
+  const document = readFileSync(OBLIGATIONS_PATH, "utf8");
+  const recommended = /commit with `(git commit -F <msgfile> -- <paths>)`/u.exec(document);
+  assert.ok(recommended, "§1 must recommend `git commit -F <msgfile> -- <paths>` as the provenance-bearing commit");
+
+  const cwd = tempRootWithGuardConfig(() => {});
+  const concrete = recommended[1].replace("<msgfile>", "scratch/commit-msg/msg.txt").replace("<paths>", "a.md");
+  const admitted = runGuardPush(concrete, cwd);
+  assert.equal(admitted.code, 0, `guard-push refuses the recommended spelling (${concrete}): ${admitted.stderr.trim().slice(0, 300)}`);
+
+  assert.doesNotMatch(document, /prefer[^\n]*--trailer/iu, "the document must not recommend --trailer");
 });
 
 test("AC-7: the document carries no absolute or machine-specific path", () => {
